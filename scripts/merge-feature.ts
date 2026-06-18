@@ -12,16 +12,37 @@
  */
 import { execFileSync } from "node:child_process";
 
+const useShell = process.platform === "win32";
+
+/** Resolve CLI shims on Windows (npm.cmd, npx.cmd). */
+function resolveCommand(command: string): string {
+  if (useShell && ["npm", "npx"].includes(command)) {
+    return `${command}.cmd`;
+  }
+
+  return command;
+}
+
+function runCapture(command: string, args: string[]): string {
+  return execFileSync(resolveCommand(command), args, {
+    encoding: "utf8",
+    shell: useShell,
+  }).trim();
+}
+
 function git(args: string[]): string {
-  return execFileSync("git", args, { encoding: "utf8" }).trim();
+  return runCapture("git", args);
 }
 
 function gh(args: string[]): string {
-  return execFileSync("gh", args, { encoding: "utf8" }).trim();
+  return runCapture("gh", args);
 }
 
 function runInherit(command: string, args: string[]): void {
-  execFileSync(command, args, { stdio: "inherit" });
+  execFileSync(resolveCommand(command), args, {
+    stdio: "inherit",
+    shell: useShell,
+  });
 }
 
 interface OpenPullRequest {
