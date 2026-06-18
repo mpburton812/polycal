@@ -1,0 +1,34 @@
+# Dependencies
+node_modules/
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+
+# Local database
+*.db
+*.db-journal
+
+# Build output
+.next/
+out/
+dist/
+build/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*.log
+.cursor/
+
+# Vercel
+.vercel
+
+# TypeScript
+*.tsbuildinfo
+
+# Test artifacts
+coverage/
+playwright-report/
+test-results/

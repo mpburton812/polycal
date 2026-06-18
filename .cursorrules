@@ -1,0 +1,53 @@
+# System Directive: Vibe Coding & Architecture Standards
+# Updated on 20260618 #mpburton
+# used for PolyCal App
+
+You are an AI programming assistant. You must adhere strictly to the following architectural, security, and documentation constraints for all code generation, refactoring, and project management tasks.
+
+## 1. Environment & Branching Strategy
+- **Branch Structure:** Enforce a strict Git flow utilizing `feature`, `dev`, `test`, and `production` branches. Code generation should assume execution within a `feature` branch until promotion.
+- **Data Isolation:** Maintain strict logical and physical separation between non-production (`dev`/`test`) and `production` databases. 
+- **Database Seeding:** Generate and maintain dedicated seeding scripts that populate `dev` and `test` environments with predictable, reset-friendly, realistic test scenarios derived from current and previous builds. Ensure production deployments strictly exclude all seeding logic and dummy data.
+
+## 2. Documentation & Traceability
+- **Requirement Breakdown:** Deconstruct broad feature requests into individual, discrete requirements before writing code. Link these specific requirements directly to their corresponding code modules.
+- **Requirement Logging:** Automatically log every individual requirement addressed per commit into a dedicated `.requirements` file in the project root.
+- **PolyCal Requirements Workflow:** Follow `docs/REQUIREMENTS-WORKFLOW.md` — Jira (PC) is planning source of truth; `.requirements` is the append-only delivery log; every `feature/*` commit must reference `PC-xxx`. Create Epic + tickets before implementation.
+- **Inline Documentation:** Generate comprehensive docstrings for all new functions. Inline comments must explicitly explain the "why" (context/purpose) and "how" (algorithmic approach), avoiding redundant descriptions of the "what".
+- **Living Documents:** Update the project changelog and relevant architectural design documents for every significant structural or functional modification.
+
+## 3. Security Standards
+- **Core Framework:** Strictly enforce OWASP Top Ten security principles across all layers of the application.
+- **Zero Trust / Deny-by-Default:** Implement a deny-by-default architecture. Assume all input is malicious.
+- **Defense-in-Depth:** Validate and sanitize all external data inputs. Encrypt all sensitive data in transit and at rest.
+- **Secrets Management:** Never generate code that hardcodes API keys, tokens, or sensitive configuration values. Rely exclusively on secure environment variables and external secret managers.
+
+## 4. UI/UX & Accessibility Standards
+- **Design Systems:** Adhere strictly to Material Design or Human Interface Guidelines (platform-dependent) to guarantee consistent layout, typography, and intuitive navigation.
+- **Accessibility (a11y):** Implement fundamental accessibility standards by default. This includes mandatory `alt` text for all media, semantic HTML, keyboard navigability, and clear visual cues/state changes for interactive elements.
+
+## 5. Code Quality & Dependency Management
+- **Formatting:** Output code that strictly conforms to the project's established linter and formatter configurations.
+- **Dependency Auditing:** Continuously monitor and recommend updates for third-party dependencies to patch security vulnerabilities and optimize performance.
+
+## 6. Testing & CI/CD Workflow Generation
+When generating or modifying `.github/workflows/` files, adhere to these explicit pipeline definitions:
+
+- **Dev Environment Workflow (`dev.yml`):**
+  - **Trigger:** Pull Request or merge from `feature` to `dev`.
+  - **Actions Required:** Instruct the generation of missing unit, integration, and Playwright tests for the promoted code.
+  - **Validation:** Execute automated checks against OWASP Top Ten compliance and accessibility standards.
+  - **Execution:** Run the full test suite and report pass/fail status directly to the GitHub PR.
+
+- **Test Environment Workflow (`test.yml`):**
+  - **Trigger:** Promotion from `dev` to `test`.
+  - **Actions Required:** Assess the codebase for required updates to automated user journeys.
+  - **Execution:** Run comprehensive End-to-End (E2E) testing and script-driven Automated Use
+
+## 7. User Management & Identity Architecture
+- **Authentication & Persistence:** Implement stateless, persistent authentication using industry-standard protocols (e.g., JWTs stored in HttpOnly secure cookies, or OAuth 2.0). Explicitly prohibit storing sensitive session tokens in LocalStorage or SessionStorage.
+- **Role-Based Access Control (RBAC):** Enforce strict, hierarchical access control with explicitly defined roles (e.g., `User`, `Manager`, `Admin`). Require authorization validation at both the frontend (route guarding and component visibility) and the backend (API endpoint execution).
+- **Self-Service & Profile Management:** Generate isolated, contemporary interfaces for users to manage their profiles, application preferences, and security settings (e.g., password rotation).
+- **Administrative Controls:** Design a dedicated administrative dashboard decoupled from the standard user interface. Include specific capabilities for user lifecycle management (create, read, update, suspend, delete), role assignment, and system-wide configuration updates.
+- **State Management:** Utilize centralized frontend state management to securely maintain and propagate the user's active session, role, and localized preferences across the application architecture without requiring redundant database queries.
+- **Audit Logging:** Automatically log all critical identity events

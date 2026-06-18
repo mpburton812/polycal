@@ -1,0 +1,23 @@
+{
+  "name": "polycal",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Polyamory group scheduling PWA",
+  "scripts": {
+    "prepare": "husky",
+    "requirements:append": "tsx scripts/append-requirement.ts",
+    "requirements:validate": "tsx scripts/validate-jira-commits.ts",
+    "requirements:validate-range": "tsx scripts/validate-jira-commits.ts --range",
+    "jira:keys": "tsx scripts/extract-jira-keys-from-range.ts",
+    "jira:sync-merge": "tsx scripts/jira-transition-on-merge.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.21",
+    "husky": "^9.1.7",
+    "tsx": "^4.19.4",
+    "typescript": "^5.8.3"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

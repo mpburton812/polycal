@@ -1,0 +1,34 @@
+name: Jira sync on merge
+
+on:
+  push:
+    branches:
+      - dev
+
+jobs:
+  jira-sync-on-merge:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Transition merged Jira tickets to Done
+        env:
+          GITHUB_EVENT_BEFORE: ${{ github.event.before }}
+          JIRA_BASE_URL: ${{ secrets.JIRA_BASE_URL }}
+          JIRA_EMAIL: ${{ secrets.JIRA_EMAIL }}
+          JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
+          JIRA_DONE_TRANSITION_NAME: ${{ vars.JIRA_DONE_TRANSITION_NAME }}
+        run: sh scripts/ci-jira-sync-on-merge.sh

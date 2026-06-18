@@ -1,0 +1,21 @@
+# .requirements — PolyCal requirement traceability log
+#
+# Full workflow: docs/REQUIREMENTS-WORKFLOW.md
+#
+# PURPOSE
+#   Append-only audit trail linking implemented work to Jira (PC-xxx) and git commits.
+#   Jira holds planned work; this file records what was delivered and where.
+#
+# FORMAT (pipe-delimited, one requirement per line)
+#   YYYY-MM-DD | <commit-sha> | PC-<n> | <requirement summary> | <primary module path>
+#
+# RULES
+#   - Do not edit or delete completed rows.
+#   - Every commit on feature/* branches MUST include a Jira key (PC-123) in the message.
+#   - Rows are appended automatically by scripts/append-requirement.ts after each commit.
+#   - If .requirements changes after a commit, include it in your next commit or amend.
+#
+# EXAMPLE
+#   2026-06-18 | a1b2c3d | PC-42 | Add weekly calendar view | src/app/calendar/page.tsx
+#
+# --- log entries below this line ---

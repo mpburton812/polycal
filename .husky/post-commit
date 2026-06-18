@@ -1,0 +1,3 @@
+#!/usr/bin/env sh
+# Append a .requirements row for the commit that just completed.
+npx tsx scripts/append-requirement.ts

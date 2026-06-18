@@ -1,0 +1,37 @@
+# GitLab CI — PolyCal
+# Validates Jira traceability on feature branches and merge requests.
+
+stages:
+  - validate
+  - sync
+
+default:
+  image: node:22-alpine
+  cache:
+    key:
+      files:
+        - package-lock.json
+    paths:
+      - node_modules/
+
+validate-jira-commits:
+  stage: validate
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH =~ /^feature\//
+  before_script:
+    - apk add --no-cache git
+    - npm ci
+  script:
+    - sh scripts/ci-validate-jira-commits.sh
+
+jira-sync-on-merge:
+  stage: sync
+  rules:
+    - if: $CI_COMMIT_BRANCH == "dev"
+  before_script:
+    - apk add --no-cache git
+    - npm ci
+  script:
+    - sh scripts/ci-jira-sync-on-merge.sh
+  allow_failure: true
