@@ -1,3 +1,5 @@
 #!/usr/bin/env sh
 # Append a .requirements row for the commit that just completed.
 npx tsx scripts/append-requirement.ts
+# Stage the log so the next commit can include it without a manual add step.
+git add .requirements 2>/dev/null || true
