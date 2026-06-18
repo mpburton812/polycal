@@ -1,22 +1,24 @@
 #!/usr/bin/env sh
-# Transition Jira PC-xxx tickets to Done for commits merged into dev.
+# Transition PC-xxx tickets to In Progress for commits pushed to feature/*.
 set -eu
 
 BRANCH="${CI_COMMIT_BRANCH:-${GITHUB_REF_NAME:-}}"
 
-if [ "$BRANCH" != "dev" ]; then
-  echo "[ci] Jira sync only runs on dev branch (current: ${BRANCH:-unknown}); skipping."
-  exit 0
-fi
+case "$BRANCH" in
+  feature/*) ;;
+  *)
+    echo "[ci] Jira In Progress sync only runs on feature/* (current: ${BRANCH:-unknown}); skipping."
+    exit 0
+    ;;
+esac
 
 if [ -n "${CI_COMMIT_BEFORE_SHA:-}" ] && [ "${CI_COMMIT_BEFORE_SHA}" != "0000000000000000000000000000000000000000" ]; then
   RANGE="${CI_COMMIT_BEFORE_SHA}..${CI_COMMIT_SHA}"
 elif [ -n "${GITHUB_EVENT_BEFORE:-}" ] && [ "${GITHUB_EVENT_BEFORE}" != "0000000000000000000000000000000000000000" ]; then
   RANGE="${GITHUB_EVENT_BEFORE}..${GITHUB_SHA}"
 else
-  echo "[ci] Cannot determine merge range for Jira sync; skipping."
-  exit 0
+  RANGE="HEAD~1..HEAD"
 fi
 
-echo "[ci] Jira Done sync for range: ${RANGE}"
-npx tsx scripts/jira-transition-issues.ts --range "${RANGE}" --status "Done"
+echo "[ci] Jira In Progress sync for range: ${RANGE}"
+npx tsx scripts/jira-transition-issues.ts --range "${RANGE}" --status "In Progress"

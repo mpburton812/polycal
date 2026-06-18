@@ -1,13 +1,19 @@
-name: Jira sync on merge
+name: Jira sync on pull request
 
 on:
-  push:
+  pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - ready_for_review
     branches:
       - dev
 
 jobs:
-  jira-sync-on-merge:
+  jira-sync-in-review:
     runs-on: ubuntu-latest
+    continue-on-error: true
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -23,11 +29,10 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Transition merged Jira tickets to Done
+      - name: Transition Jira tickets to In Review
         env:
-          GITHUB_EVENT_BEFORE: ${{ github.event.before }}
+          GITHUB_BASE_REF: ${{ github.base_ref }}
           JIRA_BASE_URL: ${{ secrets.JIRA_BASE_URL }}
           JIRA_EMAIL: ${{ secrets.JIRA_EMAIL }}
           JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
-          JIRA_DONE_TRANSITION_NAME: ${{ vars.JIRA_DONE_TRANSITION_NAME }}
-        run: sh scripts/ci-jira-sync-on-merge.sh
+        run: sh scripts/ci-jira-sync-on-pr.sh

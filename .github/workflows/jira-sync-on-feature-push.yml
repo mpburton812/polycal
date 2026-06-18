@@ -1,13 +1,14 @@
-name: Jira sync on merge
+name: Jira sync on feature push
 
 on:
   push:
     branches:
-      - dev
+      - "feature/**"
 
 jobs:
-  jira-sync-on-merge:
+  jira-sync-in-progress:
     runs-on: ubuntu-latest
+    continue-on-error: true
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -23,11 +24,10 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Transition merged Jira tickets to Done
+      - name: Transition Jira tickets to In Progress
         env:
           GITHUB_EVENT_BEFORE: ${{ github.event.before }}
           JIRA_BASE_URL: ${{ secrets.JIRA_BASE_URL }}
           JIRA_EMAIL: ${{ secrets.JIRA_EMAIL }}
           JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
-          JIRA_DONE_TRANSITION_NAME: ${{ vars.JIRA_DONE_TRANSITION_NAME }}
-        run: sh scripts/ci-jira-sync-on-merge.sh
+        run: sh scripts/ci-jira-sync-on-feature-push.sh

@@ -10,7 +10,9 @@
     "requirements:validate-range": "tsx scripts/validate-jira-commits.ts --range",
     "audit:check": "npm audit --audit-level=low",
     "jira:keys": "tsx scripts/extract-jira-keys-from-range.ts",
-    "jira:sync-merge": "tsx scripts/jira-transition-on-merge.ts"
+    "jira:sync-merge": "tsx scripts/jira-transition-issues.ts --status Done",
+    "jira:sync-review": "tsx scripts/jira-transition-issues.ts --status \"In Review\"",
+    "jira:sync-progress": "tsx scripts/jira-transition-issues.ts --status \"In Progress\""
   },
   "devDependencies": {
     "@types/node": "^22.15.21",

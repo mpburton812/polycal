@@ -35,6 +35,28 @@ npm-audit:
   script:
     - sh scripts/ci-npm-audit.sh
 
+jira-sync-in-progress:
+  stage: sync
+  rules:
+    - if: $CI_COMMIT_BRANCH =~ /^feature\// && $CI_PIPELINE_SOURCE == "push"
+  before_script:
+    - apk add --no-cache git
+    - npm ci
+  script:
+    - sh scripts/ci-jira-sync-on-feature-push.sh
+  allow_failure: true
+
+jira-sync-in-review:
+  stage: sync
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "dev"
+  before_script:
+    - apk add --no-cache git
+    - npm ci
+  script:
+    - sh scripts/ci-jira-sync-on-pr.sh
+  allow_failure: true
+
 jira-sync-on-merge:
   stage: sync
   rules:
@@ -44,4 +66,3 @@ jira-sync-on-merge:
     - npm ci
   script:
     - sh scripts/ci-jira-sync-on-merge.sh
-  allow_failure: true

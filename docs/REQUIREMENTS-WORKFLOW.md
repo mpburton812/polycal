@@ -16,13 +16,13 @@ Canonical process linking **planning (Jira)** to **implementation (git)** and **
 flowchart TD
   A[Requirements intake] --> B[Epic + PC tickets in Jira]
   B --> C["feature/* branch"]
-  C --> D["Commit with PC-xxx"]
-  D --> E[commit-msg hook validates]
+  C --> D["Push → CI: In Progress"]
+  D --> E["Commit with PC-xxx"]
   E --> F[post-commit appends .requirements]
   F --> G[MR / PR to dev]
-  G --> H[CI validates all commits]
+  G --> H["CI: In Review + validate"]
   H --> I[Merge to dev]
-  I --> J[CI transitions PC-xxx to Done]
+  I --> J["CI: Done"]
   J --> K[Promote dev → test → production]
 ```
 
@@ -49,7 +49,7 @@ flowchart TD
 ## Phase 2 — Implementation
 
 1. Create branch: `feature/<short-description>` or `feature/PC-123-short-description`.
-2. Set Jira ticket to **In Progress** when work starts.
+2. **In Progress** — set automatically on first push to `feature/*` (CI), or manually/agent when work starts.
 3. Every commit on `feature/*` **must** include the Jira key:
 
    ```
@@ -65,11 +65,29 @@ flowchart TD
 ## Phase 3 — Review and merge
 
 1. Open **MR/PR** from `feature/*` → `dev`.
-2. CI runs `validate-jira-commits` on all commits in the MR.
-3. On **merge to `dev`**:
+2. **In Review** — set automatically when the PR/MR opens (CI extracts `PC-xxx` from commits).
+3. CI runs `validate-jira-commits` and `npm-audit` on all commits in the MR.
+4. On **merge to `dev`**:
    - CI extracts all `PC-xxx` keys from merged commits
-   - Transitions each ticket to **Done** (when Jira API credentials are configured)
-4. Promote `dev` → `test` → `production` per branch strategy.
+   - Transitions each ticket to **Done** (requires `JIRA_*` secrets in CI)
+5. Promote `dev` → `test` → `production` per branch strategy.
+
+---
+
+## Jira board status (who moves what)
+
+| Status | Trigger | Handler |
+|--------|---------|---------|
+| **To Do** | Ticket created | Agent / you (intake) |
+| **In Progress** | Push to `feature/*` | **CI** (`jira-sync-in-progress`) |
+| **In Review** | PR/MR opened → `dev` | **CI** (`jira-sync-in-review`) |
+| **Done** | Merge to `dev` | **CI** (`jira-sync-on-merge`) |
+
+**You do not need to drag cards manually** when CI secrets are configured and the standard promotion path is followed.
+
+**Agent discipline (gap fallback):** When working in Cursor, the agent must still transition tickets via Jira if CI has not run yet (e.g. before first push: **In Progress**; after push before PR: **In Review**). Never mark **Done** until code is merged to `dev` — except when manually confirming a hotfix path with the user.
+
+Checking acceptance criteria in the ticket description does **not** change board status; only workflow transitions do.
 
 ---
 
@@ -125,6 +143,8 @@ YYYY-MM-DD | <sha> | PC-<n> | <summary> | <module path>
 | `npm run requirements:validate` | Check HEAD commit for `PC-xxx` |
 | `npm run requirements:append` | Manually append log row |
 | `npm run jira:sync-merge` | Transition merged tickets to Done |
+| `npm run jira:sync-review` | Transition tickets to In Review (manual) |
+| `npm run jira:sync-progress` | Transition tickets to In Progress (manual) |
 
 See also: [ARCHITECTURE.md](./ARCHITECTURE.md), [CHANGELOG.md](../CHANGELOG.md).
 
@@ -136,9 +156,11 @@ See also: [ARCHITECTURE.md](./ARCHITECTURE.md), [CHANGELOG.md](../CHANGELOG.md).
 |-----|---------|--------|
 | `validate-jira-commits` | MR + `feature/*` push | Enforce `PC-xxx` in commits |
 | `npm-audit` | MR → `dev` + `feature/*` push | Fail on unresolved `npm audit` findings (low+) |
+| `jira-sync-in-progress` | Push to `feature/*` | Transition `PC-xxx` → In Progress |
+| `jira-sync-in-review` | PR/MR → `dev` | Transition `PC-xxx` → In Review |
 | `jira-sync-on-merge` | Push to `dev` | Transition `PC-xxx` → Done |
 
-**Jira sync** is skipped when `JIRA_EMAIL` / `JIRA_API_TOKEN` are not set (local dev unaffected).
+**Jira sync** requires `JIRA_BASE_URL`, `JIRA_EMAIL`, and `JIRA_API_TOKEN` in CI secrets (configured in GitHub).
 
 ---
 
@@ -147,8 +169,11 @@ See also: [ARCHITECTURE.md](./ARCHITECTURE.md), [CHANGELOG.md](../CHANGELOG.md).
 When implementing a requirement:
 
 - [ ] Jira Epic + ticket exists (or create before coding)
+- [ ] Transition ticket to **In Progress** when starting (if not yet pushed)
 - [ ] Branch is `feature/*`
 - [ ] Commits include `PC-xxx`
 - [ ] `.requirements` updated (automatic)
+- [ ] Transition to **In Review** after push if no PR exists yet (CI handles once PR is open)
 - [ ] MR targets `dev`
+- [ ] **Do not** set **Done** until merge to `dev` (CI handles on merge)
 - [ ] Changelog updated for significant changes

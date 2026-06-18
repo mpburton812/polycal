@@ -12,7 +12,7 @@ You are an AI programming assistant. You must adhere strictly to the following a
 ## 2. Documentation & Traceability
 - **Requirement Breakdown:** Deconstruct broad feature requests into individual, discrete requirements before writing code. Link these specific requirements directly to their corresponding code modules.
 - **Requirement Logging:** Automatically log every individual requirement addressed per commit into a dedicated `.requirements` file in the project root.
-- **PolyCal Requirements Workflow:** Follow `docs/REQUIREMENTS-WORKFLOW.md` — Jira (PC) is planning source of truth; `.requirements` is the append-only delivery log; every `feature/*` commit must reference `PC-xxx`. Create Epic + tickets before implementation.
+- **PolyCal Requirements Workflow:** Follow `docs/REQUIREMENTS-WORKFLOW.md` — Jira (PC) is planning source of truth; `.requirements` is the append-only delivery log; every `feature/*` commit must reference `PC-xxx`. Create Epic + tickets before implementation. **Jira status:** agent sets In Progress at start and In Review before PR if needed; CI automates In Progress (feature push), In Review (PR→dev), and Done (merge→dev). Never set Done before merge to `dev`.
 - **Inline Documentation:** Generate comprehensive docstrings for all new functions. Inline comments must explicitly explain the "why" (context/purpose) and "how" (algorithmic approach), avoiding redundant descriptions of the "what".
 - **Living Documents:** Update the project changelog and relevant architectural design documents for every significant structural or functional modification.
 
