@@ -8,7 +8,7 @@
  *
  * Usage:
  *   npm run merge-feature
- *   npm run merge-feature -- --merge   # also merge PR after checks pass
+ *   npm run merge-feature -- --merge   # merge PR, then sync local dev
  */
 import { execFileSync } from "node:child_process";
 
@@ -81,6 +81,16 @@ function waitForChecks(prNumber: number): void {
   runInherit("gh", ["pr", "checks", String(prNumber), "--watch"]);
 }
 
+/** Fetch and check out an up-to-date local dev after a merged PR. */
+function syncLocalDev(): void {
+  console.log("[merge-feature] Syncing local dev branch...");
+  runInherit("git", ["fetch", "origin"]);
+  runInherit("git", ["checkout", "dev"]);
+  runInherit("git", ["pull", "origin", "dev"]);
+  const head = git(["rev-parse", "--short", "HEAD"]);
+  console.log(`[merge-feature] Local dev is at ${head}.`);
+}
+
 function main(): void {
   const shouldMerge = process.argv.includes("--merge");
   const repoRoot = git(["rev-parse", "--show-toplevel"]);
@@ -123,7 +133,8 @@ function main(): void {
     waitForChecks(pull.number);
     console.log("[merge-feature] Merging pull request...");
     runInherit("gh", ["pr", "merge", String(pull.number), "--merge"]);
-    console.log("[merge-feature] Merged to dev.");
+    syncLocalDev();
+    console.log("[merge-feature] Merged to dev and local dev is synced.");
   } else {
     console.log("[merge-feature] Next: merge when CI is green → gh pr merge", pull.number, "--merge");
     console.log("[merge-feature] Or re-run with --merge to wait for checks and merge automatically.");

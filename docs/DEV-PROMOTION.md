@@ -23,7 +23,7 @@ Or install the PowerShell shortcut once (see below), then from any directory:
 
 ```powershell
 merge feature          # push + open PR to dev
-merge feature -Merge   # push + open PR + wait for CI + merge to dev
+merge feature -Merge   # push + open PR + wait for CI + merge to dev + sync local dev
 ```
 
 The shortcut runs:
@@ -32,6 +32,8 @@ The shortcut runs:
 2. Jira key validation (`origin/dev...HEAD`)
 3. `git push -u origin HEAD`
 4. `gh pr create --base dev --fill` (skips if PR already open)
+
+With `-Merge`, also merges the PR when CI passes and runs `git checkout dev && git pull origin dev`.
 
 ### Manual steps
 
