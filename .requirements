@@ -22,3 +22,4 @@
 2026-06-18 | 9f543bc | PC-2 | add requirements workflow and Jira traceability | .cursorrules
 2026-06-18 | b1b2aef | PC-2 | correct branch detection in requirements append | scripts/append-requirement.ts
 2026-06-18 | 8631064 | PC-2 | sync requirements log entry for append fix | n/a
+2026-06-18 | 428d8a0 | PC-2 | auto-stage .requirements after post-commit | .husky/post-commit
