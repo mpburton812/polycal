@@ -30,3 +30,4 @@
 2026-06-18 | f2e64c4 | PC-5 | require GitHub PR for feature to dev promotion | .cursorrules
 2026-06-18 | 335f798 | PC-5 | add merge feature shortcut for dev promotion | README.md
 2026-06-18 | 0ce8a0a | PC-5 | Windows compatibility for merge-feature CLI | scripts/merge-feature.ts
+2026-06-18 | d2df266 | PC-5 | sync local dev after merge feature -Merge | docs/DEV-PROMOTION.md

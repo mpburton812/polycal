@@ -84,11 +84,23 @@ function waitForChecks(prNumber: number): void {
 /** Fetch and check out an up-to-date local dev after a merged PR. */
 function syncLocalDev(): void {
   console.log("[merge-feature] Syncing local dev branch...");
+  const dirty = git(["status", "--porcelain"]);
+  if (dirty) {
+    console.log("[merge-feature] Stashing uncommitted changes before checkout...");
+    runInherit("git", ["stash", "push", "-u", "-m", "merge-feature: pre-dev-sync"]);
+  }
+
   runInherit("git", ["fetch", "origin"]);
   runInherit("git", ["checkout", "dev"]);
   runInherit("git", ["pull", "origin", "dev"]);
   const head = git(["rev-parse", "--short", "HEAD"]);
   console.log(`[merge-feature] Local dev is at ${head}.`);
+
+  if (dirty) {
+    console.log(
+      "[merge-feature] Stashed changes preserved. On your feature branch, run: git stash pop",
+    );
+  }
 }
 
 function main(): void {
