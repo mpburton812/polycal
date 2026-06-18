@@ -11,6 +11,7 @@ import { join } from "node:path";
 import {
   appendEntry,
   cleanCommitSubject,
+  currentBranch,
   extractJiraKey,
   formatLogDate,
   git,
@@ -62,7 +63,7 @@ function main(): void {
 
   const options = parseArgs(process.argv.slice(2));
   const commitSha = options.sha ?? git(["rev-parse", "HEAD"]);
-  const branch = git(["rev-parse", "--abbrev-ref", commitSha]);
+  const branch = currentBranch();
 
   // Only feature branches participate in the requirement log workflow.
   if (!isFeatureBranch(branch)) {
