@@ -135,6 +135,7 @@ See also: [ARCHITECTURE.md](./ARCHITECTURE.md), [CHANGELOG.md](../CHANGELOG.md).
 | Job | Trigger | Action |
 |-----|---------|--------|
 | `validate-jira-commits` | MR + `feature/*` push | Enforce `PC-xxx` in commits |
+| `npm-audit` | MR → `dev` + `feature/*` push | Fail on unresolved `npm audit` findings (low+) |
 | `jira-sync-on-merge` | Push to `dev` | Transition `PC-xxx` → Done |
 
 **Jira sync** is skipped when `JIRA_EMAIL` / `JIRA_API_TOKEN` are not set (local dev unaffected).

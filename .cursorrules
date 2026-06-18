@@ -29,6 +29,7 @@ You are an AI programming assistant. You must adhere strictly to the following a
 ## 5. Code Quality & Dependency Management
 - **Formatting:** Output code that strictly conforms to the project's established linter and formatter configurations.
 - **Dependency Auditing:** Continuously monitor and recommend updates for third-party dependencies to patch security vulnerabilities and optimize performance.
+- **`npm audit` Gate (feature → dev):** Before any push or merge request from `feature/*` to `dev`, run `npm audit` and **resolve all reported issues** (critical, high, moderate, and low). Apply fixes via `npm audit fix`, targeted dependency upgrades, or documented compensating controls when no fix exists. Do not promote to `dev` with unresolved audit findings unless the user explicitly approves an exception documented in the MR/PR description.
 
 ## 6. Testing & CI/CD Workflow Generation
 When generating or modifying `.github/workflows/` files, adhere to these explicit pipeline definitions:
@@ -36,7 +37,7 @@ When generating or modifying `.github/workflows/` files, adhere to these explici
 - **Dev Environment Workflow (`dev.yml`):**
   - **Trigger:** Pull Request or merge from `feature` to `dev`.
   - **Actions Required:** Instruct the generation of missing unit, integration, and Playwright tests for the promoted code.
-  - **Validation:** Execute automated checks against OWASP Top Ten compliance and accessibility standards.
+  - **Validation:** Execute automated checks against OWASP Top Ten compliance and accessibility standards. Run `npm audit` and fail the pipeline on unresolved vulnerabilities (or enforce the same policy via `.gitlab-ci.yml` when using GitLab).
   - **Execution:** Run the full test suite and report pass/fail status directly to the GitHub PR.
 
 - **Test Environment Workflow (`test.yml`):**

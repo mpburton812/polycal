@@ -8,6 +8,7 @@
     "requirements:append": "tsx scripts/append-requirement.ts",
     "requirements:validate": "tsx scripts/validate-jira-commits.ts",
     "requirements:validate-range": "tsx scripts/validate-jira-commits.ts --range",
+    "audit:check": "npm audit --audit-level=low",
     "jira:keys": "tsx scripts/extract-jira-keys-from-range.ts",
     "jira:sync-merge": "tsx scripts/jira-transition-on-merge.ts"
   },

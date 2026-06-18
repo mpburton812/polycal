@@ -33,3 +33,24 @@ jobs:
         env:
           GITHUB_EVENT_BEFORE: ${{ github.event.before }}
         run: sh scripts/ci-validate-jira-commits.sh
+
+  npm-audit:
+    runs-on: ubuntu-latest
+    if: >-
+      (github.event_name == 'push' && startsWith(github.ref, 'refs/heads/feature/')) ||
+      (github.event_name == 'pull_request' && github.base_ref == 'dev')
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: npm audit (feature → dev gate)
+        run: sh scripts/ci-npm-audit.sh

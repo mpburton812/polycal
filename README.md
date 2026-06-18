@@ -50,6 +50,7 @@ cp .env.example .env.local
 ```bash
 npm run requirements:validate
 npm run requirements:append
+npm run audit:check
 npm run jira:keys -- --range origin/dev...HEAD
 npm run jira:sync-merge -- --range origin/dev...HEAD
 ```

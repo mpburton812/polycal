@@ -25,6 +25,16 @@ validate-jira-commits:
   script:
     - sh scripts/ci-validate-jira-commits.sh
 
+npm-audit:
+  stage: validate
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "dev"
+    - if: $CI_COMMIT_BRANCH =~ /^feature\// && $CI_PIPELINE_SOURCE == "push"
+  before_script:
+    - npm ci
+  script:
+    - sh scripts/ci-npm-audit.sh
+
 jira-sync-on-merge:
   stage: sync
   rules:
