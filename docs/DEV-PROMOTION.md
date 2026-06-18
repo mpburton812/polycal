@@ -11,6 +11,30 @@ All promotion from `feature/*` to `dev` **must use a GitHub Pull Request**. Dire
 
 ## Agent / developer workflow
 
+### Shortcut: `merge feature` (recommended)
+
+From the repo root:
+
+```bash
+npm run merge-feature
+```
+
+Or install the PowerShell shortcut once (see below), then from any directory:
+
+```powershell
+merge feature          # push + open PR to dev
+merge feature -Merge   # push + open PR + wait for CI + merge to dev
+```
+
+The shortcut runs:
+
+1. `npm audit --audit-level=low`
+2. Jira key validation (`origin/dev...HEAD`)
+3. `git push -u origin HEAD`
+4. `gh pr create --base dev --fill` (skips if PR already open)
+
+### Manual steps
+
 ```bash
 # 1. Finish work on feature branch
 git checkout feature/your-branch
@@ -49,3 +73,52 @@ Enable on the `dev` branch in GitHub repository settings:
 5. Optionally require PR reviews
 
 This enforces PR-only promotion at the platform level.
+
+## Install the `merge feature` PowerShell shortcut
+
+Run once in PowerShell (updates your profile):
+
+```powershell
+$repo = "C:\Dev\2026-06-18 polycal"
+$block = @"
+
+# PolyCal: promote feature/* to dev via GitHub PR
+function merge {
+  param(
+    [Parameter(Position = 0, Mandatory = `$true)][string]`$Target,
+    [switch]`$Merge
+  )
+  if (`$Target -ne 'feature') {
+    Write-Error "Usage: merge feature [-Merge]"
+    return
+  }
+  if (`$Merge) {
+    & "$repo\scripts\merge-feature.ps1" -Merge
+  } else {
+    & "$repo\scripts\merge-feature.ps1"
+  }
+}
+function merge-feature {
+  param([switch]`$Merge)
+  if (`$Merge) {
+    & "$repo\scripts\merge-feature.ps1" -Merge
+  } else {
+    & "$repo\scripts\merge-feature.ps1"
+  }
+}
+"@
+
+if (-not (Test-Path $PROFILE)) { New-Item -Path $PROFILE -ItemType File -Force | Out-Null }
+if (-not (Select-String -Path $PROFILE -Pattern 'PolyCal: promote feature' -Quiet)) {
+  Add-Content -Path $PROFILE -Value $block
+  Write-Host "Added merge feature shortcut to $PROFILE"
+} else {
+  Write-Host "Shortcut already installed in $PROFILE"
+}
+```
+
+Restart your terminal, then use:
+
+```powershell
+merge feature
+```
