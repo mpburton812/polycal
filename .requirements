@@ -26,3 +26,4 @@
 2026-06-18 | 8b444c4 | PC-2 | append requirements log for post-commit staging | n/a
 2026-06-18 | 6b085f1 | PC-2 | prevent requirements log append loop | .husky/post-commit
 2026-06-18 | 980341c | PC-3 | add npm audit gate for feature to dev | .cursorrules
+2026-06-18 | 08caf34 | PC-4 | automate Jira status sync across promotion workflow | .cursorrules
