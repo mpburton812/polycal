@@ -23,3 +23,4 @@
 2026-06-18 | b1b2aef | PC-2 | correct branch detection in requirements append | scripts/append-requirement.ts
 2026-06-18 | 8631064 | PC-2 | sync requirements log entry for append fix | n/a
 2026-06-18 | 428d8a0 | PC-2 | auto-stage .requirements after post-commit | .husky/post-commit
+2026-06-18 | 8b444c4 | PC-2 | append requirements log for post-commit staging | n/a

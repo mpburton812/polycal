@@ -65,6 +65,16 @@ function main(): void {
   const commitSha = options.sha ?? git(["rev-parse", "HEAD"]);
   const branch = currentBranch();
 
+  const changedFiles = changedFilesInCommit(commitSha);
+  if (
+    changedFiles.length === 1 &&
+    changedFiles[0] === ".requirements" &&
+    !options.jira
+  ) {
+    console.log("[requirements] Skipping append for requirements-only commit.");
+    return;
+  }
+
   // Only feature branches participate in the requirement log workflow.
   if (!isFeatureBranch(branch)) {
     console.log(`[requirements] Skipping append on branch "${branch}" (not feature/*).`);
@@ -91,7 +101,6 @@ function main(): void {
     return;
   }
 
-  const changedFiles = changedFilesInCommit(commitSha);
   const module = options.module ?? pickPrimaryModule(changedFiles);
   const authorDate = git(["log", "-1", "--format=%aI", commitSha]);
   const date = formatLogDate(new Date(authorDate));
