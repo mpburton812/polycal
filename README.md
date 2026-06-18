@@ -9,7 +9,9 @@ PolyCal uses a **Jira-first, git-audited** workflow:
 1. **Plan** — Epic + `PC-xxx` tickets in [Jira](https://mpburton.atlassian.net/jira/software/projects/PC/boards/7)
 2. **Build** — `feature/*` branches; every commit includes `PC-xxx`
 3. **Log** — `.requirements` append-only delivery log (automatic via git hooks)
-4. **Merge** — CI validates keys; merge to `dev` transitions tickets to Done
+4. **Merge** — PR to `dev` on GitHub; CI validates; merge triggers **Done**
+
+**Promoting to dev:** [docs/DEV-PROMOTION.md](docs/DEV-PROMOTION.md) — always use `gh pr create --base dev`, never direct push.
 
 **Full documentation:** [docs/REQUIREMENTS-WORKFLOW.md](docs/REQUIREMENTS-WORKFLOW.md)
 
@@ -58,5 +60,6 @@ npm run jira:sync-merge -- --range origin/dev...HEAD
 ## Docs
 
 - [Requirements workflow](docs/REQUIREMENTS-WORKFLOW.md)
+- [Dev promotion (PR required)](docs/DEV-PROMOTION.md)
 - [Architecture](docs/ARCHITECTURE.md)
 - [Changelog](CHANGELOG.md)

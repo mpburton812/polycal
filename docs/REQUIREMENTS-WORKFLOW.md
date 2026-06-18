@@ -64,13 +64,15 @@ flowchart TD
 
 ## Phase 3 — Review and merge
 
-1. Open **MR/PR** from `feature/*` → `dev`.
-2. **In Review** — set automatically when the PR/MR opens (CI extracts `PC-xxx` from commits).
-3. CI runs `validate-jira-commits` and `npm-audit` on all commits in the MR.
-4. On **merge to `dev`**:
+1. Push `feature/*` to GitHub.
+2. **Open a GitHub PR** from `feature/*` → `dev` using `gh pr create --base dev`. **Do not** merge or push directly to `dev` locally. See [DEV-PROMOTION.md](./DEV-PROMOTION.md).
+3. **In Review** — set automatically when the PR opens (CI extracts `PC-xxx` from commits).
+4. CI runs `validate-jira-commits` and `npm-audit` on all commits in the PR.
+5. **Merge the PR on GitHub** (after CI passes).
+6. On **merge to `dev`**:
    - CI extracts all `PC-xxx` keys from merged commits
    - Transitions each ticket to **Done** (requires `JIRA_*` secrets in CI)
-5. Promote `dev` → `test` → `production` per branch strategy.
+7. Promote `dev` → `test` → `production` per branch strategy.
 
 ---
 
@@ -174,6 +176,7 @@ When implementing a requirement:
 - [ ] Commits include `PC-xxx`
 - [ ] `.requirements` updated (automatic)
 - [ ] Transition to **In Review** after push if no PR exists yet (CI handles once PR is open)
+- [ ] **Open GitHub PR to `dev`** (`gh pr create --base dev`) — never push/merge directly to `dev`
 - [ ] MR targets `dev`
 - [ ] **Do not** set **Done** until merge to `dev` (CI handles on merge)
 - [ ] Changelog updated for significant changes

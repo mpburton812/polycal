@@ -6,7 +6,8 @@ You are an AI programming assistant. You must adhere strictly to the following a
 
 ## 1. Environment & Branching Strategy
 - **Branch Structure:** Enforce a strict Git flow utilizing `feature`, `dev`, `test`, and `production` branches. Code generation should assume execution within a `feature` branch until promotion.
-- **Data Isolation:** Maintain strict logical and physical separation between non-production (`dev`/`test`) and `production` databases. 
+- **Dev Promotion (feature → dev):** **Always** promote via a **GitHub Pull Request** — never direct `git push origin dev` or local merge-and-push to `dev`. Workflow: push `feature/*` → `gh pr create --base dev` → CI passes → merge PR on GitHub (`gh pr merge`). See `docs/DEV-PROMOTION.md`. This triggers Jira In Review (PR open) and Done (merge) automation.
+- **Data Isolation:** Maintain strict logical and physical separation between non-production (`dev`/`test`) and `production` databases.
 - **Database Seeding:** Generate and maintain dedicated seeding scripts that populate `dev` and `test` environments with predictable, reset-friendly, realistic test scenarios derived from current and previous builds. Ensure production deployments strictly exclude all seeding logic and dummy data.
 
 ## 2. Documentation & Traceability
