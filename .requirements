@@ -29,3 +29,4 @@
 2026-06-18 | 08caf34 | PC-4 | automate Jira status sync across promotion workflow | .cursorrules
 2026-06-18 | f2e64c4 | PC-5 | require GitHub PR for feature to dev promotion | .cursorrules
 2026-06-18 | 335f798 | PC-5 | add merge feature shortcut for dev promotion | README.md
+2026-06-18 | 0ce8a0a | PC-5 | Windows compatibility for merge-feature CLI | scripts/merge-feature.ts
