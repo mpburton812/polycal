@@ -14,8 +14,14 @@ if [ -n "${CI_COMMIT_BEFORE_SHA:-}" ] && [ "${CI_COMMIT_BEFORE_SHA}" != "0000000
 elif [ -n "${GITHUB_EVENT_BEFORE:-}" ] && [ "${GITHUB_EVENT_BEFORE}" != "0000000000000000000000000000000000000000" ]; then
   RANGE="${GITHUB_EVENT_BEFORE}..${GITHUB_SHA}"
 else
-  echo "[ci] Cannot determine merge range for Jira sync; skipping."
-  exit 0
+  # First push to dev (or missing before-SHA): use all commits on dev not on main.
+  git fetch origin main 2>/dev/null || true
+  if git rev-parse origin/main >/dev/null 2>&1; then
+    RANGE="origin/main..HEAD"
+  else
+    RANGE="HEAD"
+  fi
+  echo "[ci] Using fallback merge range: ${RANGE}"
 fi
 
 echo "[ci] Jira Done sync for range: ${RANGE}"
