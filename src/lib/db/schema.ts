@@ -76,6 +76,30 @@ export const schemaMeta = sqliteTable("schema_meta", {
   value: text("value").notNull(),
 });
 
+export const proposalStates = ["draft", "proposed", "resolved", "archived"] as const;
+export type ProposalState = (typeof proposalStates)[number];
+
+export const proposalTypes = ["event", "sleeping"] as const;
+export type ProposalType = (typeof proposalTypes)[number];
+
+/**
+ * Proposal records for Kanban — full workflow logic arrives in later phases.
+ */
+export const proposals = sqliteTable("proposals", {
+  id: text("id").primaryKey(),
+  title: text("title").notNull(),
+  description: text("description"),
+  proposalType: text("proposal_type", { enum: proposalTypes }).notNull(),
+  state: text("state", { enum: proposalStates }).notNull(),
+  proposerId: text("proposer_id")
+    .notNull()
+    .references(() => users.id),
+  locationId: text("location_id").references(() => locations.id),
+  notes: text("notes"),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+});
+
 export const schema = {
   users,
   polyGroup,
@@ -83,4 +107,5 @@ export const schema = {
   userActivityLog,
   storedImages,
   schemaMeta,
+  proposals,
 };

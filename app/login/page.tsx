@@ -2,6 +2,7 @@ import { Box, Button, Paper, TextField, Typography } from "@mui/material";
 import { redirect } from "next/navigation";
 
 import { auth, signIn } from "@/lib/auth";
+import { isNonProductionEnvironment } from "@/lib/env";
 
 interface LoginPageProps {
   searchParams: Promise<{ error?: string; callbackUrl?: string }>;
@@ -80,9 +81,11 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
             Sign in
           </Button>
         </Box>
-        <Typography variant="caption" display="block" sx={{ mt: 2 }}>
-          Non-production seed: luke / ChangeMe123!
-        </Typography>
+        {isNonProductionEnvironment() && (
+          <Typography variant="caption" display="block" sx={{ mt: 2 }}>
+            Non-production seed: luke / ChangeMe123!
+          </Typography>
+        )}
       </Paper>
     </Box>
   );
