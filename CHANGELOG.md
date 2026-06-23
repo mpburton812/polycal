@@ -9,6 +9,7 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Added
 
 - Phase 1 foundation: demo proposals Kanban seed (all workflow columns), admin test DB reset, profile password change with first-login enforcement, avatar and accent theme preferences.
+- Phase 2 People & Places: user provisioning with clipboard credentials, sleeping partnership graph, place CRUD with residency proposals.
 - Credentials auth (Auth.js) with persistent JWT sessions in HttpOnly cookies.
 - Turso/libSQL schema (users, poly group, locations, activity log, image blobs) with startup migrations.
 - Non-production dev bar (build SHA, branch, env) and user impersonation dropdown.

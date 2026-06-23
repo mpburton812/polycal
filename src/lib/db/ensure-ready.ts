@@ -15,6 +15,9 @@ export function ensureDbReady(): Promise<void> {
 
       const { seedDemoProposals } = await import("@/lib/seed/demo-proposals");
       await seedDemoProposals();
+
+      const { seedDemoPartnerships } = await import("@/lib/seed/demo-partnerships");
+      await seedDemoPartnerships();
     })();
   }
 
