@@ -1,15 +1,38 @@
 import { Typography } from "@mui/material";
+import { redirect } from "next/navigation";
 
-export default function PeoplePlacesPage() {
+import { listPlacesAction } from "@/actions/places";
+import { listPeopleAction, getProvisioningPolicyAction } from "@/actions/users";
+import { PeoplePlacesClient } from "@/components/people-places/PeoplePlacesClient";
+import { auth } from "@/lib/auth";
+
+export default async function PeoplePlacesPage() {
+  const session = await auth();
+  if (!session?.user) {
+    redirect("/login");
+  }
+
+  const [people, places, policy] = await Promise.all([
+    listPeopleAction(),
+    listPlacesAction(),
+    getProvisioningPolicyAction(),
+  ]);
+
   return (
     <>
       <Typography variant="h5" component="h1" gutterBottom>
         People &amp; Places
       </Typography>
-      <Typography color="text.secondary">
-        Relationship graph and location management arrive in Phase 3. Star Wars
-        seed users and five locations are in the database.
+      <Typography color="text.secondary" sx={{ mb: 3 }}>
+        Manage network members, sleeping partnerships, and shared locations.
       </Typography>
+      <PeoplePlacesClient
+        people={people}
+        places={places}
+        currentUserId={session.user.id}
+        canProvision={policy.canProvision}
+        isAdmin={policy.isAdmin}
+      />
     </>
   );
 }

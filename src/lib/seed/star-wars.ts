@@ -133,6 +133,7 @@ export async function seedStarWarsFoundation(options?: {
   await db.insert(polyGroup).values({
     id: 1,
     name: "Rebel Alliance",
+    allowUserProvisioning: false,
     updatedAt: now,
   });
 
@@ -156,6 +157,8 @@ export async function seedStarWarsFoundation(options?: {
   for (const location of SEED_LOCATIONS) {
     await db.insert(locations).values({
       ...location,
+      bedroomCount: 2,
+      bedroomNames: JSON.stringify(["Main", "Guest"]),
       createdAt: now,
       updatedAt: now,
     });

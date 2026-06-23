@@ -17,8 +17,9 @@ export default async function AdminPage() {
         Admin
       </Typography>
       <Typography color="text.secondary" sx={{ mb: 3 }}>
-        Poly group settings and user management arrive in Phase 8. Test data
-        controls are available below.
+        Poly group settings and user management arrive in Phase 8. Use People
+        &amp; Places to add users and manage partnerships. Test data controls
+        are available below.
       </Typography>
       <Stack spacing={3}>
         {isNonProductionEnvironment() && <AdminTestDataPanel />}
