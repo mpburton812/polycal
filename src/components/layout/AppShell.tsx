@@ -27,7 +27,8 @@ export function AppShell({
         sx={{
           position: "sticky",
           top: 0,
-          zIndex: (theme) => theme.zIndex.appBar + 1,
+          // Static z-index — theme callbacks cannot cross the RSC → MUI client boundary.
+          zIndex: 1101,
         }}
       >
         <DevBar />
