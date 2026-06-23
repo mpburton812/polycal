@@ -5,12 +5,14 @@ import {
   text,
 } from "drizzle-orm/sqlite-core";
 
-/** RBAC roles — passive users are schedulable profiles without login. */
-export const userRoles = ["admin", "user", "passive"] as const;
-export type UserRole = (typeof userRoles)[number];
+import {
+  userRoles,
+  userStatuses,
+  type UserRole,
+  type UserStatus,
+} from "@/types/user";
 
-export const userStatuses = ["active", "paused", "deleted"] as const;
-export type UserStatus = (typeof userStatuses)[number];
+export { userRoles, userStatuses, type UserRole, type UserStatus };
 
 /**
  * Core identity table — credentials auth with bcrypt hashes; no PII in JSON blobs.

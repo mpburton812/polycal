@@ -1,6 +1,6 @@
 import type { NextAuthConfig } from "next-auth";
 
-import type { UserRole } from "@/lib/db/schema";
+import type { UserRole } from "@/types/user";
 
 /**
  * Edge-safe Auth.js config for middleware — no DB, bcrypt, or providers.
