@@ -5,7 +5,7 @@ import { eq } from "drizzle-orm";
 import { z } from "zod";
 
 import { recordSuccessfulLogin } from "@/lib/audit";
-import { authConfig } from "@/lib/auth.config";
+import { authConfig } from "../../auth.config";
 import { getDb } from "@/lib/db/client";
 import { users, type UserRole } from "@/lib/db/schema";
 import { isNonProductionEnvironment } from "@/lib/env";

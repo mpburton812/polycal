@@ -1,10 +1,10 @@
 import type { NextAuthConfig } from "next-auth";
 
-import type { UserRole } from "@/types/user";
+import type { UserRole } from "./src/types/user";
 
 /**
- * Edge-safe Auth.js config for middleware — no DB, bcrypt, or providers.
- * Credentials provider is registered in auth.ts (Node runtime only).
+ * Edge-safe Auth.js config for middleware — lives at repo root so Vercel Edge can bundle it.
+ * Credentials provider is registered in src/lib/auth.ts (Node runtime only).
  */
 export const authConfig = {
   providers: [],
