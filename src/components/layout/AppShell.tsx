@@ -23,12 +23,20 @@ export function AppShell({
 
   return (
     <>
-      <DevBar />
-      <AppHeader
-        displayName={displayName}
-        notificationCount={0}
-        avatarSrc={avatarSrc}
-      />
+      <Box
+        sx={{
+          position: "sticky",
+          top: 0,
+          zIndex: (theme) => theme.zIndex.appBar + 1,
+        }}
+      >
+        <DevBar />
+        <AppHeader
+          displayName={displayName}
+          notificationCount={0}
+          avatarSrc={avatarSrc}
+        />
+      </Box>
       <Container
         component="main"
         maxWidth="md"

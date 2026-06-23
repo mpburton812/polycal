@@ -21,11 +21,13 @@ import {
   Typography,
 } from "@mui/material";
 import { useRouter } from "next/navigation";
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 
 import {
   createActiveUserAction,
   createPassiveUserAction,
+  checkUsernameAvailableAction,
+  updateProvisionedUsernameAction,
   type PersonSummary,
 } from "@/actions/users";
 import {
@@ -37,9 +39,11 @@ import {
 } from "@/actions/partnerships";
 import {
   createPlaceAction,
+  deletePlaceAction,
   listResidentsForPlaceAction,
   proposeResidencyAction,
   respondResidencyAction,
+  updatePlaceAction,
   type PlaceSummary,
   type ResidentView,
 } from "@/actions/places";
@@ -56,6 +60,16 @@ interface PeoplePlacesClientProps {
 function PersonAvatar({ avatarKey, name }: { avatarKey: string | null; name: string }) {
   const src = avatarSrcForKey(avatarKey);
   return <Avatar src={src} alt={name}>{name.slice(0, 1)}</Avatar>;
+}
+
+function normalizePlaceName(name: string): string {
+  return name.trim().toLowerCase();
+}
+
+function residentStatusColor(status: string): "success" | "warning" | "default" {
+  if (status === "accepted") return "success";
+  if (status === "proposed") return "warning";
+  return "default";
 }
 
 function CreateUserDialog({
@@ -75,6 +89,13 @@ function CreateUserDialog({
   const [avatarKey, setAvatarKey] = useState<string>(AVATAR_OPTIONS[0].key);
   const [message, setMessage] = useState<string | null>(null);
   const [instructions, setInstructions] = useState<string | null>(null);
+  const [usernameStatus, setUsernameStatus] = useState<{
+    checked: boolean;
+    available: boolean;
+    message: string;
+  }>({ checked: false, available: false, message: "" });
+  const [createdUserId, setCreatedUserId] = useState<string | null>(null);
+  const [temporaryPassword, setTemporaryPassword] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
   if (!canProvision) return null;
@@ -85,6 +106,9 @@ function CreateUserDialog({
     setRole("user");
     setMessage(null);
     setInstructions(null);
+    setUsernameStatus({ checked: false, available: false, message: "" });
+    setCreatedUserId(null);
+    setTemporaryPassword(null);
   }
 
   function handleClose() {
@@ -92,7 +116,48 @@ function CreateUserDialog({
     onClose();
   }
 
+  function checkUsername() {
+    if (mode !== "active" || !username.trim()) {
+      setUsernameStatus({ checked: false, available: false, message: "" });
+      return;
+    }
+
+    startTransition(async () => {
+      if (createdUserId && temporaryPassword && instructions) {
+        const result = await updateProvisionedUsernameAction({
+          userId: createdUserId,
+          username,
+          temporaryPassword,
+        });
+        setUsernameStatus({
+          checked: true,
+          available: result.ok,
+          message: result.message,
+        });
+        if (result.ok && result.loginInstructions) {
+          setInstructions(result.loginInstructions);
+        }
+        if (result.ok) {
+          router.refresh();
+        }
+        return;
+      }
+
+      const result = await checkUsernameAvailableAction(username);
+      setUsernameStatus({
+        checked: true,
+        available: result.available,
+        message: result.message,
+      });
+    });
+  }
+
   function handleSubmit() {
+    if (mode === "active" && (!usernameStatus.checked || !usernameStatus.available)) {
+      setMessage("Check username availability before creating the account.");
+      return;
+    }
+
     startTransition(async () => {
       const result =
         mode === "active"
@@ -101,6 +166,8 @@ function CreateUserDialog({
       setMessage(result.message);
       if (result.loginInstructions) {
         setInstructions(result.loginInstructions);
+        setCreatedUserId(result.userId ?? null);
+        setTemporaryPassword(result.temporaryPassword ?? null);
       }
       if (result.ok) {
         router.refresh();
@@ -119,7 +186,17 @@ function CreateUserDialog({
       <DialogTitle>Add person</DialogTitle>
       <DialogContent>
         <Stack spacing={2} sx={{ mt: 1 }}>
-          <Tabs value={mode} onChange={(_, value) => setMode(value)}>
+          <Tabs
+            value={mode}
+            onChange={(_, value) => {
+              setMode(value);
+              if (value === "passive") {
+                setInstructions(null);
+                setCreatedUserId(null);
+                setTemporaryPassword(null);
+              }
+            }}
+          >
             <Tab label="Active user" value="active" />
             <Tab label="Passive profile" value="passive" />
           </Tabs>
@@ -127,9 +204,19 @@ function CreateUserDialog({
             <TextField
               label="Username"
               value={username}
-              onChange={(event) => setUsername(event.target.value)}
+              onChange={(event) => {
+                setUsername(event.target.value);
+                setUsernameStatus({ checked: false, available: false, message: "" });
+              }}
+              onBlur={() => checkUsername()}
               required
               fullWidth
+              error={usernameStatus.checked && !usernameStatus.available}
+              helperText={
+                usernameStatus.checked
+                  ? usernameStatus.message
+                  : "Availability is checked when you leave this field."
+              }
             />
           )}
           <TextField
@@ -171,7 +258,7 @@ function CreateUserDialog({
           {message && (
             <Alert severity={message.includes("Created") ? "success" : "info"}>{message}</Alert>
           )}
-          {instructions && (
+          {mode === "active" && instructions && (
             <Box>
               <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1 }}>
                 Share these credentials outside PolyCal (email/SMS):
@@ -182,11 +269,11 @@ function CreateUserDialog({
         </Stack>
       </DialogContent>
       <DialogActions>
-        {instructions && (
+        {mode === "active" && instructions && (
           <Button onClick={() => void copyInstructions()}>Copy instructions</Button>
         )}
         <Button onClick={handleClose}>Close</Button>
-        <Button variant="contained" onClick={handleSubmit} disabled={pending}>
+        <Button variant="contained" onClick={handleSubmit} disabled={pending || (mode === "active" && (!usernameStatus.checked || !usernameStatus.available))}>
           Create
         </Button>
       </DialogActions>
@@ -347,44 +434,105 @@ function PlaceDetail({
   place,
   people,
   currentUserId,
+  isAdmin,
+  existingPlaceNames,
+  onPlaceUpdated,
 }: {
   place: PlaceSummary;
   people: PersonSummary[];
   currentUserId: string;
+  isAdmin: boolean;
+  existingPlaceNames: string[];
+  onPlaceUpdated: () => void;
 }) {
   const router = useRouter();
-  const [residents, setResidents] = useState<ResidentView[]>([]);
-  const [loaded, setLoaded] = useState(false);
+  const [residents, setResidents] = useState<ResidentView[]>(place.residents);
   const [targetUserId, setTargetUserId] = useState("");
   const [message, setMessage] = useState<string | null>(null);
+  const [editOpen, setEditOpen] = useState(false);
+  const [editName, setEditName] = useState(place.name);
+  const [editAddress, setEditAddress] = useState(place.address ?? "");
+  const [editBedroomCount, setEditBedroomCount] = useState(place.bedroomCount);
+  const [editNameWarning, setEditNameWarning] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
-  function loadResidents() {
+  useEffect(() => {
+    setResidents(place.residents);
+    setEditName(place.name);
+    setEditAddress(place.address ?? "");
+    setEditBedroomCount(place.bedroomCount);
+  }, [place]);
+
+  function refreshResidents() {
     startTransition(async () => {
       const rows = await listResidentsForPlaceAction(place.id);
       setResidents(rows);
-      setLoaded(true);
     });
   }
 
-  if (!loaded) {
-    return (
-      <Button size="small" onClick={loadResidents} sx={{ mt: 1 }}>
-        Load residents
-      </Button>
+  function validateEditName(name: string) {
+    const normalized = normalizePlaceName(name);
+    const taken = existingPlaceNames.some(
+      (existing) =>
+        normalizePlaceName(existing) === normalized &&
+        normalizePlaceName(existing) !== normalizePlaceName(place.name),
     );
+    setEditNameWarning(taken ? "A place with this name is already in use." : null);
+    return !taken;
   }
 
   return (
     <Stack spacing={1} sx={{ mt: 1 }}>
+      {isAdmin && (
+        <Stack direction="row" spacing={1}>
+          <Button
+            size="small"
+            variant="outlined"
+            onClick={() => {
+              setEditName(place.name);
+              setEditAddress(place.address ?? "");
+              setEditBedroomCount(place.bedroomCount);
+              setEditNameWarning(null);
+              setEditOpen(true);
+            }}
+          >
+            Edit place
+          </Button>
+          <Button
+            size="small"
+            color="error"
+            onClick={() =>
+              startTransition(async () => {
+                if (!window.confirm(`Delete ${place.name}? This cannot be undone.`)) {
+                  return;
+                }
+                const result = await deletePlaceAction(place.id);
+                setMessage(result.message);
+                if (result.ok) {
+                  onPlaceUpdated();
+                  router.refresh();
+                }
+              })
+            }
+          >
+            Delete place
+          </Button>
+        </Stack>
+      )}
       {place.bedroomNames.length > 0 && (
         <Typography variant="caption" color="text.secondary">
           Bedrooms: {place.bedroomNames.join(", ")}
         </Typography>
       )}
+      <Typography variant="subtitle2">Residents</Typography>
+      {residents.length === 0 && (
+        <Typography variant="body2" color="text.secondary">
+          No residents yet.
+        </Typography>
+      )}
       {residents.map((row) => (
         <Stack key={row.id} direction="row" spacing={1} alignItems="center">
-          <Chip size="small" label={row.status} />
+          <Chip size="small" label={row.status} color={residentStatusColor(row.status)} />
           <Typography variant="body2">{row.displayName}</Typography>
           {row.isIncoming && row.userId === currentUserId && (
             <>
@@ -397,7 +545,7 @@ function PlaceDetail({
                       accept: true,
                     });
                     setMessage(result.message);
-                    loadResidents();
+                    refreshResidents();
                     router.refresh();
                   })
                 }
@@ -413,7 +561,7 @@ function PlaceDetail({
                       accept: false,
                     });
                     setMessage(result.message);
-                    loadResidents();
+                    refreshResidents();
                     router.refresh();
                   })
                 }
@@ -449,7 +597,7 @@ function PlaceDetail({
               const result = await proposeResidencyAction(place.id, targetUserId);
               setMessage(result.message);
               setTargetUserId("");
-              loadResidents();
+              refreshResidents();
               router.refresh();
             })
           }
@@ -458,6 +606,66 @@ function PlaceDetail({
         </Button>
       </Stack>
       {message && <Alert severity="info">{message}</Alert>}
+
+      <Dialog open={editOpen} onClose={() => setEditOpen(false)} fullWidth maxWidth="sm">
+        <DialogTitle>Edit place</DialogTitle>
+        <DialogContent>
+          <Stack spacing={2} sx={{ mt: 1 }}>
+            <TextField
+              label="Home name"
+              value={editName}
+              onChange={(event) => {
+                setEditName(event.target.value);
+                setEditNameWarning(null);
+              }}
+              onBlur={() => validateEditName(editName)}
+              error={Boolean(editNameWarning)}
+              helperText={editNameWarning ?? undefined}
+              fullWidth
+            />
+            <TextField
+              label="Address (optional)"
+              value={editAddress}
+              onChange={(event) => setEditAddress(event.target.value)}
+              fullWidth
+            />
+            <TextField
+              label="Bedrooms"
+              type="number"
+              value={editBedroomCount}
+              onChange={(event) => setEditBedroomCount(Number(event.target.value))}
+              inputProps={{ min: 0, max: 20 }}
+              fullWidth
+            />
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setEditOpen(false)}>Cancel</Button>
+          <Button
+            variant="contained"
+            disabled={!editName.trim() || Boolean(editNameWarning) || pending}
+            onClick={() =>
+              startTransition(async () => {
+                if (!validateEditName(editName)) return;
+                const result = await updatePlaceAction({
+                  placeId: place.id,
+                  name: editName,
+                  address: editAddress || undefined,
+                  bedroomCount: editBedroomCount,
+                });
+                setMessage(result.message);
+                if (result.ok) {
+                  setEditOpen(false);
+                  onPlaceUpdated();
+                  router.refresh();
+                }
+              })
+            }
+          >
+            Save
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Stack>
   );
 }
@@ -478,11 +686,21 @@ export function PeoplePlacesClient({
   const [selectedPersonId, setSelectedPersonId] = useState<string | null>(null);
   const [placeName, setPlaceName] = useState("");
   const [placeAddress, setPlaceAddress] = useState("");
-  const [bedroomCount, setBedroomCount] = useState(2);
+  const [bedroomCount, setBedroomCount] = useState(1);
+  const [placeNameWarning, setPlaceNameWarning] = useState<string | null>(null);
   const [placeMessage, setPlaceMessage] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
   const selectedPerson = people.find((row) => row.id === selectedPersonId) ?? null;
+  const existingPlaceNames = useMemo(() => places.map((place) => place.name), [places]);
+
+  function validateNewPlaceName(name: string) {
+    const taken = existingPlaceNames.some(
+      (existing) => normalizePlaceName(existing) === normalizePlaceName(name),
+    );
+    setPlaceNameWarning(taken ? "A place with this name is already in use." : null);
+    return !taken;
+  }
 
   return (
     <Box>
@@ -543,7 +761,15 @@ export function PeoplePlacesClient({
             <TextField
               label="Home name"
               value={placeName}
-              onChange={(event) => setPlaceName(event.target.value)}
+              onChange={(event) => {
+                setPlaceName(event.target.value);
+                setPlaceNameWarning(null);
+              }}
+              onBlur={() => {
+                if (placeName.trim()) validateNewPlaceName(placeName);
+              }}
+              error={Boolean(placeNameWarning)}
+              helperText={placeNameWarning ?? undefined}
               fullWidth
             />
             <TextField
@@ -562,9 +788,10 @@ export function PeoplePlacesClient({
             />
             <Button
               variant="contained"
-              disabled={!placeName.trim() || pending}
+              disabled={!placeName.trim() || Boolean(placeNameWarning) || pending}
               onClick={() =>
                 startTransition(async () => {
+                  if (!validateNewPlaceName(placeName)) return;
                   const result = await createPlaceAction({
                     name: placeName,
                     address: placeAddress || undefined,
@@ -574,6 +801,7 @@ export function PeoplePlacesClient({
                   if (result.ok) {
                     setPlaceName("");
                     setPlaceAddress("");
+                    setPlaceNameWarning(null);
                     router.refresh();
                   }
                 })
@@ -595,7 +823,14 @@ export function PeoplePlacesClient({
               <Typography variant="caption" color="text.secondary">
                 {place.bedroomCount} bedrooms · {place.residentCount} residents
               </Typography>
-              <PlaceDetail place={place} people={people} currentUserId={currentUserId} />
+              <PlaceDetail
+                place={place}
+                people={people}
+                currentUserId={currentUserId}
+                isAdmin={isAdmin}
+                existingPlaceNames={existingPlaceNames}
+                onPlaceUpdated={() => router.refresh()}
+              />
             </Box>
           ))}
         </Stack>
