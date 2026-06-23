@@ -41,3 +41,4 @@
 2026-06-23 | 29a1613 | PC-22 | remove Edge instrumentation DB bundle causing __dirname 500 | src/lib/auth.ts
 2026-06-23 | 699447b | PC-28 | Phase 1 foundation for test data and profile | src/actions/admin.ts
 2026-06-23 | 80cf0ec | PC-27 | set per-environment AUTH_URL in Vercel sync scripts | scripts/sync-vercel-preview-env.mjs
+2026-06-23 | 63f44d9 | PC-35 | Phase 2 People and Places foundation | src/actions/partnerships.ts

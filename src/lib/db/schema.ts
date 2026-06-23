@@ -11,8 +11,15 @@ import {
   type UserRole,
   type UserStatus,
 } from "@/types/user";
+import {
+  partnershipStatuses,
+  residencyStatuses,
+  type PartnershipStatus,
+  type ResidencyStatus,
+} from "@/types/relationship";
 
 export { userRoles, userStatuses, type UserRole, type UserStatus };
+export { partnershipStatuses, residencyStatuses, type PartnershipStatus, type ResidencyStatus };
 
 /**
  * Core identity table — credentials auth with bcrypt hashes; no PII in JSON blobs.
@@ -39,6 +46,9 @@ export const users = sqliteTable("users", {
 export const polyGroup = sqliteTable("poly_group", {
   id: integer("id").primaryKey(),
   name: text("name").notNull(),
+  allowUserProvisioning: integer("allow_user_provisioning", { mode: "boolean" })
+    .notNull()
+    .default(false),
   updatedAt: text("updated_at").notNull(),
 });
 
@@ -47,6 +57,11 @@ export const locations = sqliteTable("locations", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
   description: text("description"),
+  address: text("address"),
+  bedroomCount: integer("bedroom_count").notNull().default(0),
+  /** JSON string array of bedroom labels. */
+  bedroomNames: text("bedroom_names"),
+  createdById: text("created_by_id").references(() => users.id),
   createdAt: text("created_at").notNull(),
   updatedAt: text("updated_at").notNull(),
 });
@@ -100,6 +115,42 @@ export const proposals = sqliteTable("proposals", {
   updatedAt: text("updated_at").notNull(),
 });
 
+/** Undirected sleeping partnership edge with proposal workflow (PC-36). */
+export const sleepingPartnerships = sqliteTable("sleeping_partnerships", {
+  id: text("id").primaryKey(),
+  userLowId: text("user_low_id")
+    .notNull()
+    .references(() => users.id),
+  userHighId: text("user_high_id")
+    .notNull()
+    .references(() => users.id),
+  status: text("status", { enum: partnershipStatuses }).notNull(),
+  proposedById: text("proposed_by_id")
+    .notNull()
+    .references(() => users.id),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+  respondedAt: text("responded_at"),
+});
+
+/** User residency at a place — active users must accept (PC-37). */
+export const locationResidents = sqliteTable("location_residents", {
+  id: text("id").primaryKey(),
+  locationId: text("location_id")
+    .notNull()
+    .references(() => locations.id),
+  userId: text("user_id")
+    .notNull()
+    .references(() => users.id),
+  status: text("status", { enum: residencyStatuses }).notNull(),
+  proposedById: text("proposed_by_id")
+    .notNull()
+    .references(() => users.id),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+  respondedAt: text("responded_at"),
+});
+
 export const schema = {
   users,
   polyGroup,
@@ -108,4 +159,6 @@ export const schema = {
   storedImages,
   schemaMeta,
   proposals,
+  sleepingPartnerships,
+  locationResidents,
 };
