@@ -9,7 +9,13 @@ const SCHEMA_VERSION = "1";
  */
 export async function runMigrations(): Promise<void> {
   const sql = getSqlClient();
-  await sql.executeMultiple(BOOTSTRAP_SQL);
+  const statements = BOOTSTRAP_SQL.split(";")
+    .map((statement) => statement.trim())
+    .filter(Boolean);
+
+  for (const statement of statements) {
+    await sql.execute(`${statement};`);
+  }
 
   await sql.execute({
     sql: `INSERT INTO schema_meta (key, value) VALUES ('version', ?)

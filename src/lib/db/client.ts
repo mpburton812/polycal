@@ -11,13 +11,15 @@ let database: LibSQLDatabase<typeof schema> | undefined;
  * Token is only required for libsql:// endpoints.
  */
 function createDbClient(): Client {
-  const url = process.env.TURSO_DATABASE_URL ?? "file:local.db";
+  const url = process.env.TURSO_DATABASE_URL?.trim() || "file:local.db";
   if (url.startsWith("file:")) {
     return createClient({ url });
   }
-  const authToken = process.env.TURSO_AUTH_TOKEN;
+  const authToken = process.env.TURSO_AUTH_TOKEN?.trim();
   if (!authToken) {
-    throw new Error("TURSO_AUTH_TOKEN is required for remote Turso databases.");
+    throw new Error(
+      "TURSO_AUTH_TOKEN is required for remote Turso databases. Check Vercel env for this branch.",
+    );
   }
   return createClient({ url, authToken });
 }
