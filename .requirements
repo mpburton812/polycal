@@ -36,3 +36,4 @@
 2026-06-23 | d1b8107 | PC-21 | edge-safe middleware for Vercel deploy | src/lib/auth.config.ts
 2026-06-23 | 7771ffc | PC-21 | keep middleware free of drizzle imports | src/lib/auth.config.ts
 2026-06-23 | acb9f48 | PC-21 | root auth.config for Vercel Edge middleware | src/lib/auth.config.ts
+2026-06-23 | b4d410c | PC-21 | JWT-only Edge middleware for Vercel | auth.config.ts
