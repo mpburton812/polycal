@@ -31,6 +31,7 @@ export interface PlaceSummary {
   bedroomCount: number;
   bedroomNames: string[];
   residentCount: number;
+  residents: ResidentView[];
 }
 
 export interface ResidentView {
@@ -50,25 +51,82 @@ function parseBedroomNames(raw: string | null): string[] {
   }
 }
 
+function normalizePlaceName(name: string): string {
+  return name.trim().toLowerCase();
+}
+
+/** True when another place already uses this name (case-insensitive). */
+async function isPlaceNameTaken(
+  db: ReturnType<typeof getDb>,
+  name: string,
+  excludePlaceId?: string,
+): Promise<boolean> {
+  const normalized = normalizePlaceName(name);
+  const rows = await db.select({ id: locations.id, name: locations.name }).from(locations);
+  return rows.some(
+    (row) =>
+      row.id !== excludePlaceId && normalizePlaceName(row.name) === normalized,
+  );
+}
+
+function mapResidentRows(
+  rows: {
+    id: string;
+    userId: string;
+    status: string;
+    proposedById: string;
+    displayName: string;
+  }[],
+  viewerId?: string,
+): ResidentView[] {
+  return rows.map((row) => ({
+    id: row.id,
+    userId: row.userId,
+    displayName: row.displayName,
+    status: row.status,
+    isIncoming:
+      row.status === "proposed" &&
+      Boolean(viewerId) &&
+      row.proposedById !== viewerId &&
+      row.userId === viewerId,
+  }));
+}
+
 /**
  * Lists places with accepted resident counts (PC-37).
  */
 export async function listPlacesAction(): Promise<PlaceSummary[]> {
   await ensureDbReady();
+  const session = await auth();
   const db = getDb();
   const rows = await db.select().from(locations).orderBy(asc(locations.name));
-  const residents = await db.select().from(locationResidents);
+  const residentRows = await db
+    .select({
+      id: locationResidents.id,
+      locationId: locationResidents.locationId,
+      userId: locationResidents.userId,
+      status: locationResidents.status,
+      proposedById: locationResidents.proposedById,
+      displayName: users.displayName,
+    })
+    .from(locationResidents)
+    .innerJoin(users, eq(locationResidents.userId, users.id));
 
-  return rows.map((row) => ({
-    id: row.id,
-    name: row.name,
-    address: row.address ?? null,
-    bedroomCount: row.bedroomCount,
-    bedroomNames: parseBedroomNames(row.bedroomNames),
-    residentCount: residents.filter(
-      (resident) => resident.locationId === row.id && resident.status === "accepted",
-    ).length,
-  }));
+  const viewerId = session?.user?.id;
+
+  return rows.map((row) => {
+    const placeResidents = residentRows.filter((resident) => resident.locationId === row.id);
+    return {
+      id: row.id,
+      name: row.name,
+      address: row.address ?? null,
+      bedroomCount: row.bedroomCount,
+      bedroomNames: parseBedroomNames(row.bedroomNames),
+      residentCount: placeResidents.filter((resident) => resident.status === "accepted")
+        .length,
+      residents: mapResidentRows(placeResidents, viewerId),
+    };
+  });
 }
 
 /**
@@ -89,6 +147,9 @@ export async function createPlaceAction(
 
   await ensureDbReady();
   const db = getDb();
+  if (await isPlaceNameTaken(db, parsed.data.name)) {
+    return { ok: false, message: "A place with this name is already in use." };
+  }
   const now = new Date().toISOString();
   const placeId = `place-${randomUUID()}`;
   const bedroomNames =
@@ -135,19 +196,92 @@ export async function listResidentsForPlaceAction(
     .innerJoin(users, eq(locationResidents.userId, users.id))
     .where(eq(locationResidents.locationId, locationId));
 
-  const viewerId = session?.user?.id;
+  return mapResidentRows(rows, session?.user?.id);
+}
 
-  return rows.map((row) => ({
-    id: row.id,
-    userId: row.userId,
-    displayName: row.displayName,
-    status: row.status,
-    isIncoming:
-      row.status === "proposed" &&
-      Boolean(viewerId) &&
-      row.proposedById !== viewerId &&
-      row.userId === viewerId,
-  }));
+const updatePlaceSchema = placeSchema.extend({
+  placeId: z.string().min(1),
+});
+
+/**
+ * Updates a place (admin only, PC-37).
+ */
+export async function updatePlaceAction(
+  input: z.infer<typeof updatePlaceSchema>,
+): Promise<{ ok: boolean; message: string }> {
+  const session = await auth();
+  if (!session?.user || session.user.role !== "admin") {
+    return { ok: false, message: "Admin access required." };
+  }
+
+  const parsed = updatePlaceSchema.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, message: parsed.error.issues[0]?.message ?? "Invalid input." };
+  }
+
+  await ensureDbReady();
+  const db = getDb();
+  const [place] = await db
+    .select()
+    .from(locations)
+    .where(eq(locations.id, parsed.data.placeId))
+    .limit(1);
+  if (!place) {
+    return { ok: false, message: "Place not found." };
+  }
+
+  if (await isPlaceNameTaken(db, parsed.data.name, parsed.data.placeId)) {
+    return { ok: false, message: "A place with this name is already in use." };
+  }
+
+  const bedroomNames =
+    parsed.data.bedroomNames ??
+    Array.from({ length: parsed.data.bedroomCount }, (_, index) => `Bedroom ${index + 1}`);
+  const now = new Date().toISOString();
+
+  await db
+    .update(locations)
+    .set({
+      name: parsed.data.name.trim(),
+      address: parsed.data.address ?? null,
+      description: parsed.data.description ?? null,
+      bedroomCount: parsed.data.bedroomCount,
+      bedroomNames: JSON.stringify(bedroomNames),
+      updatedAt: now,
+    })
+    .where(eq(locations.id, parsed.data.placeId));
+
+  await logUserActivity(session.user.id, "places.update", parsed.data.placeId);
+  revalidatePath("/people-places");
+
+  return { ok: true, message: `Updated place ${parsed.data.name.trim()}.` };
+}
+
+/**
+ * Deletes a place and its residency rows (admin only, PC-37).
+ */
+export async function deletePlaceAction(
+  placeId: string,
+): Promise<{ ok: boolean; message: string }> {
+  const session = await auth();
+  if (!session?.user || session.user.role !== "admin") {
+    return { ok: false, message: "Admin access required." };
+  }
+
+  await ensureDbReady();
+  const db = getDb();
+  const [place] = await db.select().from(locations).where(eq(locations.id, placeId)).limit(1);
+  if (!place) {
+    return { ok: false, message: "Place not found." };
+  }
+
+  await db.delete(locationResidents).where(eq(locationResidents.locationId, placeId));
+  await db.delete(locations).where(eq(locations.id, placeId));
+
+  await logUserActivity(session.user.id, "places.delete", placeId);
+  revalidatePath("/people-places");
+
+  return { ok: true, message: `Deleted place ${place.name}.` };
 }
 
 /**

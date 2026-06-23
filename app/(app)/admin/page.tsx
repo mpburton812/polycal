@@ -1,9 +1,10 @@
 import { Stack, Typography } from "@mui/material";
 import { redirect } from "next/navigation";
 
+import { AdminForceReloadPanel } from "@/components/admin/AdminForceReloadPanel";
 import { AdminTestDataPanel } from "@/components/admin/AdminTestDataPanel";
 import { auth } from "@/lib/auth";
-import { isNonProductionEnvironment } from "@/lib/env";
+import { getAppEnvironment, getBuildBranch, getBuildSha, isNonProductionEnvironment } from "@/lib/env";
 
 export default async function AdminPage() {
   const session = await auth();
@@ -22,6 +23,11 @@ export default async function AdminPage() {
         are available below.
       </Typography>
       <Stack spacing={3}>
+        <AdminForceReloadPanel
+          environment={getAppEnvironment()}
+          buildSha={getBuildSha()}
+          buildBranch={getBuildBranch()}
+        />
         {isNonProductionEnvironment() && <AdminTestDataPanel />}
       </Stack>
     </>

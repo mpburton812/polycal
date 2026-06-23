@@ -25,7 +25,7 @@ export function AppHeader({
   avatarSrc?: string;
 }) {
   return (
-    <AppBar position="static" color="primary">
+    <AppBar position="static" color="primary" elevation={1}>
       <Toolbar>
         <CalendarMonthIcon sx={{ mr: 1 }} aria-hidden />
         <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
