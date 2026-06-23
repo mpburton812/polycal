@@ -17,11 +17,12 @@ import { existsSync, readFileSync } from "node:fs";
 
 const scope = "michael-burton-s-projects";
 const tursoHost = "mpburton.aws-us-east-2.turso.io";
-const sourceFiles = [
-  process.argv[2],
-  ".env.vercel-setup",
-  ".env.local",
-].filter(Boolean);
+const sourceFiles = [process.argv[2], ".env.vercel-setup"].filter(Boolean);
+
+const PREVIEW_URLS = {
+  dev: "https://polycal-git-dev-michael-burton-s-projects.vercel.app",
+  test: "https://polycal-git-test-michael-burton-s-projects.vercel.app",
+};
 
 function parseEnv(file) {
   if (!file || !existsSync(file)) {
@@ -79,22 +80,33 @@ function upsertBranchVar(name, value, branch) {
 }
 
 const env = loadEnv();
+let authSecret = env.AUTH_SECRET?.trim();
+if (!authSecret) {
+  const local = parseEnv(".env.local");
+  authSecret = local.AUTH_SECRET?.trim();
+  if (!authSecret) {
+    throw new Error("AUTH_SECRET missing in .env.vercel-setup or .env.local");
+  }
+}
+
 const branches = [
   {
     gitBranch: "dev",
     appEnv: "dev",
     database: "polycal-dev",
+    authUrl: PREVIEW_URLS.dev,
     tokenKeys: ["TURSO_AUTH_TOKEN_DEV", "TURSO_AUTH_TOKEN"],
   },
   {
     gitBranch: "test",
     appEnv: "test",
     database: "polycal-test",
+    authUrl: PREVIEW_URLS.test,
     tokenKeys: ["TURSO_AUTH_TOKEN_TEST", "TURSO_AUTH_TOKEN"],
   },
 ];
 
-for (const { gitBranch, appEnv, database, tokenKeys } of branches) {
+for (const { gitBranch, appEnv, database, authUrl, tokenKeys } of branches) {
   const url = tursoDatabaseUrl(database);
   const token = tokenKeys.map((key) => env[key]?.trim()).find(Boolean);
 
@@ -107,10 +119,8 @@ for (const { gitBranch, appEnv, database, tokenKeys } of branches) {
   upsertBranchVar("TURSO_DATABASE_URL", url, gitBranch);
   upsertBranchVar("TURSO_AUTH_TOKEN", token, gitBranch);
   upsertBranchVar("NEXT_PUBLIC_APP_ENV", appEnv, gitBranch);
-
-  if (env.AUTH_SECRET?.trim()) {
-    upsertBranchVar("AUTH_SECRET", env.AUTH_SECRET.trim(), gitBranch);
-  }
+  upsertBranchVar("AUTH_SECRET", authSecret, gitBranch);
+  upsertBranchVar("AUTH_URL", authUrl, gitBranch);
 }
 
 console.log("Done. Redeploy preview branches to pick up env changes.");
