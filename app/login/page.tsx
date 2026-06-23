@@ -1,5 +1,7 @@
 import { Box, Button, Paper, TextField, Typography } from "@mui/material";
-import { signIn } from "@/lib/auth";
+import { redirect } from "next/navigation";
+
+import { auth, signIn } from "@/lib/auth";
 
 interface LoginPageProps {
   searchParams: Promise<{ error?: string; callbackUrl?: string }>;
@@ -9,6 +11,11 @@ interface LoginPageProps {
  * Credentials login — persistent session until logout or admin termination (spec §1).
  */
 export default async function LoginPage({ searchParams }: LoginPageProps) {
+  const session = await auth();
+  if (session?.user) {
+    redirect("/schedule");
+  }
+
   const params = await searchParams;
 
   async function loginAction(formData: FormData) {
