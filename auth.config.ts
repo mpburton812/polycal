@@ -1,0 +1,44 @@
+import type { NextAuthConfig } from "next-auth";
+
+import type { UserRole } from "./src/types/user";
+
+/**
+ * Edge-safe Auth.js config for middleware — lives at repo root so Vercel Edge can bundle it.
+ * Credentials provider is registered in src/lib/auth.ts (Node runtime only).
+ */
+export const authConfig = {
+  providers: [],
+  pages: {
+    signIn: "/login",
+  },
+  session: {
+    strategy: "jwt",
+    maxAge: 60 * 60 * 24 * 30,
+  },
+  callbacks: {
+    async jwt({ token, user, trigger, session }) {
+      if (user) {
+        token.id = user.id!;
+        token.role = user.role;
+        token.mustChangePassword = user.mustChangePassword;
+        token.displayName = user.displayName;
+      }
+      if (trigger === "update" && session?.user) {
+        token.mustChangePassword = session.user.mustChangePassword;
+        token.displayName = session.user.displayName ?? token.displayName;
+      }
+      return token;
+    },
+    async session({ session, token }) {
+      if (session.user) {
+        session.user.id = token.id as string;
+        session.user.role = token.role as UserRole;
+        session.user.mustChangePassword = token.mustChangePassword as boolean;
+        session.user.displayName = token.displayName as string;
+        session.user.name = token.displayName as string;
+      }
+      return session;
+    },
+  },
+  trustHost: true,
+} satisfies NextAuthConfig;

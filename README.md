@@ -45,6 +45,14 @@ YYYY-MM-DD | <sha> | PC-123 | <summary> | <module path>
 ```bash
 npm install   # installs husky hooks via prepare script
 cp .env.example .env.local
+# Set AUTH_SECRET (e.g. openssl rand -base64 32)
+npm run dev
+```
+
+**Non-production login (after seed):** `luke` / `ChangeMe123!`
+
+```bash
+npm run db:seed   # optional manual re-seed on empty database
 ```
 
 ## Commands
@@ -64,3 +72,19 @@ npm run jira:sync-merge -- --range origin/dev...HEAD
 - [Dev promotion (PR required)](docs/DEV-PROMOTION.md)
 - [Architecture](docs/ARCHITECTURE.md)
 - [Changelog](CHANGELOG.md)
+
+## Reuse this workflow (template)
+
+The portable **workflow starter** lives in [`template/`](template/README.md). Bootstrap a new project:
+
+```powershell
+npx tsx template/bootstrap.ts `
+  --target "C:\Dev\my-new-app" `
+  --name "My New App" `
+  --slug my-new-app `
+  --jira-key MA `
+  --jira-url https://your-org.atlassian.net `
+  --init-git
+```
+
+Or zip and copy: `workflow-starter-template.zip` at repo root (regenerate with `Compress-Archive -Path template -DestinationPath workflow-starter-template.zip`).
