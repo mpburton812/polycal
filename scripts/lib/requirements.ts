@@ -1,9 +1,7 @@
 import { execFileSync } from "node:child_process";
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
-
-/** Jira issue key pattern for the PolyCal project (PC). */
-export const JIRA_KEY_PATTERN = /PC-\d+/g;
+import { getJiraKeyPattern } from "./workflow-config";
 
 /** Branches that require a Jira key in every non-merge commit message. */
 export const JIRA_REQUIRED_BRANCH_PREFIX = "feature/";
@@ -39,13 +37,13 @@ export function isFeatureBranch(branch = currentBranch()): boolean {
 
 /** Extract the first Jira key from text, or null if none found. */
 export function extractJiraKey(text: string): string | null {
-  const match = text.match(JIRA_KEY_PATTERN);
+  const match = text.match(getJiraKeyPattern());
   return match?.[0] ?? null;
 }
 
 /** Extract all unique Jira keys from text. */
 export function extractAllJiraKeys(text: string): string[] {
-  return [...new Set(text.match(JIRA_KEY_PATTERN) ?? [])];
+  return [...new Set(text.match(getJiraKeyPattern()) ?? [])];
 }
 
 /** Extract all unique Jira keys from every commit in a revision range. */
@@ -70,7 +68,7 @@ export function jiraKeysInRange(range: string): string[] {
 export function cleanCommitSubject(subject: string): string {
   return subject
     .replace(/^(feat|fix|chore|docs|refactor|test|ci|build|perf|style)(\([^)]+\))?!?:\s*/i, "")
-    .replace(JIRA_KEY_PATTERN, "")
+    .replace(getJiraKeyPattern(), "")
     .replace(/\s+/g, " ")
     .trim();
 }

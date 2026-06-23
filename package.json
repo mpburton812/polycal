@@ -4,6 +4,11 @@
   "private": true,
   "description": "Polyamory group scheduling PWA",
   "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "db:seed": "tsx scripts/db-seed.ts",
     "prepare": "husky",
     "requirements:append": "tsx scripts/append-requirement.ts",
     "requirements:validate": "tsx scripts/validate-jira-commits.ts",
@@ -16,12 +21,35 @@
     "merge-feature": "tsx scripts/merge-feature.ts"
   },
   "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
     "@types/node": "^22.15.21",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "drizzle-kit": "^0.31.10",
+    "eslint": "^9.39.4",
+    "eslint-config-next": "^16.2.9",
     "husky": "^9.1.7",
     "tsx": "^4.19.4",
-    "typescript": "^5.8.3"
+    "typescript": "^5.9.3"
   },
   "engines": {
     "node": ">=20"
+  },
+  "dependencies": {
+    "@emotion/cache": "^11.14.0",
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.1",
+    "@libsql/client": "^0.17.4",
+    "@mui/icons-material": "^6.5.0",
+    "@mui/material": "^6.5.0",
+    "@serwist/next": "^9.5.11",
+    "bcryptjs": "^3.0.3",
+    "drizzle-orm": "^0.45.2",
+    "next": "^15.5.19",
+    "next-auth": "^5.0.0-beta.25",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "serwist": "^9.5.11",
+    "zod": "^4.4.3"
   }
 }

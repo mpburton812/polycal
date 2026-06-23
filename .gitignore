@@ -16,6 +16,10 @@ out/
 dist/
 build/
 
+# Local libSQL database
+local.db
+local.db-*
+
 # OS / editor
 .DS_Store
 Thumbs.db
@@ -32,3 +36,12 @@ Thumbs.db
 coverage/
 playwright-report/
 test-results/
+
+# Template bootstrap scratch / export zip
+_template-test-out/
+workflow-starter-template.zip
+
+# Local secrets (never commit)
+.turso-token.tmp
+.env.vercel-setup
+.env*

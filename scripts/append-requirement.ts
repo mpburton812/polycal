@@ -19,6 +19,7 @@ import {
   pickPrimaryModule,
   shortSha,
 } from "./lib/requirements";
+import { jiraKeyLabel } from "./lib/workflow-config";
 
 interface CliOptions {
   sha?: string;
@@ -86,7 +87,7 @@ function main(): void {
 
   if (!jiraKey) {
     console.warn(
-      `[requirements] No Jira key (PC-xxx) found for ${shortSha(commitSha)} on ${branch}.`,
+      `[requirements] No Jira key (${jiraKeyLabel()}) found for ${shortSha(commitSha)} on ${branch}.`,
     );
     return;
   }

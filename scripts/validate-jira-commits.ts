@@ -19,6 +19,7 @@ import {
   isFeatureBranch,
   shortSha,
 } from "./lib/requirements";
+import { jiraKeyExample, jiraKeyLabel } from "./lib/workflow-config";
 
 interface CliOptions {
   range?: string;
@@ -89,9 +90,9 @@ function validateCommit(commit: CommitUnderTest): string | null {
   }
 
   return (
-    `Commit ${shortSha(commit.sha)} on ${commit.branch} is missing a Jira key (PC-xxx).\n` +
+    `Commit ${shortSha(commit.sha)} on ${commit.branch} is missing a Jira key (${jiraKeyLabel()}).\n` +
     `  Subject: ${commit.subject}\n` +
-    `  Example: feat(calendar): add weekly view PC-42`
+    `  Example: feat(calendar): add weekly view ${jiraKeyExample()}`
   );
 }
 
@@ -107,8 +108,8 @@ function main(): void {
     const message = readFileSync(options.file, "utf8");
     if (isFeatureBranch(branch) && !extractJiraKey(message)) {
       errors.push(
-        `Commit message on ${branch} is missing a Jira key (PC-xxx).\n` +
-          `  Example: feat(calendar): add weekly view PC-42`,
+        `Commit message on ${branch} is missing a Jira key (${jiraKeyLabel()}).\n` +
+          `  Example: feat(calendar): add weekly view ${jiraKeyExample()}`,
       );
     }
   } else if (options.range) {
@@ -134,7 +135,7 @@ function main(): void {
     process.exit(1);
   }
 
-  console.log("[validate-jira] All checked commits include a Jira key (PC-xxx).");
+  console.log(`[validate-jira] All checked commits include a Jira key (${jiraKeyLabel()}).`);
 }
 
 main();
