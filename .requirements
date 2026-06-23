@@ -33,3 +33,4 @@
 2026-06-23 | ef2bd2a | PC-20 | Phase 0 scaffold — shell, auth, DB, dev bar, PWA | src/actions/dev.ts
 2026-06-23 | ca48194 | PC-20 | resolve npm audit findings via overrides | package.json
 2026-06-23 | 316265c | PC-20 | add workflow config for PC Jira project | .workflow.json
+2026-06-23 | d1b8107 | PC-21 | edge-safe middleware for Vercel deploy | src/lib/auth.config.ts
