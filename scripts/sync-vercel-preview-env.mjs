@@ -58,6 +58,9 @@ const branches = [
 for (const { gitBranch, appEnv } of branches) {
   for (const key of ["TURSO_DATABASE_URL", "TURSO_AUTH_TOKEN"]) {
     removeBranchVar(key, gitBranch);
+    if (env[key]?.trim()) {
+      upsertBranchVar(key, env[key].trim(), gitBranch);
+    }
   }
 
   upsertBranchVar("NEXT_PUBLIC_APP_ENV", appEnv, gitBranch);
