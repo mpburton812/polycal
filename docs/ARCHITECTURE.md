@@ -20,8 +20,8 @@ polycal/
 | Layer | Technology |
 |-------|------------|
 | Frontend | Next.js PWA, Material UI, WCAG 2.1 AA |
-| Auth | Auth.js (NextAuth) + Google OAuth, HttpOnly cookies |
-| Database | libSQL — local SQLite (dev), Turso (test/prod) |
+| Auth | Auth.js (NextAuth) credentials provider, HttpOnly JWT cookies |
+| Database | libSQL — `file:local.db` (local), Turso (`polycal-dev` / `polycal-test` / `polycal-prod`) |
 | Hosting | Vercel |
 | Identity roles | Admin, User (active), Passive (schedulable, upgrade path to User) |
 
@@ -35,8 +35,8 @@ All planned work lives in **Jira (PC)**. Delivered work is logged in **`.require
 
 | Environment | Branch | Database |
 |-------------|--------|----------|
-| Local / feature | `feature/*` | Local SQLite file |
-| Dev | `dev` | Local / dev SQLite |
+| Local / feature | `feature/*` | `file:local.db` or Turso `polycal-dev` |
+| Dev | `dev` | Turso `polycal-dev` |
 | Test | `test` | Turso `polycal-test` |
 | Production | `production` | Turso `polycal-prod` |
 
