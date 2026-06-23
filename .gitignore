@@ -5,6 +5,7 @@ node_modules/
 .env
 .env.*
 !.env.example
+!.env.vercel-setup.example
 
 # Local database
 *.db
@@ -45,3 +46,4 @@ workflow-starter-template.zip
 .turso-token.tmp
 .env.vercel-setup
 .env*
+!.env.vercel-setup.example
