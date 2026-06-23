@@ -38,3 +38,4 @@
 2026-06-23 | acb9f48 | PC-21 | root auth.config for Vercel Edge middleware | src/lib/auth.config.ts
 2026-06-23 | b4d410c | PC-21 | JWT-only Edge middleware for Vercel | auth.config.ts
 2026-06-23 | 4f98b9b | PC-21 | cookie-only Edge middleware (no __dirname) | middleware.ts
+2026-06-23 | 29a1613 | PC-22 | remove Edge instrumentation DB bundle causing __dirname 500 | src/lib/auth.ts

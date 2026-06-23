@@ -1,0 +1,19 @@
+/**
+ * Lazy DB bootstrap for Node runtime — replaces instrumentation.ts so Drizzle/Turso
+ * are not bundled into the Edge middleware instrumentation chunk.
+ */
+let readyPromise: Promise<void> | undefined;
+
+export function ensureDbReady(): Promise<void> {
+  if (!readyPromise) {
+    readyPromise = (async () => {
+      const { runMigrations } = await import("@/lib/db/migrate");
+      await runMigrations();
+
+      const { seedStarWarsFoundation } = await import("@/lib/seed/star-wars");
+      await seedStarWarsFoundation();
+    })();
+  }
+
+  return readyPromise;
+}
