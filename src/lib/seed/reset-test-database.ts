@@ -1,5 +1,6 @@
 import { getSqlClient } from "@/lib/db/client";
 import { isNonProductionEnvironment } from "@/lib/env";
+import { seedDemoPartnerships } from "@/lib/seed/demo-partnerships";
 import { seedDemoProposals } from "@/lib/seed/demo-proposals";
 import { seedStarWarsFoundation } from "@/lib/seed/star-wars";
 
@@ -18,6 +19,8 @@ export async function resetTestDatabase(): Promise<{
   const client = getSqlClient();
   await client.execute("DELETE FROM user_activity_log");
   await client.execute("DELETE FROM proposals");
+  await client.execute("DELETE FROM location_residents");
+  await client.execute("DELETE FROM sleeping_partnerships");
   await client.execute("DELETE FROM stored_images");
   await client.execute("DELETE FROM locations");
   await client.execute("DELETE FROM users");
@@ -25,6 +28,7 @@ export async function resetTestDatabase(): Promise<{
 
   const { seeded: usersSeeded } = await seedStarWarsFoundation({ force: true });
   const { count: proposalCount } = await seedDemoProposals({ force: true });
+  await seedDemoPartnerships({ force: true });
 
   if (!usersSeeded) {
     throw new Error("Star Wars seed failed after reset.");

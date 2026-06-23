@@ -1,4 +1,5 @@
 import { runMigrations } from "../src/lib/db/migrate";
+import { seedDemoPartnerships } from "../src/lib/seed/demo-partnerships";
 import { seedDemoProposals } from "../src/lib/seed/demo-proposals";
 import {
   getSeedDefaultPasswordHint,
@@ -9,6 +10,7 @@ async function main(): Promise<void> {
   await runMigrations();
   const { seeded } = await seedStarWarsFoundation();
   const demo = await seedDemoProposals();
+  const partnerships = await seedDemoPartnerships();
   if (seeded) {
     console.log(
       `Seeded Star Wars foundation. Default password: ${getSeedDefaultPasswordHint()}`,
@@ -18,6 +20,9 @@ async function main(): Promise<void> {
   }
   if (demo.seeded) {
     console.log(`Seeded ${demo.count} demo proposals.`);
+  }
+  if (partnerships.count > 0) {
+    console.log(`Seeded ${partnerships.count} demo sleeping partnerships.`);
   }
 }
 
