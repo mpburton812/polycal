@@ -1,25 +1,32 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
-import { getToken } from "next-auth/jwt";
+
+/** Auth.js v5 session cookie names (including chunked `.0`, `.1`, … suffixes). */
+const SESSION_COOKIE_PREFIXES = [
+  "__Secure-authjs.session-token",
+  "authjs.session-token",
+] as const;
 
 /**
- * Edge-safe route guard — reads the Auth.js session JWT only (no @/lib/auth import).
- * Credentials provider and DB access stay in src/lib/auth.ts (Node runtime).
+ * Lightweight Edge guard — checks for an Auth.js session cookie only.
+ * JWT validation stays in src/lib/auth.ts on the Node runtime (pages/API).
  */
-function useSecureSessionCookie(request: NextRequest): boolean {
-  if (process.env.VERCEL === "1") {
-    return true;
+function hasAuthSessionCookie(request: NextRequest): boolean {
+  for (const cookie of request.cookies.getAll()) {
+    for (const prefix of SESSION_COOKIE_PREFIXES) {
+      if (
+        (cookie.name === prefix || cookie.name.startsWith(`${prefix}.`)) &&
+        cookie.value
+      ) {
+        return true;
+      }
+    }
   }
 
-  const authUrl = process.env.AUTH_URL ?? process.env.NEXTAUTH_URL;
-  if (authUrl?.startsWith("https://")) {
-    return true;
-  }
-
-  return request.nextUrl.protocol === "https:";
+  return false;
 }
 
-export async function middleware(request: NextRequest) {
+export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const isLogin = pathname.startsWith("/login");
   const isPublicApi = pathname.startsWith("/api/auth");
@@ -29,13 +36,7 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  const token = await getToken({
-    req: request,
-    secret: process.env.AUTH_SECRET,
-    secureCookie: useSecureSessionCookie(request),
-  });
-
-  const isLoggedIn = !!token;
+  const isLoggedIn = hasAuthSessionCookie(request);
 
   if (!isLoggedIn && !isLogin) {
     const loginUrl = new URL("/login", request.url);
