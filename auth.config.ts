@@ -1,7 +1,7 @@
 import type { NextAuthConfig } from "next-auth";
 
 /**
- * Edge-safe Auth.js config for middleware — lives at repo root so Vercel Edge can bundle it.
+ * Shared Auth.js config (JWT callbacks) — imported by src/lib/auth.ts on the Node runtime.
  * Credentials provider is registered in src/lib/auth.ts (Node runtime only).
  */
 export const authConfig = {
