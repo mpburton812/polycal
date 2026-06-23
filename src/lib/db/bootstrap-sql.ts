@@ -49,4 +49,17 @@ CREATE TABLE IF NOT EXISTS schema_meta (
   key TEXT PRIMARY KEY NOT NULL,
   value TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS proposals (
+  id TEXT PRIMARY KEY NOT NULL,
+  title TEXT NOT NULL,
+  description TEXT,
+  proposal_type TEXT NOT NULL,
+  state TEXT NOT NULL,
+  proposer_id TEXT NOT NULL REFERENCES users(id),
+  location_id TEXT REFERENCES locations(id),
+  notes TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
 `;

@@ -1,7 +1,7 @@
 import { BOOTSTRAP_SQL } from "./bootstrap-sql";
 import { getSqlClient } from "./client";
 
-const SCHEMA_VERSION = "1";
+const SCHEMA_VERSION = "2";
 
 /**
  * Applies inline DDL on startup so Vercel previews and local dev share one path

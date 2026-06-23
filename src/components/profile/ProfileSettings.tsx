@@ -1,0 +1,213 @@
+"use client";
+
+import {
+  Alert,
+  Avatar,
+  Box,
+  Button,
+  FormControl,
+  FormControlLabel,
+  FormLabel,
+  Paper,
+  Radio,
+  RadioGroup,
+  Stack,
+  TextField,
+  Typography,
+} from "@mui/material";
+import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
+import { useState, useTransition } from "react";
+
+import {
+  changePasswordAction,
+  updateProfilePreferencesAction,
+} from "@/actions/profile";
+import { AVATAR_OPTIONS } from "@/lib/constants/avatars";
+import {
+  USER_THEME_IDS,
+  USER_THEME_LABELS,
+  type UserThemeId,
+} from "@/lib/constants/themes";
+
+export function ProfileSettings({
+  initialAvatarKey,
+  initialTheme,
+  mustChangePassword,
+}: {
+  initialAvatarKey: string | null;
+  initialTheme: string;
+  mustChangePassword: boolean;
+}) {
+  const router = useRouter();
+  const { update } = useSession();
+  const [avatarKey, setAvatarKey] = useState(initialAvatarKey ?? "bird_blue");
+  const [theme, setTheme] = useState<UserThemeId>(
+    (USER_THEME_IDS.includes(initialTheme as UserThemeId)
+      ? initialTheme
+      : "mint") as UserThemeId,
+  );
+  const [passwordMessage, setPasswordMessage] = useState<string | null>(null);
+  const [prefsMessage, setPrefsMessage] = useState<string | null>(null);
+  const [passwordError, setPasswordError] = useState<string | null>(null);
+  const [prefsError, setPrefsError] = useState<string | null>(null);
+  const [passwordPending, startPasswordTransition] = useTransition();
+  const [prefsPending, startPrefsTransition] = useTransition();
+
+  function handlePasswordSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setPasswordError(null);
+    setPasswordMessage(null);
+    const formData = new FormData(event.currentTarget);
+
+    startPasswordTransition(async () => {
+      const result = await changePasswordAction(formData);
+      if (!result.ok) {
+        setPasswordError(result.error);
+        return;
+      }
+      setPasswordMessage("Password updated.");
+      event.currentTarget.reset();
+      if (mustChangePassword) {
+        await update({ user: { mustChangePassword: false } });
+      }
+      router.refresh();
+    });
+  }
+
+  function handlePreferencesSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setPrefsError(null);
+    setPrefsMessage(null);
+    const formData = new FormData();
+    formData.set("avatarKey", avatarKey);
+    formData.set("theme", theme);
+
+    startPrefsTransition(async () => {
+      const result = await updateProfilePreferencesAction(formData);
+      if (!result.ok) {
+        setPrefsError(result.error);
+        return;
+      }
+      setPrefsMessage("Preferences saved.");
+      await update({ user: { avatarKey, theme } });
+      router.refresh();
+    });
+  }
+
+  return (
+    <Stack spacing={3}>
+      <Paper sx={{ p: 3 }}>
+        <Typography variant="h6" gutterBottom>
+          Password
+        </Typography>
+        {mustChangePassword && (
+          <Alert severity="warning" sx={{ mb: 2 }}>
+            Password change required on first login.
+          </Alert>
+        )}
+        {passwordError && (
+          <Alert severity="error" sx={{ mb: 2 }}>
+            {passwordError}
+          </Alert>
+        )}
+        {passwordMessage && (
+          <Alert severity="success" sx={{ mb: 2 }}>
+            {passwordMessage}
+          </Alert>
+        )}
+        <Box component="form" onSubmit={handlePasswordSubmit}>
+          <Stack spacing={2}>
+            <TextField
+              name="currentPassword"
+              label="Current password"
+              type="password"
+              required
+              fullWidth
+              autoComplete="current-password"
+            />
+            <TextField
+              name="newPassword"
+              label="New password"
+              type="password"
+              required
+              fullWidth
+              autoComplete="new-password"
+            />
+            <TextField
+              name="confirmPassword"
+              label="Confirm new password"
+              type="password"
+              required
+              fullWidth
+              autoComplete="new-password"
+            />
+            <Button type="submit" variant="contained" disabled={passwordPending}>
+              {passwordPending ? "Saving…" : "Update password"}
+            </Button>
+          </Stack>
+        </Box>
+      </Paper>
+
+      <Paper sx={{ p: 3 }}>
+        <Typography variant="h6" gutterBottom>
+          Avatar & accent theme
+        </Typography>
+        {prefsError && (
+          <Alert severity="error" sx={{ mb: 2 }}>
+            {prefsError}
+          </Alert>
+        )}
+        {prefsMessage && (
+          <Alert severity="success" sx={{ mb: 2 }}>
+            {prefsMessage}
+          </Alert>
+        )}
+        <Box component="form" onSubmit={handlePreferencesSubmit}>
+          <FormControl component="fieldset" sx={{ mb: 3 }}>
+            <FormLabel component="legend">Avatar</FormLabel>
+            <Stack direction="row" flexWrap="wrap" gap={1} sx={{ mt: 1 }}>
+              {AVATAR_OPTIONS.map((option) => (
+                <Button
+                  key={option.key}
+                  type="button"
+                  variant={avatarKey === option.key ? "contained" : "outlined"}
+                  onClick={() => setAvatarKey(option.key)}
+                  aria-pressed={avatarKey === option.key}
+                  sx={{ minWidth: 72, p: 1 }}
+                >
+                  <Avatar
+                    src={option.src}
+                    alt={option.label}
+                    sx={{ width: 40, height: 40 }}
+                  />
+                </Button>
+              ))}
+            </Stack>
+          </FormControl>
+
+          <FormControl component="fieldset" sx={{ mb: 2 }}>
+            <FormLabel component="legend">Accent theme</FormLabel>
+            <RadioGroup
+              value={theme}
+              onChange={(event) => setTheme(event.target.value as UserThemeId)}
+            >
+              {USER_THEME_IDS.map((id) => (
+                <FormControlLabel
+                  key={id}
+                  value={id}
+                  control={<Radio />}
+                  label={USER_THEME_LABELS[id]}
+                />
+              ))}
+            </RadioGroup>
+          </FormControl>
+
+          <Button type="submit" variant="contained" disabled={prefsPending}>
+            {prefsPending ? "Saving…" : "Save preferences"}
+          </Button>
+        </Box>
+      </Paper>
+    </Stack>
+  );
+}
