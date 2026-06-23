@@ -112,15 +112,19 @@ const SEED_LOCATIONS = [
  * Populates non-production databases with predictable Star Wars fixtures.
  * Skipped entirely on production per seeding policy.
  */
-export async function seedStarWarsFoundation(): Promise<{ seeded: boolean }> {
+export async function seedStarWarsFoundation(options?: {
+  force?: boolean;
+}): Promise<{ seeded: boolean }> {
   if (!isNonProductionEnvironment()) {
     return { seeded: false };
   }
 
   const db = getDb();
-  const existing = await db.select({ id: users.id }).from(users).limit(1);
-  if (existing.length > 0) {
-    return { seeded: false };
+  if (!options?.force) {
+    const existing = await db.select({ id: users.id }).from(users).limit(1);
+    if (existing.length > 0) {
+      return { seeded: false };
+    }
   }
 
   const now = new Date().toISOString();

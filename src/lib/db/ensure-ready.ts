@@ -12,6 +12,9 @@ export function ensureDbReady(): Promise<void> {
 
       const { seedStarWarsFoundation } = await import("@/lib/seed/star-wars");
       await seedStarWarsFoundation();
+
+      const { seedDemoProposals } = await import("@/lib/seed/demo-proposals");
+      await seedDemoProposals();
     })();
   }
 

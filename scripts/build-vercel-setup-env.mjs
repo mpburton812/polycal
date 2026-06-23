@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Build .env.vercel-setup from .env.local plus a fresh polycal-test DB token.
+ * Build .env.vercel-setup from .env.local plus fresh polycal-test and polycal-prod tokens.
  * Output is gitignored — used by sync-vercel-preview-env.mjs.
  */
 import { execFileSync } from "node:child_process";
@@ -31,6 +31,13 @@ const testTokenOutput = execFileSync(
 );
 const testToken = testTokenOutput.trim().split(/\r?\n/).pop();
 
+const prodTokenOutput = execFileSync(
+  "powershell",
+  ["-File", "scripts/turso.ps1", "db", "tokens", "create", "polycal-prod", "--expiration", "never"],
+  { encoding: "utf8", shell: true },
+);
+const prodToken = prodTokenOutput.trim().split(/\r?\n/).pop();
+
 if (!local.TURSO_AUTH_TOKEN?.trim()) {
   throw new Error("TURSO_AUTH_TOKEN missing in .env.local");
 }
@@ -40,6 +47,9 @@ if (!local.AUTH_SECRET?.trim()) {
 if (!testToken) {
   throw new Error("Failed to create polycal-test token");
 }
+if (!prodToken) {
+  throw new Error("Failed to create polycal-prod token");
+}
 
 writeFileSync(
   ".env.vercel-setup",
@@ -48,8 +58,9 @@ writeFileSync(
     `AUTH_SECRET=${local.AUTH_SECRET.trim()}`,
     `TURSO_AUTH_TOKEN_DEV=${local.TURSO_AUTH_TOKEN.trim()}`,
     `TURSO_AUTH_TOKEN_TEST=${testToken}`,
+    `TURSO_AUTH_TOKEN_PROD=${prodToken}`,
     "",
   ].join("\n"),
 );
 
-console.log("Wrote .env.vercel-setup (polycal-dev + polycal-test tokens)");
+console.log("Wrote .env.vercel-setup (polycal-dev + polycal-test + polycal-prod tokens)");

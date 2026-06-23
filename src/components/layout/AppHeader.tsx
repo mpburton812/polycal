@@ -2,9 +2,9 @@
 
 import CalendarMonthIcon from "@mui/icons-material/CalendarMonth";
 import NotificationsNoneIcon from "@mui/icons-material/NotificationsNone";
-import PersonIcon from "@mui/icons-material/Person";
 import {
   AppBar,
+  Avatar,
   Badge,
   IconButton,
   Toolbar,
@@ -18,9 +18,11 @@ import Link from "next/link";
 export function AppHeader({
   displayName,
   notificationCount = 0,
+  avatarSrc,
 }: {
   displayName: string;
   notificationCount?: number;
+  avatarSrc?: string;
 }) {
   return (
     <AppBar position="static" color="primary">
@@ -47,7 +49,13 @@ export function AppHeader({
           href="/profile"
           aria-label={`Profile for ${displayName}`}
         >
-          <PersonIcon />
+          <Avatar
+            src={avatarSrc}
+            alt=""
+            sx={{ width: 32, height: 32, bgcolor: "primary.dark" }}
+          >
+            {displayName.charAt(0)}
+          </Avatar>
         </IconButton>
       </Toolbar>
     </AppBar>
