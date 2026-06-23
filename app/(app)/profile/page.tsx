@@ -1,34 +1,44 @@
-import { Button, Typography } from "@mui/material";
+import { Typography } from "@mui/material";
+import { eq } from "drizzle-orm";
+import { redirect } from "next/navigation";
 
-import { auth, signOut } from "@/lib/auth";
+import { ProfileSettings } from "@/components/profile/ProfileSettings";
+import { auth } from "@/lib/auth";
+import { getDb } from "@/lib/db/client";
+import { ensureDbReady } from "@/lib/db/ensure-ready";
+import { users } from "@/lib/db/schema";
 
 export default async function ProfilePage() {
   const session = await auth();
-
-  async function logoutAction() {
-    "use server";
-    await signOut({ redirectTo: "/login" });
+  if (!session?.user) {
+    redirect("/login");
   }
+
+  await ensureDbReady();
+  const db = getDb();
+  const [row] = await db
+    .select({
+      avatarKey: users.avatarKey,
+      theme: users.theme,
+      mustChangePassword: users.mustChangePassword,
+    })
+    .from(users)
+    .where(eq(users.id, session.user.id))
+    .limit(1);
 
   return (
     <>
       <Typography variant="h5" component="h1" gutterBottom>
         Profile
       </Typography>
-      <Typography gutterBottom>
-        Signed in as <strong>{session?.user.displayName}</strong> (
-        {session?.user.role})
+      <Typography color="text.secondary" sx={{ mb: 3 }}>
+        Signed in as <strong>{session.user.displayName}</strong> ({session.user.role})
       </Typography>
-      {session?.user.mustChangePassword && (
-        <Typography color="warning.main" sx={{ mb: 2 }}>
-          Password change required on first login (Phase 2).
-        </Typography>
-      )}
-      <form action={logoutAction}>
-        <Button type="submit" variant="outlined" color="primary">
-          Log out
-        </Button>
-      </form>
+      <ProfileSettings
+        initialAvatarKey={row?.avatarKey ?? null}
+        initialTheme={row?.theme ?? "mint"}
+        mustChangePassword={row?.mustChangePassword ?? false}
+      />
     </>
   );
 }

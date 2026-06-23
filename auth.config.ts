@@ -20,10 +20,14 @@ export const authConfig = {
         token.role = user.role;
         token.mustChangePassword = user.mustChangePassword;
         token.displayName = user.displayName;
+        token.avatarKey = user.avatarKey;
+        token.theme = user.theme;
       }
       if (trigger === "update" && session?.user) {
         token.mustChangePassword = session.user.mustChangePassword;
         token.displayName = session.user.displayName ?? token.displayName;
+        if (session.user.avatarKey) token.avatarKey = session.user.avatarKey;
+        if (session.user.theme) token.theme = session.user.theme;
       }
       return token;
     },
@@ -34,6 +38,8 @@ export const authConfig = {
         session.user.mustChangePassword = token.mustChangePassword as boolean;
         session.user.displayName = token.displayName as string;
         session.user.name = token.displayName as string;
+        session.user.avatarKey = token.avatarKey as string | undefined;
+        session.user.theme = token.theme as string | undefined;
       }
       return session;
     },

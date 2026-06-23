@@ -50,6 +50,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             role: row.role as UserRole,
             mustChangePassword: row.mustChangePassword,
             displayName: row.displayName,
+            avatarKey: row.avatarKey ?? undefined,
+            theme: row.theme,
           };
         }
 
@@ -79,6 +81,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           role: row.role,
           mustChangePassword: row.mustChangePassword,
           displayName: row.displayName,
+          avatarKey: row.avatarKey ?? undefined,
+          theme: row.theme,
         };
       },
     }),
