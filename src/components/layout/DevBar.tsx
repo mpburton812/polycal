@@ -15,6 +15,7 @@ import {
   getAppEnvironment,
   getBuildBranch,
   getBuildSha,
+  getEnvironmentBannerColors,
   isNonProductionEnvironment,
 } from "@/lib/env";
 
@@ -26,32 +27,31 @@ interface DevUser {
 }
 
 /**
- * Non-production strip: build metadata + quick user impersonation for QA.
- * Hidden on production per spec §1.
+ * Environment banner: fixed tier colors (not user theme) plus impersonation on non-prod.
  */
 export function DevBar() {
   const [users, setUsers] = useState<DevUser[]>([]);
   const [pending, startTransition] = useTransition();
 
-  const showBar = isNonProductionEnvironment();
+  const environment = getAppEnvironment();
+  const banner = getEnvironmentBannerColors();
+  const showImpersonation = isNonProductionEnvironment();
 
   useEffect(() => {
-    if (!showBar) return;
+    if (!showImpersonation) return;
     void fetch("/api/dev/users")
       .then((r) => r.json())
       .then((data: { users: DevUser[] }) => setUsers(data.users ?? []))
       .catch(() => setUsers([]));
-  }, [showBar]);
-
-  if (!showBar) return null;
+  }, [showImpersonation]);
 
   return (
     <Box
       component="section"
-      aria-label="Development tools"
+      aria-label="Environment banner"
       sx={{
-        bgcolor: "grey.900",
-        color: "grey.100",
+        bgcolor: banner.background,
+        color: banner.color,
         px: 2,
         py: 0.75,
         display: "flex",
@@ -59,43 +59,54 @@ export function DevBar() {
         alignItems: { xs: "stretch", sm: "center" },
         gap: 1,
         borderBottom: 1,
-        borderColor: "grey.800",
+        borderColor: banner.border,
       }}
     >
-      <Typography variant="caption" sx={{ flex: 1 }}>
-        Build {getBuildSha()} · Branch {getBuildBranch()} · Env{" "}
-        {getAppEnvironment()}
+      <Typography variant="caption" sx={{ flex: 1, color: "inherit" }}>
+        PolyCal · {environment.toUpperCase()} · Build {getBuildSha()} · Branch{" "}
+        {getBuildBranch()}
       </Typography>
-      <FormControl size="small" sx={{ minWidth: 220 }} disabled={pending}>
-        <InputLabel id="impersonate-label" sx={{ color: "grey.400" }}>
-          Impersonate user
-        </InputLabel>
-        <Select
-          labelId="impersonate-label"
-          label="Impersonate user"
-          defaultValue=""
-          onChange={(e) => {
-            const userId = e.target.value;
-            if (!userId) return;
-            startTransition(async () => {
-              await impersonateUser(userId);
-            });
-          }}
-          sx={{
-            color: "grey.100",
-            ".MuiOutlinedInput-notchedOutline": { borderColor: "grey.600" },
-          }}
-        >
-          <MenuItem value="">
-            <em>Select user…</em>
-          </MenuItem>
-          {users.map((u) => (
-            <MenuItem key={u.id} value={u.id}>
-              {u.displayName} ({u.username})
+      {showImpersonation && (
+        <FormControl size="small" sx={{ minWidth: 220 }} disabled={pending}>
+          <InputLabel
+            id="impersonate-label"
+            sx={{ color: banner.color, opacity: 0.85 }}
+          >
+            Impersonate user
+          </InputLabel>
+          <Select
+            labelId="impersonate-label"
+            label="Impersonate user"
+            defaultValue=""
+            onChange={(e) => {
+              const userId = e.target.value;
+              if (!userId) return;
+              startTransition(async () => {
+                await impersonateUser(userId);
+              });
+            }}
+            sx={{
+              color: banner.color,
+              ".MuiOutlinedInput-notchedOutline": {
+                borderColor: banner.border,
+              },
+              "&:hover .MuiOutlinedInput-notchedOutline": {
+                borderColor: banner.color,
+              },
+              ".MuiSvgIcon-root": { color: banner.color },
+            }}
+          >
+            <MenuItem value="">
+              <em>Select user…</em>
             </MenuItem>
-          ))}
-        </Select>
-      </FormControl>
+            {users.map((u) => (
+              <MenuItem key={u.id} value={u.id}>
+                {u.displayName} ({u.username})
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+      )}
     </Box>
   );
 }
