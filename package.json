@@ -35,6 +35,10 @@
   "engines": {
     "node": ">=20"
   },
+  "overrides": {
+    "postcss": "^8.5.10",
+    "esbuild": "^0.25.0"
+  },
   "dependencies": {
     "@emotion/cache": "^11.14.0",
     "@emotion/react": "^11.14.0",
