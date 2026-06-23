@@ -7,6 +7,7 @@ import { z } from "zod";
 import { recordSuccessfulLogin } from "@/lib/audit";
 import { authConfig } from "../../auth.config";
 import { getDb } from "@/lib/db/client";
+import { ensureDbReady } from "@/lib/db/ensure-ready";
 import { users, type UserRole } from "@/lib/db/schema";
 import { isNonProductionEnvironment } from "@/lib/env";
 
@@ -29,6 +30,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         impersonateUserId: { label: "Impersonate", type: "text" },
       },
       async authorize(raw) {
+        await ensureDbReady();
+
         if (raw?.impersonateUserId && isNonProductionEnvironment()) {
           const db = getDb();
           const [row] = await db
