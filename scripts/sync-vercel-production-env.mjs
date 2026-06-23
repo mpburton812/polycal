@@ -9,7 +9,8 @@ import { existsSync, readFileSync } from "node:fs";
 
 const scope = "michael-burton-s-projects";
 const tursoHost = "mpburton.aws-us-east-2.turso.io";
-const sourceFiles = [process.argv[2], ".env.vercel-setup", ".env.local"].filter(Boolean);
+const sourceFiles = [process.argv[2], ".env.vercel-setup"].filter(Boolean);
+const PRODUCTION_URL = "https://polycal-ebon.vercel.app";
 
 function parseEnv(file) {
   if (!file || !existsSync(file)) return {};
@@ -65,16 +66,21 @@ const env = loadEnv();
 let token = env.TURSO_AUTH_TOKEN_PROD?.trim();
 if (!token) token = createProdToken();
 
-const authSecret = env.AUTH_SECRET?.trim();
-if (!authSecret) throw new Error("AUTH_SECRET missing in source env");
+let authSecret = env.AUTH_SECRET?.trim();
+if (!authSecret) {
+  const local = parseEnv(".env.local");
+  authSecret = local.AUTH_SECRET?.trim();
+  if (!authSecret) {
+    throw new Error("AUTH_SECRET missing in .env.vercel-setup or .env.local");
+  }
+}
 
 const databaseUrl = `libsql://polycal-prod-${tursoHost}`;
-const productionUrl = env.AUTH_URL?.trim() || "https://polycal-ebon.vercel.app";
 
 upsertProductionVar("TURSO_DATABASE_URL", databaseUrl);
 upsertProductionVar("TURSO_AUTH_TOKEN", token);
 upsertProductionVar("NEXT_PUBLIC_APP_ENV", "production");
 upsertProductionVar("AUTH_SECRET", authSecret);
-upsertProductionVar("AUTH_URL", productionUrl);
+upsertProductionVar("AUTH_URL", PRODUCTION_URL);
 
 console.log("Done. Redeploy production to pick up env changes.");
