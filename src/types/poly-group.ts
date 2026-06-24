@@ -33,6 +33,10 @@ export interface PolyGroupSettings {
   hideSleepingArrangements: boolean;
   logTailLength: number;
   onboardingWelcomeMessage: string;
+  proposedMaxHours: number;
+  atRiskTtlHours: number;
+  archiveGraceHours: number;
+  redraftDeadlineHours: number;
 }
 
 export const DEFAULT_ONBOARDING_WELCOME_MESSAGE =

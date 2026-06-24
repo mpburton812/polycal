@@ -29,6 +29,13 @@ import {
   type ProposalType,
 } from "@/lib/db/schema";
 import { notifyUser } from "@/lib/notifications";
+import {
+  atRiskExpiresAtIso,
+  detectViewerOverlapWarning,
+  intervalsOverlap,
+  loadEnforcementSettings,
+  runProposalEnforcement,
+} from "@/lib/proposals/enforcement";
 import { PARTNERSHIP_CARD_PREFIX } from "@/lib/proposals/constants";
 import type { UserRole } from "@/types/user";
 
@@ -101,8 +108,6 @@ const attendeeUpdateSchema = z.object({
   addOptional: z.array(z.string().min(1)).optional(),
   removeUserIds: z.array(z.string().min(1)).optional(),
 });
-
-const AT_RISK_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 export type ProposalCardKind = "proposal" | "partnership";
 
@@ -226,8 +231,9 @@ export interface ProposalDetail {
   canClone: boolean;
   viewerVoteStatus: InviteeVoteStatus | null;
   viewerSlotVotes: Record<string, InviteeVoteStatus>;
-  /** True when the viewer already voted but their calendar now conflicts (PC-45). */
+  /** True when the viewer already voted but their calendar now conflicts (PC-45/46). */
   hasOverlapWarning: boolean;
+  canAcknowledgeOverlap: boolean;
 }
 
 export interface ProposalCommentView {
@@ -477,156 +483,6 @@ function criticalProposalFieldsChanged(
   return false;
 }
 
-/** Returns true when two ISO intervals overlap (open end uses start as instant). */
-function intervalsOverlap(
-  aStart: string,
-  aEnd: string | null,
-  bStart: string,
-  bEnd: string | null,
-): boolean {
-  const aEndMs = aEnd ? new Date(aEnd).getTime() : new Date(aStart).getTime();
-  const bEndMs = bEnd ? new Date(bEnd).getTime() : new Date(bStart).getTime();
-  const aStartMs = new Date(aStart).getTime();
-  const bStartMs = new Date(bStart).getTime();
-  return aStartMs < bEndMs && bStartMs < aEndMs;
-}
-
-/**
- * Archives at-risk drafts whose TTL expired without resubmission (PC-40).
- */
-async function expireAtRiskProposals(db: ReturnType<typeof getDb>): Promise<void> {
-  const now = new Date().toISOString();
-  const expired = await db
-    .select()
-    .from(proposals)
-    .where(and(eq(proposals.state, "draft"), eq(proposals.atRisk, true)));
-
-  for (const proposal of expired) {
-    if (!proposal.atRiskExpiresAt || proposal.atRiskExpiresAt > now) continue;
-    await db
-      .update(proposals)
-      .set({
-        state: "archived",
-        atRisk: false,
-        atRiskExpiresAt: null,
-        updatedAt: now,
-      })
-      .where(eq(proposals.id, proposal.id));
-    await logProposalTransition(
-      db,
-      proposal.id,
-      null,
-      "proposal.at_risk_expired",
-      "At-risk TTL elapsed without resubmission.",
-    );
-  }
-}
-
-/**
- * Auto-transitions at-risk resolved proposals within 24h of start back to proposed (PC-45).
- */
-async function processRedraftDeadlines(db: ReturnType<typeof getDb>): Promise<void> {
-  const now = new Date();
-  const nowIso = now.toISOString();
-  const deadlineMs = now.getTime() + 24 * 60 * 60 * 1000;
-
-  const candidates = await db
-    .select()
-    .from(proposals)
-    .where(and(eq(proposals.state, "resolved"), eq(proposals.atRisk, true)));
-
-  for (const proposal of candidates) {
-    if (!proposal.scheduledStartAt) continue;
-    const startMs = new Date(proposal.scheduledStartAt).getTime();
-    if (startMs > deadlineMs) continue;
-
-    await db
-      .update(proposals)
-      .set({ state: "proposed", updatedAt: nowIso })
-      .where(eq(proposals.id, proposal.id));
-
-    await resetInviteeVotes(db, proposal.id);
-    await logProposalTransition(
-      db,
-      proposal.id,
-      null,
-      "proposal.redraft_deadline",
-      "Within 24h of start — returned to proposed for re-approval.",
-    );
-
-    const invitees = await db
-      .select({ userId: proposalInvitees.userId })
-      .from(proposalInvitees)
-      .where(eq(proposalInvitees.proposalId, proposal.id));
-
-    const notifyIds = new Set<string>([proposal.proposerId, ...invitees.map((row) => row.userId)]);
-    for (const userId of notifyIds) {
-      await notifyUser(
-        userId,
-        "proposal_redraft_deadline",
-        `Proposal "${proposal.title}" needs re-approval before it starts.`,
-        { proposalId: proposal.id, action: "vote" },
-      );
-    }
-  }
-}
-
-/**
- * Detects whether the viewer's calendar conflicts with this proposal after they voted (PC-45).
- */
-async function detectViewerOverlapWarning(
-  db: ReturnType<typeof getDb>,
-  proposalId: string,
-  viewerId: string,
-  viewerVoteStatus: InviteeVoteStatus | null | undefined,
-  scheduledStartAt: string | null,
-  scheduledEndAt: string | null,
-): Promise<boolean> {
-  if (!scheduledStartAt || !viewerVoteStatus || viewerVoteStatus === "not_seen") {
-    return false;
-  }
-
-  const activeProposals = await db
-    .select({
-      id: proposals.id,
-      scheduledStartAt: proposals.scheduledStartAt,
-      scheduledEndAt: proposals.scheduledEndAt,
-      proposerId: proposals.proposerId,
-    })
-    .from(proposals)
-    .where(inArray(proposals.state, ["proposed", "resolved"]));
-
-  const activeInvitees = await db
-    .select({ proposalId: proposalInvitees.proposalId, userId: proposalInvitees.userId })
-    .from(proposalInvitees);
-
-  const inviteesByProposal = new Map<string, string[]>();
-  for (const row of activeInvitees) {
-    const list = inviteesByProposal.get(row.proposalId) ?? [];
-    list.push(row.userId);
-    inviteesByProposal.set(row.proposalId, list);
-  }
-
-  for (const other of activeProposals) {
-    if (other.id === proposalId || !other.scheduledStartAt) continue;
-    const stakeholders = new Set([other.proposerId, ...(inviteesByProposal.get(other.id) ?? [])]);
-    if (!stakeholders.has(viewerId)) continue;
-
-    if (
-      intervalsOverlap(
-        scheduledStartAt,
-        scheduledEndAt,
-        other.scheduledStartAt,
-        other.scheduledEndAt,
-      )
-    ) {
-      return true;
-    }
-  }
-
-  return false;
-}
-
 /** Picks the poll slot with the highest accept score; ties break on earliest start. */
 function pickWinningSlot(
   slots: { id: string; startAt: string; endAt: string | null }[],
@@ -727,8 +583,7 @@ export async function listProposalBoardAction(): Promise<ProposalBoard> {
   }
 
   const db = getDb();
-  await expireAtRiskProposals(db);
-  await processRedraftDeadlines(db);
+  await runProposalEnforcement(db);
   const viewerId = session.user.id;
   const isAdmin = await userHasAdminAccess(session.user.role);
   const privacyFlags = await getPrivacyAdminFlags(db);
@@ -1116,7 +971,7 @@ async function wipeProposalVotes(db: ReturnType<typeof getDb>, proposalId: strin
   const now = new Date().toISOString();
   await db
     .update(proposalInvitees)
-    .set({ voteStatus: "not_seen", respondedAt: null })
+    .set({ voteStatus: "not_seen", respondedAt: null, overlapAcknowledgedAt: null })
     .where(eq(proposalInvitees.proposalId, proposalId));
   await db.delete(proposalSlotVotes).where(eq(proposalSlotVotes.proposalId, proposalId));
   await db
@@ -1230,7 +1085,8 @@ async function autoDeclineCollidingProposals(
   }
 
   const now = new Date().toISOString();
-  const expiresAt = new Date(Date.now() + AT_RISK_TTL_MS).toISOString();
+  const enforcement = await loadEnforcementSettings(db);
+  const expiresAt = atRiskExpiresAtIso(enforcement);
 
   for (const other of pending) {
     if (other.id === resolved.id) continue;
@@ -2114,8 +1970,7 @@ export async function getProposalDetailAction(
 
   await ensureDbReady();
   const db = getDb();
-  await expireAtRiskProposals(db);
-  await processRedraftDeadlines(db);
+  await runProposalEnforcement(db);
   const isAdmin = await userHasAdminAccess(session.user.role);
   const privacyFlags = await getPrivacyAdminFlags(db);
   const auditLogVisibility = await getAuditLogVisibility(db);
@@ -2162,6 +2017,7 @@ export async function getProposalDetailAction(
       displayName: users.displayName,
       role: proposalInvitees.role,
       voteStatus: proposalInvitees.voteStatus,
+      overlapAcknowledgedAt: proposalInvitees.overlapAcknowledgedAt,
     })
     .from(proposalInvitees)
     .innerJoin(users, eq(proposalInvitees.userId, users.id))
@@ -2270,6 +2126,7 @@ export async function getProposalDetailAction(
         proposalId,
         session.user.id,
         viewerInvitee?.voteStatus,
+        viewerInvitee?.overlapAcknowledgedAt,
         display.scheduledStartAt ?? null,
         display.scheduledEndAt ?? null,
       )
@@ -2372,8 +2229,135 @@ export async function getProposalDetailAction(
       viewerVoteStatus: viewerInvitee?.voteStatus ?? null,
       viewerSlotVotes: masked ? {} : viewerSlotVotes,
       hasOverlapWarning,
+      canAcknowledgeOverlap: hasOverlapWarning,
     },
   };
+}
+
+const overlapResponseSchema = z.object({
+  proposalId: z.string().min(1),
+  response: z.enum(["acknowledge", "decline"]),
+});
+
+/**
+ * Acknowledges or declines an in-flight calendar overlap after voting (PC-46).
+ */
+export async function acknowledgeProposalOverlapAction(
+  input: z.infer<typeof overlapResponseSchema>,
+): Promise<{ ok: boolean; message: string }> {
+  const session = await auth();
+  if (!session?.user) {
+    return { ok: false, message: "Sign in required." };
+  }
+
+  const parsed = overlapResponseSchema.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, message: "Invalid overlap response." };
+  }
+
+  await ensureDbReady();
+  const db = getDb();
+  await runProposalEnforcement(db);
+
+  const [proposal] = await db
+    .select()
+    .from(proposals)
+    .where(eq(proposals.id, parsed.data.proposalId))
+    .limit(1);
+  if (!proposal || proposal.state === "draft" || proposal.state === "archived") {
+    return { ok: false, message: "Proposal not found." };
+  }
+
+  const [invitee] = await db
+    .select()
+    .from(proposalInvitees)
+    .where(
+      and(
+        eq(proposalInvitees.proposalId, parsed.data.proposalId),
+        eq(proposalInvitees.userId, session.user.id),
+      ),
+    )
+    .limit(1);
+
+  if (!invitee || invitee.voteStatus === "not_seen") {
+    return { ok: false, message: "You have not voted on this proposal yet." };
+  }
+
+  const hasOverlap = await detectViewerOverlapWarning(
+    db,
+    proposal.id,
+    session.user.id,
+    invitee.voteStatus,
+    invitee.overlapAcknowledgedAt,
+    proposal.scheduledStartAt,
+    proposal.scheduledEndAt,
+  );
+
+  if (!hasOverlap) {
+    return { ok: false, message: "No active overlap warning for this proposal." };
+  }
+
+  const now = new Date().toISOString();
+
+  if (parsed.data.response === "acknowledge") {
+    await db
+      .update(proposalInvitees)
+      .set({ overlapAcknowledgedAt: now })
+      .where(eq(proposalInvitees.id, invitee.id));
+
+    await logProposalTransition(
+      db,
+      proposal.id,
+      session.user.id,
+      "proposal.overlap_acknowledged",
+      "Viewer acknowledged schedule conflict after voting.",
+    );
+
+    revalidatePath("/proposals");
+    revalidatePath("/schedule");
+    return { ok: true, message: "Overlap acknowledged. Your vote stands." };
+  }
+
+  await db
+    .update(proposalInvitees)
+    .set({
+      voteStatus: "decline",
+      respondedAt: now,
+      overlapAcknowledgedAt: null,
+    })
+    .where(eq(proposalInvitees.id, invitee.id));
+
+  await logProposalTransition(
+    db,
+    proposal.id,
+    session.user.id,
+    "proposal.overlap_declined",
+    "Viewer declined after schedule conflict was detected.",
+  );
+
+  await notifyUser(
+    proposal.proposerId,
+    "proposal_vote_cast",
+    `A vote was changed to decline on "${proposal.title}" after a schedule conflict.`,
+    { proposalId: proposal.id, voterId: session.user.id, vote: "decline" },
+  );
+
+  if (invitee.role === "required") {
+    if (proposal.state === "proposed" || (proposal.state === "resolved" && proposal.atRisk)) {
+      await evaluateProposalAfterVote(db, proposal.id, session.user.id);
+    } else if (proposal.state === "resolved") {
+      await revertProposalToDraft(
+        db,
+        proposal,
+        session.user.id,
+        "A required invitee declined after a schedule conflict.",
+      );
+    }
+  }
+
+  revalidatePath("/proposals");
+  revalidatePath("/schedule");
+  return { ok: true, message: "Vote changed to decline due to schedule conflict." };
 }
 
 /**
@@ -3161,7 +3145,8 @@ export async function redraftProposalAction(
   }
 
   const now = new Date().toISOString();
-  const expiresAt = new Date(Date.now() + AT_RISK_TTL_MS).toISOString();
+  const enforcement = await loadEnforcementSettings(db);
+  const expiresAt = atRiskExpiresAtIso(enforcement);
   await db
     .update(proposals)
     .set({

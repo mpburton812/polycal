@@ -20,6 +20,19 @@ export async function goToAdmin(page: Page): Promise<void> {
   await expect(page).toHaveURL(/\/admin/);
 }
 
+/** Opens the header profile menu (avatar button). */
+export async function openProfileMenu(page: Page): Promise<void> {
+  await page.getByRole("button", { name: /Profile menu for/i }).click();
+  await expect(page.getByRole("menu")).toBeVisible();
+}
+
+/** Navigates to profile settings via the header profile menu. */
+export async function goToProfile(page: Page): Promise<void> {
+  await openProfileMenu(page);
+  await page.getByRole("menuitem", { name: "Settings" }).click();
+  await expect(page).toHaveURL(/\/profile/);
+}
+
 export async function selectProposalTab(page: Page, tab: "Drafts" | "Proposed" | "Resolved" | "Archived"): Promise<void> {
   await page.getByRole("tab", { name: new RegExp(tab, "i") }).click();
 }
