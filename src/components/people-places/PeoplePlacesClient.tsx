@@ -40,10 +40,12 @@ import {
 import {
   createPlaceAction,
   deletePlaceAction,
+  getPlaceDeleteImpactAction,
   listResidentsForPlaceAction,
   proposeResidencyAction,
   respondResidencyAction,
   updatePlaceAction,
+  type PlaceDeleteImpact,
   type PlaceSummary,
   type ResidentView,
 } from "@/actions/places";
@@ -521,12 +523,16 @@ function PlaceDetail({
     bedroomLabelsForForm(place.bedroomCount, place.bedroomNames),
   );
   const [editNameWarning, setEditNameWarning] = useState<string | null>(null);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteImpact, setDeleteImpact] = useState<PlaceDeleteImpact | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
-  const canEditPlace = isAdmin || place.createdById === currentUserId;
   const isResident = residents.some(
     (row) => row.userId === currentUserId && row.status === "accepted",
   );
+  const canEditPlace = isAdmin || place.createdById === currentUserId;
+  const canDeletePlace = isAdmin || isResident || place.createdById === currentUserId;
 
   useEffect(() => {
     setResidents(place.residents);
@@ -554,50 +560,66 @@ function PlaceDetail({
     return !taken;
   }
 
+  function openDeleteDialog() {
+    setDeleteError(null);
+    startTransition(async () => {
+      const result = await getPlaceDeleteImpactAction(place.id);
+      if (!result.ok || !result.impact) {
+        setDeleteError(result.message);
+        return;
+      }
+      setDeleteImpact(result.impact);
+      setDeleteOpen(true);
+    });
+  }
+
+  function confirmDeletePlace() {
+    setDeleteError(null);
+    startTransition(async () => {
+      const result = await deletePlaceAction(place.id);
+      if (!result.ok) {
+        setDeleteError(result.message);
+        return;
+      }
+      setDeleteOpen(false);
+      setDeleteImpact(null);
+      setMessage(result.message);
+      onPlaceUpdated();
+      router.refresh();
+    });
+  }
+
   return (
     <Stack spacing={1} sx={{ mt: 1 }}>
       {canEditPlace && (
         <Stack direction="row" spacing={1}>
-          {canEditPlace && (
-            <Button
-              size="small"
-              variant="outlined"
-              onClick={() => {
-                setEditName(place.name);
-                setEditAddress(place.address ?? "");
-                setEditBedroomCount(place.bedroomCount);
-                setEditBedroomLabels(
-                  bedroomLabelsForForm(place.bedroomCount, place.bedroomNames),
-                );
-                setEditNameWarning(null);
-                setEditOpen(true);
-              }}
-            >
-              Edit place
-            </Button>
-          )}
-          {isAdmin && (
-            <Button
-              size="small"
-              color="error"
-              onClick={() =>
-                startTransition(async () => {
-                  if (!window.confirm(`Delete ${place.name}? This cannot be undone.`)) {
-                    return;
-                  }
-                  const result = await deletePlaceAction(place.id);
-                  setMessage(result.message);
-                  if (result.ok) {
-                    onPlaceUpdated();
-                    router.refresh();
-                  }
-                })
-              }
-            >
+          <Button
+            size="small"
+            variant="outlined"
+            onClick={() => {
+              setEditName(place.name);
+              setEditAddress(place.address ?? "");
+              setEditBedroomCount(place.bedroomCount);
+              setEditBedroomLabels(
+                bedroomLabelsForForm(place.bedroomCount, place.bedroomNames),
+              );
+              setEditNameWarning(null);
+              setEditOpen(true);
+            }}
+          >
+            Edit place
+          </Button>
+          {canDeletePlace && (
+            <Button size="small" color="error" onClick={openDeleteDialog} disabled={pending}>
               Delete place
             </Button>
           )}
         </Stack>
+      )}
+      {!canEditPlace && canDeletePlace && (
+        <Button size="small" color="error" onClick={openDeleteDialog} disabled={pending}>
+          Delete place
+        </Button>
       )}
       {place.bedroomNames.length > 0 && (
         <Typography variant="caption" color="text.secondary">
@@ -774,6 +796,50 @@ function PlaceDetail({
             }
           >
             Save
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={deleteOpen} onClose={() => setDeleteOpen(false)} fullWidth maxWidth="sm">
+        <DialogTitle>Delete {deleteImpact?.placeName ?? place.name}?</DialogTitle>
+        <DialogContent>
+          <Stack spacing={2} sx={{ mt: 1 }}>
+            <Typography>
+              This cannot be undone. The place will be removed from the list.
+            </Typography>
+            {deleteImpact && deleteImpact.affectedProposalCount > 0 && (
+              <Alert severity="warning">
+                {deleteImpact.activeProposalCount > 0 && (
+                  <Typography variant="body2">
+                    {deleteImpact.activeProposalCount} active proposal
+                    {deleteImpact.activeProposalCount === 1 ? "" : "s"} use this place.
+                  </Typography>
+                )}
+                {deleteImpact.scheduledEventCount > 0 && (
+                  <Typography variant="body2">
+                    {deleteImpact.scheduledEventCount} scheduled future event
+                    {deleteImpact.scheduledEventCount === 1 ? "" : "s"} use this place.
+                  </Typography>
+                )}
+                <Typography variant="body2" sx={{ mt: 1 }}>
+                  Affected proposals will move to Drafts. Proposers and invitees will be
+                  notified.
+                </Typography>
+              </Alert>
+            )}
+            {deleteImpact && deleteImpact.pendingResidencyCount > 0 && (
+              <Alert severity="info">
+                {deleteImpact.pendingResidencyCount} pending residency proposal
+                {deleteImpact.pendingResidencyCount === 1 ? "" : "s"} will be cancelled.
+              </Alert>
+            )}
+            {deleteError && <Alert severity="error">{deleteError}</Alert>}
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDeleteOpen(false)}>Cancel</Button>
+          <Button variant="contained" color="error" disabled={pending} onClick={confirmDeletePlace}>
+            Delete place
           </Button>
         </DialogActions>
       </Dialog>
