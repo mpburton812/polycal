@@ -79,6 +79,11 @@ export const polyGroup = sqliteTable("poly_group", {
     .default(false),
   logTailLength: integer("log_tail_length").notNull().default(100),
   onboardingWelcomeMessage: text("onboarding_welcome_message"),
+  /** Hours in proposed before auto-expire; 0 = expire only when event start passes (PC-46). */
+  proposedMaxHours: integer("proposed_max_hours").notNull().default(0),
+  atRiskTtlHours: integer("at_risk_ttl_hours").notNull().default(168),
+  archiveGraceHours: integer("archive_grace_hours").notNull().default(24),
+  redraftDeadlineHours: integer("redraft_deadline_hours").notNull().default(24),
   updatedAt: text("updated_at").notNull(),
 });
 
@@ -197,6 +202,7 @@ export const proposalInvitees = sqliteTable(
       .notNull()
       .default("not_seen"),
     respondedAt: text("responded_at"),
+    overlapAcknowledgedAt: text("overlap_acknowledged_at"),
     createdAt: text("created_at").notNull(),
   },
   (table) => [unique().on(table.proposalId, table.userId)],

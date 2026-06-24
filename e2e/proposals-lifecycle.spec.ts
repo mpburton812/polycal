@@ -60,7 +60,7 @@ test.describe("Poll proposal draft", () => {
     await page.getByRole("button", { name: "New proposal" }).click();
     const dialog = page.getByRole("dialog");
     await dialog.getByLabel("Title").fill(title);
-    await dialog.getByLabel("Description").fill("Poll with two options.");
+    await dialog.getByLabel(/Description/i).fill("Poll with two options.");
     await dialog.getByRole("checkbox", { name: /Time poll/i }).check();
 
     const startInputs = dialog.getByLabel("Start");
@@ -88,7 +88,7 @@ test.describe("Recurring event draft", () => {
     await page.getByRole("button", { name: "New proposal" }).click();
     const dialog = page.getByRole("dialog");
     await dialog.getByLabel("Title").fill(title);
-    await dialog.getByLabel("Description").fill("Weekly council meetings.");
+    await dialog.getByLabel(/Description/i).fill("Weekly council meetings.");
     await dialog.getByRole("checkbox", { name: /Recurring series/i }).check();
     await dialog.getByLabel("Start").first().fill("2099-09-01T09:00");
     await dialog.getByRole("button", { name: "Create draft" }).click();

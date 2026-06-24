@@ -34,7 +34,12 @@ export async function applyProposalsMigrations(sql: Client): Promise<void> {
   `);
 
   await ensureColumn(sql, "proposal_invitees", "vote_status", "TEXT NOT NULL DEFAULT 'not_seen'");
-  await ensureColumn(sql, "proposal_invitees", "responded_at", "TEXT");
+  await ensureColumn(sql, "proposal_invitees", "overlap_acknowledged_at", "TEXT");
+
+  await ensureColumn(sql, "poly_group", "proposed_max_hours", "INTEGER NOT NULL DEFAULT 0");
+  await ensureColumn(sql, "poly_group", "at_risk_ttl_hours", "INTEGER NOT NULL DEFAULT 168");
+  await ensureColumn(sql, "poly_group", "archive_grace_hours", "INTEGER NOT NULL DEFAULT 24");
+  await ensureColumn(sql, "poly_group", "redraft_deadline_hours", "INTEGER NOT NULL DEFAULT 24");
 
   await sql.execute(`
     CREATE TABLE IF NOT EXISTS proposal_time_slots (

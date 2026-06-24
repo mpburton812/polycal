@@ -39,6 +39,10 @@ const settingsSchema = z.object({
   hideSleepingArrangements: z.boolean(),
   logTailLength: z.number().int().min(0).max(1000),
   onboardingWelcomeMessage: z.string().trim().min(1).max(2000),
+  proposedMaxHours: z.number().int().min(0).max(8760),
+  atRiskTtlHours: z.number().int().min(1).max(8760),
+  archiveGraceHours: z.number().int().min(0).max(8760),
+  redraftDeadlineHours: z.number().int().min(1).max(168),
 });
 
 function rowToSettings(row: typeof polyGroup.$inferSelect): PolyGroupSettings {
@@ -58,6 +62,10 @@ function rowToSettings(row: typeof polyGroup.$inferSelect): PolyGroupSettings {
     logTailLength: row.logTailLength,
     onboardingWelcomeMessage:
       row.onboardingWelcomeMessage?.trim() || DEFAULT_ONBOARDING_WELCOME_MESSAGE,
+    proposedMaxHours: row.proposedMaxHours ?? 0,
+    atRiskTtlHours: row.atRiskTtlHours ?? 168,
+    archiveGraceHours: row.archiveGraceHours ?? 24,
+    redraftDeadlineHours: row.redraftDeadlineHours ?? 24,
   };
 }
 
@@ -184,6 +192,10 @@ export async function updatePolyGroupSettingsAction(
       hideSleepingArrangements: parsed.data.hideSleepingArrangements,
       logTailLength: parsed.data.logTailLength,
       onboardingWelcomeMessage: parsed.data.onboardingWelcomeMessage,
+      proposedMaxHours: parsed.data.proposedMaxHours,
+      atRiskTtlHours: parsed.data.atRiskTtlHours,
+      archiveGraceHours: parsed.data.archiveGraceHours,
+      redraftDeadlineHours: parsed.data.redraftDeadlineHours,
       updatedAt: now,
     })
     .where(eq(polyGroup.id, 1));

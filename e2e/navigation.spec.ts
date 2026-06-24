@@ -5,8 +5,10 @@ import { USERS } from "./helpers/constants";
 import {
   goToAdmin,
   goToPeoplePlaces,
+  goToProfile,
   goToProposals,
   goToSchedule,
+  openProfileMenu,
 } from "./helpers/navigation";
 
 test.describe("App navigation (admin)", () => {
@@ -23,6 +25,14 @@ test.describe("App navigation (admin)", () => {
     await expect(nav.getByRole("link", { name: "Proposals" })).toBeVisible();
     await expect(nav.getByRole("link", { name: "People & Places" })).toBeVisible();
     await expect(nav.getByRole("link", { name: "Admin" })).toBeVisible();
+    await expect(page.getByText("Rebel Alliance")).toBeVisible();
+    await expect(page.getByText("PolyCal", { exact: true })).toBeVisible();
+  });
+
+  test("profile menu opens settings and logout entries", async ({ page }) => {
+    await openProfileMenu(page);
+    await expect(page.getByRole("menuitem", { name: "Settings" })).toBeVisible();
+    await expect(page.getByRole("menuitem", { name: "Logout" })).toBeVisible();
   });
 
   test("navigates to all primary tabs", async ({ page }) => {
@@ -37,6 +47,9 @@ test.describe("App navigation (admin)", () => {
 
     await goToAdmin(page);
     await expect(page.getByRole("heading", { name: "Admin", level: 1 })).toBeVisible();
+
+    await goToProfile(page);
+    await expect(page.getByRole("heading", { name: "Profile", level: 1 })).toBeVisible();
   });
 });
 
