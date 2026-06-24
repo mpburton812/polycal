@@ -1,6 +1,7 @@
 "use server";
 
-import { eq } from "drizzle-orm";
+import { randomUUID } from "node:crypto";
+import { and, eq, ne } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
@@ -8,7 +9,8 @@ import { auth } from "@/lib/auth";
 import { logUserActivity } from "@/lib/audit";
 import { getDb } from "@/lib/db/client";
 import { ensureDbReady } from "@/lib/db/ensure-ready";
-import { polyGroup, users } from "@/lib/db/schema";
+import { notifyUser } from "@/lib/notifications";
+import { polyGroup, proposalInvitees, proposalStateLog, proposals, users } from "@/lib/db/schema";
 import {
   DEFAULT_ONBOARDING_WELCOME_MESSAGE,
   auditLogVisibilityLevels,
@@ -196,4 +198,101 @@ export async function updatePolyGroupSettingsAction(
   revalidatePath("/admin");
   revalidatePath("/people-places");
   return { ok: true, message: "Poly group settings saved." };
+}
+
+const groupNameProposalSchema = z.object({
+  proposedName: z.string().trim().min(1).max(80),
+});
+
+/**
+ * Creates a proposed-state group name change proposal when enabled (PC-45).
+ */
+export async function proposeGroupNameChangeAction(
+  input: z.infer<typeof groupNameProposalSchema>,
+): Promise<PolyGroupActionResult> {
+  const session = await requireAdmin();
+  if (!session) {
+    return { ok: false, message: "Admin access required." };
+  }
+
+  const parsed = groupNameProposalSchema.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, message: parsed.error.issues[0]?.message ?? "Invalid name." };
+  }
+
+  await ensureDbReady();
+  const db = getDb();
+  const [group] = await db.select().from(polyGroup).where(eq(polyGroup.id, 1)).limit(1);
+  if (!group?.allowGroupNameProposals) {
+    return { ok: false, message: "Group name proposals are disabled." };
+  }
+
+  if (parsed.data.proposedName === group.name) {
+    return { ok: false, message: "Proposed name matches the current name." };
+  }
+
+  const activeUsers = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(and(eq(users.status, "active"), ne(users.role, "passive")));
+
+  const now = new Date().toISOString();
+  const proposalId = `prop-${randomUUID()}`;
+  const title = `Rename group to "${parsed.data.proposedName}"`;
+
+  await db.insert(proposals).values({
+    id: proposalId,
+    title,
+    description: JSON.stringify({
+      groupNameProposal: true,
+      proposedName: parsed.data.proposedName,
+      previousName: group.name,
+    }),
+    proposalType: "event",
+    state: "proposed",
+    proposerId: session.user.id,
+    eventPrivacy: "open",
+    createdAt: now,
+    updatedAt: now,
+  });
+
+  for (const user of activeUsers) {
+    if (user.id === session.user.id) continue;
+    await db.insert(proposalInvitees).values({
+      id: `pi-${randomUUID()}`,
+      proposalId,
+      userId: user.id,
+      role: "required",
+      voteStatus: "not_seen",
+      createdAt: now,
+    });
+  }
+
+  await db.insert(proposalStateLog).values({
+    id: `psl-${randomUUID()}`,
+    proposalId,
+    actorUserId: session.user.id,
+    action: "proposal.group_name_created",
+    details: parsed.data.proposedName,
+    createdAt: now,
+  });
+
+  for (const user of activeUsers) {
+    if (user.id === session.user.id) continue;
+    await notifyUser(user.id, "proposal_submitted", `${title} needs your review.`, {
+      proposalId,
+      proposalType: "group_name",
+    });
+  }
+
+  await logUserActivity(
+    session.user.id,
+    "admin.group_name_proposal",
+    JSON.stringify({ proposalId, proposedName: parsed.data.proposedName }),
+    "system",
+  );
+
+  revalidatePath("/admin");
+  revalidatePath("/proposals");
+  return { ok: true, message: "Group name change proposed to the network." };
 }

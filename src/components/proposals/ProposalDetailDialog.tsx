@@ -276,7 +276,7 @@ export function ProposalDetailDialog({
     });
   }
 
-  function handleRemoveOptionalAttendee(userId: string) {
+  function handleRemoveAttendee(userId: string) {
     if (!proposalId) return;
     startTransition(async () => {
       const result = await updateResolvedAttendeesAction({
@@ -315,6 +315,11 @@ export function ProposalDetailDialog({
           {detail?.isContentMasked && (
             <Alert severity="warning" sx={{ mb: 2 }}>
               This is a private event. Details are hidden because you are not an invitee.
+            </Alert>
+          )}
+          {detail?.hasOverlapWarning && (
+            <Alert severity="warning" sx={{ mb: 2 }}>
+              Your calendar now conflicts with this event after you voted. Review your schedule.
             </Alert>
           )}
           {showConflictConfirm && conflictWarnings.length > 0 && (
@@ -520,11 +525,11 @@ export function ProposalDetailDialog({
                       <Typography variant="body2">{invitee.displayName}</Typography>
                       <Chip size="small" label={invitee.role} variant="outlined" />
                       <Chip size="small" label={voteLabel(invitee.voteStatus)} />
-                      {detail.canManageAttendees && invitee.role === "optional" && (
+                      {detail.canManageAttendees && (
                         <Button
                           size="small"
                           color="error"
-                          onClick={() => handleRemoveOptionalAttendee(invitee.userId)}
+                          onClick={() => handleRemoveAttendee(invitee.userId)}
                           disabled={pending}
                         >
                           Remove

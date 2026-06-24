@@ -9,10 +9,10 @@ import { z } from "zod";
 import { auth } from "@/lib/auth";
 import { logUserActivity } from "@/lib/audit";
 import { isUserThemeId, type UserThemeId } from "@/lib/constants/themes";
-import { AVATAR_OPTIONS, type AvatarKey } from "@/lib/constants/avatars";
+import { AVATAR_OPTIONS, isCustomAvatarKey, type AvatarKey } from "@/lib/constants/avatars";
 import { getDb } from "@/lib/db/client";
 import { ensureDbReady } from "@/lib/db/ensure-ready";
-import { users } from "@/lib/db/schema";
+import { storedImages, users } from "@/lib/db/schema";
 import {
   DEFAULT_NOTIFICATION_PREFS,
   parseNotificationPrefs,
@@ -38,12 +38,16 @@ function formatPasswordErrors(error: z.ZodError): string {
 }
 
 const AVATAR_KEYS = AVATAR_OPTIONS.map((option) => option.key);
+const MAX_AVATAR_BYTES = 2 * 1024 * 1024;
+const ALLOWED_AVATAR_MIMES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
+
+function isValidAvatarKey(value: string): value is AvatarKey | `custom:${string}` {
+  if (AVATAR_KEYS.includes(value as AvatarKey)) return true;
+  return isCustomAvatarKey(value);
+}
 
 const preferencesSchema = z.object({
-  avatarKey: z.string().refine(
-    (value): value is AvatarKey => AVATAR_KEYS.includes(value as AvatarKey),
-    "Invalid avatar",
-  ),
+  avatarKey: z.string().refine(isValidAvatarKey, "Invalid avatar"),
   theme: z.string().refine(isUserThemeId, "Invalid theme"),
 });
 
@@ -141,6 +145,52 @@ export async function updateProfilePreferencesAction(
 
   revalidatePath("/profile");
   return { ok: true };
+}
+
+/**
+ * Stores a user-uploaded avatar in `stored_images` and sets avatarKey (PC-45).
+ */
+export async function uploadCustomAvatarAction(
+  formData: FormData,
+): Promise<{ ok: true; avatarKey: string } | { ok: false; error: string }> {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return { ok: false, error: "Not signed in." };
+  }
+
+  const file = formData.get("avatar");
+  if (!(file instanceof File) || file.size === 0) {
+    return { ok: false, error: "Choose an image file." };
+  }
+  if (file.size > MAX_AVATAR_BYTES) {
+    return { ok: false, error: "Image must be 2 MB or smaller." };
+  }
+  if (!ALLOWED_AVATAR_MIMES.has(file.type)) {
+    return { ok: false, error: "Use JPEG, PNG, WebP, or GIF." };
+  }
+
+  const buffer = Buffer.from(await file.arrayBuffer());
+  const imageId = randomUUID();
+  const avatarKey = `custom:${imageId}`;
+  const now = new Date().toISOString();
+
+  await ensureDbReady();
+  const db = getDb();
+  await db.insert(storedImages).values({
+    id: imageId,
+    mimeType: file.type,
+    data: buffer,
+    createdAt: now,
+  });
+
+  await db
+    .update(users)
+    .set({ avatarKey, updatedAt: now })
+    .where(eq(users.id, session.user.id));
+
+  await logUserActivity(session.user.id, "profile.custom_avatar_upload", imageId);
+  revalidatePath("/profile");
+  return { ok: true, avatarKey };
 }
 
 const displayNameSchema = z

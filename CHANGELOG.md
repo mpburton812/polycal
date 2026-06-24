@@ -8,6 +8,9 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- Phase 7 post-resolution (PC-45): required attendee removal with notifications, redraft T−24h auto-repropose, overlap warnings for voters.
+- Phase 2 profile completion (PC-45): quiet hours, alert-type toggles, custom avatar upload with API route.
+- Phase 8 admin completion (PC-45): pause/delete user proposal workflow, audit log visibility tiers, group name change proposals.
 - Phase 5 notifications (PC-43): Web Push subscription storage and service worker handler; actionable inbox (partnership accept/decline, proposal links); notification email with verification token; email delivery queue stub in activity log.
 - Relationship proposals surface on Proposals Kanban with dedicated dialog; partnership actions send inbox notifications.
 - Solo event toggle on event drafts; Submit button visible immediately after first draft save.

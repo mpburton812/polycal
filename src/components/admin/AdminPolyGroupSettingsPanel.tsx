@@ -19,6 +19,7 @@ import { useState, useTransition } from "react";
 
 import {
   getPolyGroupSettingsAction,
+  proposeGroupNameChangeAction,
   updatePolyGroupSettingsAction,
 } from "@/actions/poly-group";
 import type { PolyGroupSettings } from "@/types/poly-group";
@@ -54,6 +55,8 @@ export function AdminPolyGroupSettingsPanel({
   const [settings, setSettings] = useState(initialSettings);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [proposedName, setProposedName] = useState("");
+  const [proposalMessage, setProposalMessage] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
   function save() {
@@ -66,6 +69,21 @@ export function AdminPolyGroupSettingsPanel({
         return;
       }
       setMessage(result.message);
+      router.refresh();
+    });
+  }
+
+  function proposeNameChange() {
+    setProposalMessage(null);
+    setError(null);
+    startTransition(async () => {
+      const result = await proposeGroupNameChangeAction({ proposedName });
+      if (!result.ok) {
+        setError(result.message);
+        return;
+      }
+      setProposalMessage(result.message);
+      setProposedName("");
       router.refresh();
     });
   }
@@ -83,7 +101,30 @@ export function AdminPolyGroupSettingsPanel({
           value={settings.name}
           onChange={(e) => setSettings({ ...settings, name: e.target.value })}
           fullWidth
+          helperText={
+            settings.allowGroupNameProposals
+              ? "Direct saves update immediately; use “Propose name change” for consensus workflow."
+              : undefined
+          }
         />
+        {settings.allowGroupNameProposals && (
+          <Stack direction="row" spacing={2} alignItems="flex-start">
+            <TextField
+              label="Proposed new name"
+              value={proposedName}
+              onChange={(e) => setProposedName(e.target.value)}
+              fullWidth
+            />
+            <Button
+              variant="outlined"
+              onClick={proposeNameChange}
+              disabled={pending || !proposedName.trim()}
+            >
+              Propose name change
+            </Button>
+          </Stack>
+        )}
+        {proposalMessage && <Alert severity="success">{proposalMessage}</Alert>}
         <FormControlLabel
           control={
             <Switch
