@@ -1,34 +1,41 @@
 "use client";
 
+import AddIcon from "@mui/icons-material/Add";
 import {
   Alert,
   Box,
-  Button,
-  Chip,
-  List,
-  ListItem,
-  ListItemButton,
-  ListItemText,
-  Paper,
-  Stack,
+  Fab,
+  Tab,
+  Tabs,
   Typography,
 } from "@mui/material";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
-import { type ProposalBoard, type ProposalCard, type ProposalDetail } from "@/actions/proposals";
+import {
+  deleteDraftProposalAction,
+  getProposalDetailAction,
+  type ProposalBoard,
+  type ProposalDetail,
+} from "@/actions/proposals";
 import type { ProposalPlaceOption } from "@/actions/proposals";
 import type { PersonSummary } from "@/actions/users";
 
+import { ProposalCard } from "./ProposalCard";
 import { ProposalDetailDialog } from "./ProposalDetailDialog";
 import { ProposalDraftDialog } from "./ProposalDraftDialog";
 
-const COLUMN_LABELS = {
+const TAB_KEYS = ["draft", "proposed", "resolved", "archived"] as const;
+type TabKey = (typeof TAB_KEYS)[number];
+
+const TAB_LABELS: Record<TabKey, string> = {
   draft: "Drafts",
   proposed: "Proposed",
   resolved: "Resolved",
   archived: "Archived",
-} as const;
+};
+
+const POLY_GREEN = "#004d40";
 
 interface ProposalsClientProps {
   board: ProposalBoard;
@@ -37,44 +44,8 @@ interface ProposalsClientProps {
   currentUserId: string;
 }
 
-function ProposalListItem({
-  proposal,
-  onOpen,
-}: {
-  proposal: ProposalCard;
-  onOpen: (id: string) => void;
-}) {
-  return (
-    <ListItem disableGutters sx={{ borderBottom: 1, borderColor: "divider" }}>
-      <ListItemButton onClick={() => onOpen(proposal.id)} sx={{ alignItems: "flex-start", py: 1.5 }}>
-        <ListItemText
-          primary={
-            <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
-              <Typography variant="subtitle2">{proposal.title}</Typography>
-              <Chip size="small" label={proposal.proposalType} variant="outlined" />
-              {proposal.atRisk && <Chip size="small" label="At risk" color="warning" />}
-              {proposal.needsViewerAction && (
-                <Chip size="small" label="Action needed" color="primary" />
-              )}
-            </Stack>
-          }
-          secondary={
-            <>
-              {proposal.description}
-              <br />
-              Proposer: {proposal.proposerName}
-              {proposal.locationName ? ` · ${proposal.locationName}` : ""}
-              {proposal.inviteeCount > 0 ? ` · ${proposal.inviteeCount} invitee(s)` : ""}
-            </>
-          }
-        />
-      </ListItemButton>
-    </ListItem>
-  );
-}
-
 /**
- * Interactive proposals Kanban — Phase 4 voting and draft editing (PC-40).
+ * Proposals hub with horizontal tabs and graphical cards (PC-40).
  */
 export function ProposalsClient({
   board,
@@ -83,6 +54,7 @@ export function ProposalsClient({
   currentUserId,
 }: ProposalsClientProps) {
   const router = useRouter();
+  const [activeTab, setActiveTab] = useState<TabKey>("draft");
   const [createOpen, setCreateOpen] = useState(false);
   const [editDetail, setEditDetail] = useState<ProposalDetail | null>(null);
   const [selectedProposalId, setSelectedProposalId] = useState<string | null>(null);
@@ -90,9 +62,32 @@ export function ProposalsClient({
   const [message, setMessage] = useState<string | null>(null);
   const [, startTransition] = useTransition();
 
+  const proposals = board[activeTab];
+
   function openDetail(proposalId: string) {
     setSelectedProposalId(proposalId);
     setDetailOpen(true);
+  }
+
+  function handleContinueEdit(proposalId: string) {
+    startTransition(async () => {
+      const result = await getProposalDetailAction(proposalId);
+      if (!result.ok || !result.detail) {
+        setMessage(result.message);
+        return;
+      }
+      setEditDetail(result.detail);
+      setCreateOpen(true);
+    });
+  }
+
+  function handleDeleteDraft(proposalId: string) {
+    if (!window.confirm("Delete this draft?")) return;
+    startTransition(async () => {
+      const result = await deleteDraftProposalAction(proposalId);
+      setMessage(result.message);
+      if (result.ok) router.refresh();
+    });
   }
 
   function handleEditFromDetail(detail: ProposalDetail) {
@@ -108,50 +103,76 @@ export function ProposalsClient({
   }
 
   return (
-    <Box>
-      <Stack direction="row" justifyContent="flex-end" sx={{ mb: 2 }}>
-        <Button
-          variant="contained"
-          onClick={() => {
-            setEditDetail(null);
-            setCreateOpen(true);
-          }}
-        >
-          New proposal
-        </Button>
-      </Stack>
+    <Box sx={{ position: "relative", pb: 10 }}>
+      <Tabs
+        value={activeTab}
+        onChange={(_, value: TabKey) => setActiveTab(value)}
+        variant="fullWidth"
+        sx={{
+          mb: 3,
+          borderBottom: 1,
+          borderColor: "divider",
+          "& .MuiTab-root.Mui-selected": { color: POLY_GREEN, fontWeight: 600 },
+          "& .MuiTabs-indicator": { bgcolor: POLY_GREEN },
+        }}
+      >
+        {TAB_KEYS.map((key) => (
+          <Tab
+            key={key}
+            value={key}
+            label={`${TAB_LABELS[key]} (${board[key].length})`}
+          />
+        ))}
+      </Tabs>
+
       {message && (
-        <Alert severity="info" sx={{ mb: 2 }}>
+        <Alert severity="info" sx={{ mb: 2 }} onClose={() => setMessage(null)}>
           {message}
         </Alert>
       )}
-      <Stack spacing={2}>
-        {(Object.keys(COLUMN_LABELS) as (keyof ProposalBoard)[]).map((column) => (
-          <Paper key={column} variant="outlined" sx={{ p: 2 }}>
-            <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1 }}>
-              <Typography variant="subtitle1" fontWeight={600}>
-                {COLUMN_LABELS[column]}
-              </Typography>
-              <Chip size="small" label={board[column].length} />
-            </Stack>
-            {board[column].length === 0 ? (
-              <Typography variant="body2" color="text.secondary">
-                No proposals in this column.
-              </Typography>
-            ) : (
-              <List dense disablePadding>
-                {board[column].map((proposal) => (
-                  <ProposalListItem
-                    key={proposal.id}
-                    proposal={proposal}
-                    onOpen={openDetail}
-                  />
-                ))}
-              </List>
-            )}
-          </Paper>
-        ))}
-      </Stack>
+
+      {proposals.length === 0 ? (
+        <Typography variant="body2" color="text.secondary" sx={{ py: 4, textAlign: "center" }}>
+          No proposals in {TAB_LABELS[activeTab].toLowerCase()}.
+        </Typography>
+      ) : (
+        <Box
+          sx={{
+            display: "grid",
+            gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr", lg: "1fr 1fr 1fr" },
+            gap: 2,
+          }}
+        >
+          {proposals.map((proposal) => (
+            <ProposalCard
+              key={proposal.id}
+              proposal={proposal}
+              onOpen={openDetail}
+              onContinueEdit={proposal.state === "draft" ? handleContinueEdit : undefined}
+              onDeleteDraft={proposal.state === "draft" ? handleDeleteDraft : undefined}
+            />
+          ))}
+        </Box>
+      )}
+
+      <Fab
+        color="primary"
+        aria-label="New proposal"
+        onClick={() => {
+          setEditDetail(null);
+          setCreateOpen(true);
+        }}
+        sx={{
+          position: "fixed",
+          bottom: 88,
+          right: 24,
+          bgcolor: POLY_GREEN,
+          "&:hover": { bgcolor: "#00332c" },
+        }}
+      >
+        <AddIcon />
+      </Fab>
+
       <ProposalDraftDialog
         open={createOpen}
         onClose={handleDraftDialogClose}
@@ -163,6 +184,7 @@ export function ProposalsClient({
       <ProposalDetailDialog
         proposalId={selectedProposalId}
         open={detailOpen}
+        people={people}
         onClose={() => {
           setDetailOpen(false);
           setSelectedProposalId(null);
