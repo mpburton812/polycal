@@ -23,9 +23,10 @@ test.describe("Admin", () => {
 });
 
 test.describe("Schedule placeholder", () => {
-  test("schedule tab shows phase placeholder", async ({ page }) => {
+  test("schedule tab loads calendar shell after login", async ({ page }) => {
     await login(page, USERS.luke.username);
     await page.getByRole("link", { name: "Schedule" }).click();
-    await expect(page.getByText(/Phase 6|Calendar views/i)).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Schedule", level: 1 })).toBeVisible();
+    await expect(page.getByText(/network calendar/i)).toBeVisible();
   });
 });

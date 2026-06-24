@@ -9,6 +9,7 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Added
 
 - Phase 4 close-out (PC-40): resolution collision engine auto-declines overlapping pending proposals into proposer review; notification inbox in app header; per-bedroom picker on sleeping drafts; schema v10 (`notification_dismissals`).
+- Phase 6 schedule (PC-42): weekly/two-week calendar views, color-coded events, network filters, planning mode drawer, proposal detail from calendar blocks.
 
 - Phase 1 foundation: demo proposals Kanban seed (all workflow columns), admin test DB reset, profile password change with first-login enforcement, avatar and accent theme preferences.
 - Phase 2 People & Places: user provisioning with clipboard credentials, sleeping partnership graph, place CRUD with residency proposals.
