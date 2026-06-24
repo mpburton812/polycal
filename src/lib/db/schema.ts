@@ -260,6 +260,21 @@ export const proposalComments = sqliteTable("proposal_comments", {
   createdAt: text("created_at").notNull(),
 });
 
+/** Tracks per-user dismissal of system notifications in the activity log (PC-40). */
+export const notificationDismissals = sqliteTable(
+  "notification_dismissals",
+  {
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id),
+    logId: integer("log_id")
+      .notNull()
+      .references(() => userActivityLog.id),
+    dismissedAt: text("dismissed_at").notNull(),
+  },
+  (table) => [unique().on(table.userId, table.logId)],
+);
+
 /** Undirected sleeping partnership edge with proposal workflow (PC-36). */
 export const sleepingPartnerships = sqliteTable("sleeping_partnerships", {
   id: text("id").primaryKey(),
@@ -312,6 +327,7 @@ export const schema = {
   proposalTimeSlots,
   proposalStateLog,
   proposalComments,
+  notificationDismissals,
   sleepingPartnerships,
   locationResidents,
 };

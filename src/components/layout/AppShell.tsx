@@ -4,6 +4,7 @@ import { AppHeader } from "@/components/layout/AppHeader";
 import { AppTabs } from "@/components/layout/AppTabs";
 import { DevBar } from "@/components/layout/DevBar";
 import { avatarSrcForKey } from "@/lib/constants/avatars";
+import type { NotificationItem } from "@/actions/notifications";
 
 /**
  * Authenticated shell wrapping all primary tabs with dev tooling and bottom nav.
@@ -13,11 +14,15 @@ export function AppShell({
   displayName,
   isAdmin,
   avatarKey,
+  notificationCount = 0,
+  notificationItems = [],
 }: {
   children: React.ReactNode;
   displayName: string;
   isAdmin: boolean;
   avatarKey?: string;
+  notificationCount?: number;
+  notificationItems?: NotificationItem[];
 }) {
   const avatarSrc = avatarSrcForKey(avatarKey);
 
@@ -34,7 +39,8 @@ export function AppShell({
         <DevBar />
         <AppHeader
           displayName={displayName}
-          notificationCount={0}
+          notificationCount={notificationCount}
+          notificationItems={notificationItems}
           avatarSrc={avatarSrc}
         />
       </Box>

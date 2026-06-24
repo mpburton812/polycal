@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { listPeopleAction } from "@/actions/users";
+import { getNotificationInboxAction } from "@/actions/notifications";
 import { AppShell } from "@/components/layout/AppShell";
 import { FirstLoginWizard } from "@/components/onboarding/FirstLoginWizard";
 import { UserThemeProvider } from "@/components/providers/UserThemeProvider";
@@ -23,6 +24,8 @@ export default async function AppLayout({
     ? session.user.theme!
     : "mint";
 
+  const notificationInbox = await getNotificationInboxAction();
+
   const showOnboarding = !session.user.onboardingComplete;
 
   let partnerOptions: { id: string; displayName: string }[] = [];
@@ -39,6 +42,8 @@ export default async function AppLayout({
         displayName={session.user.displayName}
         isAdmin={hasAdminAccess}
         avatarKey={session.user.avatarKey}
+        notificationCount={notificationInbox.count}
+        notificationItems={notificationInbox.items}
       >
         {showOnboarding ? (
           <FirstLoginWizard

@@ -1,8 +1,7 @@
 import { logUserActivity } from "@/lib/audit";
 
 /**
- * Records a user-targeted system notification in the activity log until a dedicated
- * in-app notification inbox ships (PC-37).
+ * Records a user-targeted system notification in the activity log (PC-40 inbox).
  */
 export async function notifyUser(
   userId: string,
