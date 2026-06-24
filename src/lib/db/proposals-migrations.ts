@@ -11,6 +11,9 @@ export async function applyProposalsMigrations(sql: Client): Promise<void> {
   await ensureColumn(sql, "proposals", "is_poll", "INTEGER NOT NULL DEFAULT 0");
   await ensureColumn(sql, "proposals", "at_risk", "INTEGER NOT NULL DEFAULT 0");
   await ensureColumn(sql, "proposals", "parent_proposal_id", "TEXT REFERENCES proposals(id)");
+  await ensureColumn(sql, "proposals", "batch_group_id", "TEXT");
+  await ensureColumn(sql, "proposals", "winning_slot_id", "TEXT");
+  await ensureColumn(sql, "proposals", "at_risk_expires_at", "TEXT");
 
   await sql.execute(`
     CREATE TABLE IF NOT EXISTS proposal_invitees (
@@ -37,6 +40,19 @@ export async function applyProposalsMigrations(sql: Client): Promise<void> {
       label TEXT,
       sort_order INTEGER NOT NULL DEFAULT 0,
       created_at TEXT NOT NULL
+    );
+  `);
+
+  await sql.execute(`
+    CREATE TABLE IF NOT EXISTS proposal_slot_votes (
+      id TEXT PRIMARY KEY NOT NULL,
+      proposal_id TEXT NOT NULL REFERENCES proposals(id),
+      time_slot_id TEXT NOT NULL REFERENCES proposal_time_slots(id),
+      user_id TEXT NOT NULL REFERENCES users(id),
+      vote_status TEXT NOT NULL DEFAULT 'not_seen',
+      responded_at TEXT,
+      created_at TEXT NOT NULL,
+      UNIQUE(time_slot_id, user_id)
     );
   `);
 

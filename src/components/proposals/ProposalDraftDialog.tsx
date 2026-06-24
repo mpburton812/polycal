@@ -23,6 +23,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 
 import {
+  createBatchSleepingProposalsAction,
   createDraftProposalAction,
   updateDraftProposalAction,
   type ProposalDetail,
@@ -83,6 +84,10 @@ export function ProposalDraftDialog({
   const [locationId, setLocationId] = useState("");
   const [intentionalSolo, setIntentionalSolo] = useState(false);
   const [isPoll, setIsPoll] = useState(false);
+  const [batchMode, setBatchMode] = useState(false);
+  const [rangeStart, setRangeStart] = useState("");
+  const [rangeEnd, setRangeEnd] = useState("");
+  const [nightsPattern, setNightsPattern] = useState<"every" | "weekdays" | "weekends">("every");
   const [eventPrivacy, setEventPrivacy] = useState<"open" | "private" | "super_private">("open");
   const [slots, setSlots] = useState<SlotDraft[]>([{ startAt: "", endAt: "", label: "" }]);
   const [inviteeMode, setInviteeMode] = useState<Record<string, InviteeSelection>>({});
@@ -126,6 +131,10 @@ export function ProposalDraftDialog({
       setLocationId("");
       setIntentionalSolo(false);
       setIsPoll(false);
+      setBatchMode(false);
+      setRangeStart("");
+      setRangeEnd("");
+      setNightsPattern("every");
       setEventPrivacy("open");
       setSlots([{ startAt: "", endAt: "", label: "" }]);
       setInviteeMode({});
@@ -178,6 +187,33 @@ export function ProposalDraftDialog({
     };
 
     startTransition(async () => {
+      if (batchMode && proposalType === "sleeping" && !isEdit) {
+        const rangeStartIso = localInputToIso(rangeStart);
+        const rangeEndIso = localInputToIso(rangeEnd);
+        if (!rangeStartIso || !rangeEndIso) {
+          setError("Batch mode requires a valid date range.");
+          return;
+        }
+        const result = await createBatchSleepingProposalsAction({
+          title,
+          description,
+          locationId: locationId || undefined,
+          notes: notes || undefined,
+          intentionalSolo: intentionalSolo,
+          invitees,
+          rangeStart: rangeStartIso,
+          rangeEnd: rangeEndIso,
+          nightsPattern,
+        });
+        if (!result.ok) {
+          setError(result.message);
+          return;
+        }
+        handleClose();
+        router.refresh();
+        return;
+      }
+
       const result = isEdit && initialDetail
         ? await updateDraftProposalAction({ ...payload, proposalId: initialDetail.id })
         : await createDraftProposalAction(payload);
@@ -246,6 +282,17 @@ export function ProposalDraftDialog({
               <MenuItem value="super_private">Super private</MenuItem>
             </Select>
           </FormControl>
+          {proposalType === "sleeping" && !isEdit && (
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={batchMode}
+                  onChange={(event) => setBatchMode(event.target.checked)}
+                />
+              }
+              label="Batch / recurring nights (create multiple drafts)"
+            />
+          )}
           {proposalType === "event" && (
             <FormControlLabel
               control={
@@ -258,8 +305,44 @@ export function ProposalDraftDialog({
             />
           )}
           <Typography variant="subtitle2">
-            {isPoll ? "Poll time slots" : "Time window"}
+            {batchMode ? "Date range for batch" : isPoll ? "Poll time slots" : "Time window"}
           </Typography>
+          {batchMode ? (
+            <Stack spacing={1}>
+              <TextField
+                label="Range start"
+                type="datetime-local"
+                value={rangeStart}
+                onChange={(event) => setRangeStart(event.target.value)}
+                fullWidth
+                InputLabelProps={{ shrink: true }}
+              />
+              <TextField
+                label="Range end"
+                type="datetime-local"
+                value={rangeEnd}
+                onChange={(event) => setRangeEnd(event.target.value)}
+                fullWidth
+                InputLabelProps={{ shrink: true }}
+              />
+              <FormControl fullWidth>
+                <InputLabel id="nights-pattern-label">Nights pattern</InputLabel>
+                <Select
+                  labelId="nights-pattern-label"
+                  label="Nights pattern"
+                  value={nightsPattern}
+                  onChange={(event) =>
+                    setNightsPattern(event.target.value as "every" | "weekdays" | "weekends")
+                  }
+                >
+                  <MenuItem value="every">Every night</MenuItem>
+                  <MenuItem value="weekdays">Weekdays only</MenuItem>
+                  <MenuItem value="weekends">Weekends only</MenuItem>
+                </Select>
+              </FormControl>
+            </Stack>
+          ) : (
+            <>
           {slots.map((slot, index) => (
             <Stack key={`slot-${index}`} spacing={1} sx={{ p: 1.5, border: 1, borderColor: "divider", borderRadius: 1 }}>
               {isPoll && (
@@ -307,6 +390,8 @@ export function ProposalDraftDialog({
             >
               Add poll option
             </Button>
+          )}
+            </>
           )}
           <FormControl fullWidth>
             <InputLabel id="proposal-place-label">Location (optional)</InputLabel>
