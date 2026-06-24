@@ -47,3 +47,6 @@
 2026-06-23 | 79fc854 | PC-35 | use static z-index in AppShell sticky header | src/components/layout/AppShell.tsx
 2026-06-24 | f83a76c | PC-35 | correct username availability validation and error messages | src/actions/users.ts
 2026-06-24 | d23d1a1 | PC-35 | lock add-person dialog after create and add admin user edit/delete | src/actions/users.ts
+2026-06-24 | 3c6a190 | PC-8 | admin tab, profile gaps, passive activation and onboarding | src/actions/admin.ts
+2026-06-24 | cc9fed8 | PC-8 | admin tab, profile gaps, passive activation and onboarding | src/actions/admin.ts
+2026-06-24 | 9e5e40e | PC-8 | admin tab, profile gaps, passive activation and onboarding | src/actions/admin.ts

@@ -12,6 +12,11 @@ import { AVATAR_OPTIONS, type AvatarKey } from "@/lib/constants/avatars";
 import { getDb } from "@/lib/db/client";
 import { ensureDbReady } from "@/lib/db/ensure-ready";
 import { users } from "@/lib/db/schema";
+import {
+  DEFAULT_NOTIFICATION_PREFS,
+  parseNotificationPrefs,
+  type NotificationPrefs,
+} from "@/types/notification-prefs";
 
 const passwordSchema = z
   .object({
@@ -126,6 +131,84 @@ export async function updateProfilePreferencesAction(
     `${parsed.data.avatarKey}, ${parsed.data.theme}`,
   );
 
+  revalidatePath("/profile");
+  return { ok: true };
+}
+
+const displayNameSchema = z
+  .string()
+  .trim()
+  .min(1, "Display name is required.")
+  .max(80, "Display name must be 80 characters or fewer.");
+
+/**
+ * Updates the signed-in user's display name (PC-9).
+ */
+export async function updateDisplayNameAction(displayName: string): Promise<ActionResult> {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return { ok: false, error: "Not signed in." };
+  }
+
+  const parsed = displayNameSchema.safeParse(displayName);
+  if (!parsed.success) {
+    return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid display name." };
+  }
+
+  await ensureDbReady();
+  const db = getDb();
+  const now = new Date().toISOString();
+  await db
+    .update(users)
+    .set({ displayName: parsed.data, updatedAt: now })
+    .where(eq(users.id, session.user.id));
+
+  await logUserActivity(session.user.id, "profile.display_name_update", parsed.data);
+  revalidatePath("/profile");
+  return { ok: true };
+}
+
+/**
+ * Loads notification preferences for the signed-in user (PC-9).
+ */
+export async function getNotificationPrefsAction(): Promise<NotificationPrefs> {
+  const session = await auth();
+  if (!session?.user?.id) return DEFAULT_NOTIFICATION_PREFS;
+
+  await ensureDbReady();
+  const db = getDb();
+  const [row] = await db
+    .select({ notificationPrefsJson: users.notificationPrefsJson })
+    .from(users)
+    .where(eq(users.id, session.user.id))
+    .limit(1);
+
+  return parseNotificationPrefs(row?.notificationPrefsJson);
+}
+
+/**
+ * Saves notification preferences (email verification deferred to PC-19).
+ */
+export async function updateNotificationPrefsAction(
+  prefs: NotificationPrefs,
+): Promise<ActionResult> {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return { ok: false, error: "Not signed in." };
+  }
+
+  await ensureDbReady();
+  const db = getDb();
+  const now = new Date().toISOString();
+  await db
+    .update(users)
+    .set({
+      notificationPrefsJson: JSON.stringify(prefs),
+      updatedAt: now,
+    })
+    .where(eq(users.id, session.user.id));
+
+  await logUserActivity(session.user.id, "profile.notification_prefs_update");
   revalidatePath("/profile");
   return { ok: true };
 }
