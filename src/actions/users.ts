@@ -2,7 +2,7 @@
 
 import { hash } from "bcryptjs";
 import { randomUUID } from "node:crypto";
-import { asc, eq, ne, or } from "drizzle-orm";
+import { and, asc, eq, inArray, ne, or } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
@@ -13,11 +13,14 @@ import { ensureDbReady } from "@/lib/db/ensure-ready";
 import {
   locationResidents,
   polyGroup,
+  proposalInvitees,
+  proposalSlotVotes,
   proposals,
   sleepingPartnerships,
   users,
   type UserRole,
 } from "@/lib/db/schema";
+import { notifyUser } from "@/lib/notifications";
 import {
   buildLoginInstructions,
   generateTemporaryPassword,
@@ -142,6 +145,221 @@ function formatZodError(error: z.ZodError): string {
       return `${label}: ${issue.message}`;
     })
     .join(" ");
+}
+
+/**
+ * Archives proposals owned by a departing user and removes them as invitees elsewhere (PC-45).
+ */
+async function archiveProposalsForDeletedUser(
+  db: ReturnType<typeof getDb>,
+  userId: string,
+  actorUserId: string,
+): Promise<void> {
+  const now = new Date().toISOString();
+
+  const owned = await db
+    .select({ id: proposals.id, title: proposals.title })
+    .from(proposals)
+    .where(
+      and(
+        eq(proposals.proposerId, userId),
+        inArray(proposals.state, ["draft", "proposed", "resolved"]),
+      ),
+    );
+
+  for (const proposal of owned) {
+    await db
+      .update(proposals)
+      .set({
+        state: "archived",
+        scheduledStartAt: null,
+        scheduledEndAt: null,
+        atRisk: false,
+        updatedAt: now,
+      })
+      .where(eq(proposals.id, proposal.id));
+
+    const invitees = await db
+      .select({ userId: proposalInvitees.userId })
+      .from(proposalInvitees)
+      .where(eq(proposalInvitees.proposalId, proposal.id));
+
+    for (const invitee of invitees) {
+      if (invitee.userId === userId) continue;
+      await notifyUser(
+        invitee.userId,
+        "proposal_cancelled",
+        `Proposal "${proposal.title}" was archived because the proposer was removed.`,
+        { proposalId: proposal.id },
+      );
+    }
+  }
+
+  await demoteOrRemoveInviteeFromActiveProposals(db, userId, actorUserId, "removed from the network");
+}
+
+/**
+ * Demotes a paused/deleted user to optional on active proposals; reverts when no required remain (PC-45).
+ */
+async function demoteOrRemoveInviteeFromActiveProposals(
+  db: ReturnType<typeof getDb>,
+  userId: string,
+  actorUserId: string | null,
+  reason: string,
+): Promise<void> {
+  const now = new Date().toISOString();
+
+  const inviteeRows = await db
+    .select({
+      id: proposalInvitees.id,
+      proposalId: proposalInvitees.proposalId,
+      role: proposalInvitees.role,
+    })
+    .from(proposalInvitees)
+    .innerJoin(proposals, eq(proposalInvitees.proposalId, proposals.id))
+    .where(
+      and(
+        eq(proposalInvitees.userId, userId),
+        inArray(proposals.state, ["proposed", "resolved"]),
+      ),
+    );
+
+  for (const row of inviteeRows) {
+    await db.delete(proposalSlotVotes).where(
+      and(eq(proposalSlotVotes.proposalId, row.proposalId), eq(proposalSlotVotes.userId, userId)),
+    );
+    await db.delete(proposalInvitees).where(eq(proposalInvitees.id, row.id));
+
+    const [proposal] = await db
+      .select()
+      .from(proposals)
+      .where(eq(proposals.id, row.proposalId))
+      .limit(1);
+    if (!proposal) continue;
+
+    const remainingRequired = await db
+      .select({ userId: proposalInvitees.userId })
+      .from(proposalInvitees)
+      .where(
+        and(eq(proposalInvitees.proposalId, row.proposalId), eq(proposalInvitees.role, "required")),
+      );
+
+    if (remainingRequired.length === 0) {
+      const noteLine = `Returned to drafts: participant ${reason}.`;
+      await db
+        .update(proposals)
+        .set({
+          state: "draft",
+          atRisk: false,
+          notes: proposal.notes?.trim() ? `${proposal.notes.trim()}\n${noteLine}` : noteLine,
+          updatedAt: now,
+        })
+        .where(eq(proposals.id, row.proposalId));
+
+      const stakeholders = await db
+        .select({ userId: proposalInvitees.userId })
+        .from(proposalInvitees)
+        .where(eq(proposalInvitees.proposalId, row.proposalId));
+
+      const notifyIds = new Set<string>([proposal.proposerId, ...stakeholders.map((s) => s.userId)]);
+      for (const notifyId of notifyIds) {
+        await notifyUser(
+          notifyId,
+          "proposal_reverted_to_draft",
+          `Proposal "${proposal.title}" was moved back to drafts.`,
+          { proposalId: row.proposalId, reason },
+        );
+      }
+    } else if (row.role === "required") {
+      const notifyIds = new Set<string>([
+        proposal.proposerId,
+        ...remainingRequired.map((r) => r.userId),
+      ]);
+      for (const notifyId of notifyIds) {
+        await notifyUser(
+          notifyId,
+          "proposal_attendees_updated",
+          `A required attendee was ${reason} on "${proposal.title}".`,
+          { proposalId: row.proposalId },
+        );
+      }
+    }
+  }
+}
+
+/**
+ * Pauses active proposals involving a user by demoting them to optional (PC-45).
+ */
+async function pauseUserProposalSideEffects(
+  db: ReturnType<typeof getDb>,
+  userId: string,
+): Promise<void> {
+  const now = new Date().toISOString();
+  const affectedProposalIds = new Set<string>();
+
+  const requiredRows = await db
+    .select({ id: proposalInvitees.id, proposalId: proposalInvitees.proposalId })
+    .from(proposalInvitees)
+    .innerJoin(proposals, eq(proposalInvitees.proposalId, proposals.id))
+    .where(
+      and(
+        eq(proposalInvitees.userId, userId),
+        eq(proposalInvitees.role, "required"),
+        inArray(proposals.state, ["proposed", "resolved"]),
+      ),
+    );
+
+  for (const row of requiredRows) {
+    await db
+      .update(proposalInvitees)
+      .set({ role: "optional", voteStatus: "abstain", respondedAt: now })
+      .where(eq(proposalInvitees.id, row.id));
+    affectedProposalIds.add(row.proposalId);
+  }
+
+  for (const proposalId of affectedProposalIds) {
+    const remainingRequired = await db
+      .select({ userId: proposalInvitees.userId })
+      .from(proposalInvitees)
+      .where(
+        and(eq(proposalInvitees.proposalId, proposalId), eq(proposalInvitees.role, "required")),
+      );
+
+    if (remainingRequired.length > 0) continue;
+
+    const [proposal] = await db
+      .select()
+      .from(proposals)
+      .where(eq(proposals.id, proposalId))
+      .limit(1);
+    if (!proposal) continue;
+
+    const noteLine = "Returned to drafts: no required invitees remain after a participant was paused.";
+    await db
+      .update(proposals)
+      .set({
+        state: "draft",
+        atRisk: false,
+        notes: proposal.notes?.trim() ? `${proposal.notes.trim()}\n${noteLine}` : noteLine,
+        updatedAt: now,
+      })
+      .where(eq(proposals.id, proposalId));
+
+    const invitees = await db
+      .select({ userId: proposalInvitees.userId })
+      .from(proposalInvitees)
+      .where(eq(proposalInvitees.proposalId, proposalId));
+
+    const notifyIds = new Set<string>([proposal.proposerId, ...invitees.map((i) => i.userId)]);
+    for (const notifyId of notifyIds) {
+      await notifyUser(
+        notifyId,
+        "proposal_reverted_to_draft",
+        `Proposal "${proposal.title}" was moved back to drafts.`,
+        { proposalId, reason: "participant paused" },
+      );
+    }
+  }
 }
 
 /**
@@ -512,7 +730,8 @@ export async function deleteUserAction(userId: string): Promise<UserActionResult
       ),
     );
 
-  await db.delete(proposals).where(eq(proposals.proposerId, userId));
+  await archiveProposalsForDeletedUser(db, userId, session.user.id);
+  await demoteOrRemoveInviteeFromActiveProposals(db, userId, session.user.id, "removed");
 
   const now = new Date().toISOString();
   await db
@@ -538,6 +757,8 @@ export async function deleteUserAction(userId: string): Promise<UserActionResult
   revalidatePath("/people-places");
   revalidatePath("/admin");
   revalidatePath("/api/dev/users");
+  revalidatePath("/proposals");
+  revalidatePath("/schedule");
 
   return { ok: true, message: `Deleted ${user.displayName}.` };
 }
@@ -586,6 +807,8 @@ export async function pauseUserAction(userId: string): Promise<UserActionResult>
     return { ok: false, message: "User not found or not active." };
   }
 
+  await pauseUserProposalSideEffects(db, userId);
+
   const now = new Date().toISOString();
   await db
     .update(users)
@@ -599,6 +822,8 @@ export async function pauseUserAction(userId: string): Promise<UserActionResult>
   await logUserActivity(session.user.id, "users.admin_pause", JSON.stringify({ userId }));
   revalidatePath("/admin");
   revalidatePath("/people-places");
+  revalidatePath("/proposals");
+  revalidatePath("/schedule");
   return { ok: true, message: `Paused ${user.displayName}.` };
 }
 

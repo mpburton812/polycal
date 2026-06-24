@@ -226,6 +226,8 @@ export interface ProposalDetail {
   canClone: boolean;
   viewerVoteStatus: InviteeVoteStatus | null;
   viewerSlotVotes: Record<string, InviteeVoteStatus>;
+  /** True when the viewer already voted but their calendar now conflicts (PC-45). */
+  hasOverlapWarning: boolean;
 }
 
 export interface ProposalCommentView {
@@ -273,6 +275,51 @@ async function getPrivacyAdminFlags(
     adminCanSeePrivate: group?.adminCanSeePrivate ?? false,
     adminCanSeeSuperPrivate: group?.adminCanSeeSuperPrivate ?? false,
   };
+}
+
+/** Loads proposal audit-log visibility policy from poly group settings (PC-45). */
+async function getAuditLogVisibility(
+  db: ReturnType<typeof getDb>,
+): Promise<(typeof polyGroup.$inferSelect)["auditLogVisibility"]> {
+  const [group] = await db
+    .select({ auditLogVisibility: polyGroup.auditLogVisibility })
+    .from(polyGroup)
+    .where(eq(polyGroup.id, 1))
+    .limit(1);
+  return group?.auditLogVisibility ?? "admin_only";
+}
+
+/**
+ * Filters proposal state log entries per poly-group audit visibility (PC-45).
+ */
+function filterStateLogForViewer(
+  logRows: ProposalStateLogView[],
+  visibility: string,
+  viewerId: string,
+  isAdmin: boolean,
+  isProposer: boolean,
+  isInvitee: boolean,
+): ProposalStateLogView[] {
+  if (visibility === "everyone") return logRows;
+  if (visibility === "admin_only") return isAdmin ? logRows : [];
+  if (visibility === "proposer_admin") {
+    return isAdmin || isProposer ? logRows : [];
+  }
+  if (visibility === "invitees_proposer_admin") {
+    return isAdmin || isProposer || isInvitee ? logRows : [];
+  }
+  return isAdmin ? logRows : [];
+}
+
+/** Parses proposed group name from a group_name proposal description (PC-45). */
+function parseGroupNameProposalMeta(description: string | null): string | null {
+  if (!description) return null;
+  try {
+    const parsed = JSON.parse(description) as { proposedName?: string };
+    return typeof parsed.proposedName === "string" ? parsed.proposedName.trim() : null;
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -475,6 +522,111 @@ async function expireAtRiskProposals(db: ReturnType<typeof getDb>): Promise<void
   }
 }
 
+/**
+ * Auto-transitions at-risk resolved proposals within 24h of start back to proposed (PC-45).
+ */
+async function processRedraftDeadlines(db: ReturnType<typeof getDb>): Promise<void> {
+  const now = new Date();
+  const nowIso = now.toISOString();
+  const deadlineMs = now.getTime() + 24 * 60 * 60 * 1000;
+
+  const candidates = await db
+    .select()
+    .from(proposals)
+    .where(and(eq(proposals.state, "resolved"), eq(proposals.atRisk, true)));
+
+  for (const proposal of candidates) {
+    if (!proposal.scheduledStartAt) continue;
+    const startMs = new Date(proposal.scheduledStartAt).getTime();
+    if (startMs > deadlineMs) continue;
+
+    await db
+      .update(proposals)
+      .set({ state: "proposed", updatedAt: nowIso })
+      .where(eq(proposals.id, proposal.id));
+
+    await resetInviteeVotes(db, proposal.id);
+    await logProposalTransition(
+      db,
+      proposal.id,
+      null,
+      "proposal.redraft_deadline",
+      "Within 24h of start — returned to proposed for re-approval.",
+    );
+
+    const invitees = await db
+      .select({ userId: proposalInvitees.userId })
+      .from(proposalInvitees)
+      .where(eq(proposalInvitees.proposalId, proposal.id));
+
+    const notifyIds = new Set<string>([proposal.proposerId, ...invitees.map((row) => row.userId)]);
+    for (const userId of notifyIds) {
+      await notifyUser(
+        userId,
+        "proposal_redraft_deadline",
+        `Proposal "${proposal.title}" needs re-approval before it starts.`,
+        { proposalId: proposal.id, action: "vote" },
+      );
+    }
+  }
+}
+
+/**
+ * Detects whether the viewer's calendar conflicts with this proposal after they voted (PC-45).
+ */
+async function detectViewerOverlapWarning(
+  db: ReturnType<typeof getDb>,
+  proposalId: string,
+  viewerId: string,
+  viewerVoteStatus: InviteeVoteStatus | null | undefined,
+  scheduledStartAt: string | null,
+  scheduledEndAt: string | null,
+): Promise<boolean> {
+  if (!scheduledStartAt || !viewerVoteStatus || viewerVoteStatus === "not_seen") {
+    return false;
+  }
+
+  const activeProposals = await db
+    .select({
+      id: proposals.id,
+      scheduledStartAt: proposals.scheduledStartAt,
+      scheduledEndAt: proposals.scheduledEndAt,
+      proposerId: proposals.proposerId,
+    })
+    .from(proposals)
+    .where(inArray(proposals.state, ["proposed", "resolved"]));
+
+  const activeInvitees = await db
+    .select({ proposalId: proposalInvitees.proposalId, userId: proposalInvitees.userId })
+    .from(proposalInvitees);
+
+  const inviteesByProposal = new Map<string, string[]>();
+  for (const row of activeInvitees) {
+    const list = inviteesByProposal.get(row.proposalId) ?? [];
+    list.push(row.userId);
+    inviteesByProposal.set(row.proposalId, list);
+  }
+
+  for (const other of activeProposals) {
+    if (other.id === proposalId || !other.scheduledStartAt) continue;
+    const stakeholders = new Set([other.proposerId, ...(inviteesByProposal.get(other.id) ?? [])]);
+    if (!stakeholders.has(viewerId)) continue;
+
+    if (
+      intervalsOverlap(
+        scheduledStartAt,
+        scheduledEndAt,
+        other.scheduledStartAt,
+        other.scheduledEndAt,
+      )
+    ) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 /** Picks the poll slot with the highest accept score; ties break on earliest start. */
 function pickWinningSlot(
   slots: { id: string; startAt: string; endAt: string | null }[],
@@ -576,6 +728,7 @@ export async function listProposalBoardAction(): Promise<ProposalBoard> {
 
   const db = getDb();
   await expireAtRiskProposals(db);
+  await processRedraftDeadlines(db);
   const viewerId = session.user.id;
   const isAdmin = await userHasAdminAccess(session.user.role);
   const privacyFlags = await getPrivacyAdminFlags(db);
@@ -645,10 +798,10 @@ export async function listProposalBoardAction(): Promise<ProposalBoard> {
     const viewerInvitee = invitees.find((invitee) => invitee.userId === viewerId);
     const respondedCount = invitees.filter((inv) => inv.voteStatus !== "not_seen").length;
     const needsViewerAction =
-      row.state === "proposed" &&
       !masked &&
       viewerInvitee !== undefined &&
-      viewerInvitee.voteStatus === "not_seen";
+      viewerInvitee.voteStatus === "not_seen" &&
+      (row.state === "proposed" || (row.state === "resolved" && row.atRisk));
 
     const scheduleEnd = display.scheduledEndAt ?? display.scheduledStartAt;
     const isPastSchedule = Boolean(scheduleEnd && scheduleEnd < nowIso);
@@ -1196,11 +1349,21 @@ async function resolveProposal(
       scheduledStartAt: scheduleStart,
       scheduledEndAt: scheduleEnd,
       winningSlotId,
+      atRisk: false,
+      atRiskExpiresAt: null,
       updatedAt: now,
     })
     .where(eq(proposals.id, proposal.id));
 
   await logProposalTransition(db, proposal.id, actorUserId, "proposal.resolved");
+
+  const proposedName = parseGroupNameProposalMeta(proposal.description);
+  if (proposedName) {
+    await db
+      .update(polyGroup)
+      .set({ name: proposedName, updatedAt: now })
+      .where(eq(polyGroup.id, 1));
+  }
 
   const invitees = await db
     .select({ userId: proposalInvitees.userId })
@@ -1234,7 +1397,12 @@ async function evaluateProposalAfterVote(
     .from(proposals)
     .where(eq(proposals.id, proposalId))
     .limit(1);
-  if (!proposal || proposal.state !== "proposed") return;
+  if (
+    !proposal ||
+    (proposal.state !== "proposed" && !(proposal.state === "resolved" && proposal.atRisk))
+  ) {
+    return;
+  }
 
   const invitees = await db
     .select()
@@ -1947,8 +2115,10 @@ export async function getProposalDetailAction(
   await ensureDbReady();
   const db = getDb();
   await expireAtRiskProposals(db);
+  await processRedraftDeadlines(db);
   const isAdmin = await userHasAdminAccess(session.user.role);
   const privacyFlags = await getPrivacyAdminFlags(db);
+  const auditLogVisibility = await getAuditLogVisibility(db);
 
   const [row] = await db
     .select({
@@ -2073,9 +2243,37 @@ export async function getProposalDetailAction(
     .orderBy(asc(proposalStateLog.createdAt));
 
   const isProposer = row.proposerId === session.user.id;
+  const isInvitee = inviteeUserIds.includes(session.user.id);
   const canManage = isProposer || isAdmin;
   const recurrenceRule = parseRecurrenceRule(row.recurrenceRule);
   const canViewSensitive = !masked;
+
+  const stateLogEntries = canViewSensitive
+    ? filterStateLogForViewer(
+        logRows.map((entry) => ({
+          action: entry.action,
+          actorName: entry.actorName ?? null,
+          details: entry.details ?? null,
+          createdAt: entry.createdAt,
+        })),
+        auditLogVisibility,
+        session.user.id,
+        isAdmin,
+        isProposer,
+        isInvitee,
+      )
+    : [];
+
+  const hasOverlapWarning = canViewSensitive
+    ? await detectViewerOverlapWarning(
+        db,
+        proposalId,
+        session.user.id,
+        viewerInvitee?.voteStatus,
+        display.scheduledStartAt ?? null,
+        display.scheduledEndAt ?? null,
+      )
+    : false;
 
   return {
     ok: true,
@@ -2138,14 +2336,7 @@ export async function getProposalDetailAction(
             createdAt: comment.createdAt,
           }))
         : [],
-      stateLog: canViewSensitive
-        ? logRows.map((entry) => ({
-            action: entry.action,
-            actorName: entry.actorName ?? null,
-            details: entry.details ?? null,
-            createdAt: entry.createdAt,
-          }))
-        : [],
+      stateLog: stateLogEntries,
       canEdit: row.state === "draft" && isProposer,
       canVote:
         !masked &&
@@ -2153,6 +2344,10 @@ export async function getProposalDetailAction(
         ((row.state === "proposed" &&
           viewerInvitee !== undefined &&
           viewerInvitee.voteStatus === "not_seen") ||
+          (row.state === "resolved" &&
+            row.atRisk &&
+            viewerInvitee?.role === "required" &&
+            viewerInvitee.voteStatus === "not_seen") ||
           (row.state === "resolved" &&
             viewerInvitee?.role === "optional" &&
             viewerInvitee.voteStatus === "not_seen")),
@@ -2176,6 +2371,7 @@ export async function getProposalDetailAction(
         (row.state === "resolved" || row.state === "proposed" || row.state === "archived"),
       viewerVoteStatus: viewerInvitee?.voteStatus ?? null,
       viewerSlotVotes: masked ? {} : viewerSlotVotes,
+      hasOverlapWarning,
     },
   };
 }
@@ -2225,9 +2421,14 @@ export async function castProposalVoteAction(
 
   const isOptionalResolvedVote =
     proposal.state === "resolved" && invitee.role === "optional" && invitee.voteStatus === "not_seen";
+  const isAtRiskRequiredVote =
+    proposal.state === "resolved" &&
+    proposal.atRisk &&
+    invitee.role === "required" &&
+    invitee.voteStatus === "not_seen";
   const isProposedVote = proposal.state === "proposed" && invitee.voteStatus === "not_seen";
 
-  if (!isOptionalResolvedVote && !isProposedVote) {
+  if (!isOptionalResolvedVote && !isAtRiskRequiredVote && !isProposedVote) {
     return { ok: false, message: "Proposal is not open for voting." };
   }
 
@@ -2517,7 +2718,7 @@ export async function createBatchSleepingProposalsAction(
 }
 
 /**
- * Adds or removes optional attendees on a resolved proposal (PC-40).
+ * Adds or removes attendees on a resolved proposal (PC-40, PC-45).
  */
 export async function updateResolvedAttendeesAction(
   input: z.infer<typeof attendeeUpdateSchema>,
@@ -2551,55 +2752,63 @@ export async function updateResolvedAttendeesAction(
   }
 
   const now = new Date().toISOString();
+  let attendeesChanged = false;
 
   for (const userId of parsed.data.removeUserIds ?? []) {
     const [row] = await db
       .select()
       .from(proposalInvitees)
       .where(
-        and(
-          eq(proposalInvitees.proposalId, proposal.id),
-          eq(proposalInvitees.userId, userId),
-          eq(proposalInvitees.role, "optional"),
-        ),
+        and(eq(proposalInvitees.proposalId, proposal.id), eq(proposalInvitees.userId, userId)),
       )
       .limit(1);
 
-    if (row) {
-      await db.delete(proposalSlotVotes).where(
-        and(
-          eq(proposalSlotVotes.proposalId, proposal.id),
-          eq(proposalSlotVotes.userId, userId),
-        ),
-      );
-      await db.delete(proposalInvitees).where(eq(proposalInvitees.id, row.id));
-    }
+    if (!row) continue;
+
+    await db.delete(proposalSlotVotes).where(
+      and(eq(proposalSlotVotes.proposalId, proposal.id), eq(proposalSlotVotes.userId, userId)),
+    );
+    await db.delete(proposalInvitees).where(eq(proposalInvitees.id, row.id));
+    attendeesChanged = true;
+
+    await notifyUser(userId, "proposal_attendee_removed", `You were removed from "${proposal.title}".`, {
+      proposalId: proposal.id,
+    });
   }
 
   async function addAttendee(userId: string, role: InviteeRole): Promise<void> {
     if (userId === proposal.proposerId) return;
 
     const [existing] = await db
-      .select({ id: proposalInvitees.id })
+      .select({ id: proposalInvitees.id, role: proposalInvitees.role })
       .from(proposalInvitees)
       .where(
         and(eq(proposalInvitees.proposalId, proposal.id), eq(proposalInvitees.userId, userId)),
       )
       .limit(1);
 
-    if (!existing) {
-      await db.insert(proposalInvitees).values({
-        id: `pi-${randomUUID()}`,
-        proposalId: proposal.id,
-        userId,
-        role,
-        voteStatus: "not_seen",
-        createdAt: now,
-      });
-      await notifyUser(userId, "proposal_attendee_added", `You were added to "${proposal.title}".`, {
-        proposalId: proposal.id,
-      });
+    if (existing) return;
+
+    await db.insert(proposalInvitees).values({
+      id: `pi-${randomUUID()}`,
+      proposalId: proposal.id,
+      userId,
+      role,
+      voteStatus: "not_seen",
+      createdAt: now,
+    });
+    attendeesChanged = true;
+
+    if (role === "required") {
+      await db
+        .update(proposals)
+        .set({ atRisk: true, updatedAt: now })
+        .where(eq(proposals.id, proposal.id));
     }
+
+    await notifyUser(userId, "proposal_attendee_added", `You were added to "${proposal.title}".`, {
+      proposalId: proposal.id,
+    });
   }
 
   for (const userId of parsed.data.addRequired ?? []) {
@@ -2610,11 +2819,35 @@ export async function updateResolvedAttendeesAction(
     await addAttendee(userId, "optional");
   }
 
-  await logProposalTransition(db, proposal.id, session.user.id, "proposal.attendees_updated");
+  if (attendeesChanged) {
+    const remainingRequired = await db
+      .select({ userId: proposalInvitees.userId })
+      .from(proposalInvitees)
+      .where(
+        and(eq(proposalInvitees.proposalId, proposal.id), eq(proposalInvitees.role, "required")),
+      );
+
+    for (const row of remainingRequired) {
+      if (row.userId === session.user.id) continue;
+      await notifyUser(
+        row.userId,
+        "proposal_attendees_updated",
+        `Attendees changed on "${proposal.title}" — review the proposal.`,
+        { proposalId: proposal.id, action: "view" },
+      );
+    }
+
+    await logProposalTransition(db, proposal.id, session.user.id, "proposal.attendees_updated");
+  }
+
   revalidatePath("/proposals");
+  revalidatePath("/schedule");
 
   return { ok: true, message: "Attendees updated." };
 }
+
+/** Alias for updateResolvedAttendeesAction (PC-45). */
+export const updateProposalAttendeesAction = updateResolvedAttendeesAction;
 
 /**
  * Deletes a draft owned by the signed-in user (PC-40).

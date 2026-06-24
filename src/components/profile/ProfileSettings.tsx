@@ -27,8 +27,9 @@ import {
   updateNotificationEmailAction,
   updateNotificationPrefsAction,
   updateProfilePreferencesAction,
+  uploadCustomAvatarAction,
 } from "@/actions/profile";
-import { AVATAR_OPTIONS } from "@/lib/constants/avatars";
+import { AVATAR_OPTIONS, avatarSrcForKey, isCustomAvatarKey } from "@/lib/constants/avatars";
 import {
   USER_THEME_IDS,
   USER_THEME_LABELS,
@@ -78,6 +79,10 @@ export function ProfileSettings({
   const [prefsPending, startPrefsTransition] = useTransition();
   const [namePending, startNameTransition] = useTransition();
   const [notifPending, startNotifTransition] = useTransition();
+  const [avatarUploadPending, startAvatarUploadTransition] = useTransition();
+  const [avatarUploadError, setAvatarUploadError] = useState<string | null>(null);
+
+  const customAvatarSrc = isCustomAvatarKey(avatarKey) ? avatarSrcForKey(avatarKey) : undefined;
 
   function handlePasswordSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -146,6 +151,25 @@ export function ProfileSettings({
       }
       setNotifMessage("Notification preferences saved.");
     });
+  }
+
+  function handleCustomAvatarChange(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setAvatarUploadError(null);
+    const formData = new FormData();
+    formData.set("avatar", file);
+    startAvatarUploadTransition(async () => {
+      const result = await uploadCustomAvatarAction(formData);
+      if (!result.ok) {
+        setAvatarUploadError(result.error);
+        return;
+      }
+      setAvatarKey(result.avatarKey);
+      await update({ user: { avatarKey: result.avatarKey } });
+      router.refresh();
+    });
+    event.target.value = "";
   }
 
   function handleNotificationEmailSave() {
@@ -276,6 +300,32 @@ export function ProfileSettings({
             </Stack>
           </FormControl>
 
+          <Stack spacing={1} sx={{ mb: 2 }}>
+            <FormLabel component="legend">Custom avatar</FormLabel>
+            {avatarUploadError && (
+              <Alert severity="error">{avatarUploadError}</Alert>
+            )}
+            <Stack direction="row" spacing={2} alignItems="center">
+              {customAvatarSrc && (
+                <Avatar src={customAvatarSrc} alt="Your custom avatar" sx={{ width: 48, height: 48 }} />
+              )}
+              <Button variant="outlined" component="label" disabled={avatarUploadPending}>
+                {avatarUploadPending ? "Uploading…" : "Upload image"}
+                <input
+                  type="file"
+                  hidden
+                  accept="image/jpeg,image/png,image/webp,image/gif"
+                  onChange={handleCustomAvatarChange}
+                />
+              </Button>
+              {isCustomAvatarKey(avatarKey) && (
+                <Typography variant="caption" color="text.secondary">
+                  Custom avatar selected
+                </Typography>
+              )}
+            </Stack>
+          </Stack>
+
           <FormControl component="fieldset" sx={{ mb: 2 }}>
             <FormLabel component="legend">Accent theme</FormLabel>
             <RadioGroup
@@ -367,6 +417,85 @@ export function ProfileSettings({
               />
             }
             label="Email"
+          />
+        </FormGroup>
+        <Typography variant="subtitle2" sx={{ mt: 1 }}>
+          Quiet hours
+        </Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+          In-app and push alerts are paused during this window (email still delivers).
+        </Typography>
+        <Stack direction="row" spacing={2} sx={{ mb: 2 }}>
+          <TextField
+            label="Start"
+            type="time"
+            value={notificationPrefs.quietHoursStart ?? ""}
+            onChange={(e) =>
+              setNotificationPrefs({
+                ...notificationPrefs,
+                quietHoursStart: e.target.value || null,
+              })
+            }
+            InputLabelProps={{ shrink: true }}
+            fullWidth
+          />
+          <TextField
+            label="End"
+            type="time"
+            value={notificationPrefs.quietHoursEnd ?? ""}
+            onChange={(e) =>
+              setNotificationPrefs({
+                ...notificationPrefs,
+                quietHoursEnd: e.target.value || null,
+              })
+            }
+            InputLabelProps={{ shrink: true }}
+            fullWidth
+          />
+        </Stack>
+        <Typography variant="subtitle2">Alert types</Typography>
+        <FormGroup sx={{ mb: 2 }}>
+          <FormControlLabel
+            control={
+              <Checkbox
+                checked={notificationPrefs.alertTypes.proposals}
+                onChange={(e) =>
+                  setNotificationPrefs({
+                    ...notificationPrefs,
+                    alertTypes: { ...notificationPrefs.alertTypes, proposals: e.target.checked },
+                  })
+                }
+              />
+            }
+            label="Proposals"
+          />
+          <FormControlLabel
+            control={
+              <Checkbox
+                checked={notificationPrefs.alertTypes.partnerships}
+                onChange={(e) =>
+                  setNotificationPrefs({
+                    ...notificationPrefs,
+                    alertTypes: { ...notificationPrefs.alertTypes, partnerships: e.target.checked },
+                  })
+                }
+              />
+            }
+            label="Partnerships"
+          />
+          <FormControlLabel
+            control={
+              <Checkbox
+                checked={notificationPrefs.alertTypes.events}
+                onChange={(e) =>
+                  setNotificationPrefs({
+                    ...notificationPrefs,
+                    alertTypes: { ...notificationPrefs.alertTypes, events: e.target.checked },
+                  })
+                }
+              />
+            }
+            label="Events"
           />
         </FormGroup>
         <Button variant="contained" onClick={handleNotificationSave} disabled={notifPending}>
