@@ -7,6 +7,7 @@ import {
   Chip,
   List,
   ListItem,
+  ListItemButton,
   ListItemText,
   Paper,
   Stack,
@@ -15,15 +16,12 @@ import {
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
-import {
-  submitProposalAction,
-  type ProposalBoard,
-  type ProposalCard,
-} from "@/actions/proposals";
+import { type ProposalBoard, type ProposalCard, type ProposalDetail } from "@/actions/proposals";
 import type { ProposalPlaceOption } from "@/actions/proposals";
 import type { PersonSummary } from "@/actions/users";
 
-import { CreateProposalDialog } from "./CreateProposalDialog";
+import { ProposalDetailDialog } from "./ProposalDetailDialog";
+import { ProposalDraftDialog } from "./ProposalDraftDialog";
 
 const COLUMN_LABELS = {
   draft: "Drafts",
@@ -41,63 +39,42 @@ interface ProposalsClientProps {
 
 function ProposalListItem({
   proposal,
-  showSubmit,
-  onSubmit,
-  pending,
+  onOpen,
 }: {
   proposal: ProposalCard;
-  showSubmit: boolean;
-  onSubmit: (id: string) => void;
-  pending: boolean;
+  onOpen: (id: string) => void;
 }) {
   return (
-    <ListItem
-      disableGutters
-      sx={{
-        alignItems: "flex-start",
-        flexDirection: "column",
-        borderBottom: 1,
-        borderColor: "divider",
-        py: 1.5,
-      }}
-    >
-      <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 0.5 }}>
-        <Typography variant="subtitle2">{proposal.title}</Typography>
-        <Chip size="small" label={proposal.proposalType} variant="outlined" />
-        {proposal.atRisk && <Chip size="small" label="At risk" color="warning" />}
-        {proposal.needsViewerAction && (
-          <Chip size="small" label="Action needed" color="primary" />
-        )}
-      </Stack>
-      <ListItemText
-        primaryTypographyProps={{ variant: "body2" }}
-        secondary={
-          <>
-            {proposal.description}
-            <br />
-            Proposer: {proposal.proposerName}
-            {proposal.locationName ? ` · ${proposal.locationName}` : ""}
-            {proposal.inviteeCount > 0 ? ` · ${proposal.inviteeCount} invitee(s)` : ""}
-          </>
-        }
-      />
-      {showSubmit && (
-        <Button
-          size="small"
-          variant="outlined"
-          sx={{ mt: 1 }}
-          disabled={pending}
-          onClick={() => onSubmit(proposal.id)}
-        >
-          Submit proposal
-        </Button>
-      )}
+    <ListItem disableGutters sx={{ borderBottom: 1, borderColor: "divider" }}>
+      <ListItemButton onClick={() => onOpen(proposal.id)} sx={{ alignItems: "flex-start", py: 1.5 }}>
+        <ListItemText
+          primary={
+            <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+              <Typography variant="subtitle2">{proposal.title}</Typography>
+              <Chip size="small" label={proposal.proposalType} variant="outlined" />
+              {proposal.atRisk && <Chip size="small" label="At risk" color="warning" />}
+              {proposal.needsViewerAction && (
+                <Chip size="small" label="Action needed" color="primary" />
+              )}
+            </Stack>
+          }
+          secondary={
+            <>
+              {proposal.description}
+              <br />
+              Proposer: {proposal.proposerName}
+              {proposal.locationName ? ` · ${proposal.locationName}` : ""}
+              {proposal.inviteeCount > 0 ? ` · ${proposal.inviteeCount} invitee(s)` : ""}
+            </>
+          }
+        />
+      </ListItemButton>
     </ListItem>
   );
 }
 
 /**
- * Interactive proposals Kanban — Phase 4 foundation (PC-40).
+ * Interactive proposals Kanban — Phase 4 voting and draft editing (PC-40).
  */
 export function ProposalsClient({
   board,
@@ -107,22 +84,39 @@ export function ProposalsClient({
 }: ProposalsClientProps) {
   const router = useRouter();
   const [createOpen, setCreateOpen] = useState(false);
+  const [editDetail, setEditDetail] = useState<ProposalDetail | null>(null);
+  const [selectedProposalId, setSelectedProposalId] = useState<string | null>(null);
+  const [detailOpen, setDetailOpen] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
-  const [pending, startTransition] = useTransition();
+  const [, startTransition] = useTransition();
 
-  function handleSubmit(proposalId: string) {
-    setMessage(null);
-    startTransition(async () => {
-      const result = await submitProposalAction(proposalId);
-      setMessage(result.message);
-      if (result.ok) router.refresh();
-    });
+  function openDetail(proposalId: string) {
+    setSelectedProposalId(proposalId);
+    setDetailOpen(true);
+  }
+
+  function handleEditFromDetail(detail: ProposalDetail) {
+    setDetailOpen(false);
+    setEditDetail(detail);
+    setCreateOpen(true);
+  }
+
+  function handleDraftDialogClose() {
+    setCreateOpen(false);
+    setEditDetail(null);
+    router.refresh();
   }
 
   return (
     <Box>
       <Stack direction="row" justifyContent="flex-end" sx={{ mb: 2 }}>
-        <Button variant="contained" onClick={() => setCreateOpen(true)}>
+        <Button
+          variant="contained"
+          onClick={() => {
+            setEditDetail(null);
+            setCreateOpen(true);
+          }}
+        >
           New proposal
         </Button>
       </Stack>
@@ -150,9 +144,7 @@ export function ProposalsClient({
                   <ProposalListItem
                     key={proposal.id}
                     proposal={proposal}
-                    showSubmit={column === "draft" && proposal.proposerId === currentUserId}
-                    onSubmit={handleSubmit}
-                    pending={pending}
+                    onOpen={openDetail}
                   />
                 ))}
               </List>
@@ -160,12 +152,22 @@ export function ProposalsClient({
           </Paper>
         ))}
       </Stack>
-      <CreateProposalDialog
+      <ProposalDraftDialog
         open={createOpen}
-        onClose={() => setCreateOpen(false)}
+        onClose={handleDraftDialogClose}
         people={people}
         places={places}
         currentUserId={currentUserId}
+        initialDetail={editDetail}
+      />
+      <ProposalDetailDialog
+        proposalId={selectedProposalId}
+        open={detailOpen}
+        onClose={() => {
+          setDetailOpen(false);
+          setSelectedProposalId(null);
+        }}
+        onEdit={handleEditFromDetail}
       />
     </Box>
   );
