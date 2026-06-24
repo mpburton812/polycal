@@ -10,20 +10,23 @@ import {
   Typography,
 } from "@mui/material";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 
 import {
   deleteDraftProposalAction,
   getProposalDetailAction,
   type ProposalBoard,
+  type ProposalCard as ProposalCardData,
   type ProposalDetail,
 } from "@/actions/proposals";
 import type { ProposalPlaceOption } from "@/actions/proposals";
 import type { PersonSummary } from "@/actions/users";
 
 import { ProposalCard } from "./ProposalCard";
+import { PartnershipProposalDialog } from "./PartnershipProposalDialog";
 import { ProposalDetailDialog } from "./ProposalDetailDialog";
 import { ProposalDraftDialog } from "./ProposalDraftDialog";
+import { PARTNERSHIP_CARD_PREFIX } from "@/lib/proposals/constants";
 
 const TAB_KEYS = ["draft", "proposed", "resolved", "archived"] as const;
 type TabKey = (typeof TAB_KEYS)[number];
@@ -59,12 +62,25 @@ export function ProposalsClient({
   const [editDetail, setEditDetail] = useState<ProposalDetail | null>(null);
   const [selectedProposalId, setSelectedProposalId] = useState<string | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
+  const [partnershipCard, setPartnershipCard] = useState<ProposalCardData | null>(null);
+  const [partnershipOpen, setPartnershipOpen] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [, startTransition] = useTransition();
 
   const proposals = board[activeTab];
 
+  const allBoardCards = useMemo(
+    () => [...board.draft, ...board.proposed, ...board.resolved, ...board.archived],
+    [board],
+  );
+
   function openDetail(proposalId: string) {
+    if (proposalId.startsWith(PARTNERSHIP_CARD_PREFIX)) {
+      const card = allBoardCards.find((row) => row.id === proposalId) ?? null;
+      setPartnershipCard(card);
+      setPartnershipOpen(true);
+      return;
+    }
     setSelectedProposalId(proposalId);
     setDetailOpen(true);
   }
@@ -190,6 +206,14 @@ export function ProposalsClient({
           setSelectedProposalId(null);
         }}
         onEdit={handleEditFromDetail}
+      />
+      <PartnershipProposalDialog
+        card={partnershipCard}
+        open={partnershipOpen}
+        onClose={() => {
+          setPartnershipOpen(false);
+          setPartnershipCard(null);
+        }}
       />
     </Box>
   );

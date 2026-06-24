@@ -12,19 +12,26 @@ import {
   ListItem,
   ListItemText,
   Popover,
+  Stack,
   Typography,
 } from "@mui/material";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition, type MouseEvent } from "react";
 
+import { respondPartnershipAction } from "@/actions/partnerships";
 import {
   clearAllNotificationsAction,
   dismissNotificationAction,
   type NotificationItem,
 } from "@/actions/notifications";
 
+function formatNotificationType(type: string): string {
+  return type.replaceAll("_", " ");
+}
+
 /**
- * Header notification bell with dismissible inbox popover (PC-40).
+ * Header notification bell with dismissible inbox popover (PC-40, PC-43).
  */
 export function NotificationInbox({
   initialCount,
@@ -65,6 +72,16 @@ export function NotificationInbox({
       if (!result.ok) return;
       setItems([]);
       setCount(0);
+      router.refresh();
+    });
+  }
+
+  function respondToPartnership(logId: number, partnershipId: string, accept: boolean) {
+    startTransition(async () => {
+      const result = await respondPartnershipAction({ partnershipId, accept });
+      if (!result.ok) return;
+      setItems((current) => current.filter((item) => item.id !== logId));
+      setCount((current) => Math.max(0, current - 1));
       router.refresh();
     });
   }
@@ -110,30 +127,79 @@ export function NotificationInbox({
           </Typography>
         ) : (
           <List dense disablePadding sx={{ maxHeight: 360, overflow: "auto" }}>
-            {items.map((item) => (
-              <ListItem
-                key={item.id}
-                secondaryAction={
-                  <IconButton
-                    edge="end"
-                    size="small"
-                    aria-label="Dismiss notification"
-                    disabled={pending}
-                    onClick={() => dismissOne(item.id)}
-                  >
-                    <CloseIcon fontSize="small" />
-                  </IconButton>
-                }
-                sx={{ alignItems: "flex-start", py: 1.5 }}
-              >
-                <ListItemText
-                  primary={item.message}
-                  secondary={new Date(item.createdAt).toLocaleString()}
-                  primaryTypographyProps={{ variant: "body2" }}
-                  secondaryTypographyProps={{ variant: "caption" }}
-                />
-              </ListItem>
-            ))}
+            {items.map((item) => {
+              const partnershipId =
+                typeof item.metadata.partnershipId === "string"
+                  ? item.metadata.partnershipId
+                  : null;
+              const proposalId =
+                typeof item.metadata.proposalId === "string"
+                  ? item.metadata.proposalId
+                  : null;
+
+              return (
+                <ListItem
+                  key={item.id}
+                  secondaryAction={
+                    <IconButton
+                      edge="end"
+                      size="small"
+                      aria-label="Dismiss notification"
+                      disabled={pending}
+                      onClick={() => dismissOne(item.id)}
+                    >
+                      <CloseIcon fontSize="small" />
+                    </IconButton>
+                  }
+                  sx={{ alignItems: "flex-start", py: 1.5, flexDirection: "column" }}
+                >
+                  <ListItemText
+                    primary={item.message}
+                    secondary={
+                      <>
+                        <Typography component="span" variant="caption" display="block">
+                          {formatNotificationType(item.type)} ·{" "}
+                          {new Date(item.createdAt).toLocaleString()}
+                        </Typography>
+                      </>
+                    }
+                    primaryTypographyProps={{ variant: "body2" }}
+                  />
+                  <Stack direction="row" spacing={1} sx={{ mt: 1, pr: 4 }}>
+                    {item.type === "partnership_proposed" && partnershipId && (
+                      <>
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          disabled={pending}
+                          onClick={() => respondToPartnership(item.id, partnershipId, false)}
+                        >
+                          Decline
+                        </Button>
+                        <Button
+                          size="small"
+                          variant="contained"
+                          disabled={pending}
+                          onClick={() => respondToPartnership(item.id, partnershipId, true)}
+                        >
+                          Accept
+                        </Button>
+                      </>
+                    )}
+                    {proposalId && (
+                      <Button
+                        size="small"
+                        component={Link}
+                        href="/proposals"
+                        onClick={handleClose}
+                      >
+                        View proposal
+                      </Button>
+                    )}
+                  </Stack>
+                </ListItem>
+              );
+            })}
           </List>
         )}
       </Popover>

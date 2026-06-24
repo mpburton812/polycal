@@ -9,6 +9,7 @@ import PollOutlinedIcon from "@mui/icons-material/PollOutlined";
 import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 import {
   Alert,
+  Autocomplete,
   Box,
   Button,
   Card,
@@ -35,6 +36,8 @@ import { useEffect, useMemo, useState, useTransition, type ReactNode } from "rea
 import {
   createBatchSleepingProposalsAction,
   createDraftProposalAction,
+  getProposalDetailAction,
+  submitProposalAction,
   updateDraftProposalAction,
   type ProposalDetail,
   type ProposalPlaceOption,
@@ -82,11 +85,38 @@ function toLocalInput(iso: string | null | undefined): string {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
+/** Date-only input for sleeping proposals (no clock times). */
+function toLocalDateInput(iso: string | null | undefined): string {
+  if (!iso) return "";
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "";
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
 function localInputToIso(value: string): string | undefined {
   if (!value) return undefined;
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return undefined;
   return date.toISOString();
+}
+
+function localDateToStartIso(value: string): string | undefined {
+  if (!value) return undefined;
+  const [y, m, d] = value.split("-").map(Number);
+  if (!y || !m || !d) return undefined;
+  return new Date(y, m - 1, d, 0, 0, 0, 0).toISOString();
+}
+
+function localDateToEndIso(value: string): string | undefined {
+  if (!value) return undefined;
+  const [y, m, d] = value.split("-").map(Number);
+  if (!y || !m || !d) return undefined;
+  return new Date(y, m - 1, d, 23, 59, 59, 999).toISOString();
+}
+
+function slotStartInput(iso: string | null | undefined, proposalType: "event" | "sleeping"): string {
+  return proposalType === "sleeping" ? toLocalDateInput(iso) : toLocalInput(iso);
 }
 
 function SectionHeader({
@@ -127,7 +157,9 @@ export function ProposalDraftDialog({
   initialDetail,
 }: ProposalDraftDialogProps) {
   const router = useRouter();
-  const isEdit = Boolean(initialDetail);
+  const [savedDraftId, setSavedDraftId] = useState<string | null>(null);
+  const isEdit = Boolean(initialDetail || savedDraftId);
+  const activeProposalId = initialDetail?.id ?? savedDraftId ?? null;
   const proposerName =
     people.find((p) => p.id === currentUserId)?.displayName ?? "You";
 
@@ -136,8 +168,10 @@ export function ProposalDraftDialog({
   const [description, setDescription] = useState("");
   const [notes, setNotes] = useState("");
   const [locationId, setLocationId] = useState("");
+  const [locationCustom, setLocationCustom] = useState("");
   const [bedroomIndex, setBedroomIndex] = useState<number | "">("");
   const [intentionalSolo, setIntentionalSolo] = useState(false);
+  const [soloEvent, setSoloEvent] = useState(false);
   const [isPoll, setIsPoll] = useState(false);
   const [batchMode, setBatchMode] = useState(false);
   const [rangeStart, setRangeStart] = useState("");
@@ -158,7 +192,8 @@ export function ProposalDraftDialog({
     (person) => person.id !== currentUserId && person.status === "active",
   );
 
-  const locationName = places.find((p) => p.id === locationId)?.name ?? null;
+  const locationName =
+    places.find((p) => p.id === locationId)?.name ?? (locationCustom.trim() || null);
   const selectedPlace = places.find((p) => p.id === locationId);
   const bedroomOptions =
     selectedPlace && selectedPlace.bedroomCount > 0
@@ -169,18 +204,39 @@ export function ProposalDraftDialog({
       : [];
 
   const previewStartIso = useMemo(() => {
-    if (batchMode) return localInputToIso(rangeStart);
+    if (batchMode) {
+      return proposalType === "sleeping"
+        ? localDateToStartIso(rangeStart)
+        : localInputToIso(rangeStart);
+    }
     const first = slots.find((s) => s.startAt);
-    return first ? localInputToIso(first.startAt) : undefined;
-  }, [batchMode, rangeStart, slots]);
+    if (!first) return undefined;
+    return proposalType === "sleeping"
+      ? localDateToStartIso(first.startAt)
+      : localInputToIso(first.startAt);
+  }, [batchMode, rangeStart, slots, proposalType]);
 
   const previewEndIso = useMemo(() => {
-    if (batchMode) return localInputToIso(rangeEnd);
+    if (batchMode) {
+      return proposalType === "sleeping"
+        ? localDateToEndIso(rangeEnd)
+        : localInputToIso(rangeEnd);
+    }
     const first = slots.find((s) => s.startAt);
-    return first?.endAt ? localInputToIso(first.endAt) : undefined;
-  }, [batchMode, rangeEnd, slots]);
+    if (!first) return undefined;
+    if (proposalType === "sleeping") {
+      return first.endAt
+        ? localDateToEndIso(first.endAt)
+        : localDateToEndIso(first.startAt);
+    }
+    return first.endAt ? localInputToIso(first.endAt) : undefined;
+  }, [batchMode, rangeEnd, slots, proposalType]);
 
-  const timePreview = formatTimeRange(previewStartIso ?? null, previewEndIso ?? null);
+  const timePreview = formatTimeRange(
+    previewStartIso ?? null,
+    previewEndIso ?? null,
+    proposalType,
+  );
   const showPastWarning = isPastSchedule(previewStartIso);
 
   useEffect(() => {
@@ -191,12 +247,16 @@ export function ProposalDraftDialog({
       setDescription(initialDetail.description ?? "");
       setNotes(initialDetail.notes ?? "");
       setLocationId(initialDetail.locationId ?? "");
+      setLocationCustom(
+        initialDetail.locationId ? "" : (initialDetail.locationText ?? initialDetail.locationName ?? ""),
+      );
       setBedroomIndex(
         initialDetail.bedroomIndex !== null && initialDetail.bedroomIndex !== undefined
           ? initialDetail.bedroomIndex
           : "",
       );
       setIntentionalSolo(initialDetail.intentionalSolo);
+      setSoloEvent(initialDetail.proposalType === "event" && initialDetail.intentionalSolo);
       setIsPoll(initialDetail.isPoll);
       setEventPrivacy(initialDetail.eventPrivacy);
       setIsRecurring(initialDetail.isRecurrenceParent);
@@ -207,8 +267,10 @@ export function ProposalDraftDialog({
       setSlots(
         initialDetail.timeSlots.length > 0
           ? initialDetail.timeSlots.map((slot) => ({
-              startAt: toLocalInput(slot.startAt),
-              endAt: toLocalInput(slot.endAt),
+              startAt: slotStartInput(slot.startAt, initialDetail.proposalType),
+              endAt: slot.endAt
+                ? slotStartInput(slot.endAt, initialDetail.proposalType)
+                : "",
               label: slot.label ?? "",
             }))
           : [{ startAt: "", endAt: "", label: "" }],
@@ -224,8 +286,11 @@ export function ProposalDraftDialog({
       setDescription("");
       setNotes("");
       setLocationId("");
+      setLocationCustom("");
       setBedroomIndex("");
       setIntentionalSolo(false);
+      setSoloEvent(false);
+      setSavedDraftId(null);
       setIsPoll(false);
       setBatchMode(false);
       setRangeStart("");
@@ -242,7 +307,47 @@ export function ProposalDraftDialog({
   }, [open, initialDetail]);
 
   function handleClose() {
+    setSavedDraftId(null);
     onClose();
+  }
+
+  function applyDetailToForm(detail: ProposalDetail) {
+    setProposalType(detail.proposalType);
+    setTitle(detail.title);
+    setDescription(detail.description ?? "");
+    setNotes(detail.notes ?? "");
+    setLocationId(detail.locationId ?? "");
+    setLocationCustom(
+      detail.locationId ? "" : (detail.locationText ?? detail.locationName ?? ""),
+    );
+    setBedroomIndex(
+      detail.bedroomIndex !== null && detail.bedroomIndex !== undefined
+        ? detail.bedroomIndex
+        : "",
+    );
+    setIntentionalSolo(detail.intentionalSolo);
+    setSoloEvent(detail.proposalType === "event" && detail.intentionalSolo);
+    setIsPoll(detail.isPoll);
+    setEventPrivacy(detail.eventPrivacy);
+    setIsRecurring(detail.isRecurrenceParent);
+    if (detail.recurrenceRule) {
+      setRecurrencePattern(detail.recurrenceRule.pattern);
+      setRecurrenceCount(detail.recurrenceRule.count);
+    }
+    setSlots(
+      detail.timeSlots.length > 0
+        ? detail.timeSlots.map((slot) => ({
+            startAt: slotStartInput(slot.startAt, detail.proposalType),
+            endAt: slot.endAt ? slotStartInput(slot.endAt, detail.proposalType) : "",
+            label: slot.label ?? "",
+          }))
+        : [{ startAt: "", endAt: "", label: "" }],
+    );
+    const modes: Record<string, InviteeSelection> = {};
+    for (const invitee of detail.invitees) {
+      modes[invitee.userId] = invitee.role;
+    }
+    setInviteeMode(modes);
   }
 
   function cycleInvitee(personId: string) {
@@ -256,12 +361,26 @@ export function ProposalDraftDialog({
 
   function handleSave() {
     setError(null);
-    const invitees = Object.entries(inviteeMode)
-      .filter(([, role]) => role === "required" || role === "optional")
-      .map(([userId, role]) => ({ userId, role: role as "required" | "optional" }));
+    const invitees = soloEvent || intentionalSolo
+      ? []
+      : Object.entries(inviteeMode)
+          .filter(([, role]) => role === "required" || role === "optional")
+          .map(([userId, role]) => ({ userId, role: role as "required" | "optional" }));
 
     const timeSlots = slots
       .map((slot) => {
+        if (proposalType === "sleeping") {
+          const startIso = localDateToStartIso(slot.startAt);
+          if (!startIso) return null;
+          const endIso = slot.endAt
+            ? localDateToEndIso(slot.endAt)
+            : localDateToEndIso(slot.startAt);
+          return {
+            startAt: startIso,
+            endAt: endIso,
+            label: slot.label.trim() || undefined,
+          };
+        }
         const startIso = localInputToIso(slot.startAt);
         if (!startIso) return null;
         return {
@@ -277,10 +396,12 @@ export function ProposalDraftDialog({
       description,
       proposalType,
       locationId: locationId || undefined,
+      locationText: locationCustom.trim() || undefined,
       bedroomIndex:
         proposalType === "sleeping" && bedroomIndex !== "" ? bedroomIndex : undefined,
       notes: notes || undefined,
-      intentionalSolo: proposalType === "sleeping" ? intentionalSolo : false,
+      intentionalSolo:
+        proposalType === "sleeping" ? intentionalSolo : soloEvent,
       isPoll: proposalType === "event" ? isPoll : false,
       eventPrivacy,
       isRecurring: !batchMode && isRecurring,
@@ -294,8 +415,14 @@ export function ProposalDraftDialog({
 
     startTransition(async () => {
       if (batchMode && proposalType === "sleeping" && !isEdit) {
-        const rangeStartIso = localInputToIso(rangeStart);
-        const rangeEndIso = localInputToIso(rangeEnd);
+        const rangeStartIso =
+          proposalType === "sleeping"
+            ? localDateToStartIso(rangeStart)
+            : localInputToIso(rangeStart);
+        const rangeEndIso =
+          proposalType === "sleeping"
+            ? localDateToEndIso(rangeEnd)
+            : localInputToIso(rangeEnd);
         if (!rangeStartIso || !rangeEndIso) {
           setError("Batch mode requires a valid date range.");
           return;
@@ -320,9 +447,44 @@ export function ProposalDraftDialog({
         return;
       }
 
-      const result = isEdit && initialDetail
-        ? await updateDraftProposalAction({ ...payload, proposalId: initialDetail.id })
-        : await createDraftProposalAction(payload);
+      const editId = initialDetail?.id ?? savedDraftId;
+      let proposalId = editId;
+      if (isEdit && editId) {
+        const result = await updateDraftProposalAction({ ...payload, proposalId: editId });
+        if (!result.ok) {
+          setError(result.message);
+          return;
+        }
+      } else {
+        const result = await createDraftProposalAction(payload);
+        if (!result.ok) {
+          setError(result.message);
+          return;
+        }
+        proposalId = result.proposalId ?? null;
+      }
+
+      if (!proposalId) {
+        handleClose();
+        router.refresh();
+        return;
+      }
+
+      setSavedDraftId(proposalId);
+      const detailResult = await getProposalDetailAction(proposalId);
+      if (detailResult.ok && detailResult.detail) {
+        applyDetailToForm(detailResult.detail);
+      }
+      router.refresh();
+    });
+  }
+
+  function handleSubmit() {
+    const proposalId = initialDetail?.id ?? savedDraftId;
+    if (!proposalId) return;
+    setError(null);
+    startTransition(async () => {
+      const result = await submitProposalAction(proposalId, false);
       if (!result.ok) {
         setError(result.message);
         return;
@@ -338,10 +500,13 @@ export function ProposalDraftDialog({
       onClose={handleClose}
       fullWidth
       maxWidth="sm"
-      PaperProps={{ sx: { bgcolor: "transparent", boxShadow: "none", overflow: "visible" } }}
+      scroll="paper"
+      PaperProps={{
+        sx: { bgcolor: "transparent", boxShadow: "none", overflow: "visible", maxHeight: "92vh" },
+      }}
     >
-      <Card variant="outlined" sx={{ ...proposalCardSx, bgcolor: "background.paper" }}>
-        <CardContent sx={{ pb: 1 }}>
+      <Card variant="outlined" sx={{ ...proposalCardSx, bgcolor: "background.paper", maxHeight: "92vh", display: "flex", flexDirection: "column" }}>
+        <CardContent sx={{ pb: 1, overflow: "auto", flex: 1 }}>
           <Stack direction="row" justifyContent="space-between" alignItems="flex-start" sx={{ mb: 1.5 }}>
             <Chip label={typeBadgeLabel(proposalType)} size="small" sx={typeChipSx} />
             <Typography variant="caption" color="text.secondary" sx={{ textAlign: "right" }}>
@@ -466,13 +631,23 @@ export function ProposalDraftDialog({
 
           <SectionHeader
             icon={<AccessTimeIcon fontSize="small" />}
-            title={batchMode ? "Batch date range" : isPoll ? "Poll time slots" : "Time window"}
+            title={
+              batchMode
+                ? "Batch date range"
+                : isPoll
+                  ? "Poll time slots"
+                  : proposalType === "sleeping"
+                    ? "Dates"
+                    : "Time window"
+            }
             subtitle={
               batchMode
                 ? "Creates multiple sleeping drafts across the range"
                 : isPoll
                   ? "Add up to 5 options for invitees to choose from"
-                  : "When does this proposal happen?"
+                  : proposalType === "sleeping"
+                    ? "Which night(s) — dates only, no times"
+                    : "When does this proposal happen?"
             }
           />
           <Stack spacing={1.5} sx={{ mb: 2 }}>
@@ -504,7 +679,7 @@ export function ProposalDraftDialog({
               <>
                 <TextField
                   label="Range start"
-                  type="datetime-local"
+                  type={proposalType === "sleeping" ? "date" : "datetime-local"}
                   value={rangeStart}
                   onChange={(event) => setRangeStart(event.target.value)}
                   fullWidth
@@ -513,7 +688,7 @@ export function ProposalDraftDialog({
                 />
                 <TextField
                   label="Range end"
-                  type="datetime-local"
+                  type={proposalType === "sleeping" ? "date" : "datetime-local"}
                   value={rangeEnd}
                   onChange={(event) => setRangeEnd(event.target.value)}
                   fullWidth
@@ -565,8 +740,8 @@ export function ProposalDraftDialog({
                     )}
                     <Stack spacing={1}>
                       <TextField
-                        label="Start"
-                        type="datetime-local"
+                        label={proposalType === "sleeping" ? "Night of" : "Start"}
+                        type={proposalType === "sleeping" ? "date" : "datetime-local"}
                         value={slot.startAt}
                         onChange={(event) => {
                           const next = [...slots];
@@ -578,8 +753,10 @@ export function ProposalDraftDialog({
                         InputLabelProps={{ shrink: true }}
                       />
                       <TextField
-                        label="End (optional)"
-                        type="datetime-local"
+                        label={
+                          proposalType === "sleeping" ? "Through (optional)" : "End (optional)"
+                        }
+                        type={proposalType === "sleeping" ? "date" : "datetime-local"}
                         value={slot.endAt}
                         onChange={(event) => {
                           const next = [...slots];
@@ -661,27 +838,47 @@ export function ProposalDraftDialog({
           <SectionHeader
             icon={<LocationOnOutlinedIcon fontSize="small" />}
             title="Location"
-            subtitle="Optional place for this proposal"
+            subtitle="Your places, sleeping partners' places, custom text, or leave blank"
           />
-          <FormControl fullWidth size="small" sx={{ mb: 2 }}>
-            <InputLabel id="proposal-place-label">Location</InputLabel>
-            <Select
-              labelId="proposal-place-label"
-              label="Location"
-              value={locationId}
-              onChange={(event) => {
-                setLocationId(event.target.value);
+          <Autocomplete
+            freeSolo
+            options={places}
+            getOptionLabel={(option) => (typeof option === "string" ? option : option.name)}
+            value={
+              locationId
+                ? (places.find((place) => place.id === locationId) ?? null)
+                : locationCustom || null
+            }
+            onChange={(_, newValue) => {
+              if (!newValue) {
+                setLocationId("");
+                setLocationCustom("");
                 setBedroomIndex("");
-              }}
-            >
-              <MenuItem value="">None</MenuItem>
-              {places.map((place) => (
-                <MenuItem key={place.id} value={place.id}>
-                  {place.name}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
+              } else if (typeof newValue === "string") {
+                setLocationId("");
+                setLocationCustom(newValue);
+                setBedroomIndex("");
+              } else {
+                setLocationId(newValue.id);
+                setLocationCustom("");
+                setBedroomIndex("");
+              }
+            }}
+            onInputChange={(_, value, reason) => {
+              if (reason === "input" && !locationId) {
+                setLocationCustom(value);
+              }
+            }}
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                label="Location"
+                size="small"
+                placeholder="Select a place, type custom text, or leave blank"
+              />
+            )}
+            sx={{ mb: 2 }}
+          />
 
           {proposalType === "sleeping" && bedroomOptions.length > 0 && (
             <FormControl fullWidth size="small" sx={{ mb: 2 }}>
@@ -710,7 +907,10 @@ export function ProposalDraftDialog({
               exclusive
               value={intentionalSolo ? "solo" : "network"}
               onChange={(_, value) => {
-                if (value) setIntentionalSolo(value === "solo");
+                if (value) {
+                  setIntentionalSolo(value === "solo");
+                  if (value === "solo") setInviteeMode({});
+                }
               }}
               size="small"
               sx={{
@@ -724,6 +924,32 @@ export function ProposalDraftDialog({
             >
               <ToggleButton value="network">With invitees</ToggleButton>
               <ToggleButton value="solo">Intentional solo</ToggleButton>
+            </ToggleButtonGroup>
+          )}
+
+          {proposalType === "event" && (
+            <ToggleButtonGroup
+              exclusive
+              value={soloEvent ? "solo" : "group"}
+              onChange={(_, value) => {
+                if (value) {
+                  const nextSolo = value === "solo";
+                  setSoloEvent(nextSolo);
+                  if (nextSolo) setInviteeMode({});
+                }
+              }}
+              size="small"
+              sx={{
+                mb: 2,
+                "& .MuiToggleButton-root.Mui-selected": {
+                  bgcolor: POLY_GREEN,
+                  color: "#fff",
+                  "&:hover": { bgcolor: POLY_GREEN_HOVER },
+                },
+              }}
+            >
+              <ToggleButton value="group">With invitees</ToggleButton>
+              <ToggleButton value="solo">Solo event (just me)</ToggleButton>
             </ToggleButtonGroup>
           )}
 
@@ -748,8 +974,13 @@ export function ProposalDraftDialog({
           <SectionHeader
             icon={<GroupsOutlinedIcon fontSize="small" />}
             title="Invitees"
-            subtitle="Tap to cycle: none → required → optional → none"
+            subtitle={
+              soloEvent || intentionalSolo
+                ? "Solo proposals do not include invitees"
+                : "Tap to cycle: none → required → optional → none"
+            }
           />
+          {!soloEvent && !intentionalSolo && (
           <Stack direction="row" flexWrap="wrap" gap={1}>
             {candidates.map((person) => {
               const mode = inviteeMode[person.id] ?? "none";
@@ -780,6 +1011,7 @@ export function ProposalDraftDialog({
               );
             })}
           </Stack>
+          )}
 
           {error && (
             <Alert severity="error" sx={{ mt: 2 }}>
@@ -788,7 +1020,7 @@ export function ProposalDraftDialog({
           )}
         </CardContent>
 
-        <CardActions sx={{ px: 2, pb: 2, pt: 0, justifyContent: "flex-end", gap: 1 }}>
+        <CardActions sx={{ px: 2, pb: 2, pt: 0, justifyContent: "flex-end", gap: 1, flexShrink: 0 }}>
           <Button onClick={handleClose} color="inherit">
             Cancel
           </Button>
@@ -800,6 +1032,16 @@ export function ProposalDraftDialog({
           >
             {isEdit ? "Save draft" : "Create draft"}
           </Button>
+          {isEdit && activeProposalId && (
+            <Button
+              variant="contained"
+              disabled={!title.trim() || !description.trim() || pending}
+              onClick={handleSubmit}
+              sx={primaryButtonSx}
+            >
+              Submit
+            </Button>
+          )}
         </CardActions>
       </Card>
     </Dialog>

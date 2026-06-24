@@ -8,6 +8,21 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- Phase 5 notifications (PC-43): Web Push subscription storage and service worker handler; actionable inbox (partnership accept/decline, proposal links); notification email with verification token; email delivery queue stub in activity log.
+- Relationship proposals surface on Proposals Kanban with dedicated dialog; partnership actions send inbox notifications.
+- Solo event toggle on event drafts; Submit button visible immediately after first draft save.
+- Calendar blocks show time and participant names (privacy-masked when required); schedule week anchor always opens on current week.
+- Sleeping drafts use date-only fields; location autocomplete with direct + sleeping-network places and custom text; schedule re-draft opens draft editor.
+
+### Fixed
+
+- Sleeping partnership proposals visible on Proposals tab (not only People & Places).
+- Proposal draft dialog scrolls on small screens.
+- Schedule localStorage no longer restores a stale week anchor.
+- Re-draft from schedule/calendar opens the proposal draft dialog instead of leaving detail view only.
+
+### Added
+
 - Phase 4 close-out (PC-40): resolution collision engine auto-declines overlapping pending proposals into proposer review; notification inbox in app header; per-bedroom picker on sleeping drafts; schema v10 (`notification_dismissals`).
 - Phase 6 schedule (PC-42): weekly/two-week calendar views, color-coded events, network filters, planning mode drawer, proposal detail from calendar blocks.
 

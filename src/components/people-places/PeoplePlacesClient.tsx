@@ -376,6 +376,9 @@ function PersonDetail({
       {canViewPartnerships && (
         <>
           <Typography variant="subtitle2">Sleeping partners</Typography>
+          <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1 }}>
+            Pending relationship proposals also appear on the Proposals tab.
+          </Typography>
           {partnershipsLoading && (
             <Typography variant="body2" color="text.secondary">
               Loading…

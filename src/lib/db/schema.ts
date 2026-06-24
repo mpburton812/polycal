@@ -42,6 +42,7 @@ export const users = sqliteTable("users", {
   gender: text("gender"),
   notificationEmail: text("notification_email"),
   emailVerifiedAt: text("email_verified_at"),
+  emailVerificationToken: text("email_verification_token"),
   notificationPrefsJson: text("notification_prefs_json"),
   onboardingComplete: integer("onboarding_complete", { mode: "boolean" }).notNull().default(true),
   sessionVersion: integer("session_version").notNull().default(0),
@@ -155,6 +156,8 @@ export const proposals = sqliteTable("proposals", {
     .notNull()
     .references(() => users.id),
   locationId: text("location_id").references(() => locations.id),
+  /** Free-text location when no registered place is selected (PC-43). */
+  locationText: text("location_text"),
   scheduledStartAt: text("scheduled_start_at"),
   scheduledEndAt: text("scheduled_end_at"),
   intentionalSolo: integer("intentional_solo", { mode: "boolean" }).notNull().default(false),
@@ -275,6 +278,22 @@ export const notificationDismissals = sqliteTable(
   (table) => [unique().on(table.userId, table.logId)],
 );
 
+/** Web Push subscription endpoints per user device (PC-43 Phase 5). */
+export const pushSubscriptions = sqliteTable(
+  "push_subscriptions",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id),
+    endpoint: text("endpoint").notNull().unique(),
+    p256dh: text("p256dh").notNull(),
+    auth: text("auth").notNull(),
+    createdAt: text("created_at").notNull(),
+    updatedAt: text("updated_at").notNull(),
+  },
+);
+
 /** Undirected sleeping partnership edge with proposal workflow (PC-36). */
 export const sleepingPartnerships = sqliteTable("sleeping_partnerships", {
   id: text("id").primaryKey(),
@@ -328,6 +347,7 @@ export const schema = {
   proposalStateLog,
   proposalComments,
   notificationDismissals,
+  pushSubscriptions,
   sleepingPartnerships,
   locationResidents,
 };

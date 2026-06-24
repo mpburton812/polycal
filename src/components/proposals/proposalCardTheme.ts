@@ -6,8 +6,15 @@ export const PAST_SCHEDULE_BG = "#fff8e1";
 export const PAST_SCHEDULE_TEXT = "#f57f17";
 export const PAST_SCHEDULE_ICON = "#f9a825";
 
-export function formatTimeRange(start: string | null, end: string | null): string | null {
+export function formatTimeRange(
+  start: string | null,
+  end: string | null,
+  proposalType: "event" | "sleeping" = "event",
+): string | null {
   if (!start) return null;
+  if (proposalType === "sleeping") {
+    return formatDateRange(start, end);
+  }
   const startLabel = new Date(start).toLocaleString(undefined, {
     weekday: "short",
     month: "short",
@@ -23,7 +30,28 @@ export function formatTimeRange(start: string | null, end: string | null): strin
   return `${startLabel} – ${endLabel}`;
 }
 
-export function typeBadgeLabel(type: string): string {
+/** Date-only span for sleeping proposals (no clock times). */
+export function formatDateRange(start: string | null, end: string | null): string | null {
+  if (!start) return null;
+  const dateOpts: Intl.DateTimeFormatOptions = {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+  };
+  const startLabel = new Date(start).toLocaleDateString(undefined, dateOpts);
+  if (!end) return startLabel;
+  const endDate = new Date(end);
+  const startDate = new Date(start);
+  const sameDay =
+    startDate.getFullYear() === endDate.getFullYear() &&
+    startDate.getMonth() === endDate.getMonth() &&
+    startDate.getDate() === endDate.getDate();
+  if (sameDay) return startLabel;
+  return `${startLabel} – ${endDate.toLocaleDateString(undefined, dateOpts)}`;
+}
+
+export function typeBadgeLabel(type: string, cardKind?: string): string {
+  if (cardKind === "partnership") return "RELATIONSHIP PROPOSAL";
   return type === "sleeping" ? "SLEEPING PROPOSAL" : "EVENT PROPOSAL";
 }
 

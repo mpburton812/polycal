@@ -2,7 +2,7 @@ import { Typography } from "@mui/material";
 import { eq } from "drizzle-orm";
 import { redirect } from "next/navigation";
 
-import { getNotificationPrefsAction } from "@/actions/profile";
+import { getNotificationEmailAction, getNotificationPrefsAction } from "@/actions/profile";
 import { ProfileSettings } from "@/components/profile/ProfileSettings";
 import { auth } from "@/lib/auth";
 import { getDb } from "@/lib/db/client";
@@ -29,6 +29,7 @@ export default async function ProfilePage() {
     .limit(1);
 
   const notificationPrefs = await getNotificationPrefsAction();
+  const notificationEmail = await getNotificationEmailAction();
 
   return (
     <>
@@ -43,6 +44,8 @@ export default async function ProfilePage() {
         initialAvatarKey={row?.avatarKey ?? null}
         initialTheme={row?.theme ?? "mint"}
         initialNotificationPrefs={notificationPrefs}
+        initialNotificationEmail={notificationEmail.email}
+        initialEmailVerified={notificationEmail.verified}
         mustChangePassword={row?.mustChangePassword ?? false}
       />
     </>
