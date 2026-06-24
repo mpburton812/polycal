@@ -3,6 +3,7 @@ import {
   integer,
   sqliteTable,
   text,
+  unique,
 } from "drizzle-orm/sqlite-core";
 
 import {
@@ -126,8 +127,23 @@ export type ProposalState = (typeof proposalStates)[number];
 export const proposalTypes = ["event", "sleeping"] as const;
 export type ProposalType = (typeof proposalTypes)[number];
 
+export const inviteeRoles = ["required", "optional"] as const;
+export type InviteeRole = (typeof inviteeRoles)[number];
+
+export const inviteeVoteStatuses = [
+  "not_seen",
+  "accept",
+  "abstain",
+  "decline",
+  "accept_suboptimal",
+] as const;
+export type InviteeVoteStatus = (typeof inviteeVoteStatuses)[number];
+
+export const eventPrivacyLevels = ["open", "private", "super_private"] as const;
+export type EventPrivacyLevel = (typeof eventPrivacyLevels)[number];
+
 /**
- * Proposal records for Kanban — full workflow logic arrives in later phases.
+ * Proposal records for Kanban workflow (PC-40).
  */
 export const proposals = sqliteTable("proposals", {
   id: text("id").primaryKey(),
@@ -139,9 +155,62 @@ export const proposals = sqliteTable("proposals", {
     .notNull()
     .references(() => users.id),
   locationId: text("location_id").references(() => locations.id),
+  scheduledStartAt: text("scheduled_start_at"),
+  scheduledEndAt: text("scheduled_end_at"),
+  intentionalSolo: integer("intentional_solo", { mode: "boolean" }).notNull().default(false),
+  eventPrivacy: text("event_privacy", { enum: eventPrivacyLevels }).notNull().default("open"),
+  isPoll: integer("is_poll", { mode: "boolean" }).notNull().default(false),
+  atRisk: integer("at_risk", { mode: "boolean" }).notNull().default(false),
+  parentProposalId: text("parent_proposal_id"),
   notes: text("notes"),
   createdAt: text("created_at").notNull(),
   updatedAt: text("updated_at").notNull(),
+});
+
+/** Users invited to a proposal — voting queue and notifications (PC-40). */
+export const proposalInvitees = sqliteTable(
+  "proposal_invitees",
+  {
+    id: text("id").primaryKey(),
+    proposalId: text("proposal_id")
+      .notNull()
+      .references(() => proposals.id),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id),
+    role: text("role", { enum: inviteeRoles }).notNull().default("required"),
+    voteStatus: text("vote_status", { enum: inviteeVoteStatuses })
+      .notNull()
+      .default("not_seen"),
+    respondedAt: text("responded_at"),
+    createdAt: text("created_at").notNull(),
+  },
+  (table) => [unique().on(table.proposalId, table.userId)],
+);
+
+/** Poll or single-slot scheduling options attached to a draft/proposed item. */
+export const proposalTimeSlots = sqliteTable("proposal_time_slots", {
+  id: text("id").primaryKey(),
+  proposalId: text("proposal_id")
+    .notNull()
+    .references(() => proposals.id),
+  startAt: text("start_at").notNull(),
+  endAt: text("end_at"),
+  label: text("label"),
+  sortOrder: integer("sort_order").notNull().default(0),
+  createdAt: text("created_at").notNull(),
+});
+
+/** Immutable proposal state transition audit trail (PC-40). */
+export const proposalStateLog = sqliteTable("proposal_state_log", {
+  id: text("id").primaryKey(),
+  proposalId: text("proposal_id")
+    .notNull()
+    .references(() => proposals.id),
+  actorUserId: text("actor_user_id").references(() => users.id),
+  action: text("action").notNull(),
+  details: text("details"),
+  createdAt: text("created_at").notNull(),
 });
 
 /** Undirected sleeping partnership edge with proposal workflow (PC-36). */
@@ -191,6 +260,9 @@ export const schema = {
   storedImages,
   schemaMeta,
   proposals,
+  proposalInvitees,
+  proposalTimeSlots,
+  proposalStateLog,
   sleepingPartnerships,
   locationResidents,
 };

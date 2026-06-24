@@ -1,12 +1,14 @@
 import { getDb } from "@/lib/db/client";
 import {
   proposals,
+  proposalInvitees,
   locations,
   users,
   type ProposalState,
   type ProposalType,
 } from "@/lib/db/schema";
 import { isNonProductionEnvironment } from "@/lib/env";
+import { randomUUID } from "node:crypto";
 
 interface DemoProposal {
   id: string;
@@ -17,6 +19,8 @@ interface DemoProposal {
   proposerId: string;
   locationId?: string;
   notes?: string;
+  scheduledStartAt?: string;
+  inviteeIds?: string[];
 }
 
 /** Representative fixtures across all Kanban columns for QA and demos. */
@@ -48,6 +52,7 @@ const DEMO_PROPOSALS: DemoProposal[] = [
     state: "proposed",
     proposerId: "sw-leia",
     locationId: "loc-cloudcity",
+    inviteeIds: ["sw-luke", "sw-han"],
   },
   {
     id: "prop-proposed-2",
@@ -57,6 +62,7 @@ const DEMO_PROPOSALS: DemoProposal[] = [
     state: "proposed",
     proposerId: "sw-han",
     locationId: "loc-tatooine",
+    inviteeIds: ["sw-leia"],
   },
   {
     id: "prop-proposed-3",
@@ -66,6 +72,7 @@ const DEMO_PROPOSALS: DemoProposal[] = [
     state: "proposed",
     proposerId: "sw-vader",
     locationId: "loc-deathstar",
+    inviteeIds: ["sw-luke"],
   },
   {
     id: "prop-resolved-1",
@@ -75,6 +82,8 @@ const DEMO_PROPOSALS: DemoProposal[] = [
     state: "resolved",
     proposerId: "sw-luke",
     locationId: "loc-falcon",
+    scheduledStartAt: "2099-06-01T18:00:00.000Z",
+    inviteeIds: ["sw-leia", "sw-han"],
   },
   {
     id: "prop-resolved-2",
@@ -84,6 +93,8 @@ const DEMO_PROPOSALS: DemoProposal[] = [
     state: "resolved",
     proposerId: "sw-lando",
     locationId: "loc-cloudcity",
+    scheduledStartAt: "2099-07-15T22:00:00.000Z",
+    inviteeIds: ["sw-han"],
   },
   {
     id: "prop-archived-1",
@@ -142,10 +153,23 @@ export async function seedDemoProposals(options?: {
       state: proposal.state,
       proposerId: proposal.proposerId,
       locationId: proposal.locationId,
+      scheduledStartAt: proposal.scheduledStartAt ?? null,
+      intentionalSolo: false,
       notes: proposal.notes,
       createdAt: now,
       updatedAt: now,
     });
+
+    for (const inviteeId of proposal.inviteeIds ?? []) {
+      if (!userIds.has(inviteeId)) continue;
+      await db.insert(proposalInvitees).values({
+        id: `pi-${randomUUID()}`,
+        proposalId: proposal.id,
+        userId: inviteeId,
+        role: "required",
+        createdAt: now,
+      });
+    }
   }
 
   return { seeded: true, count: eligible.length };
