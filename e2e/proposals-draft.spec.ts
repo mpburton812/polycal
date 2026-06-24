@@ -21,7 +21,7 @@ test.describe("Proposal draft workflows", () => {
 
     await page.getByRole("button", { name: "New proposal" }).click();
     await page.getByLabel("Title").fill(title);
-    await page.getByLabel("Description").fill("Automated E2E draft creation.");
+    await page.getByLabel(/Description/i).fill("Automated E2E draft creation.");
     await page.getByRole("button", { name: "Create draft" }).click();
 
     const dialog = page.getByRole("dialog");
@@ -55,6 +55,19 @@ test.describe("Proposal draft workflows", () => {
     await page.getByRole("button", { name: "Delete Draft" }).first().click();
     await expect(proposalCard(page, DEMO.draftJediCouncil)).toHaveCount(0);
   });
+
+  test("creates a draft without optional description", async ({ page }) => {
+    const title = `E2E No Description ${Date.now()}`;
+
+    await page.getByRole("button", { name: "New proposal" }).click();
+    await page.getByLabel("Title").fill(title);
+    await page.getByRole("button", { name: "Create draft" }).click();
+
+    const dialog = page.getByRole("dialog");
+    await expect(dialog.getByRole("button", { name: "Submit" })).toBeVisible();
+    await dialog.getByRole("button", { name: "Cancel" }).click();
+    await expect(proposalCard(page, title)).toBeVisible();
+  });
 });
 
 test.describe("Proposal submit and conflict warnings", () => {
@@ -67,7 +80,7 @@ test.describe("Proposal submit and conflict warnings", () => {
     const title = `E2E Submit ${Date.now()}`;
     await page.getByRole("button", { name: "New proposal" }).click();
     await page.getByLabel("Title").fill(title);
-    await page.getByLabel("Description").fill("Needs invitee vote.");
+    await page.getByLabel(/Description/i).fill("Needs invitee vote.");
     await page.getByRole("button", { name: /Leia Organa/i }).click();
     await page.getByRole("button", { name: "Create draft" }).click();
 

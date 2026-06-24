@@ -35,6 +35,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 
 import {
+  acknowledgeProposalOverlapAction,
   addProposalCommentAction,
   cancelProposalAction,
   castProposalVoteAction,
@@ -135,6 +136,18 @@ export function ProposalDetailDialog({
     reloadDetail(proposalId);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- reload when proposal changes
   }, [open, proposalId]);
+
+  function handleOverlapResponse(response: "acknowledge" | "decline") {
+    if (!proposalId) return;
+    setMessage(null);
+    startTransition(async () => {
+      const result = await acknowledgeProposalOverlapAction({ proposalId, response });
+      setMessage(result.message);
+      if (!result.ok) return;
+      reloadDetail(proposalId);
+      router.refresh();
+    });
+  }
 
   function handleVote(vote: "accept" | "abstain" | "decline" | "accept_suboptimal") {
     if (!proposalId) return;
@@ -320,6 +333,28 @@ export function ProposalDetailDialog({
           {detail?.hasOverlapWarning && (
             <Alert severity="warning" sx={{ mb: 2 }}>
               Your calendar now conflicts with this event after you voted. Review your schedule.
+              {detail.canAcknowledgeOverlap && (
+                <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
+                  <Button
+                    size="small"
+                    variant="contained"
+                    sx={primaryButtonSx}
+                    onClick={() => handleOverlapResponse("acknowledge")}
+                    disabled={pending}
+                  >
+                    Acknowledge
+                  </Button>
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    color="warning"
+                    onClick={() => handleOverlapResponse("decline")}
+                    disabled={pending}
+                  >
+                    Decline
+                  </Button>
+                </Stack>
+              )}
             </Alert>
           )}
           {showConflictConfirm && conflictWarnings.length > 0 && (

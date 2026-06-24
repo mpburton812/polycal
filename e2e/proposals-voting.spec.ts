@@ -12,19 +12,26 @@ test.describe("Proposal voting", () => {
   });
 
   test("required invitee can accept a standard event proposal", async ({ page }) => {
+    const dialog = page.getByRole("dialog");
     await openProposalCard(page, DEMO.proposedDeathStar);
-    await page.getByRole("dialog").getByRole("button", { name: "Accept" }).click();
-    await expect(page.getByRole("dialog").getByText(/Vote recorded/i)).toBeVisible({
+    await dialog.getByRole("button", { name: "Accept" }).click();
+    await expect(dialog.getByText(/Vote recorded/i)).toBeVisible({
       timeout: 15_000,
     });
+    await expect(dialog.getByText(USERS.luke.displayName)).toBeVisible();
+    await expect(dialog.getByText("Accepted", { exact: true })).toBeVisible();
+    await expect(dialog.getByRole("button", { name: "Accept" })).toHaveCount(0);
   });
 
   test("required invitee can abstain on a proposed event", async ({ page }) => {
+    const dialog = page.getByRole("dialog");
     await openProposalCard(page, DEMO.proposedRescueHan);
-    await page.getByRole("dialog").getByRole("button", { name: "Abstain" }).click();
-    await expect(page.getByRole("dialog").getByText(/Vote recorded/i)).toBeVisible({
+    await dialog.getByRole("button", { name: "Abstain" }).click();
+    await expect(dialog.getByText(/Vote recorded/i)).toBeVisible({
       timeout: 15_000,
     });
+    await expect(dialog.getByText("Abstained", { exact: true })).toBeVisible();
+    await expect(dialog.getByRole("button", { name: "Abstain" })).toHaveCount(0);
   });
 
   test("detail dialog shows invitee vote controls and comments", async ({ page }) => {

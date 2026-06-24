@@ -292,6 +292,61 @@ export function AdminPolyGroupSettingsPanel({
           fullWidth
           helperText="Shown to users when they finish first-login onboarding."
         />
+        <Typography variant="subtitle2" sx={{ pt: 1 }}>
+          Proposal enforcement
+        </Typography>
+        <TextField
+          label="Max hours in proposed"
+          type="number"
+          inputProps={{ min: 0, max: 8760 }}
+          value={settings.proposedMaxHours}
+          onChange={(e) =>
+            setSettings({
+              ...settings,
+              proposedMaxHours: Math.min(8760, Math.max(0, Number(e.target.value) || 0)),
+            })
+          }
+          helperText="0 = expire only when event start passes without resolution"
+        />
+        <TextField
+          label="At-risk draft TTL (hours)"
+          type="number"
+          inputProps={{ min: 1, max: 8760 }}
+          value={settings.atRiskTtlHours}
+          onChange={(e) =>
+            setSettings({
+              ...settings,
+              atRiskTtlHours: Math.min(8760, Math.max(1, Number(e.target.value) || 1)),
+            })
+          }
+          helperText="How long collision/re-draft drafts stay editable before archive"
+        />
+        <TextField
+          label="Archive grace (hours after end)"
+          type="number"
+          inputProps={{ min: 0, max: 8760 }}
+          value={settings.archiveGraceHours}
+          onChange={(e) =>
+            setSettings({
+              ...settings,
+              archiveGraceHours: Math.min(8760, Math.max(0, Number(e.target.value) || 0)),
+            })
+          }
+          helperText="Resolved events auto-archive this many hours after scheduled end"
+        />
+        <TextField
+          label="Redraft deadline (hours before start)"
+          type="number"
+          inputProps={{ min: 1, max: 168 }}
+          value={settings.redraftDeadlineHours}
+          onChange={(e) =>
+            setSettings({
+              ...settings,
+              redraftDeadlineHours: Math.min(168, Math.max(1, Number(e.target.value) || 1)),
+            })
+          }
+          helperText="At-risk resolved events return to proposed within this window"
+        />
         <Button variant="contained" onClick={save} disabled={pending}>
           {pending ? "Saving…" : "Save settings"}
         </Button>
