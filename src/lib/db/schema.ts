@@ -161,7 +161,10 @@ export const proposals = sqliteTable("proposals", {
   eventPrivacy: text("event_privacy", { enum: eventPrivacyLevels }).notNull().default("open"),
   isPoll: integer("is_poll", { mode: "boolean" }).notNull().default(false),
   atRisk: integer("at_risk", { mode: "boolean" }).notNull().default(false),
+  atRiskExpiresAt: text("at_risk_expires_at"),
   parentProposalId: text("parent_proposal_id"),
+  batchGroupId: text("batch_group_id"),
+  winningSlotId: text("winning_slot_id"),
   notes: text("notes"),
   createdAt: text("created_at").notNull(),
   updatedAt: text("updated_at").notNull(),
@@ -200,6 +203,29 @@ export const proposalTimeSlots = sqliteTable("proposal_time_slots", {
   sortOrder: integer("sort_order").notNull().default(0),
   createdAt: text("created_at").notNull(),
 });
+
+/** Per-slot poll votes — matrix voting for multi-slot polls (PC-40). */
+export const proposalSlotVotes = sqliteTable(
+  "proposal_slot_votes",
+  {
+    id: text("id").primaryKey(),
+    proposalId: text("proposal_id")
+      .notNull()
+      .references(() => proposals.id),
+    timeSlotId: text("time_slot_id")
+      .notNull()
+      .references(() => proposalTimeSlots.id),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id),
+    voteStatus: text("vote_status", { enum: inviteeVoteStatuses })
+      .notNull()
+      .default("not_seen"),
+    respondedAt: text("responded_at"),
+    createdAt: text("created_at").notNull(),
+  },
+  (table) => [unique().on(table.timeSlotId, table.userId)],
+);
 
 /** Immutable proposal state transition audit trail (PC-40). */
 export const proposalStateLog = sqliteTable("proposal_state_log", {
@@ -274,6 +300,7 @@ export const schema = {
   schemaMeta,
   proposals,
   proposalInvitees,
+  proposalSlotVotes,
   proposalTimeSlots,
   proposalStateLog,
   proposalComments,
