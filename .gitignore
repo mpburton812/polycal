@@ -20,6 +20,8 @@ build/
 # Local libSQL database
 local.db
 local.db-*
+e2e.db
+e2e.db-*
 
 # OS / editor
 .DS_Store
