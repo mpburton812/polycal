@@ -2,6 +2,7 @@ import { getDb } from "@/lib/db/client";
 import {
   proposals,
   proposalInvitees,
+  proposalTimeSlots,
   locations,
   users,
   type ProposalState,
@@ -9,6 +10,13 @@ import {
 } from "@/lib/db/schema";
 import { isNonProductionEnvironment } from "@/lib/env";
 import { randomUUID } from "node:crypto";
+
+interface DemoTimeSlot {
+  startOffsetDays: number;
+  startHour: number;
+  durationHours: number;
+  label?: string;
+}
 
 interface DemoProposal {
   id: string;
@@ -19,8 +27,28 @@ interface DemoProposal {
   proposerId: string;
   locationId?: string;
   notes?: string;
-  scheduledStartAt?: string;
   inviteeIds?: string[];
+  /** Resolved events — schedule relative to seed time (PC-42). */
+  scheduledOffsetDays?: number;
+  scheduledStartHour?: number;
+  scheduledDurationHours?: number;
+  /** Proposed events without resolve — time slot windows for calendar (PC-42). */
+  timeSlots?: DemoTimeSlot[];
+}
+
+/** Builds ISO timestamps anchored to the current week for schedule demos. */
+function scheduleWindow(
+  offsetDays: number,
+  startHour: number,
+  durationHours: number,
+): { startAt: string; endAt: string } {
+  const start = new Date();
+  start.setHours(0, 0, 0, 0);
+  start.setDate(start.getDate() + offsetDays);
+  start.setHours(startHour, 0, 0, 0);
+  const end = new Date(start);
+  end.setTime(end.getTime() + durationHours * 60 * 60 * 1000);
+  return { startAt: start.toISOString(), endAt: end.toISOString() };
 }
 
 /** Representative fixtures across all Kanban columns for QA and demos. */
@@ -53,16 +81,18 @@ const DEMO_PROPOSALS: DemoProposal[] = [
     proposerId: "sw-leia",
     locationId: "loc-cloudcity",
     inviteeIds: ["sw-luke", "sw-han"],
+    timeSlots: [{ startOffsetDays: 1, startHour: 14, durationHours: 2 }],
   },
   {
     id: "prop-proposed-2",
     title: "Falcon overnight — Tatooine",
-    description: "Multi-night sleeping proposal in poll state.",
+    description: "Sleeping proposal awaiting votes.",
     proposalType: "sleeping",
     state: "proposed",
     proposerId: "sw-han",
     locationId: "loc-tatooine",
     inviteeIds: ["sw-leia"],
+    timeSlots: [{ startOffsetDays: 3, startHour: 22, durationHours: 8 }],
   },
   {
     id: "prop-proposed-3",
@@ -73,6 +103,7 @@ const DEMO_PROPOSALS: DemoProposal[] = [
     proposerId: "sw-vader",
     locationId: "loc-deathstar",
     inviteeIds: ["sw-luke"],
+    timeSlots: [{ startOffsetDays: 5, startHour: 10, durationHours: 1 }],
   },
   {
     id: "prop-resolved-1",
@@ -82,7 +113,9 @@ const DEMO_PROPOSALS: DemoProposal[] = [
     state: "resolved",
     proposerId: "sw-luke",
     locationId: "loc-falcon",
-    scheduledStartAt: "2099-06-01T18:00:00.000Z",
+    scheduledOffsetDays: 2,
+    scheduledStartHour: 18,
+    scheduledDurationHours: 3,
     inviteeIds: ["sw-leia", "sw-han"],
   },
   {
@@ -93,7 +126,9 @@ const DEMO_PROPOSALS: DemoProposal[] = [
     state: "resolved",
     proposerId: "sw-lando",
     locationId: "loc-cloudcity",
-    scheduledStartAt: "2099-07-15T22:00:00.000Z",
+    scheduledOffsetDays: 4,
+    scheduledStartHour: 22,
+    scheduledDurationHours: 8,
     inviteeIds: ["sw-han"],
   },
   {
@@ -145,6 +180,23 @@ export async function seedDemoProposals(options?: {
 
   const now = new Date().toISOString();
   for (const proposal of eligible) {
+    let scheduledStartAt: string | null = null;
+    let scheduledEndAt: string | null = null;
+
+    if (
+      proposal.scheduledOffsetDays !== undefined &&
+      proposal.scheduledStartHour !== undefined &&
+      proposal.scheduledDurationHours !== undefined
+    ) {
+      const window = scheduleWindow(
+        proposal.scheduledOffsetDays,
+        proposal.scheduledStartHour,
+        proposal.scheduledDurationHours,
+      );
+      scheduledStartAt = window.startAt;
+      scheduledEndAt = window.endAt;
+    }
+
     await db.insert(proposals).values({
       id: proposal.id,
       title: proposal.title,
@@ -153,7 +205,8 @@ export async function seedDemoProposals(options?: {
       state: proposal.state,
       proposerId: proposal.proposerId,
       locationId: proposal.locationId,
-      scheduledStartAt: proposal.scheduledStartAt ?? null,
+      scheduledStartAt,
+      scheduledEndAt,
       intentionalSolo: false,
       notes: proposal.notes,
       createdAt: now,
@@ -167,6 +220,24 @@ export async function seedDemoProposals(options?: {
         proposalId: proposal.id,
         userId: inviteeId,
         role: "required",
+        createdAt: now,
+      });
+    }
+
+    for (let index = 0; index < (proposal.timeSlots ?? []).length; index += 1) {
+      const slot = proposal.timeSlots![index];
+      const window = scheduleWindow(
+        slot.startOffsetDays,
+        slot.startHour,
+        slot.durationHours,
+      );
+      await db.insert(proposalTimeSlots).values({
+        id: `pts-${proposal.id}-${index}`,
+        proposalId: proposal.id,
+        startAt: window.startAt,
+        endAt: window.endAt,
+        label: slot.label ?? null,
+        sortOrder: index,
         createdAt: now,
       });
     }
