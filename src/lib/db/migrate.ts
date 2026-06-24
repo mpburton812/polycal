@@ -2,8 +2,9 @@ import { BOOTSTRAP_SQL } from "./bootstrap-sql";
 import { getSqlClient } from "./client";
 import { applyPeoplePlacesMigrations } from "./people-places-migrations";
 import { applyAdminMigrations } from "./admin-migrations";
+import { applyProposalsMigrations } from "./proposals-migrations";
 
-const SCHEMA_VERSION = "4";
+const SCHEMA_VERSION = "6";
 
 /**
  * Applies inline DDL on startup so Vercel previews and local dev share one path
@@ -21,6 +22,7 @@ export async function runMigrations(): Promise<void> {
 
   await applyPeoplePlacesMigrations(sql);
   await applyAdminMigrations(sql);
+  await applyProposalsMigrations(sql);
 
   await sql.execute({
     sql: `INSERT INTO schema_meta (key, value) VALUES ('version', ?)

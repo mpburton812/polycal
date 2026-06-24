@@ -10,7 +10,15 @@ import { userHasAdminAccess } from "@/lib/admin-access";
 import { logUserActivity } from "@/lib/audit";
 import { getDb } from "@/lib/db/client";
 import { ensureDbReady } from "@/lib/db/ensure-ready";
-import { locationResidents, locations, users } from "@/lib/db/schema";
+import {
+  locationResidents,
+  locations,
+  proposalInvitees,
+  proposals,
+  users,
+} from "@/lib/db/schema";
+import { notifyUser } from "@/lib/notifications";
+import type { UserRole } from "@/types/user";
 
 const placeSchema = z.object({
   name: z.string().trim().min(1).max(120),
@@ -42,6 +50,180 @@ export interface ResidentView {
   displayName: string;
   status: string;
   isIncoming: boolean;
+}
+
+/** Summary shown before confirming place deletion (PC-37). */
+export interface PlaceDeleteImpact {
+  placeName: string;
+  activeProposalCount: number;
+  scheduledEventCount: number;
+  pendingResidencyCount: number;
+  affectedProposalCount: number;
+}
+
+const PLACE_DELETED_DRAFT_NOTE =
+  "Place was deleted. Location cleared and proposal moved to your drafts.";
+
+function appendProposalNote(existing: string | null, line: string): string {
+  if (!existing?.trim()) return line;
+  return `${existing.trim()}\n${line}`;
+}
+
+/** True when a resolved proposal should be treated as a future scheduled event. */
+function isFutureScheduledEvent(scheduledStartAt: string | null): boolean {
+  if (!scheduledStartAt) return true;
+  return scheduledStartAt >= new Date().toISOString();
+}
+
+/**
+ * Whether the viewer may delete a place (admin, creator, or accepted resident).
+ */
+async function userCanDeletePlace(
+  db: ReturnType<typeof getDb>,
+  userId: string,
+  role: UserRole,
+  placeId: string,
+): Promise<boolean> {
+  if (await userHasAdminAccess(role)) return true;
+
+  const [place] = await db.select().from(locations).where(eq(locations.id, placeId)).limit(1);
+  if (!place) return false;
+  if (place.createdById === userId) return true;
+
+  const [resident] = await db
+    .select({ id: locationResidents.id })
+    .from(locationResidents)
+    .where(
+      and(
+        eq(locationResidents.locationId, placeId),
+        eq(locationResidents.userId, userId),
+        eq(locationResidents.status, "accepted"),
+      ),
+    )
+    .limit(1);
+
+  return Boolean(resident);
+}
+
+/**
+ * Loads linked proposals and residency rows that matter for delete confirmation (PC-37).
+ */
+export async function getPlaceDeleteImpactAction(
+  placeId: string,
+): Promise<{ ok: boolean; message: string; impact?: PlaceDeleteImpact }> {
+  const session = await auth();
+  if (!session?.user) {
+    return { ok: false, message: "Sign in required." };
+  }
+
+  await ensureDbReady();
+  const db = getDb();
+  const [place] = await db.select().from(locations).where(eq(locations.id, placeId)).limit(1);
+  if (!place) {
+    return { ok: false, message: "Place not found." };
+  }
+
+  if (!(await userCanDeletePlace(db, session.user.id, session.user.role, placeId))) {
+    return { ok: false, message: "You cannot delete this place." };
+  }
+
+  const linkedProposals = await db
+    .select({
+      id: proposals.id,
+      state: proposals.state,
+      scheduledStartAt: proposals.scheduledStartAt,
+    })
+    .from(proposals)
+    .where(eq(proposals.locationId, placeId));
+
+  const activeProposalCount = linkedProposals.filter((row) => row.state === "proposed").length;
+  const scheduledEventCount = linkedProposals.filter(
+    (row) => row.state === "resolved" && isFutureScheduledEvent(row.scheduledStartAt),
+  ).length;
+
+  const pendingResidents = await db
+    .select({ id: locationResidents.id })
+    .from(locationResidents)
+    .where(
+      and(eq(locationResidents.locationId, placeId), eq(locationResidents.status, "proposed")),
+    );
+
+  const affectedProposalCount = activeProposalCount + scheduledEventCount;
+
+  return {
+    ok: true,
+    message: "Impact loaded.",
+    impact: {
+      placeName: place.name,
+      activeProposalCount,
+      scheduledEventCount,
+      pendingResidencyCount: pendingResidents.length,
+      affectedProposalCount,
+    },
+  };
+}
+
+/**
+ * Moves active or future scheduled proposals to drafts and notifies stakeholders (PC-37).
+ */
+async function revertProposalsForDeletedPlace(
+  db: ReturnType<typeof getDb>,
+  placeId: string,
+  placeName: string,
+  deletedByUserId: string,
+): Promise<number> {
+  const linked = await db.select().from(proposals).where(eq(proposals.locationId, placeId));
+  const now = new Date().toISOString();
+  let movedCount = 0;
+
+  for (const proposal of linked) {
+    const shouldMoveToDraft =
+      proposal.state === "proposed" ||
+      (proposal.state === "resolved" && isFutureScheduledEvent(proposal.scheduledStartAt));
+
+    if (shouldMoveToDraft) {
+      await db
+        .update(proposals)
+        .set({
+          state: "draft",
+          locationId: null,
+          scheduledStartAt: null,
+          notes: appendProposalNote(proposal.notes, PLACE_DELETED_DRAFT_NOTE),
+          updatedAt: now,
+        })
+        .where(eq(proposals.id, proposal.id));
+
+      const inviteeRows = await db
+        .select({ userId: proposalInvitees.userId })
+        .from(proposalInvitees)
+        .where(eq(proposalInvitees.proposalId, proposal.id));
+
+      const notifyIds = new Set<string>([proposal.proposerId, ...inviteeRows.map((r) => r.userId)]);
+      const notificationMessage = `Place "${placeName}" was deleted. Proposal "${proposal.title}" was moved to drafts.`;
+
+      for (const userId of notifyIds) {
+        await notifyUser(userId, "place_deleted_proposal_reverted", notificationMessage, {
+          placeId,
+          placeName,
+          proposalId: proposal.id,
+          proposalTitle: proposal.title,
+          deletedByUserId,
+        });
+      }
+
+      movedCount += 1;
+      continue;
+    }
+
+    if (proposal.locationId) {
+      await db
+        .update(proposals)
+        .set({ locationId: null, updatedAt: now })
+        .where(eq(proposals.id, proposal.id));
+    }
+  }
+
+  return movedCount;
 }
 
 function parseBedroomNames(raw: string | null): string[] {
@@ -277,14 +459,14 @@ export async function updatePlaceAction(
 }
 
 /**
- * Deletes a place and its residency rows (admin only, PC-37).
+ * Deletes a place, reverts linked proposals to drafts, and notifies stakeholders (PC-37).
  */
 export async function deletePlaceAction(
   placeId: string,
-): Promise<{ ok: boolean; message: string }> {
+): Promise<{ ok: boolean; message: string; movedProposalCount?: number }> {
   const session = await auth();
-  if (!session?.user || session.user.role !== "admin") {
-    return { ok: false, message: "Admin access required." };
+  if (!session?.user) {
+    return { ok: false, message: "Sign in required." };
   }
 
   await ensureDbReady();
@@ -294,13 +476,38 @@ export async function deletePlaceAction(
     return { ok: false, message: "Place not found." };
   }
 
+  if (!(await userCanDeletePlace(db, session.user.id, session.user.role, placeId))) {
+    return { ok: false, message: "You cannot delete this place." };
+  }
+
+  const movedProposalCount = await revertProposalsForDeletedPlace(
+    db,
+    placeId,
+    place.name,
+    session.user.id,
+  );
+
   await db.delete(locationResidents).where(eq(locationResidents.locationId, placeId));
   await db.delete(locations).where(eq(locations.id, placeId));
 
-  await logUserActivity(session.user.id, "places.delete", placeId);
+  await logUserActivity(
+    session.user.id,
+    "places.delete",
+    JSON.stringify({ placeId, placeName: place.name, movedProposalCount }),
+  );
   revalidatePath("/people-places");
+  revalidatePath("/proposals");
 
-  return { ok: true, message: `Deleted place ${place.name}.` };
+  const movedSuffix =
+    movedProposalCount > 0
+      ? ` ${movedProposalCount} proposal(s) moved to drafts and stakeholders notified.`
+      : "";
+
+  return {
+    ok: true,
+    message: `Deleted place ${place.name}.${movedSuffix}`,
+    movedProposalCount,
+  };
 }
 
 /**
