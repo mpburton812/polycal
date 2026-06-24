@@ -13,6 +13,7 @@ import { ensureDbReady } from "@/lib/db/ensure-ready";
 import {
   locationResidents,
   locations,
+  polyGroup,
   proposalComments,
   proposalInvitees,
   proposalSlotVotes,
@@ -40,6 +41,12 @@ const timeSlotInputSchema = z.object({
   label: z.string().trim().max(120).optional(),
 });
 
+const recurrenceRuleSchema = z.object({
+  pattern: z.enum(["daily", "weekly", "monthly", "yearly"]),
+  interval: z.number().int().min(1).max(12).default(1),
+  count: z.number().int().min(2).max(52),
+});
+
 const draftProposalSchema = z.object({
   title: z.string().trim().min(1, "Title is required.").max(200),
   description: z.string().trim().min(1, "Description is required.").max(2000),
@@ -51,6 +58,9 @@ const draftProposalSchema = z.object({
   eventPrivacy: z.enum(["open", "private", "super_private"]).optional(),
   invitees: z.array(inviteeInputSchema).optional(),
   timeSlots: z.array(timeSlotInputSchema).max(10).optional(),
+  isRecurring: z.boolean().optional(),
+  recurrenceRule: recurrenceRuleSchema.optional(),
+  bedroomIndex: z.number().int().min(0).max(19).optional(),
 });
 
 const commentSchema = z.object({
@@ -102,11 +112,21 @@ export interface ProposalCard {
   scheduledEndAt: string | null;
   atRisk: boolean;
   isPoll: boolean;
+  eventPrivacy: EventPrivacyLevel;
+  isContentMasked: boolean;
   /** True when the viewer must act on a proposed item. */
   needsViewerAction: boolean;
   inviteeCount: number;
   respondedCount: number;
   isPastSchedule: boolean;
+}
+
+export type RecurrencePattern = "daily" | "weekly" | "monthly" | "yearly";
+
+export interface RecurrenceRule {
+  pattern: RecurrencePattern;
+  interval: number;
+  count: number;
 }
 
 export interface ProposalBoard {
@@ -149,6 +169,8 @@ export interface ProposalConflictWarning {
   conflictingState: ProposalState;
   overlapStart: string;
   overlapEnd: string | null;
+  /** Bedroom or place asset lock conflict (PC-40). */
+  conflictKind?: "schedule" | "place_asset";
 }
 
 export interface ProposalDetail {
@@ -168,6 +190,13 @@ export interface ProposalDetail {
   scheduledStartAt: string | null;
   scheduledEndAt: string | null;
   atRisk: boolean;
+  isContentMasked: boolean;
+  isRecurring: boolean;
+  isRecurrenceParent: boolean;
+  parentProposalId: string | null;
+  recurrenceRule: RecurrenceRule | null;
+  occurrenceIndex: number | null;
+  bedroomIndex: number | null;
   invitees: ProposalInviteeView[];
   timeSlots: ProposalTimeSlotView[];
   slotVotes: ProposalSlotVoteView[];
@@ -181,6 +210,7 @@ export interface ProposalDetail {
   canComment: boolean;
   canCancel: boolean;
   canRedraft: boolean;
+  canClone: boolean;
   viewerVoteStatus: InviteeVoteStatus | null;
   viewerSlotVotes: Record<string, InviteeVoteStatus>;
 }
@@ -200,6 +230,190 @@ export interface ProposalStateLogView {
 }
 
 const APPROVING_VOTES: InviteeVoteStatus[] = ["accept", "abstain", "accept_suboptimal"];
+const APPROVING_SLOT_VOTES: InviteeVoteStatus[] = ["accept", "abstain", "accept_suboptimal"];
+
+const MASKED_TITLE = "Private event";
+const MASKED_DESCRIPTION = "Details are hidden for your privacy level.";
+
+function parseRecurrenceRule(raw: string | null): RecurrenceRule | null {
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as RecurrenceRule;
+    if (!parsed.pattern || !parsed.count) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function serializeRecurrenceRule(rule: RecurrenceRule | undefined): string | null {
+  if (!rule) return null;
+  return JSON.stringify(rule);
+}
+
+/** Poly-group admin visibility toggles for private proposals (PC-40). */
+async function getPrivacyAdminFlags(
+  db: ReturnType<typeof getDb>,
+): Promise<{ adminCanSeePrivate: boolean; adminCanSeeSuperPrivate: boolean }> {
+  const [group] = await db.select().from(polyGroup).where(eq(polyGroup.id, 1)).limit(1);
+  return {
+    adminCanSeePrivate: group?.adminCanSeePrivate ?? false,
+    adminCanSeeSuperPrivate: group?.adminCanSeeSuperPrivate ?? false,
+  };
+}
+
+/**
+ * Whether resolved/archived card content should be masked for the viewer (PC-40).
+ */
+function shouldMaskProposalContent(
+  viewerId: string,
+  isAdmin: boolean,
+  proposerId: string,
+  inviteeUserIds: string[],
+  eventPrivacy: EventPrivacyLevel,
+  adminCanSeePrivate: boolean,
+  adminCanSeeSuperPrivate: boolean,
+  state: ProposalState,
+): boolean {
+  if (state !== "resolved" && state !== "archived") return false;
+  if (eventPrivacy === "open") return false;
+  if (proposerId === viewerId || inviteeUserIds.includes(viewerId)) return false;
+  if (eventPrivacy === "private" && isAdmin && adminCanSeePrivate) return false;
+  if (eventPrivacy === "super_private" && isAdmin && adminCanSeeSuperPrivate) return false;
+  return true;
+}
+
+function applyProposalMask<T extends {
+  title: string;
+  description: string | null;
+  locationName: string | null;
+  scheduledStartAt: string | null;
+  scheduledEndAt: string | null;
+  notes?: string | null;
+}>(row: T, masked: boolean): T {
+  if (!masked) return row;
+  return {
+    ...row,
+    title: MASKED_TITLE,
+    description: MASKED_DESCRIPTION,
+    locationName: null,
+    scheduledStartAt: null,
+    scheduledEndAt: null,
+    notes: row.notes !== undefined ? null : undefined,
+  };
+}
+
+/** Counts slots where every required invitee voted accept/abstain/sub-optimal (PC-40). */
+function countMutuallyAgreeableSlots(
+  slotIds: string[],
+  requiredUserIds: string[],
+  slotVotes: { timeSlotId: string; userId: string; voteStatus: InviteeVoteStatus }[],
+): number {
+  if (requiredUserIds.length === 0 || slotIds.length === 0) return 0;
+  let agreeable = 0;
+  for (const slotId of slotIds) {
+    const unanimous = requiredUserIds.every((userId) => {
+      const vote = slotVotes.find((v) => v.timeSlotId === slotId && v.userId === userId);
+      return vote !== undefined && APPROVING_SLOT_VOTES.includes(vote.voteStatus);
+    });
+    if (unanimous) agreeable += 1;
+  }
+  return agreeable;
+}
+
+/** True when a required invitee answered every poll slot. */
+function requiredCompletedPollMatrix(
+  slotIds: string[],
+  userId: string,
+  slotVotes: { timeSlotId: string; userId: string; voteStatus: InviteeVoteStatus }[],
+): boolean {
+  if (slotIds.length === 0) return false;
+  return slotIds.every((slotId) => {
+    const vote = slotVotes.find((v) => v.timeSlotId === slotId && v.userId === userId);
+    return vote !== undefined && vote.voteStatus !== "not_seen";
+  });
+}
+
+/** Advances a date by recurrence pattern for occurrence generation (PC-40 MVP). */
+function advanceOccurrenceDate(date: Date, pattern: RecurrencePattern, interval: number): Date {
+  const next = new Date(date);
+  switch (pattern) {
+    case "daily":
+      next.setDate(next.getDate() + interval);
+      break;
+    case "weekly":
+      next.setDate(next.getDate() + 7 * interval);
+      break;
+    case "monthly":
+      next.setMonth(next.getMonth() + interval);
+      break;
+    case "yearly":
+      next.setFullYear(next.getFullYear() + interval);
+      break;
+    default:
+      break;
+  }
+  return next;
+}
+
+/** Builds ISO occurrence windows from the first slot and recurrence rule (PC-40). */
+function buildRecurrenceOccurrences(
+  baseStart: string,
+  baseEnd: string | null,
+  rule: RecurrenceRule,
+): { startAt: string; endAt: string | null }[] {
+  const occurrences: { startAt: string; endAt: string | null }[] = [];
+  let cursorStart = new Date(baseStart);
+  let cursorEnd = baseEnd ? new Date(baseEnd) : null;
+  const durationMs =
+    cursorEnd && !Number.isNaN(cursorEnd.getTime())
+      ? cursorEnd.getTime() - cursorStart.getTime()
+      : 0;
+
+  for (let index = 0; index < rule.count; index += 1) {
+    const startAt = cursorStart.toISOString();
+    const endAt =
+      cursorEnd && durationMs > 0
+        ? new Date(cursorStart.getTime() + durationMs).toISOString()
+        : baseEnd;
+    occurrences.push({ startAt, endAt: endAt ?? null });
+    if (index < rule.count - 1) {
+      cursorStart = advanceOccurrenceDate(cursorStart, rule.pattern, rule.interval);
+      if (cursorEnd) {
+        cursorEnd = advanceOccurrenceDate(cursorEnd, rule.pattern, rule.interval);
+      }
+    }
+  }
+  return occurrences;
+}
+
+function slotsFingerprint(
+  slots: { startAt: string; endAt?: string | null; label?: string | null }[],
+): string {
+  return slots
+    .map((slot) => `${slot.startAt}|${slot.endAt ?? ""}|${slot.label ?? ""}`)
+    .sort()
+    .join(";");
+}
+
+/** Returns true when time, location, or poll slots changed enough to wipe votes (PC-40). */
+function criticalProposalFieldsChanged(
+  before: typeof proposals.$inferSelect,
+  afterLocationId: string | null,
+  afterSlots: { startAt: string; endAt?: string | null; label?: string | null }[],
+  beforeSlots: { startAt: string; endAt: string | null; label: string | null }[],
+): boolean {
+  if ((before.locationId ?? null) !== afterLocationId) return true;
+  if (slotsFingerprint(beforeSlots) !== slotsFingerprint(afterSlots)) return true;
+  if (
+    before.scheduledStartAt &&
+    afterSlots[0] &&
+    before.scheduledStartAt !== afterSlots[0].startAt
+  ) {
+    return true;
+  }
+  return false;
+}
 
 /** Returns true when two ISO intervals overlap (open end uses start as instant). */
 function intervalsOverlap(
@@ -349,6 +563,7 @@ export async function listProposalBoardAction(): Promise<ProposalBoard> {
   await expireAtRiskProposals(db);
   const viewerId = session.user.id;
   const isAdmin = await userHasAdminAccess(session.user.role);
+  const privacyFlags = await getPrivacyAdminFlags(db);
   const nowIso = new Date().toISOString();
 
   const rows = await db
@@ -365,6 +580,7 @@ export async function listProposalBoardAction(): Promise<ProposalBoard> {
       scheduledEndAt: proposals.scheduledEndAt,
       atRisk: proposals.atRisk,
       isPoll: proposals.isPoll,
+      eventPrivacy: proposals.eventPrivacy,
     })
     .from(proposals)
     .innerJoin(users, eq(proposals.proposerId, users.id))
@@ -394,33 +610,48 @@ export async function listProposalBoardAction(): Promise<ProposalBoard> {
 
     if (row.state === "draft") {
       if (row.proposerId !== viewerId) continue;
-    } else if (!viewerCanSeeProposal(viewerId, isAdmin, row.proposerId, inviteeUserIds)) {
-      continue;
+    } else if (row.state === "proposed") {
+      if (!viewerCanSeeProposal(viewerId, isAdmin, row.proposerId, inviteeUserIds)) continue;
     }
+
+    const masked = shouldMaskProposalContent(
+      viewerId,
+      isAdmin,
+      row.proposerId,
+      inviteeUserIds,
+      row.eventPrivacy,
+      privacyFlags.adminCanSeePrivate,
+      privacyFlags.adminCanSeeSuperPrivate,
+      row.state,
+    );
+    const display = applyProposalMask(row, masked);
 
     const viewerInvitee = invitees.find((invitee) => invitee.userId === viewerId);
     const respondedCount = invitees.filter((inv) => inv.voteStatus !== "not_seen").length;
     const needsViewerAction =
       row.state === "proposed" &&
+      !masked &&
       viewerInvitee !== undefined &&
       viewerInvitee.voteStatus === "not_seen";
 
-    const scheduleEnd = row.scheduledEndAt ?? row.scheduledStartAt;
+    const scheduleEnd = display.scheduledEndAt ?? display.scheduledStartAt;
     const isPastSchedule = Boolean(scheduleEnd && scheduleEnd < nowIso);
 
     const card: ProposalCard = {
       id: row.id,
-      title: row.title,
-      description: row.description,
+      title: display.title,
+      description: display.description,
       proposalType: row.proposalType,
       state: row.state,
       proposerId: row.proposerId,
       proposerName: row.proposerName,
-      locationName: row.locationName ?? null,
-      scheduledStartAt: row.scheduledStartAt ?? null,
-      scheduledEndAt: row.scheduledEndAt ?? null,
+      locationName: display.locationName ?? null,
+      scheduledStartAt: display.scheduledStartAt ?? null,
+      scheduledEndAt: display.scheduledEndAt ?? null,
       atRisk: row.atRisk,
       isPoll: row.isPoll,
+      eventPrivacy: row.eventPrivacy,
+      isContentMasked: masked,
       needsViewerAction,
       inviteeCount: invitees.length,
       respondedCount,
@@ -573,12 +804,21 @@ function scheduleFromSlots(
 }
 
 async function resetInviteeVotes(db: ReturnType<typeof getDb>, proposalId: string): Promise<void> {
+  await wipeProposalVotes(db, proposalId);
+}
+
+/** Clears invitee votes, slot matrix votes, and winning slot (PC-40). */
+async function wipeProposalVotes(db: ReturnType<typeof getDb>, proposalId: string): Promise<void> {
   const now = new Date().toISOString();
   await db
     .update(proposalInvitees)
     .set({ voteStatus: "not_seen", respondedAt: null })
     .where(eq(proposalInvitees.proposalId, proposalId));
-  await db.update(proposals).set({ updatedAt: now }).where(eq(proposals.id, proposalId));
+  await db.delete(proposalSlotVotes).where(eq(proposalSlotVotes.proposalId, proposalId));
+  await db
+    .update(proposals)
+    .set({ winningSlotId: null, updatedAt: now })
+    .where(eq(proposals.id, proposalId));
 }
 
 /**
@@ -698,6 +938,7 @@ async function resolveProposal(
 
 /**
  * Checks whether a proposed item should resolve or revert after a vote (PC-40).
+ * Poll proposals wait for all required matrix votes before evaluating mutual slots.
  */
 async function evaluateProposalAfterVote(
   db: ReturnType<typeof getDb>,
@@ -717,6 +958,50 @@ async function evaluateProposalAfterVote(
     .where(eq(proposalInvitees.proposalId, proposalId));
 
   const required = invitees.filter((row) => row.role === "required");
+  const slotRows = await db
+    .select({ id: proposalTimeSlots.id })
+    .from(proposalTimeSlots)
+    .where(eq(proposalTimeSlots.proposalId, proposalId));
+  const isPollMatrix = proposal.isPoll && slotRows.length > 1;
+
+  if (isPollMatrix) {
+    const slotVoteRows = await db
+      .select({
+        timeSlotId: proposalSlotVotes.timeSlotId,
+        userId: proposalSlotVotes.userId,
+        voteStatus: proposalSlotVotes.voteStatus,
+      })
+      .from(proposalSlotVotes)
+      .where(eq(proposalSlotVotes.proposalId, proposalId));
+
+    const slotIds = slotRows.map((row) => row.id);
+    const requiredIds = required.map((row) => row.userId);
+    const allMatricesComplete = requiredIds.every((userId) =>
+      requiredCompletedPollMatrix(slotIds, userId, slotVoteRows),
+    );
+
+    if (!allMatricesComplete) return;
+
+    const agreeableSlots = countMutuallyAgreeableSlots(slotIds, requiredIds, slotVoteRows);
+    if (agreeableSlots === 0) {
+      await revertProposalToDraft(
+        db,
+        proposal,
+        actorUserId,
+        "No mutually agreeable poll slots among required invitees.",
+      );
+      return;
+    }
+
+    const pendingRequired = required.filter((row) => row.voteStatus === "not_seen");
+    if (pendingRequired.length > 0) return;
+
+    if (required.length === 0 || required.every((row) => APPROVING_VOTES.includes(row.voteStatus))) {
+      await resolveProposal(db, proposal, actorUserId);
+    }
+    return;
+  }
+
   const declinedRequired = required.find((row) => row.voteStatus === "decline");
   if (declinedRequired) {
     await revertProposalToDraft(db, proposal, actorUserId, "A required invitee declined.");
@@ -765,6 +1050,147 @@ async function syncInviteeAggregateFromSlotVotes(
     .where(
       and(eq(proposalInvitees.proposalId, proposalId), eq(proposalInvitees.userId, userId)),
     );
+}
+
+/**
+ * Detects bedroom/place occupancy conflicts for sleeping proposals (PC-40 MVP).
+ */
+async function checkPlaceAssetConflicts(
+  db: ReturnType<typeof getDb>,
+  proposal: typeof proposals.$inferSelect,
+  checkWindows: { start: string; end: string | null }[],
+  excludeProposalId?: string,
+): Promise<ProposalConflictWarning[]> {
+  if (proposal.proposalType !== "sleeping" || !proposal.locationId || checkWindows.length === 0) {
+    return [];
+  }
+
+  const [place] = await db
+    .select({ id: locations.id, name: locations.name })
+    .from(locations)
+    .where(eq(locations.id, proposal.locationId))
+    .limit(1);
+  if (!place) return [];
+
+  const sleepingActive = await db
+    .select({
+      id: proposals.id,
+      title: proposals.title,
+      state: proposals.state,
+      locationId: proposals.locationId,
+      bedroomIndex: proposals.bedroomIndex,
+      scheduledStartAt: proposals.scheduledStartAt,
+      scheduledEndAt: proposals.scheduledEndAt,
+    })
+    .from(proposals)
+    .where(
+      and(
+        eq(proposals.proposalType, "sleeping"),
+        inArray(proposals.state, ["proposed", "resolved"]),
+      ),
+    );
+
+  const warnings: ProposalConflictWarning[] = [];
+  for (const other of sleepingActive) {
+    if (other.id === excludeProposalId || other.id === proposal.id) continue;
+    if (other.locationId !== proposal.locationId) continue;
+    if (!other.scheduledStartAt) continue;
+
+    const sameBedroom =
+      proposal.bedroomIndex === null ||
+      other.bedroomIndex === null ||
+      proposal.bedroomIndex === other.bedroomIndex;
+    if (!sameBedroom) continue;
+
+    for (const window of checkWindows) {
+      if (
+        intervalsOverlap(
+          window.start,
+          window.end,
+          other.scheduledStartAt,
+          other.scheduledEndAt,
+        )
+      ) {
+        warnings.push({
+          userId: proposal.proposerId,
+          displayName: place.name,
+          conflictingTitle: other.title,
+          conflictingState: other.state as ProposalState,
+          overlapStart: window.start,
+          overlapEnd: window.end,
+          conflictKind: "place_asset",
+        });
+        break;
+      }
+    }
+  }
+
+  return warnings;
+}
+
+/**
+ * Creates child proposal drafts for recurring series occurrences after the parent (PC-40).
+ */
+async function createRecurringChildProposals(
+  db: ReturnType<typeof getDb>,
+  parent: typeof proposals.$inferSelect,
+  occurrences: { startAt: string; endAt: string | null }[],
+  invitees: { userId: string; role: InviteeRole }[],
+): Promise<void> {
+  const now = new Date().toISOString();
+  for (let index = 1; index < occurrences.length; index += 1) {
+    const occurrence = occurrences[index];
+    const childId = `prop-${randomUUID()}`;
+    const label = new Date(occurrence.startAt).toLocaleDateString(undefined, {
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+    });
+
+    await db.insert(proposals).values({
+      id: childId,
+      title: `${parent.title} — ${label}`,
+      description: parent.description,
+      proposalType: parent.proposalType,
+      state: parent.state,
+      proposerId: parent.proposerId,
+      locationId: parent.locationId,
+      scheduledStartAt: parent.state === "resolved" ? occurrence.startAt : null,
+      scheduledEndAt: parent.state === "resolved" ? occurrence.endAt : null,
+      intentionalSolo: parent.intentionalSolo,
+      eventPrivacy: parent.eventPrivacy,
+      isPoll: false,
+      parentProposalId: parent.id,
+      occurrenceIndex: index,
+      isRecurrenceParent: false,
+      bedroomIndex: parent.bedroomIndex,
+      notes: parent.notes,
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    await db.insert(proposalTimeSlots).values({
+      id: `pts-${randomUUID()}`,
+      proposalId: childId,
+      startAt: occurrence.startAt,
+      endAt: occurrence.endAt,
+      label,
+      sortOrder: 0,
+      createdAt: now,
+    });
+
+    if (invitees.length > 0) {
+      await replaceInvitees(db, childId, parent.proposerId, invitees);
+    }
+
+    await logProposalTransition(
+      db,
+      childId,
+      parent.proposerId,
+      "proposal.recurrence_child_created",
+      JSON.stringify({ parentId: parent.id, occurrenceIndex: index }),
+    );
+  }
 }
 
 /**
@@ -879,6 +1305,9 @@ export async function checkProposalConflictsAction(
     }
   }
 
+  const placeWarnings = await checkPlaceAssetConflicts(db, proposal, checkWindows, proposalId);
+  warnings.push(...placeWarnings);
+
   return {
     ok: true,
     message: warnings.length > 0 ? "Schedule conflicts detected." : "No conflicts.",
@@ -920,6 +1349,10 @@ export async function createDraftProposalAction(
   const intentionalSolo = Boolean(parsed.data.intentionalSolo);
   const isPoll = Boolean(parsed.data.isPoll) || (parsed.data.timeSlots?.length ?? 0) > 1;
   const eventPrivacy = parsed.data.eventPrivacy ?? "open";
+  const isRecurring = Boolean(parsed.data.isRecurring && parsed.data.recurrenceRule);
+  const recurrenceJson = isRecurring
+    ? serializeRecurrenceRule(parsed.data.recurrenceRule)
+    : null;
 
   await db.insert(proposals).values({
     id: proposalId,
@@ -933,6 +1366,10 @@ export async function createDraftProposalAction(
     intentionalSolo,
     isPoll,
     eventPrivacy,
+    isRecurrenceParent: isRecurring,
+    recurrenceRule: recurrenceJson,
+    occurrenceIndex: isRecurring ? 0 : null,
+    bedroomIndex: parsed.data.bedroomIndex ?? null,
     createdAt: now,
     updatedAt: now,
   });
@@ -996,17 +1433,49 @@ export async function updateDraftProposalAction(
     parsed.data.isPoll !== undefined
       ? parsed.data.isPoll
       : (parsed.data.timeSlots?.length ?? 0) > 1;
+  const isRecurring = Boolean(parsed.data.isRecurring && parsed.data.recurrenceRule);
+  const recurrenceJson = isRecurring
+    ? serializeRecurrenceRule(parsed.data.recurrenceRule)
+    : proposal.recurrenceRule;
+
+  const existingSlots = await db
+    .select({
+      startAt: proposalTimeSlots.startAt,
+      endAt: proposalTimeSlots.endAt,
+      label: proposalTimeSlots.label,
+    })
+    .from(proposalTimeSlots)
+    .where(eq(proposalTimeSlots.proposalId, proposal.id));
+
+  const afterLocationId = parsed.data.locationId ?? null;
+  const afterSlots =
+    parsed.data.timeSlots?.map((slot) => ({
+      startAt: slot.startAt,
+      endAt: slot.endAt ?? null,
+      label: slot.label ?? null,
+    })) ?? existingSlots;
+
+  const criticalChanged = criticalProposalFieldsChanged(
+    proposal,
+    afterLocationId,
+    afterSlots,
+    existingSlots,
+  );
+
   await db
     .update(proposals)
     .set({
       title: parsed.data.title,
       description: parsed.data.description,
       proposalType: parsed.data.proposalType,
-      locationId: parsed.data.locationId ?? null,
+      locationId: afterLocationId,
       notes: parsed.data.notes ?? null,
       intentionalSolo: Boolean(parsed.data.intentionalSolo),
       isPoll: Boolean(isPoll),
       eventPrivacy: parsed.data.eventPrivacy ?? proposal.eventPrivacy,
+      isRecurrenceParent: isRecurring || proposal.isRecurrenceParent,
+      recurrenceRule: recurrenceJson,
+      bedroomIndex: parsed.data.bedroomIndex ?? proposal.bedroomIndex,
       updatedAt: now,
     })
     .where(eq(proposals.id, proposal.id));
@@ -1017,6 +1486,10 @@ export async function updateDraftProposalAction(
 
   if (parsed.data.timeSlots) {
     await replaceTimeSlots(db, proposal.id, parsed.data.timeSlots);
+  }
+
+  if (criticalChanged || proposal.atRisk) {
+    await wipeProposalVotes(db, proposal.id);
   }
 
   await logProposalTransition(db, proposal.id, session.user.id, "draft.updated");
@@ -1099,6 +1572,10 @@ export async function submitProposalAction(
   const now = new Date().toISOString();
   const nextState: ProposalState = autoResolve ? "resolved" : "proposed";
 
+  if (proposal.atRisk) {
+    await wipeProposalVotes(db, proposalId);
+  }
+
   await db
     .update(proposals)
     .set({
@@ -1110,6 +1587,27 @@ export async function submitProposalAction(
       updatedAt: now,
     })
     .where(eq(proposals.id, proposalId));
+
+  const recurrenceRule = parseRecurrenceRule(proposal.recurrenceRule);
+  if (proposal.isRecurrenceParent && recurrenceRule && slots.length > 0) {
+    const occurrences = buildRecurrenceOccurrences(
+      slots[0].startAt,
+      slots[0].endAt,
+      recurrenceRule,
+    );
+    const inviteeRows = invitees.map((row) => ({
+      userId: row.userId,
+      role: row.role as InviteeRole,
+    }));
+    const [updatedParent] = await db
+      .select()
+      .from(proposals)
+      .where(eq(proposals.id, proposalId))
+      .limit(1);
+    if (updatedParent) {
+      await createRecurringChildProposals(db, updatedParent, occurrences, inviteeRows);
+    }
+  }
 
   await logProposalTransition(
     db,
@@ -1159,6 +1657,7 @@ export async function getProposalDetailAction(
   const db = getDb();
   await expireAtRiskProposals(db);
   const isAdmin = await userHasAdminAccess(session.user.role);
+  const privacyFlags = await getPrivacyAdminFlags(db);
 
   const [row] = await db
     .select({
@@ -1179,6 +1678,11 @@ export async function getProposalDetailAction(
       scheduledEndAt: proposals.scheduledEndAt,
       atRisk: proposals.atRisk,
       winningSlotId: proposals.winningSlotId,
+      parentProposalId: proposals.parentProposalId,
+      recurrenceRule: proposals.recurrenceRule,
+      occurrenceIndex: proposals.occurrenceIndex,
+      isRecurrenceParent: proposals.isRecurrenceParent,
+      bedroomIndex: proposals.bedroomIndex,
     })
     .from(proposals)
     .innerJoin(users, eq(proposals.proposerId, users.id))
@@ -1206,11 +1710,23 @@ export async function getProposalDetailAction(
     return { ok: false, message: "Proposal not found." };
   }
   if (
-    row.state !== "draft" &&
+    row.state === "proposed" &&
     !viewerCanSeeProposal(session.user.id, isAdmin, row.proposerId, inviteeUserIds)
   ) {
     return { ok: false, message: "Proposal not found." };
   }
+
+  const masked = shouldMaskProposalContent(
+    session.user.id,
+    isAdmin,
+    row.proposerId,
+    inviteeUserIds,
+    row.eventPrivacy,
+    privacyFlags.adminCanSeePrivate,
+    privacyFlags.adminCanSeeSuperPrivate,
+    row.state,
+  );
+  const display = applyProposalMask(row, masked);
 
   const slotRows = await db
     .select()
@@ -1266,60 +1782,80 @@ export async function getProposalDetailAction(
 
   const isProposer = row.proposerId === session.user.id;
   const canManage = isProposer || isAdmin;
+  const recurrenceRule = parseRecurrenceRule(row.recurrenceRule);
+  const canViewSensitive = !masked;
 
   return {
     ok: true,
     message: "Loaded.",
     detail: {
       id: row.id,
-      title: row.title,
-      description: row.description,
-      notes: row.notes,
+      title: display.title,
+      description: display.description,
+      notes: masked ? null : row.notes,
       proposalType: row.proposalType,
       state: row.state,
       proposerId: row.proposerId,
       proposerName: row.proposerName,
-      locationId: row.locationId ?? null,
-      locationName: row.locationName ?? null,
+      locationId: masked ? null : row.locationId ?? null,
+      locationName: display.locationName ?? null,
       intentionalSolo: row.intentionalSolo,
       isPoll: row.isPoll,
       eventPrivacy: row.eventPrivacy,
-      scheduledStartAt: row.scheduledStartAt ?? null,
-      scheduledEndAt: row.scheduledEndAt ?? null,
+      scheduledStartAt: display.scheduledStartAt ?? null,
+      scheduledEndAt: display.scheduledEndAt ?? null,
       atRisk: row.atRisk,
-      invitees: inviteeRows.map((invitee) => ({
-        userId: invitee.userId,
-        displayName: invitee.displayName,
-        role: invitee.role,
-        voteStatus: invitee.voteStatus,
-      })),
-      timeSlots: slotRows.map((slot) => ({
-        id: slot.id,
-        startAt: slot.startAt,
-        endAt: slot.endAt ?? null,
-        label: slot.label ?? null,
-      })),
-      slotVotes: slotVoteRows.map((vote) => ({
-        timeSlotId: vote.timeSlotId,
-        userId: vote.userId,
-        displayName: vote.displayName,
-        voteStatus: vote.voteStatus,
-      })),
+      isContentMasked: masked,
+      isRecurring: Boolean(recurrenceRule || row.parentProposalId),
+      isRecurrenceParent: row.isRecurrenceParent,
+      parentProposalId: row.parentProposalId ?? null,
+      recurrenceRule,
+      occurrenceIndex: row.occurrenceIndex ?? null,
+      bedroomIndex: masked ? null : row.bedroomIndex ?? null,
+      invitees: canViewSensitive
+        ? inviteeRows.map((invitee) => ({
+            userId: invitee.userId,
+            displayName: invitee.displayName,
+            role: invitee.role,
+            voteStatus: invitee.voteStatus,
+          }))
+        : [],
+      timeSlots: masked
+        ? []
+        : slotRows.map((slot) => ({
+            id: slot.id,
+            startAt: slot.startAt,
+            endAt: slot.endAt ?? null,
+            label: slot.label ?? null,
+          })),
+      slotVotes: masked
+        ? []
+        : slotVoteRows.map((vote) => ({
+            timeSlotId: vote.timeSlotId,
+            userId: vote.userId,
+            displayName: vote.displayName,
+            voteStatus: vote.voteStatus,
+          })),
       winningSlotId: row.winningSlotId ?? null,
-      comments: commentRows.map((comment) => ({
-        id: comment.id,
-        authorName: comment.authorName,
-        body: comment.body,
-        createdAt: comment.createdAt,
-      })),
-      stateLog: logRows.map((entry) => ({
-        action: entry.action,
-        actorName: entry.actorName ?? null,
-        details: entry.details ?? null,
-        createdAt: entry.createdAt,
-      })),
+      comments: canViewSensitive
+        ? commentRows.map((comment) => ({
+            id: comment.id,
+            authorName: comment.authorName,
+            body: comment.body,
+            createdAt: comment.createdAt,
+          }))
+        : [],
+      stateLog: canViewSensitive
+        ? logRows.map((entry) => ({
+            action: entry.action,
+            actorName: entry.actorName ?? null,
+            details: entry.details ?? null,
+            createdAt: entry.createdAt,
+          }))
+        : [],
       canEdit: row.state === "draft" && isProposer,
       canVote:
+        !masked &&
         !isPollMatrix &&
         ((row.state === "proposed" &&
           viewerInvitee !== undefined &&
@@ -1328,20 +1864,25 @@ export async function getProposalDetailAction(
             viewerInvitee?.role === "optional" &&
             viewerInvitee.voteStatus === "not_seen")),
       canVoteSlots:
+        !masked &&
         isPollMatrix &&
         viewerInvitee !== undefined &&
         (row.state === "proposed" || (row.state === "resolved" && viewerInvitee.role === "optional")) &&
         pollSlotsIncomplete,
       canManageAttendees:
-        (isProposer || isAdmin) && row.state === "resolved",
+        canViewSensitive && (isProposer || isAdmin) && row.state === "resolved",
       canComment:
+        canViewSensitive &&
         row.state !== "draft" &&
         row.state !== "archived" &&
         viewerCanSeeProposal(session.user.id, isAdmin, row.proposerId, inviteeUserIds),
       canCancel: canManage && (row.state === "proposed" || row.state === "resolved"),
       canRedraft: isProposer && row.state === "resolved",
+      canClone:
+        isProposer &&
+        (row.state === "resolved" || row.state === "proposed" || row.state === "archived"),
       viewerVoteStatus: viewerInvitee?.voteStatus ?? null,
-      viewerSlotVotes,
+      viewerSlotVotes: masked ? {} : viewerSlotVotes,
     },
   };
 }
@@ -1849,10 +2390,110 @@ export async function addProposalCommentAction(
 }
 
 /**
+ * Clones a proposal into a new draft for the proposer (PC-40).
+ */
+export async function cloneProposalAction(
+  proposalId: string,
+): Promise<{ ok: boolean; message: string; newProposalId?: string }> {
+  const session = await auth();
+  if (!session?.user) {
+    return { ok: false, message: "Sign in required." };
+  }
+
+  await ensureDbReady();
+  const db = getDb();
+  const [source] = await db
+    .select()
+    .from(proposals)
+    .where(eq(proposals.id, proposalId))
+    .limit(1);
+
+  if (
+    !source ||
+    source.proposerId !== session.user.id ||
+    !["resolved", "proposed", "archived"].includes(source.state)
+  ) {
+    return { ok: false, message: "Proposal cannot be cloned." };
+  }
+
+  const inviteeRows = await db
+    .select({ userId: proposalInvitees.userId, role: proposalInvitees.role })
+    .from(proposalInvitees)
+    .where(eq(proposalInvitees.proposalId, proposalId));
+
+  const slotRows = await db
+    .select({
+      startAt: proposalTimeSlots.startAt,
+      endAt: proposalTimeSlots.endAt,
+      label: proposalTimeSlots.label,
+      sortOrder: proposalTimeSlots.sortOrder,
+    })
+    .from(proposalTimeSlots)
+    .where(eq(proposalTimeSlots.proposalId, proposalId))
+    .orderBy(asc(proposalTimeSlots.sortOrder));
+
+  const now = new Date().toISOString();
+  const newId = `prop-${randomUUID()}`;
+
+  await db.insert(proposals).values({
+    id: newId,
+    title: `${source.title} (copy)`,
+    description: source.description,
+    proposalType: source.proposalType,
+    state: "draft",
+    proposerId: session.user.id,
+    locationId: source.locationId,
+    scheduledStartAt: null,
+    scheduledEndAt: null,
+    intentionalSolo: source.intentionalSolo,
+    eventPrivacy: source.eventPrivacy,
+    isPoll: source.isPoll,
+    bedroomIndex: source.bedroomIndex,
+    notes: source.notes,
+    createdAt: now,
+    updatedAt: now,
+  });
+
+  for (const slot of slotRows) {
+    await db.insert(proposalTimeSlots).values({
+      id: `pts-${randomUUID()}`,
+      proposalId: newId,
+      startAt: slot.startAt,
+      endAt: slot.endAt,
+      label: slot.label,
+      sortOrder: slot.sortOrder,
+      createdAt: now,
+    });
+  }
+
+  if (inviteeRows.length > 0) {
+    await replaceInvitees(
+      db,
+      newId,
+      session.user.id,
+      inviteeRows.map((row) => ({ userId: row.userId, role: row.role as InviteeRole })),
+    );
+  }
+
+  await logProposalTransition(
+    db,
+    newId,
+    session.user.id,
+    "proposal.cloned",
+    JSON.stringify({ sourceId: proposalId }),
+  );
+
+  revalidatePath("/proposals");
+  return { ok: true, message: "Draft created from proposal.", newProposalId: newId };
+}
+
+/**
  * Archives a proposed or resolved proposal (proposer or admin, PC-40).
+ * Recurring items support occurrence-only or entire-series scope.
  */
 export async function cancelProposalAction(
   proposalId: string,
+  scope: "occurrence" | "series" = "occurrence",
 ): Promise<{ ok: boolean; message: string }> {
   const session = await auth();
   if (!session?.user) {
@@ -1877,18 +2518,78 @@ export async function cancelProposalAction(
   }
 
   const now = new Date().toISOString();
-  await db
-    .update(proposals)
-    .set({
-      state: "archived",
-      scheduledStartAt: null,
-      scheduledEndAt: null,
-      atRisk: false,
-      updatedAt: now,
-    })
-    .where(eq(proposals.id, proposalId));
+  const actorId = session.user.id;
 
-  await logProposalTransition(db, proposalId, session.user.id, "proposal.cancelled");
+  async function archiveOne(id: string): Promise<void> {
+    await db
+      .update(proposals)
+      .set({
+        state: "archived",
+        scheduledStartAt: null,
+        scheduledEndAt: null,
+        atRisk: false,
+        updatedAt: now,
+      })
+      .where(eq(proposals.id, id));
+    await logProposalTransition(db, id, actorId, "proposal.cancelled");
+  }
+
+  if (scope === "series" && (proposal.isRecurrenceParent || proposal.parentProposalId)) {
+    const rootId = proposal.isRecurrenceParent ? proposal.id : proposal.parentProposalId!;
+    const toArchive = new Set<string>([rootId]);
+
+    const childRows = await db
+      .select({ id: proposals.id })
+      .from(proposals)
+      .where(
+        and(
+          eq(proposals.parentProposalId, rootId),
+          inArray(proposals.state, ["proposed", "resolved", "draft"]),
+        ),
+      );
+
+    for (const child of childRows) {
+      toArchive.add(child.id);
+    }
+    if (!proposal.isRecurrenceParent) {
+      toArchive.add(proposal.id);
+    }
+
+    for (const id of toArchive) {
+      await archiveOne(id);
+    }
+  } else if (proposal.parentProposalId && scope === "occurrence") {
+    const forkId = `prop-${randomUUID()}`;
+    await db.insert(proposals).values({
+      id: forkId,
+      title: `${proposal.title} (forked)`,
+      description: proposal.description,
+      proposalType: proposal.proposalType,
+      state: "archived",
+      proposerId: proposal.proposerId,
+      locationId: proposal.locationId,
+      intentionalSolo: proposal.intentionalSolo,
+      eventPrivacy: proposal.eventPrivacy,
+      isPoll: proposal.isPoll,
+      parentProposalId: null,
+      occurrenceIndex: proposal.occurrenceIndex,
+      bedroomIndex: proposal.bedroomIndex,
+      notes: proposal.notes,
+      createdAt: now,
+      updatedAt: now,
+    });
+    await logProposalTransition(
+      db,
+      forkId,
+      actorId,
+      "proposal.occurrence_forked",
+      JSON.stringify({ sourceId: proposal.id }),
+    );
+    await archiveOne(proposal.id);
+  } else {
+    await archiveOne(proposal.id);
+  }
+
   await notifyProposalStakeholders(
     db,
     proposal,

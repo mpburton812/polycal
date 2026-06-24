@@ -56,3 +56,5 @@
 2026-06-24 | 004e626 | PC-40 | add proposal voting, draft editing, and time slots | src/actions/proposals.ts
 2026-06-24 | 54579be | PC-40 | add proposal comments, cancel/re-draft, and poll draft UI | src/actions/proposals.ts
 2026-06-24 | cf61fe4 | PC-40 | poll matrix voting, conflict checks, and proposal card UI | src/actions/proposals.ts
+2026-06-24 | 28b026d | PC-40 | shared proposal card theme and draft dialog layout | src/components/proposals/ProposalCard.tsx
+2026-06-24 | 703cdac | PC-40 | poll rules, privacy masking, recurrence, and bedroom locks | src/actions/proposals.ts

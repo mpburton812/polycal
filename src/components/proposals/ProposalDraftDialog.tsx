@@ -1,13 +1,23 @@
 "use client";
 
+import AccessTimeIcon from "@mui/icons-material/AccessTime";
+import EventNoteOutlinedIcon from "@mui/icons-material/EventNoteOutlined";
+import GroupsOutlinedIcon from "@mui/icons-material/GroupsOutlined";
+import LocationOnOutlinedIcon from "@mui/icons-material/LocationOnOutlined";
+import NotesOutlinedIcon from "@mui/icons-material/NotesOutlined";
+import PollOutlinedIcon from "@mui/icons-material/PollOutlined";
+import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 import {
   Alert,
+  Box,
   Button,
+  Card,
+  CardActions,
+  CardContent,
   Checkbox,
+  Chip,
   Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
+  Divider,
   FormControl,
   FormControlLabel,
   InputLabel,
@@ -20,7 +30,7 @@ import {
   Typography,
 } from "@mui/material";
 import { useRouter } from "next/navigation";
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition, type ReactNode } from "react";
 
 import {
   createBatchSleepingProposalsAction,
@@ -30,6 +40,21 @@ import {
   type ProposalPlaceOption,
 } from "@/actions/proposals";
 import type { PersonSummary } from "@/actions/users";
+
+import {
+  POLY_GREEN,
+  POLY_GREEN_HOVER,
+  POLY_GREEN_LIGHT,
+  formatTimeRange,
+  isPastSchedule,
+  primaryButtonSx,
+  proposalCardSx,
+  typeBadgeLabel,
+  typeChipSx,
+  PAST_SCHEDULE_BG,
+  PAST_SCHEDULE_ICON,
+  PAST_SCHEDULE_TEXT,
+} from "./proposalCardTheme";
 
 type InviteeSelection = "none" | "required" | "optional";
 
@@ -64,8 +89,34 @@ function localInputToIso(value: string): string | undefined {
   return date.toISOString();
 }
 
+function SectionHeader({
+  icon,
+  title,
+  subtitle,
+}: {
+  icon: ReactNode;
+  title: string;
+  subtitle?: string;
+}) {
+  return (
+    <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1.5 }}>
+      <Box sx={{ color: POLY_GREEN, display: "flex" }}>{icon}</Box>
+      <Box>
+        <Typography variant="subtitle2" sx={{ fontWeight: 600, color: POLY_GREEN }}>
+          {title}
+        </Typography>
+        {subtitle && (
+          <Typography variant="caption" color="text.secondary">
+            {subtitle}
+          </Typography>
+        )}
+      </Box>
+    </Stack>
+  );
+}
+
 /**
- * Create or edit a proposal draft with invitees and an optional time window (PC-40).
+ * Create or edit a proposal draft using the graphical card layout (PC-40).
  */
 export function ProposalDraftDialog({
   open,
@@ -77,6 +128,9 @@ export function ProposalDraftDialog({
 }: ProposalDraftDialogProps) {
   const router = useRouter();
   const isEdit = Boolean(initialDetail);
+  const proposerName =
+    people.find((p) => p.id === currentUserId)?.displayName ?? "You";
+
   const [proposalType, setProposalType] = useState<"event" | "sleeping">("event");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -89,6 +143,11 @@ export function ProposalDraftDialog({
   const [rangeEnd, setRangeEnd] = useState("");
   const [nightsPattern, setNightsPattern] = useState<"every" | "weekdays" | "weekends">("every");
   const [eventPrivacy, setEventPrivacy] = useState<"open" | "private" | "super_private">("open");
+  const [isRecurring, setIsRecurring] = useState(false);
+  const [recurrencePattern, setRecurrencePattern] = useState<
+    "daily" | "weekly" | "monthly" | "yearly"
+  >("weekly");
+  const [recurrenceCount, setRecurrenceCount] = useState(4);
   const [slots, setSlots] = useState<SlotDraft[]>([{ startAt: "", endAt: "", label: "" }]);
   const [inviteeMode, setInviteeMode] = useState<Record<string, InviteeSelection>>({});
   const [error, setError] = useState<string | null>(null);
@@ -97,6 +156,23 @@ export function ProposalDraftDialog({
   const candidates = people.filter(
     (person) => person.id !== currentUserId && person.status === "active",
   );
+
+  const locationName = places.find((p) => p.id === locationId)?.name ?? null;
+
+  const previewStartIso = useMemo(() => {
+    if (batchMode) return localInputToIso(rangeStart);
+    const first = slots.find((s) => s.startAt);
+    return first ? localInputToIso(first.startAt) : undefined;
+  }, [batchMode, rangeStart, slots]);
+
+  const previewEndIso = useMemo(() => {
+    if (batchMode) return localInputToIso(rangeEnd);
+    const first = slots.find((s) => s.startAt);
+    return first?.endAt ? localInputToIso(first.endAt) : undefined;
+  }, [batchMode, rangeEnd, slots]);
+
+  const timePreview = formatTimeRange(previewStartIso ?? null, previewEndIso ?? null);
+  const showPastWarning = isPastSchedule(previewStartIso);
 
   useEffect(() => {
     if (!open) return;
@@ -109,6 +185,11 @@ export function ProposalDraftDialog({
       setIntentionalSolo(initialDetail.intentionalSolo);
       setIsPoll(initialDetail.isPoll);
       setEventPrivacy(initialDetail.eventPrivacy);
+      setIsRecurring(initialDetail.isRecurrenceParent);
+      if (initialDetail.recurrenceRule) {
+        setRecurrencePattern(initialDetail.recurrenceRule.pattern);
+        setRecurrenceCount(initialDetail.recurrenceRule.count);
+      }
       setSlots(
         initialDetail.timeSlots.length > 0
           ? initialDetail.timeSlots.map((slot) => ({
@@ -136,6 +217,9 @@ export function ProposalDraftDialog({
       setRangeEnd("");
       setNightsPattern("every");
       setEventPrivacy("open");
+      setIsRecurring(false);
+      setRecurrencePattern("weekly");
+      setRecurrenceCount(4);
       setSlots([{ startAt: "", endAt: "", label: "" }]);
       setInviteeMode({});
     }
@@ -182,6 +266,11 @@ export function ProposalDraftDialog({
       intentionalSolo: proposalType === "sleeping" ? intentionalSolo : false,
       isPoll: proposalType === "event" ? isPoll : false,
       eventPrivacy,
+      isRecurring: !batchMode && isRecurring,
+      recurrenceRule:
+        !batchMode && isRecurring
+          ? { pattern: recurrencePattern, interval: 1, count: recurrenceCount }
+          : undefined,
       invitees,
       timeSlots,
     };
@@ -227,177 +316,341 @@ export function ProposalDraftDialog({
   }
 
   return (
-    <Dialog open={open} onClose={handleClose} fullWidth maxWidth="sm">
-      <DialogTitle>{isEdit ? "Edit draft" : "New proposal"}</DialogTitle>
-      <DialogContent>
-        <Stack spacing={2} sx={{ mt: 1 }}>
-          <FormControl fullWidth>
-            <InputLabel id="proposal-type-label">Type</InputLabel>
-            <Select
-              labelId="proposal-type-label"
-              label="Type"
-              value={proposalType}
-              onChange={(event) => setProposalType(event.target.value as "event" | "sleeping")}
-            >
-              <MenuItem value="event">Event</MenuItem>
-              <MenuItem value="sleeping">Sleeping</MenuItem>
-            </Select>
-          </FormControl>
-          <TextField
-            label="Title"
-            value={title}
-            onChange={(event) => setTitle(event.target.value)}
-            required
-            fullWidth
-          />
-          <TextField
-            label="Description"
-            value={description}
-            onChange={(event) => setDescription(event.target.value)}
-            required
-            fullWidth
-            multiline
-            minRows={2}
-          />
-          <TextField
-            label="Notes (optional)"
-            value={notes}
-            onChange={(event) => setNotes(event.target.value)}
-            fullWidth
-            multiline
-            minRows={2}
-          />
-          <FormControl fullWidth>
-            <InputLabel id="proposal-privacy-label">Privacy</InputLabel>
-            <Select
-              labelId="proposal-privacy-label"
-              label="Privacy"
-              value={eventPrivacy}
-              onChange={(event) =>
-                setEventPrivacy(event.target.value as "open" | "private" | "super_private")
-              }
-            >
-              <MenuItem value="open">Open</MenuItem>
-              <MenuItem value="private">Private</MenuItem>
-              <MenuItem value="super_private">Super private</MenuItem>
-            </Select>
-          </FormControl>
-          {proposalType === "sleeping" && !isEdit && (
-            <FormControlLabel
-              control={
-                <Checkbox
-                  checked={batchMode}
-                  onChange={(event) => setBatchMode(event.target.checked)}
-                />
-              }
-              label="Batch / recurring nights (create multiple drafts)"
-            />
-          )}
-          {proposalType === "event" && (
-            <FormControlLabel
-              control={
-                <Checkbox
-                  checked={isPoll}
-                  onChange={(event) => setIsPoll(event.target.checked)}
-                />
-              }
-              label="Time poll (multiple slot options)"
-            />
-          )}
-          <Typography variant="subtitle2">
-            {batchMode ? "Date range for batch" : isPoll ? "Poll time slots" : "Time window"}
-          </Typography>
-          {batchMode ? (
-            <Stack spacing={1}>
-              <TextField
-                label="Range start"
-                type="datetime-local"
-                value={rangeStart}
-                onChange={(event) => setRangeStart(event.target.value)}
-                fullWidth
-                InputLabelProps={{ shrink: true }}
+    <Dialog
+      open={open}
+      onClose={handleClose}
+      fullWidth
+      maxWidth="sm"
+      PaperProps={{ sx: { bgcolor: "transparent", boxShadow: "none", overflow: "visible" } }}
+    >
+      <Card variant="outlined" sx={{ ...proposalCardSx, bgcolor: "background.paper" }}>
+        <CardContent sx={{ pb: 1 }}>
+          <Stack direction="row" justifyContent="space-between" alignItems="flex-start" sx={{ mb: 1.5 }}>
+            <Chip label={typeBadgeLabel(proposalType)} size="small" sx={typeChipSx} />
+            <Typography variant="caption" color="text.secondary" sx={{ textAlign: "right" }}>
+              PROPOSED BY {proposerName.toUpperCase()}
+            </Typography>
+          </Stack>
+
+          <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" sx={{ mb: 2 }}>
+            <Typography variant="h6" component="h2" sx={{ fontSize: "1.1rem", fontWeight: 600 }}>
+              {isEdit ? "Edit draft" : "New proposal"}
+            </Typography>
+            <Chip label="DRAFT" size="small" variant="outlined" sx={{ fontWeight: 600, fontSize: "0.65rem" }} />
+            {isPoll && (
+              <Chip
+                icon={<PollOutlinedIcon sx={{ fontSize: "14px !important" }} />}
+                label="Poll"
+                size="small"
+                sx={{ bgcolor: POLY_GREEN, color: "#fff", fontSize: "0.65rem" }}
               />
-              <TextField
-                label="Range end"
-                type="datetime-local"
-                value={rangeEnd}
-                onChange={(event) => setRangeEnd(event.target.value)}
-                fullWidth
-                InputLabelProps={{ shrink: true }}
-              />
-              <FormControl fullWidth>
-                <InputLabel id="nights-pattern-label">Nights pattern</InputLabel>
-                <Select
-                  labelId="nights-pattern-label"
-                  label="Nights pattern"
-                  value={nightsPattern}
-                  onChange={(event) =>
-                    setNightsPattern(event.target.value as "every" | "weekdays" | "weekends")
-                  }
-                >
-                  <MenuItem value="every">Every night</MenuItem>
-                  <MenuItem value="weekdays">Weekdays only</MenuItem>
-                  <MenuItem value="weekends">Weekends only</MenuItem>
-                </Select>
-              </FormControl>
-            </Stack>
-          ) : (
-            <>
-          {slots.map((slot, index) => (
-            <Stack key={`slot-${index}`} spacing={1} sx={{ p: 1.5, border: 1, borderColor: "divider", borderRadius: 1 }}>
-              {isPoll && (
-                <TextField
-                  label={`Option ${index + 1} label`}
-                  value={slot.label}
-                  onChange={(event) => {
-                    const next = [...slots];
-                    next[index] = { ...next[index], label: event.target.value };
-                    setSlots(next);
-                  }}
-                  fullWidth
-                />
+            )}
+          </Stack>
+
+          {(timePreview || locationName) && (
+            <Box sx={{ mb: 2, p: 1.5, bgcolor: POLY_GREEN_LIGHT, borderRadius: 1 }}>
+              {timePreview && (
+                <Stack direction="row" spacing={0.5} alignItems="center">
+                  <AccessTimeIcon sx={{ fontSize: 16, color: POLY_GREEN }} />
+                  <Typography variant="body2" sx={{ color: POLY_GREEN, fontWeight: 500 }}>
+                    {timePreview}
+                  </Typography>
+                </Stack>
               )}
-              <TextField
-                label="Start"
-                type="datetime-local"
-                value={slot.startAt}
-                onChange={(event) => {
-                  const next = [...slots];
-                  next[index] = { ...next[index], startAt: event.target.value };
-                  setSlots(next);
-                }}
-                fullWidth
-                InputLabelProps={{ shrink: true }}
-              />
-              <TextField
-                label="End (optional)"
-                type="datetime-local"
-                value={slot.endAt}
-                onChange={(event) => {
-                  const next = [...slots];
-                  next[index] = { ...next[index], endAt: event.target.value };
-                  setSlots(next);
-                }}
-                fullWidth
-                InputLabelProps={{ shrink: true }}
-              />
-            </Stack>
-          ))}
-          {isPoll && slots.length < 5 && (
-            <Button
-              size="small"
-              onClick={() => setSlots([...slots, { startAt: "", endAt: "", label: "" }])}
+              <Stack direction="row" spacing={0.5} alignItems="center" sx={{ mt: timePreview ? 0.5 : 0 }}>
+                <LocationOnOutlinedIcon sx={{ fontSize: 16, color: POLY_GREEN }} />
+                <Typography variant="body2" sx={{ color: POLY_GREEN }}>
+                  {locationName ?? "No location set"}
+                </Typography>
+              </Stack>
+            </Box>
+          )}
+
+          {showPastWarning && (
+            <Box
+              sx={{
+                mb: 2,
+                p: 1.5,
+                bgcolor: PAST_SCHEDULE_BG,
+                borderRadius: 1,
+                display: "flex",
+                alignItems: "flex-start",
+                gap: 1,
+              }}
             >
-              Add poll option
-            </Button>
+              <WarningAmberIcon sx={{ fontSize: 20, color: PAST_SCHEDULE_ICON, mt: 0.25 }} />
+              <Box>
+                <Typography variant="body2" sx={{ color: PAST_SCHEDULE_TEXT, fontWeight: 600 }}>
+                  Past schedule
+                </Typography>
+                <Typography variant="caption" sx={{ color: PAST_SCHEDULE_TEXT }}>
+                  This proposal is scheduled in the past. Confirm the date and time are intentional
+                  before submitting.
+                </Typography>
+              </Box>
+            </Box>
           )}
-            </>
-          )}
-          <FormControl fullWidth>
-            <InputLabel id="proposal-place-label">Location (optional)</InputLabel>
+
+          <SectionHeader
+            icon={<EventNoteOutlinedIcon fontSize="small" />}
+            title="Proposal details"
+            subtitle="Type, title, and description"
+          />
+          <Stack spacing={2} sx={{ mb: 2 }}>
+            <FormControl fullWidth size="small">
+              <InputLabel id="proposal-type-label">Type</InputLabel>
+              <Select
+                labelId="proposal-type-label"
+                label="Type"
+                value={proposalType}
+                onChange={(event) => setProposalType(event.target.value as "event" | "sleeping")}
+              >
+                <MenuItem value="event">Event</MenuItem>
+                <MenuItem value="sleeping">Sleeping</MenuItem>
+              </Select>
+            </FormControl>
+            <TextField
+              label="Title"
+              value={title}
+              onChange={(event) => setTitle(event.target.value)}
+              required
+              fullWidth
+              size="small"
+              placeholder="Untitled Proposal"
+            />
+            <TextField
+              label="Description"
+              value={description}
+              onChange={(event) => setDescription(event.target.value)}
+              required
+              fullWidth
+              multiline
+              minRows={2}
+              size="small"
+            />
+            <FormControl fullWidth size="small">
+              <InputLabel id="proposal-privacy-label">Privacy</InputLabel>
+              <Select
+                labelId="proposal-privacy-label"
+                label="Privacy"
+                value={eventPrivacy}
+                onChange={(event) =>
+                  setEventPrivacy(event.target.value as "open" | "private" | "super_private")
+                }
+              >
+                <MenuItem value="open">Open</MenuItem>
+                <MenuItem value="private">Private</MenuItem>
+                <MenuItem value="super_private">Super private</MenuItem>
+              </Select>
+            </FormControl>
+          </Stack>
+
+          <Divider sx={{ my: 2 }} />
+
+          <SectionHeader
+            icon={<AccessTimeIcon fontSize="small" />}
+            title={batchMode ? "Batch date range" : isPoll ? "Poll time slots" : "Time window"}
+            subtitle={
+              batchMode
+                ? "Creates multiple sleeping drafts across the range"
+                : isPoll
+                  ? "Add up to 5 options for invitees to choose from"
+                  : "When does this proposal happen?"
+            }
+          />
+          <Stack spacing={1.5} sx={{ mb: 2 }}>
+            {proposalType === "sleeping" && !isEdit && (
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={batchMode}
+                    onChange={(event) => setBatchMode(event.target.checked)}
+                    sx={{ color: POLY_GREEN, "&.Mui-checked": { color: POLY_GREEN } }}
+                  />
+                }
+                label="Batch / recurring nights (create multiple drafts)"
+              />
+            )}
+            {proposalType === "event" && (
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={isPoll}
+                    onChange={(event) => setIsPoll(event.target.checked)}
+                    sx={{ color: POLY_GREEN, "&.Mui-checked": { color: POLY_GREEN } }}
+                  />
+                }
+                label="Time poll (multiple slot options)"
+              />
+            )}
+            {batchMode ? (
+              <>
+                <TextField
+                  label="Range start"
+                  type="datetime-local"
+                  value={rangeStart}
+                  onChange={(event) => setRangeStart(event.target.value)}
+                  fullWidth
+                  size="small"
+                  InputLabelProps={{ shrink: true }}
+                />
+                <TextField
+                  label="Range end"
+                  type="datetime-local"
+                  value={rangeEnd}
+                  onChange={(event) => setRangeEnd(event.target.value)}
+                  fullWidth
+                  size="small"
+                  InputLabelProps={{ shrink: true }}
+                />
+                <FormControl fullWidth size="small">
+                  <InputLabel id="nights-pattern-label">Nights pattern</InputLabel>
+                  <Select
+                    labelId="nights-pattern-label"
+                    label="Nights pattern"
+                    value={nightsPattern}
+                    onChange={(event) =>
+                      setNightsPattern(event.target.value as "every" | "weekdays" | "weekends")
+                    }
+                  >
+                    <MenuItem value="every">Every night</MenuItem>
+                    <MenuItem value="weekdays">Weekdays only</MenuItem>
+                    <MenuItem value="weekends">Weekends only</MenuItem>
+                  </Select>
+                </FormControl>
+              </>
+            ) : (
+              <>
+                {slots.map((slot, index) => (
+                  <Box
+                    key={`slot-${index}`}
+                    sx={{
+                      p: 1.5,
+                      border: 1,
+                      borderColor: "divider",
+                      borderRadius: 1,
+                      borderLeft: `3px solid ${POLY_GREEN}`,
+                    }}
+                  >
+                    {isPoll && (
+                      <TextField
+                        label={`Option ${index + 1} label`}
+                        value={slot.label}
+                        onChange={(event) => {
+                          const next = [...slots];
+                          next[index] = { ...next[index], label: event.target.value };
+                          setSlots(next);
+                        }}
+                        fullWidth
+                        size="small"
+                        sx={{ mb: 1 }}
+                      />
+                    )}
+                    <Stack spacing={1}>
+                      <TextField
+                        label="Start"
+                        type="datetime-local"
+                        value={slot.startAt}
+                        onChange={(event) => {
+                          const next = [...slots];
+                          next[index] = { ...next[index], startAt: event.target.value };
+                          setSlots(next);
+                        }}
+                        fullWidth
+                        size="small"
+                        InputLabelProps={{ shrink: true }}
+                      />
+                      <TextField
+                        label="End (optional)"
+                        type="datetime-local"
+                        value={slot.endAt}
+                        onChange={(event) => {
+                          const next = [...slots];
+                          next[index] = { ...next[index], endAt: event.target.value };
+                          setSlots(next);
+                        }}
+                        fullWidth
+                        size="small"
+                        InputLabelProps={{ shrink: true }}
+                      />
+                    </Stack>
+                  </Box>
+                ))}
+                {isPoll && slots.length < 5 && (
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    sx={{ borderColor: POLY_GREEN, color: POLY_GREEN }}
+                    onClick={() => setSlots([...slots, { startAt: "", endAt: "", label: "" }])}
+                  >
+                    Add poll option
+                  </Button>
+                )}
+              </>
+            )}
+            {!batchMode && !isPoll && (
+              <>
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      checked={isRecurring}
+                      onChange={(event) => setIsRecurring(event.target.checked)}
+                      sx={{ color: POLY_GREEN, "&.Mui-checked": { color: POLY_GREEN } }}
+                    />
+                  }
+                  label="Recurring series (events and sleeping)"
+                />
+                {isRecurring && (
+                  <Stack direction="row" spacing={1}>
+                    <FormControl fullWidth size="small">
+                      <InputLabel id="recurrence-pattern-label">Pattern</InputLabel>
+                      <Select
+                        labelId="recurrence-pattern-label"
+                        label="Pattern"
+                        value={recurrencePattern}
+                        onChange={(event) =>
+                          setRecurrencePattern(
+                            event.target.value as "daily" | "weekly" | "monthly" | "yearly",
+                          )
+                        }
+                      >
+                        <MenuItem value="daily">Daily</MenuItem>
+                        <MenuItem value="weekly">Weekly</MenuItem>
+                        <MenuItem value="monthly">Monthly</MenuItem>
+                        <MenuItem value="yearly">Yearly</MenuItem>
+                      </Select>
+                    </FormControl>
+                    <TextField
+                      label="Occurrences"
+                      type="number"
+                      size="small"
+                      value={recurrenceCount}
+                      onChange={(event) =>
+                        setRecurrenceCount(
+                          Math.min(52, Math.max(2, Number(event.target.value) || 2)),
+                        )
+                      }
+                      inputProps={{ min: 2, max: 52 }}
+                      sx={{ width: 140 }}
+                    />
+                  </Stack>
+                )}
+              </>
+            )}
+          </Stack>
+
+          <Divider sx={{ my: 2 }} />
+
+          <SectionHeader
+            icon={<LocationOnOutlinedIcon fontSize="small" />}
+            title="Location"
+            subtitle="Optional place for this proposal"
+          />
+          <FormControl fullWidth size="small" sx={{ mb: 2 }}>
+            <InputLabel id="proposal-place-label">Location</InputLabel>
             <Select
               labelId="proposal-place-label"
-              label="Location (optional)"
+              label="Location"
               value={locationId}
               onChange={(event) => setLocationId(event.target.value)}
             >
@@ -409,6 +662,7 @@ export function ProposalDraftDialog({
               ))}
             </Select>
           </FormControl>
+
           {proposalType === "sleeping" && (
             <ToggleButtonGroup
               exclusive
@@ -417,15 +671,43 @@ export function ProposalDraftDialog({
                 if (value) setIntentionalSolo(value === "solo");
               }}
               size="small"
+              sx={{
+                mb: 2,
+                "& .MuiToggleButton-root.Mui-selected": {
+                  bgcolor: POLY_GREEN,
+                  color: "#fff",
+                  "&:hover": { bgcolor: POLY_GREEN_HOVER },
+                },
+              }}
             >
               <ToggleButton value="network">With invitees</ToggleButton>
               <ToggleButton value="solo">Intentional solo</ToggleButton>
             </ToggleButtonGroup>
           )}
-          <Typography variant="subtitle2">Invitees</Typography>
-          <Typography variant="caption" color="text.secondary">
-            Tap a person to cycle: none → required → optional → none.
-          </Typography>
+
+          <SectionHeader
+            icon={<NotesOutlinedIcon fontSize="small" />}
+            title="Notes"
+            subtitle="Private notes visible to invitees"
+          />
+          <TextField
+            label="Notes (optional)"
+            value={notes}
+            onChange={(event) => setNotes(event.target.value)}
+            fullWidth
+            multiline
+            minRows={2}
+            size="small"
+            sx={{ mb: 2 }}
+          />
+
+          <Divider sx={{ my: 2 }} />
+
+          <SectionHeader
+            icon={<GroupsOutlinedIcon fontSize="small" />}
+            title="Invitees"
+            subtitle="Tap to cycle: none → required → optional → none"
+          />
           <Stack direction="row" flexWrap="wrap" gap={1}>
             {candidates.map((person) => {
               const mode = inviteeMode[person.id] ?? "none";
@@ -436,7 +718,19 @@ export function ProposalDraftDialog({
                   selected={mode !== "none"}
                   onClick={() => cycleInvitee(person.id)}
                   size="small"
-                  color={mode === "required" ? "primary" : "standard"}
+                  sx={{
+                    textTransform: "none",
+                    ...(mode === "required" && {
+                      bgcolor: POLY_GREEN,
+                      color: "#fff",
+                      "&:hover": { bgcolor: POLY_GREEN_HOVER },
+                      "&.Mui-selected": { bgcolor: POLY_GREEN, color: "#fff" },
+                    }),
+                    ...(mode === "optional" && {
+                      borderColor: POLY_GREEN,
+                      color: POLY_GREEN,
+                    }),
+                  }}
                 >
                   {person.displayName}
                   {mode !== "none" ? ` (${mode})` : ""}
@@ -444,19 +738,28 @@ export function ProposalDraftDialog({
               );
             })}
           </Stack>
-          {error && <Alert severity="error">{error}</Alert>}
-        </Stack>
-      </DialogContent>
-      <DialogActions>
-        <Button onClick={handleClose}>Cancel</Button>
-        <Button
-          variant="contained"
-          disabled={!title.trim() || !description.trim() || pending}
-          onClick={handleSave}
-        >
-          Save draft
-        </Button>
-      </DialogActions>
+
+          {error && (
+            <Alert severity="error" sx={{ mt: 2 }}>
+              {error}
+            </Alert>
+          )}
+        </CardContent>
+
+        <CardActions sx={{ px: 2, pb: 2, pt: 0, justifyContent: "flex-end", gap: 1 }}>
+          <Button onClick={handleClose} color="inherit">
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            disabled={!title.trim() || !description.trim() || pending}
+            onClick={handleSave}
+            sx={primaryButtonSx}
+          >
+            {isEdit ? "Save draft" : "Create draft"}
+          </Button>
+        </CardActions>
+      </Card>
     </Dialog>
   );
 }
