@@ -17,8 +17,13 @@ export async function resetTestDatabase(): Promise<{
   }
 
   const client = getSqlClient();
-  await client.execute("DELETE FROM user_activity_log");
+  await client.execute("DELETE FROM proposal_slot_votes");
+  await client.execute("DELETE FROM proposal_comments");
+  await client.execute("DELETE FROM proposal_state_log");
+  await client.execute("DELETE FROM proposal_time_slots");
+  await client.execute("DELETE FROM proposal_invitees");
   await client.execute("DELETE FROM proposals");
+  await client.execute("DELETE FROM user_activity_log");
   await client.execute("DELETE FROM location_residents");
   await client.execute("DELETE FROM sleeping_partnerships");
   await client.execute("DELETE FROM stored_images");
