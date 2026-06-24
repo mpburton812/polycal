@@ -1,5 +1,12 @@
 "use client";
 
+import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
+import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
+import HowToRegOutlinedIcon from "@mui/icons-material/HowToRegOutlined";
+import LockResetIcon from "@mui/icons-material/LockReset";
+import PauseCircleOutlineIcon from "@mui/icons-material/PauseCircleOutline";
+import PlayCircleOutlineIcon from "@mui/icons-material/PlayCircleOutline";
+import SwitchAccountOutlinedIcon from "@mui/icons-material/SwitchAccountOutlined";
 import {
   Alert,
   Box,
@@ -11,6 +18,7 @@ import {
   DialogContentText,
   DialogTitle,
   FormControl,
+  IconButton,
   InputLabel,
   MenuItem,
   Paper,
@@ -22,6 +30,7 @@ import {
   TableHead,
   TableRow,
   TextField,
+  Tooltip,
   Typography,
 } from "@mui/material";
 import { useRouter } from "next/navigation";
@@ -148,7 +157,6 @@ export function AdminUserManagementPanel({
           <TableHead>
             <TableRow>
               <TableCell>Name</TableCell>
-              <TableCell>Username</TableCell>
               <TableCell>Role</TableCell>
               <TableCell>Status</TableCell>
               <TableCell>Last login</TableCell>
@@ -160,7 +168,6 @@ export function AdminUserManagementPanel({
             {users.map((user) => (
               <TableRow key={user.id}>
                 <TableCell>{user.displayName}</TableCell>
-                <TableCell>{user.username}</TableCell>
                 <TableCell>{user.role}</TableCell>
                 <TableCell>
                   <Chip
@@ -176,102 +183,140 @@ export function AdminUserManagementPanel({
                 </TableCell>
                 <TableCell align="right">{user.loginCount}</TableCell>
                 <TableCell>
-                  <Stack direction="row" spacing={0.5} flexWrap="wrap">
-                    <Button size="small" disabled={pending} onClick={() => openEdit(user)}>
-                      Edit
-                    </Button>
+                  <Stack direction="row" spacing={0.25} flexWrap="wrap" useFlexGap>
+                    <Tooltip title="Edit">
+                      <span>
+                        <IconButton
+                          size="small"
+                          aria-label={`Edit ${user.displayName}`}
+                          disabled={pending}
+                          onClick={() => openEdit(user)}
+                        >
+                          <EditOutlinedIcon fontSize="small" />
+                        </IconButton>
+                      </span>
+                    </Tooltip>
                     {user.role === "passive" && user.status === "active" && (
-                      <Button
-                        size="small"
-                        variant="outlined"
-                        disabled={pending}
-                        onClick={() => {
-                          setActivateUser(user);
-                          setActivateUsername("");
-                          setActivateRole("user");
-                          setActivateUsernameStatus({
-                            checked: false,
-                            available: false,
-                            message: "",
-                          });
-                        }}
-                      >
-                        Activate
-                      </Button>
+                      <Tooltip title="Activate">
+                        <span>
+                          <IconButton
+                            size="small"
+                            aria-label={`Activate ${user.displayName}`}
+                            disabled={pending}
+                            onClick={() => {
+                              setActivateUser(user);
+                              setActivateUsername("");
+                              setActivateRole("user");
+                              setActivateUsernameStatus({
+                                checked: false,
+                                available: false,
+                                message: "",
+                              });
+                            }}
+                          >
+                            <HowToRegOutlinedIcon fontSize="small" />
+                          </IconButton>
+                        </span>
+                      </Tooltip>
                     )}
                     {user.role !== "passive" && user.status === "active" && (
-                      <Button
-                        size="small"
-                        disabled={pending}
-                        onClick={() =>
-                          startTransition(async () => {
-                            const result = await adminImpersonateUserAction(user.id);
-                            if (!result.ok) {
-                              showStatus(result.message, "error");
+                      <Tooltip title="Impersonate">
+                        <span>
+                          <IconButton
+                            size="small"
+                            aria-label={`Impersonate ${user.displayName}`}
+                            disabled={pending}
+                            onClick={() =>
+                              startTransition(async () => {
+                                const result = await adminImpersonateUserAction(user.id);
+                                if (!result.ok) {
+                                  showStatus(result.message, "error");
+                                }
+                              })
                             }
-                          })
-                        }
-                      >
-                        Impersonate
-                      </Button>
+                          >
+                            <SwitchAccountOutlinedIcon fontSize="small" />
+                          </IconButton>
+                        </span>
+                      </Tooltip>
                     )}
                     {user.role !== "passive" && user.status === "active" && (
-                      <Button
-                        size="small"
-                        disabled={pending}
-                        onClick={() =>
-                          startTransition(async () => {
-                            const result = await adminResetPasswordAction({ userId: user.id });
-                            showStatus(result.message, result.ok ? "success" : "error");
-                            if (result.loginInstructions) {
-                              setCredentials(result.loginInstructions);
+                      <Tooltip title="Reset password">
+                        <span>
+                          <IconButton
+                            size="small"
+                            aria-label={`Reset password for ${user.displayName}`}
+                            disabled={pending}
+                            onClick={() =>
+                              startTransition(async () => {
+                                const result = await adminResetPasswordAction({ userId: user.id });
+                                showStatus(result.message, result.ok ? "success" : "error");
+                                if (result.loginInstructions) {
+                                  setCredentials(result.loginInstructions);
+                                }
+                              })
                             }
-                          })
-                        }
-                      >
-                        Reset password
-                      </Button>
+                          >
+                            <LockResetIcon fontSize="small" />
+                          </IconButton>
+                        </span>
+                      </Tooltip>
                     )}
                     {user.status === "active" && user.id !== currentUserId && (
-                      <Button
-                        size="small"
-                        color="warning"
-                        disabled={pending}
-                        onClick={() =>
-                          startTransition(async () => {
-                            const result = await pauseUserAction(user.id);
-                            showStatus(result.message, result.ok ? "success" : "error");
-                            if (result.ok) router.refresh();
-                          })
-                        }
-                      >
-                        Pause
-                      </Button>
+                      <Tooltip title="Pause">
+                        <span>
+                          <IconButton
+                            size="small"
+                            aria-label={`Pause ${user.displayName}`}
+                            color="warning"
+                            disabled={pending}
+                            onClick={() =>
+                              startTransition(async () => {
+                                const result = await pauseUserAction(user.id);
+                                showStatus(result.message, result.ok ? "success" : "error");
+                                if (result.ok) router.refresh();
+                              })
+                            }
+                          >
+                            <PauseCircleOutlineIcon fontSize="small" />
+                          </IconButton>
+                        </span>
+                      </Tooltip>
                     )}
                     {user.status === "paused" && (
-                      <Button
-                        size="small"
-                        disabled={pending}
-                        onClick={() =>
-                          startTransition(async () => {
-                            const result = await resumeUserAction(user.id);
-                            showStatus(result.message, result.ok ? "success" : "error");
-                            if (result.ok) router.refresh();
-                          })
-                        }
-                      >
-                        Resume
-                      </Button>
+                      <Tooltip title="Resume">
+                        <span>
+                          <IconButton
+                            size="small"
+                            aria-label={`Resume ${user.displayName}`}
+                            disabled={pending}
+                            onClick={() =>
+                              startTransition(async () => {
+                                const result = await resumeUserAction(user.id);
+                                showStatus(result.message, result.ok ? "success" : "error");
+                                if (result.ok) router.refresh();
+                              })
+                            }
+                          >
+                            <PlayCircleOutlineIcon fontSize="small" />
+                          </IconButton>
+                        </span>
+                      </Tooltip>
                     )}
                     {user.id !== currentUserId && user.status !== "deleted" && (
-                      <Button
-                        size="small"
-                        color="error"
-                        disabled={pending}
-                        onClick={() => setDeleteTarget(user)}
-                      >
-                        Delete
-                      </Button>
+                      <Tooltip title="Delete">
+                        <span>
+                          <IconButton
+                            size="small"
+                            aria-label={`Delete ${user.displayName}`}
+                            color="error"
+                            disabled={pending}
+                            onClick={() => setDeleteTarget(user)}
+                          >
+                            <DeleteOutlineIcon fontSize="small" />
+                          </IconButton>
+                        </span>
+                      </Tooltip>
                     )}
                   </Stack>
                 </TableCell>

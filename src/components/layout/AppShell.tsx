@@ -14,6 +14,7 @@ import type { NotificationItem } from "@/actions/notifications";
 export function AppShell({
   children,
   displayName,
+  groupName,
   isAdmin,
   avatarKey,
   notificationCount = 0,
@@ -21,6 +22,7 @@ export function AppShell({
 }: {
   children: React.ReactNode;
   displayName: string;
+  groupName: string;
   isAdmin: boolean;
   avatarKey?: string;
   notificationCount?: number;
@@ -43,6 +45,7 @@ export function AppShell({
         <DevBar />
         <AppHeader
           displayName={displayName}
+          groupName={groupName}
           notificationCount={notificationCount}
           notificationItems={notificationItems}
           avatarSrc={avatarSrc}

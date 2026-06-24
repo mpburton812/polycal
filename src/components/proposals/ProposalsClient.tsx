@@ -9,8 +9,8 @@ import {
   Tabs,
   Typography,
 } from "@mui/material";
-import { useRouter } from "next/navigation";
-import { useMemo, useState, useTransition } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 
 import {
   deleteDraftProposalAction,
@@ -57,6 +57,7 @@ export function ProposalsClient({
   currentUserId,
 }: ProposalsClientProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState<TabKey>("draft");
   const [createOpen, setCreateOpen] = useState(false);
   const [editDetail, setEditDetail] = useState<ProposalDetail | null>(null);
@@ -117,6 +118,27 @@ export function ProposalsClient({
     setEditDetail(null);
     router.refresh();
   }
+
+  const handledOpenRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    const openId = searchParams.get("open");
+    if (!openId || handledOpenRef.current === openId) return;
+    handledOpenRef.current = openId;
+
+    if (openId.startsWith(PARTNERSHIP_CARD_PREFIX)) {
+      setActiveTab("proposed");
+      const card = allBoardCards.find((row) => row.id === openId) ?? null;
+      setPartnershipCard(card);
+      setPartnershipOpen(true);
+      return;
+    }
+
+    const tabForState = TAB_KEYS.find((key) => board[key].some((row) => row.id === openId));
+    if (tabForState) setActiveTab(tabForState);
+    setSelectedProposalId(openId);
+    setDetailOpen(true);
+  }, [searchParams, board, allBoardCards]);
 
   return (
     <Box sx={{ position: "relative", pb: 10 }}>
@@ -210,6 +232,7 @@ export function ProposalsClient({
       <PartnershipProposalDialog
         card={partnershipCard}
         open={partnershipOpen}
+        currentUserId={currentUserId}
         onClose={() => {
           setPartnershipOpen(false);
           setPartnershipCard(null);

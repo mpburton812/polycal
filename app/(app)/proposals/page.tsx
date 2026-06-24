@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { Typography } from "@mui/material";
 import { redirect } from "next/navigation";
 
@@ -26,12 +27,14 @@ export default async function ProposalsPage() {
       <Typography color="text.secondary" sx={{ mb: 3 }}>
         Draft, submit, vote, and resolve proposals. Click any card for details and actions.
       </Typography>
-      <ProposalsClient
-        board={board}
-        people={people}
-        places={places}
-        currentUserId={session.user.id}
-      />
+      <Suspense fallback={null}>
+        <ProposalsClient
+          board={board}
+          people={people}
+          places={places}
+          currentUserId={session.user.id}
+        />
+      </Suspense>
     </>
   );
 }
