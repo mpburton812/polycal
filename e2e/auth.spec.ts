@@ -18,7 +18,7 @@ test.describe("Authentication", () => {
     await login(page, USERS.luke.username);
     await expectAuthenticatedShell(page);
     await expect(page.getByRole("heading", { name: "Schedule" })).toBeVisible();
-    await expect(page.getByText(/Phase 6|Calendar views/i)).toBeVisible();
+    await expect(page.getByText(/network calendar/i)).toBeVisible();
   });
 
   test("redirects unauthenticated users to login", async ({ page }) => {
