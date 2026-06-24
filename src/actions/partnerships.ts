@@ -198,6 +198,61 @@ export async function proposePartnershipAction(
 }
 
 /**
+ * Withdraws a pending partnership proposal (proposer only).
+ */
+export async function withdrawPartnershipProposalAction(
+  partnershipId: string,
+): Promise<{ ok: boolean; message: string }> {
+  const session = await auth();
+  if (!session?.user) {
+    return { ok: false, message: "Sign in required." };
+  }
+
+  await ensureDbReady();
+  const db = getDb();
+  const [row] = await db
+    .select()
+    .from(sleepingPartnerships)
+    .where(eq(sleepingPartnerships.id, partnershipId))
+    .limit(1);
+
+  if (!row || row.status !== "proposed") {
+    return { ok: false, message: "Proposal not found." };
+  }
+
+  if (row.proposedById !== session.user.id) {
+    return { ok: false, message: "Only the proposer can withdraw this proposal." };
+  }
+
+  const now = new Date().toISOString();
+  await db
+    .update(sleepingPartnerships)
+    .set({ status: "declined", updatedAt: now, respondedAt: now })
+    .where(eq(sleepingPartnerships.id, row.id));
+
+  const partnerId =
+    row.userLowId === session.user.id ? row.userHighId : row.userLowId;
+  const [proposer] = await db
+    .select({ displayName: users.displayName })
+    .from(users)
+    .where(eq(users.id, session.user.id))
+    .limit(1);
+
+  await notifyUser(
+    partnerId,
+    "partnership_withdrawn",
+    `${proposer?.displayName ?? "Someone"} withdrew their sleeping partnership proposal.`,
+    { partnershipId: row.id },
+  );
+
+  await logUserActivity(session.user.id, "partnership.withdraw", row.id);
+  revalidatePath("/people-places");
+  revalidatePath("/proposals");
+
+  return { ok: true, message: "Partnership proposal withdrawn." };
+}
+
+/**
  * Accept or decline an incoming sleeping partnership proposal (PC-36).
  */
 export async function respondPartnershipAction(

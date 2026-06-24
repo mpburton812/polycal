@@ -15,7 +15,6 @@ import {
   Stack,
   Typography,
 } from "@mui/material";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition, type MouseEvent } from "react";
 
@@ -189,9 +188,11 @@ export function NotificationInbox({
                     {proposalId && (
                       <Button
                         size="small"
-                        component={Link}
-                        href="/proposals"
-                        onClick={handleClose}
+                        disabled={pending}
+                        onClick={() => {
+                          handleClose();
+                          router.push(`/proposals?open=${encodeURIComponent(proposalId)}`);
+                        }}
                       >
                         View proposal
                       </Button>

@@ -192,6 +192,9 @@ export function ProposalDraftDialog({
     (person) => person.id !== currentUserId && person.status === "active",
   );
 
+  const isSoloProposal =
+    proposalType === "sleeping" ? intentionalSolo : soloEvent;
+
   const locationName =
     places.find((p) => p.id === locationId)?.name ?? (locationCustom.trim() || null);
   const selectedPlace = places.find((p) => p.id === locationId);
@@ -255,7 +258,9 @@ export function ProposalDraftDialog({
           ? initialDetail.bedroomIndex
           : "",
       );
-      setIntentionalSolo(initialDetail.intentionalSolo);
+      setIntentionalSolo(
+        initialDetail.proposalType === "sleeping" ? initialDetail.intentionalSolo : false,
+      );
       setSoloEvent(initialDetail.proposalType === "event" && initialDetail.intentionalSolo);
       setIsPoll(initialDetail.isPoll);
       setEventPrivacy(initialDetail.eventPrivacy);
@@ -325,7 +330,7 @@ export function ProposalDraftDialog({
         ? detail.bedroomIndex
         : "",
     );
-    setIntentionalSolo(detail.intentionalSolo);
+    setIntentionalSolo(detail.proposalType === "sleeping" ? detail.intentionalSolo : false);
     setSoloEvent(detail.proposalType === "event" && detail.intentionalSolo);
     setIsPoll(detail.isPoll);
     setEventPrivacy(detail.eventPrivacy);
@@ -361,7 +366,7 @@ export function ProposalDraftDialog({
 
   function handleSave() {
     setError(null);
-    const invitees = soloEvent || intentionalSolo
+    const invitees = isSoloProposal
       ? []
       : Object.entries(inviteeMode)
           .filter(([, role]) => role === "required" || role === "optional")
@@ -400,8 +405,7 @@ export function ProposalDraftDialog({
       bedroomIndex:
         proposalType === "sleeping" && bedroomIndex !== "" ? bedroomIndex : undefined,
       notes: notes || undefined,
-      intentionalSolo:
-        proposalType === "sleeping" ? intentionalSolo : soloEvent,
+      intentionalSolo: isSoloProposal,
       isPoll: proposalType === "event" ? isPoll : false,
       eventPrivacy,
       isRecurring: !batchMode && isRecurring,
@@ -585,7 +589,15 @@ export function ProposalDraftDialog({
                 labelId="proposal-type-label"
                 label="Type"
                 value={proposalType}
-                onChange={(event) => setProposalType(event.target.value as "event" | "sleeping")}
+                onChange={(event) => {
+                  const nextType = event.target.value as "event" | "sleeping";
+                  setProposalType(nextType);
+                  if (nextType === "event") {
+                    setIntentionalSolo(false);
+                  } else {
+                    setSoloEvent(false);
+                  }
+                }}
               >
                 <MenuItem value="event">Event</MenuItem>
                 <MenuItem value="sleeping">Sleeping</MenuItem>
@@ -601,10 +613,9 @@ export function ProposalDraftDialog({
               placeholder="Untitled Proposal"
             />
             <TextField
-              label="Description"
+              label="Description (optional)"
               value={description}
               onChange={(event) => setDescription(event.target.value)}
-              required
               fullWidth
               multiline
               minRows={2}
@@ -902,57 +913,6 @@ export function ProposalDraftDialog({
             </FormControl>
           )}
 
-          {proposalType === "sleeping" && (
-            <ToggleButtonGroup
-              exclusive
-              value={intentionalSolo ? "solo" : "network"}
-              onChange={(_, value) => {
-                if (value) {
-                  setIntentionalSolo(value === "solo");
-                  if (value === "solo") setInviteeMode({});
-                }
-              }}
-              size="small"
-              sx={{
-                mb: 2,
-                "& .MuiToggleButton-root.Mui-selected": {
-                  bgcolor: POLY_GREEN,
-                  color: "#fff",
-                  "&:hover": { bgcolor: POLY_GREEN_HOVER },
-                },
-              }}
-            >
-              <ToggleButton value="network">With invitees</ToggleButton>
-              <ToggleButton value="solo">Intentional solo</ToggleButton>
-            </ToggleButtonGroup>
-          )}
-
-          {proposalType === "event" && (
-            <ToggleButtonGroup
-              exclusive
-              value={soloEvent ? "solo" : "group"}
-              onChange={(_, value) => {
-                if (value) {
-                  const nextSolo = value === "solo";
-                  setSoloEvent(nextSolo);
-                  if (nextSolo) setInviteeMode({});
-                }
-              }}
-              size="small"
-              sx={{
-                mb: 2,
-                "& .MuiToggleButton-root.Mui-selected": {
-                  bgcolor: POLY_GREEN,
-                  color: "#fff",
-                  "&:hover": { bgcolor: POLY_GREEN_HOVER },
-                },
-              }}
-            >
-              <ToggleButton value="group">With invitees</ToggleButton>
-              <ToggleButton value="solo">Solo event (just me)</ToggleButton>
-            </ToggleButtonGroup>
-          )}
-
           <SectionHeader
             icon={<NotesOutlinedIcon fontSize="small" />}
             title="Notes"
@@ -975,12 +935,60 @@ export function ProposalDraftDialog({
             icon={<GroupsOutlinedIcon fontSize="small" />}
             title="Invitees"
             subtitle={
-              soloEvent || intentionalSolo
+              isSoloProposal
                 ? "Solo proposals do not include invitees"
                 : "Tap to cycle: none → required → optional → none"
             }
           />
-          {!soloEvent && !intentionalSolo && (
+          {proposalType === "event" && (
+            <ToggleButtonGroup
+              exclusive
+              value={soloEvent ? "solo" : "group"}
+              onChange={(_, value) => {
+                if (!value) return;
+                const nextSolo = value === "solo";
+                setSoloEvent(nextSolo);
+                setIntentionalSolo(false);
+                if (nextSolo) setInviteeMode({});
+              }}
+              size="small"
+              sx={{
+                mb: 1.5,
+                "& .MuiToggleButton-root.Mui-selected": {
+                  bgcolor: POLY_GREEN,
+                  color: "#fff",
+                  "&:hover": { bgcolor: POLY_GREEN_HOVER },
+                },
+              }}
+            >
+              <ToggleButton value="group">With invitees</ToggleButton>
+              <ToggleButton value="solo">Solo event (just me)</ToggleButton>
+            </ToggleButtonGroup>
+          )}
+          {proposalType === "sleeping" && (
+            <ToggleButtonGroup
+              exclusive
+              value={intentionalSolo ? "solo" : "network"}
+              onChange={(_, value) => {
+                if (!value) return;
+                setIntentionalSolo(value === "solo");
+                if (value === "solo") setInviteeMode({});
+              }}
+              size="small"
+              sx={{
+                mb: 1.5,
+                "& .MuiToggleButton-root.Mui-selected": {
+                  bgcolor: POLY_GREEN,
+                  color: "#fff",
+                  "&:hover": { bgcolor: POLY_GREEN_HOVER },
+                },
+              }}
+            >
+              <ToggleButton value="network">With invitees</ToggleButton>
+              <ToggleButton value="solo">Intentional solo</ToggleButton>
+            </ToggleButtonGroup>
+          )}
+          {!isSoloProposal && (
           <Stack direction="row" flexWrap="wrap" gap={1}>
             {candidates.map((person) => {
               const mode = inviteeMode[person.id] ?? "none";
@@ -1026,7 +1034,7 @@ export function ProposalDraftDialog({
           </Button>
           <Button
             variant="contained"
-            disabled={!title.trim() || !description.trim() || pending}
+            disabled={!title.trim() || pending}
             onClick={handleSave}
             sx={primaryButtonSx}
           >
@@ -1035,7 +1043,7 @@ export function ProposalDraftDialog({
           {isEdit && activeProposalId && (
             <Button
               variant="contained"
-              disabled={!title.trim() || !description.trim() || pending}
+              disabled={!title.trim() || pending}
               onClick={handleSubmit}
               sx={primaryButtonSx}
             >

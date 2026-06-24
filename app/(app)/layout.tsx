@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { listPeopleAction } from "@/actions/users";
+import { getPolyGroupDisplayNameAction } from "@/actions/poly-group";
 import { getNotificationInboxAction } from "@/actions/notifications";
 import { AppShell } from "@/components/layout/AppShell";
 import { FirstLoginWizard } from "@/components/onboarding/FirstLoginWizard";
@@ -25,6 +26,7 @@ export default async function AppLayout({
     : "mint";
 
   const notificationInbox = await getNotificationInboxAction();
+  const groupName = await getPolyGroupDisplayNameAction();
 
   const showOnboarding = !session.user.onboardingComplete;
 
@@ -40,6 +42,7 @@ export default async function AppLayout({
     <UserThemeProvider themeId={themeId}>
       <AppShell
         displayName={session.user.displayName}
+        groupName={groupName}
         isAdmin={hasAdminAccess}
         avatarKey={session.user.avatarKey}
         notificationCount={notificationInbox.count}

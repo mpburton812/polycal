@@ -68,6 +68,20 @@ async function requireAdmin() {
 }
 
 /**
+ * Loads the poly group display name for app chrome (all signed-in users).
+ */
+export async function getPolyGroupDisplayNameAction(): Promise<string> {
+  await ensureDbReady();
+  const db = getDb();
+  const [row] = await db
+    .select({ name: polyGroup.name })
+    .from(polyGroup)
+    .where(eq(polyGroup.id, 1))
+    .limit(1);
+  return row?.name?.trim() || "PolyCal";
+}
+
+/**
  * Loads poly group settings for the Admin tab (PC-30).
  */
 export async function getPolyGroupSettingsAction(): Promise<PolyGroupSettings | null> {
