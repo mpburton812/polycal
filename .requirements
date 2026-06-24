@@ -70,3 +70,4 @@
 2026-06-24 | fc0c8aa | PC-43 | Phase 5 notifications and proposal UX fixes | src/actions/partnerships.ts
 2026-06-24 | 5a43490 | PC-43 | fix lifecycle E2E for draft dialog stay-open UX | e2e/proposals-lifecycle.spec.ts
 2026-06-24 | 10deb8f | PC-44 | admin UX, proposal polish, and header improvements | src/actions/partnerships.ts
+2026-06-24 | 386df9d | PC-45 | complete phases 2, 7, and 8 foundations | src/actions/poly-group.ts
