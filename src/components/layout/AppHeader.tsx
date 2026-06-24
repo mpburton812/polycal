@@ -1,16 +1,17 @@
 "use client";
 
 import CalendarMonthIcon from "@mui/icons-material/CalendarMonth";
-import NotificationsNoneIcon from "@mui/icons-material/NotificationsNone";
 import {
   AppBar,
   Avatar,
-  Badge,
   IconButton,
   Toolbar,
   Typography,
 } from "@mui/material";
 import Link from "next/link";
+
+import type { NotificationItem } from "@/actions/notifications";
+import { NotificationInbox } from "@/components/layout/NotificationInbox";
 
 /**
  * Primary app chrome — calendar branding left, alerts + profile right (spec §1).
@@ -18,10 +19,12 @@ import Link from "next/link";
 export function AppHeader({
   displayName,
   notificationCount = 0,
+  notificationItems = [],
   avatarSrc,
 }: {
   displayName: string;
   notificationCount?: number;
+  notificationItems?: NotificationItem[];
   avatarSrc?: string;
 }) {
   return (
@@ -31,18 +34,7 @@ export function AppHeader({
         <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
           PolyCal
         </Typography>
-        <IconButton
-          color="inherit"
-          aria-label={
-            notificationCount > 0
-              ? `${notificationCount} notifications`
-              : "Notifications"
-          }
-        >
-          <Badge badgeContent={notificationCount} color="error">
-            <NotificationsNoneIcon />
-          </Badge>
-        </IconButton>
+        <NotificationInbox initialCount={notificationCount} initialItems={notificationItems} />
         <IconButton
           color="inherit"
           component={Link}

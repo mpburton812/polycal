@@ -80,6 +80,15 @@ export async function applyProposalsMigrations(sql: Client): Promise<void> {
       created_at TEXT NOT NULL
     );
   `);
+
+  await sql.execute(`
+    CREATE TABLE IF NOT EXISTS notification_dismissals (
+      user_id TEXT NOT NULL REFERENCES users(id),
+      log_id INTEGER NOT NULL REFERENCES user_activity_log(id),
+      dismissed_at TEXT NOT NULL,
+      PRIMARY KEY (user_id, log_id)
+    );
+  `);
 }
 
 async function ensureColumn(

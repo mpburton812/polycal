@@ -136,6 +136,7 @@ export function ProposalDraftDialog({
   const [description, setDescription] = useState("");
   const [notes, setNotes] = useState("");
   const [locationId, setLocationId] = useState("");
+  const [bedroomIndex, setBedroomIndex] = useState<number | "">("");
   const [intentionalSolo, setIntentionalSolo] = useState(false);
   const [isPoll, setIsPoll] = useState(false);
   const [batchMode, setBatchMode] = useState(false);
@@ -158,6 +159,14 @@ export function ProposalDraftDialog({
   );
 
   const locationName = places.find((p) => p.id === locationId)?.name ?? null;
+  const selectedPlace = places.find((p) => p.id === locationId);
+  const bedroomOptions =
+    selectedPlace && selectedPlace.bedroomCount > 0
+      ? Array.from({ length: selectedPlace.bedroomCount }, (_, index) => ({
+          index,
+          label: selectedPlace.bedroomNames[index] ?? `Bedroom ${index + 1}`,
+        }))
+      : [];
 
   const previewStartIso = useMemo(() => {
     if (batchMode) return localInputToIso(rangeStart);
@@ -182,6 +191,11 @@ export function ProposalDraftDialog({
       setDescription(initialDetail.description ?? "");
       setNotes(initialDetail.notes ?? "");
       setLocationId(initialDetail.locationId ?? "");
+      setBedroomIndex(
+        initialDetail.bedroomIndex !== null && initialDetail.bedroomIndex !== undefined
+          ? initialDetail.bedroomIndex
+          : "",
+      );
       setIntentionalSolo(initialDetail.intentionalSolo);
       setIsPoll(initialDetail.isPoll);
       setEventPrivacy(initialDetail.eventPrivacy);
@@ -210,6 +224,7 @@ export function ProposalDraftDialog({
       setDescription("");
       setNotes("");
       setLocationId("");
+      setBedroomIndex("");
       setIntentionalSolo(false);
       setIsPoll(false);
       setBatchMode(false);
@@ -262,6 +277,8 @@ export function ProposalDraftDialog({
       description,
       proposalType,
       locationId: locationId || undefined,
+      bedroomIndex:
+        proposalType === "sleeping" && bedroomIndex !== "" ? bedroomIndex : undefined,
       notes: notes || undefined,
       intentionalSolo: proposalType === "sleeping" ? intentionalSolo : false,
       isPoll: proposalType === "event" ? isPoll : false,
@@ -652,7 +669,10 @@ export function ProposalDraftDialog({
               labelId="proposal-place-label"
               label="Location"
               value={locationId}
-              onChange={(event) => setLocationId(event.target.value)}
+              onChange={(event) => {
+                setLocationId(event.target.value);
+                setBedroomIndex("");
+              }}
             >
               <MenuItem value="">None</MenuItem>
               {places.map((place) => (
@@ -662,6 +682,28 @@ export function ProposalDraftDialog({
               ))}
             </Select>
           </FormControl>
+
+          {proposalType === "sleeping" && bedroomOptions.length > 0 && (
+            <FormControl fullWidth size="small" sx={{ mb: 2 }}>
+              <InputLabel id="proposal-bedroom-label">Bedroom</InputLabel>
+              <Select
+                labelId="proposal-bedroom-label"
+                label="Bedroom"
+                value={bedroomIndex === "" ? "" : String(bedroomIndex)}
+                onChange={(event) => {
+                  const value = event.target.value;
+                  setBedroomIndex(value === "" ? "" : Number(value));
+                }}
+              >
+                <MenuItem value="">Any / whole place</MenuItem>
+                {bedroomOptions.map((bedroom) => (
+                  <MenuItem key={bedroom.index} value={String(bedroom.index)}>
+                    {bedroom.label}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          )}
 
           {proposalType === "sleeping" && (
             <ToggleButtonGroup
