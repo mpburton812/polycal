@@ -76,6 +76,7 @@ export const polyGroup = sqliteTable("poly_group", {
     .notNull()
     .default(false),
   logTailLength: integer("log_tail_length").notNull().default(100),
+  onboardingWelcomeMessage: text("onboarding_welcome_message"),
   updatedAt: text("updated_at").notNull(),
 });
 

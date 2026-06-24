@@ -47,7 +47,7 @@ interface PartnerOption {
   displayName: string;
 }
 
-const STEPS = ["Password", "Avatar & theme", "Sleeping partners", "Notifications"];
+const STEPS = ["Password", "Avatar & theme", "Sleeping partners", "Notifications", "Welcome"];
 
 /**
  * Multi-step first-login onboarding per spec §4 (PC-10).
@@ -76,6 +76,7 @@ export function FirstLoginWizard({
   );
   const [selectedPartners, setSelectedPartners] = useState<string[]>([]);
   const [prefs, setPrefs] = useState<NotificationPrefs>(DEFAULT_NOTIFICATION_PREFS);
+  const [welcomeMessage, setWelcomeMessage] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
   function handlePasswordSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -133,9 +134,30 @@ export function FirstLoginWizard({
         setError(result.message);
         return;
       }
+      setWelcomeMessage(result.welcomeMessage ?? null);
+      setActiveStep(4);
+    });
+  }
+
+  function enterApp() {
+    startTransition(async () => {
       await update({ user: { onboardingComplete: true } });
       router.refresh();
     });
+  }
+
+  if (welcomeMessage !== null && activeStep === 4) {
+    return (
+      <Paper sx={{ p: 3, maxWidth: 640, mx: "auto" }}>
+        <Typography variant="h5" component="h1" gutterBottom>
+          Welcome!
+        </Typography>
+        <Typography sx={{ mb: 3, whiteSpace: "pre-wrap" }}>{welcomeMessage}</Typography>
+        <Button variant="contained" onClick={enterApp} disabled={pending}>
+          {pending ? "Loading…" : "Get started"}
+        </Button>
+      </Paper>
+    );
   }
 
   return (

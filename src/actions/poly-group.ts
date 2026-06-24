@@ -10,6 +10,7 @@ import { getDb } from "@/lib/db/client";
 import { ensureDbReady } from "@/lib/db/ensure-ready";
 import { polyGroup, users } from "@/lib/db/schema";
 import {
+  DEFAULT_ONBOARDING_WELCOME_MESSAGE,
   auditLogVisibilityLevels,
   groupNameChangeModes,
   powerManagementModes,
@@ -35,6 +36,7 @@ const settingsSchema = z.object({
   allowUserProvisioning: z.boolean(),
   hideSleepingArrangements: z.boolean(),
   logTailLength: z.number().int().min(0).max(1000),
+  onboardingWelcomeMessage: z.string().trim().min(1).max(2000),
 });
 
 function rowToSettings(row: typeof polyGroup.$inferSelect): PolyGroupSettings {
@@ -52,6 +54,8 @@ function rowToSettings(row: typeof polyGroup.$inferSelect): PolyGroupSettings {
     allowUserProvisioning: row.allowUserProvisioning,
     hideSleepingArrangements: row.hideSleepingArrangements,
     logTailLength: row.logTailLength,
+    onboardingWelcomeMessage:
+      row.onboardingWelcomeMessage?.trim() || DEFAULT_ONBOARDING_WELCOME_MESSAGE,
   };
 }
 
@@ -163,6 +167,7 @@ export async function updatePolyGroupSettingsAction(
       allowUserProvisioning: parsed.data.allowUserProvisioning,
       hideSleepingArrangements: parsed.data.hideSleepingArrangements,
       logTailLength: parsed.data.logTailLength,
+      onboardingWelcomeMessage: parsed.data.onboardingWelcomeMessage,
       updatedAt: now,
     })
     .where(eq(polyGroup.id, 1));

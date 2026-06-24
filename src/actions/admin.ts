@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 
 import { auth } from "@/lib/auth";
 import { logUserActivity } from "@/lib/audit";
+import { userHasAdminAccess } from "@/lib/admin-access";
 import { ensureDbReady } from "@/lib/db/ensure-ready";
 import { getAppEnvironment, isNonProductionEnvironment } from "@/lib/env";
 import { getDb } from "@/lib/db/client";
@@ -73,6 +74,42 @@ export async function logForceReloadAction(): Promise<AdminActionResult> {
   );
 
   return { ok: true, message: "Reloading to the latest version…" };
+}
+
+/**
+ * Admin impersonation — signs in as another active user (audit logged).
+ */
+export async function adminImpersonateUserAction(userId: string): Promise<AdminActionResult> {
+  const session = await auth();
+  if (!session?.user || !(await userHasAdminAccess(session.user.role))) {
+    return { ok: false, message: "Admin access required." };
+  }
+
+  if (userId === session.user.id) {
+    return { ok: false, message: "You are already signed in as this user." };
+  }
+
+  const secret = process.env.AUTH_IMPERSONATION_SECRET ?? process.env.AUTH_SECRET;
+  if (!secret) {
+    return { ok: false, message: "Impersonation is not configured on this server." };
+  }
+
+  await ensureDbReady();
+  await logUserActivity(
+    session.user.id,
+    "admin.impersonate",
+    JSON.stringify({ targetUserId: userId }),
+    "system",
+  );
+
+  const { signIn } = await import("@/lib/auth");
+  await signIn("credentials", {
+    impersonateUserId: userId,
+    impersonateSecret: secret,
+    redirectTo: "/schedule",
+  });
+
+  return { ok: true, message: "Switching user…" };
 }
 
 export interface ActivityLogEntry {
