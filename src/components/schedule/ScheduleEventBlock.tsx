@@ -12,6 +12,14 @@ interface ScheduleEventBlockProps {
   onClick: () => void;
 }
 
+/** Formats stakeholder names for calendar blocks, respecting privacy masking (PC-43). */
+function formatStakeholders(event: ScheduleEvent): string | null {
+  if (event.isContentMasked) return "Private";
+  if (event.intentionalSolo) return "Solo";
+  if (event.participantNames.length === 0) return null;
+  return event.participantNames.join(", ");
+}
+
 /**
  * Clickable calendar block with tentative/confirmed color coding (PC-42).
  */
@@ -24,13 +32,15 @@ export function ScheduleEventBlock({ event, compact = false, onClick }: Schedule
     atRisk: event.atRisk,
   });
   const colors = scheduleBlockSx(variant);
+  const stakeholders = formatStakeholders(event);
+  const timeLabel = formatEventTime(event.startAt, event.endAt, event.proposalType);
 
   return (
     <Box
       component="button"
       type="button"
       onClick={onClick}
-      aria-label={`${event.title}, ${formatEventTime(event.startAt, event.endAt)}`}
+      aria-label={`${event.title}, ${timeLabel}${stakeholders ? `, ${stakeholders}` : ""}`}
       sx={{
         display: "block",
         width: "100%",
@@ -50,10 +60,18 @@ export function ScheduleEventBlock({ event, compact = false, onClick }: Schedule
       <Typography variant={compact ? "caption" : "body2"} fontWeight={600} noWrap>
         {event.title}
       </Typography>
+      <Typography variant="caption" display="block" noWrap>
+        {timeLabel}
+        {compact && stakeholders ? ` · ${stakeholders}` : ""}
+      </Typography>
+      {!compact && stakeholders && (
+        <Typography variant="caption" display="block" noWrap>
+          {stakeholders}
+        </Typography>
+      )}
       {!compact && (
         <Typography variant="caption" display="block">
-          {formatEventTime(event.startAt, event.endAt)}
-          {event.isTentative ? " · Tentative" : ""}
+          {event.isTentative ? "Tentative" : "Confirmed"}
           {event.atRisk ? " · At risk" : ""}
           {event.hasOverlap ? " · Conflict" : ""}
         </Typography>

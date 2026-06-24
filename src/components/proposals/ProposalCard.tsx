@@ -76,7 +76,7 @@ export function ProposalCard({
       <CardContent sx={{ pb: 1 }}>
         <Stack direction="row" justifyContent="space-between" alignItems="flex-start" sx={{ mb: 1 }}>
           <Chip
-            label={typeBadgeLabel(proposal.proposalType)}
+            label={typeBadgeLabel(proposal.proposalType, proposal.cardKind)}
             size="small"
             sx={typeChipSx}
           />

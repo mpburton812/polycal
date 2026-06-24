@@ -33,9 +33,11 @@ test.describe("Resolved proposal actions", () => {
     page.once("dialog", (dialog) => dialog.accept());
     await openProposalCard(page, DEMO.resolvedCelebration);
     await page.getByRole("dialog").getByRole("button", { name: "Re-draft" }).click();
-    await expect(page.getByRole("dialog").getByText(/moved to drafts/i)).toBeVisible({
+    const draftDialog = page.getByRole("dialog");
+    await expect(draftDialog.getByRole("button", { name: "Submit" })).toBeVisible({
       timeout: 15_000,
     });
+    await expect(draftDialog.getByText("Edit draft")).toBeVisible();
   });
 
   test("resolved detail shows card-styled layout with activity section", async ({ page }) => {
@@ -67,6 +69,8 @@ test.describe("Poll proposal draft", () => {
     await startInputs.nth(1).fill("2099-08-02T10:00");
 
     await dialog.getByRole("button", { name: "Create draft" }).click();
+    await expect(dialog.getByRole("button", { name: "Submit" })).toBeVisible();
+    await dialog.getByRole("button", { name: "Cancel" }).click();
     await expect(proposalCard(page, title)).toBeVisible();
     await proposalCard(page, title).getByRole("button", { name: "Continue Editing" }).click();
     await expect(dialog.getByRole("checkbox", { name: /Time poll/i })).toBeChecked();
@@ -88,6 +92,8 @@ test.describe("Recurring event draft", () => {
     await dialog.getByRole("checkbox", { name: /Recurring series/i }).check();
     await dialog.getByLabel("Start").first().fill("2099-09-01T09:00");
     await dialog.getByRole("button", { name: "Create draft" }).click();
+    await expect(dialog.getByRole("button", { name: "Submit" })).toBeVisible();
+    await dialog.getByRole("button", { name: "Cancel" }).click();
     await expect(proposalCard(page, title)).toBeVisible();
   });
 });

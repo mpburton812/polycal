@@ -11,6 +11,7 @@ import { getDb } from "@/lib/db/client";
 import { ensureDbReady } from "@/lib/db/ensure-ready";
 import { sleepingPartnerships, users } from "@/lib/db/schema";
 import { canonicalUserPair } from "@/lib/users/pair";
+import { notifyUser } from "@/lib/notifications";
 
 export interface PartnershipView {
   id: string;
@@ -137,6 +138,7 @@ export async function proposePartnershipAction(
   const now = new Date().toISOString();
   const autoAccept = target.role === "passive";
   const status = autoAccept ? "accepted" : "proposed";
+  const partnershipId = existing?.id ?? `sp-${randomUUID()}`;
 
   if (existing) {
     await db
@@ -151,7 +153,7 @@ export async function proposePartnershipAction(
       .where(eq(sleepingPartnerships.id, existing.id));
   } else {
     await db.insert(sleepingPartnerships).values({
-      id: `sp-${randomUUID()}`,
+      id: partnershipId,
       userLowId,
       userHighId,
       status,
@@ -163,13 +165,29 @@ export async function proposePartnershipAction(
     });
   }
 
+  const [proposer] = await db
+    .select({ displayName: users.displayName })
+    .from(users)
+    .where(eq(users.id, proposerId))
+    .limit(1);
+
   await logUserActivity(
     session.user.id,
     "partnership.propose",
     JSON.stringify({ targetUserId, status }),
   );
 
+  if (!autoAccept) {
+    await notifyUser(
+      targetUserId,
+      "partnership_proposed",
+      `${proposer?.displayName ?? "Someone"} proposed a sleeping partnership with you.`,
+      { partnershipId, proposerId, partnerId: targetUserId },
+    );
+  }
+
   revalidatePath("/people-places");
+  revalidatePath("/proposals");
 
   return {
     ok: true,
@@ -221,6 +239,21 @@ export async function respondPartnershipAction(
     .set({ status, updatedAt: now, respondedAt: now })
     .where(eq(sleepingPartnerships.id, row.id));
 
+  const partnerId =
+    row.userLowId === session.user.id ? row.userHighId : row.userLowId;
+  const [responder] = await db
+    .select({ displayName: users.displayName })
+    .from(users)
+    .where(eq(users.id, session.user.id))
+    .limit(1);
+
+  await notifyUser(
+    row.proposedById,
+    parsed.data.accept ? "partnership_accepted" : "partnership_declined",
+    `${responder?.displayName ?? "Someone"} ${parsed.data.accept ? "accepted" : "declined"} your sleeping partnership proposal.`,
+    { partnershipId: row.id, partnerId },
+  );
+
   await logUserActivity(
     session.user.id,
     parsed.data.accept ? "partnership.accept" : "partnership.decline",
@@ -228,6 +261,7 @@ export async function respondPartnershipAction(
   );
 
   revalidatePath("/people-places");
+  revalidatePath("/proposals");
 
   return {
     ok: true,

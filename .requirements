@@ -61,3 +61,11 @@
 2026-06-24 | f5b49fb | PC-40 | add Playwright E2E suite, CI workflow, and promotion gates | src/lib/seed/reset-test-database.ts
 2026-06-24 | 720db88 | PC-40 | Phase 4 close-out — collision engine, notification inbox, bedroom picker | src/actions/notifications.ts
 2026-06-24 | cda7c09 | PC-42 | Phase 6 schedule tab with weekly calendar, filters, and planning mode | src/actions/schedule.ts
+2026-06-24 | pending | PC-43 | Surface sleeping partnership proposals on Proposals Kanban | src/actions/proposals.ts
+2026-06-24 | pending | PC-43 | Actionable notification inbox with partnership accept/decline | src/components/layout/NotificationInbox.tsx
+2026-06-24 | pending | PC-43 | Web Push subscriptions and service worker push handler | src/lib/push.ts
+2026-06-24 | pending | PC-43 | Notification email verification hook on profile | src/actions/profile.ts
+2026-06-24 | pending | PC-43 | Solo event toggle and post-create Submit in draft dialog | src/components/proposals/ProposalDraftDialog.tsx
+2026-06-24 | pending | PC-43 | Calendar blocks show stakeholders; week anchor resets to today | src/components/schedule/ScheduleEventBlock.tsx
+2026-06-24 | fc0c8aa | PC-43 | Phase 5 notifications and proposal UX fixes | src/actions/partnerships.ts
+2026-06-24 | 5a43490 | PC-43 | fix lifecycle E2E for draft dialog stay-open UX | e2e/proposals-lifecycle.spec.ts

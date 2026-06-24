@@ -57,8 +57,30 @@ export function formatDayHeader(date: Date): string {
   return date.toLocaleDateString(undefined, { weekday: "short", month: "numeric", day: "numeric" });
 }
 
-/** Formats a time span for agenda chips. */
-export function formatEventTime(startAt: string, endAt: string | null): string {
+/** Formats a time or date span for calendar blocks. */
+export function formatEventTime(
+  startAt: string,
+  endAt: string | null,
+  proposalType: "event" | "sleeping" = "event",
+): string {
+  if (proposalType === "sleeping") {
+    const dateOpts: Intl.DateTimeFormatOptions = {
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+    };
+    const start = new Date(startAt);
+    const startLabel = start.toLocaleDateString(undefined, dateOpts);
+    if (!endAt) return startLabel;
+    const end = new Date(endAt);
+    const sameDay =
+      start.getFullYear() === end.getFullYear() &&
+      start.getMonth() === end.getMonth() &&
+      start.getDate() === end.getDate();
+    if (sameDay) return startLabel;
+    return `${startLabel} – ${end.toLocaleDateString(undefined, dateOpts)}`;
+  }
+
   const start = new Date(startAt);
   const end = endAt ? new Date(endAt) : null;
   const dateOpts: Intl.DateTimeFormatOptions = { hour: "numeric", minute: "2-digit" };

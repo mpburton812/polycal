@@ -3,7 +3,9 @@ import { Box, Container } from "@mui/material";
 import { AppHeader } from "@/components/layout/AppHeader";
 import { AppTabs } from "@/components/layout/AppTabs";
 import { DevBar } from "@/components/layout/DevBar";
+import { PushSubscriptionManager } from "@/components/notifications/PushSubscriptionManager";
 import { avatarSrcForKey } from "@/lib/constants/avatars";
+import { getVapidPublicKey } from "@/lib/push";
 import type { NotificationItem } from "@/actions/notifications";
 
 /**
@@ -25,9 +27,11 @@ export function AppShell({
   notificationItems?: NotificationItem[];
 }) {
   const avatarSrc = avatarSrcForKey(avatarKey);
+  const vapidPublicKey = getVapidPublicKey();
 
   return (
     <>
+      <PushSubscriptionManager vapidPublicKey={vapidPublicKey} />
       <Box
         sx={{
           position: "sticky",

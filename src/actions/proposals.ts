@@ -1,7 +1,7 @@
 "use server";
 
 import { randomUUID } from "node:crypto";
-import { and, asc, eq, inArray } from "drizzle-orm";
+import { and, asc, eq, inArray, or } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
@@ -20,6 +20,7 @@ import {
   proposalStateLog,
   proposalTimeSlots,
   proposals,
+  sleepingPartnerships,
   users,
   type EventPrivacyLevel,
   type InviteeRole,
@@ -28,6 +29,7 @@ import {
   type ProposalType,
 } from "@/lib/db/schema";
 import { notifyUser } from "@/lib/notifications";
+import { PARTNERSHIP_CARD_PREFIX } from "@/lib/proposals/constants";
 import type { UserRole } from "@/types/user";
 
 const inviteeInputSchema = z.object({
@@ -52,6 +54,7 @@ const draftProposalSchema = z.object({
   description: z.string().trim().min(1, "Description is required.").max(2000),
   proposalType: z.enum(["event", "sleeping"]),
   locationId: z.string().optional(),
+  locationText: z.string().trim().max(200).optional(),
   notes: z.string().trim().max(500).optional(),
   intentionalSolo: z.boolean().optional(),
   isPoll: z.boolean().optional(),
@@ -83,6 +86,7 @@ const batchSleepingSchema = z.object({
   title: z.string().trim().min(1).max(200),
   description: z.string().trim().min(1).max(2000),
   locationId: z.string().optional(),
+  locationText: z.string().trim().max(200).optional(),
   notes: z.string().trim().max(500).optional(),
   intentionalSolo: z.boolean().optional(),
   invitees: z.array(inviteeInputSchema).optional(),
@@ -98,6 +102,8 @@ const attendeeUpdateSchema = z.object({
 });
 
 const AT_RISK_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+
+export type ProposalCardKind = "proposal" | "partnership";
 
 export interface ProposalCard {
   id: string;
@@ -119,6 +125,9 @@ export interface ProposalCard {
   inviteeCount: number;
   respondedCount: number;
   isPastSchedule: boolean;
+  cardKind?: ProposalCardKind;
+  partnershipId?: string;
+  partnerName?: string;
 }
 
 export type RecurrencePattern = "daily" | "weekly" | "monthly" | "yearly";
@@ -185,6 +194,7 @@ export interface ProposalDetail {
   proposerId: string;
   proposerName: string;
   locationId: string | null;
+  locationText: string | null;
   locationName: string | null;
   intentionalSolo: boolean;
   isPoll: boolean;
@@ -289,6 +299,7 @@ function applyProposalMask<T extends {
   title: string;
   description: string | null;
   locationName: string | null;
+  locationText?: string | null;
   scheduledStartAt: string | null;
   scheduledEndAt: string | null;
   notes?: string | null;
@@ -299,6 +310,7 @@ function applyProposalMask<T extends {
     title: MASKED_TITLE,
     description: MASKED_DESCRIPTION,
     locationName: null,
+    locationText: row.locationText !== undefined ? null : undefined,
     scheduledStartAt: null,
     scheduledEndAt: null,
     notes: row.notes !== undefined ? null : undefined,
@@ -578,6 +590,7 @@ export async function listProposalBoardAction(): Promise<ProposalBoard> {
       proposerId: proposals.proposerId,
       proposerName: users.displayName,
       locationName: locations.name,
+      locationText: proposals.locationText,
       scheduledStartAt: proposals.scheduledStartAt,
       scheduledEndAt: proposals.scheduledEndAt,
       atRisk: proposals.atRisk,
@@ -647,7 +660,7 @@ export async function listProposalBoardAction(): Promise<ProposalBoard> {
       state: row.state,
       proposerId: row.proposerId,
       proposerName: row.proposerName,
-      locationName: display.locationName ?? null,
+      locationName: display.locationName ?? display.locationText ?? null,
       scheduledStartAt: display.scheduledStartAt ?? null,
       scheduledEndAt: display.scheduledEndAt ?? null,
       atRisk: row.atRisk,
@@ -662,6 +675,68 @@ export async function listProposalBoardAction(): Promise<ProposalBoard> {
 
     const column = row.state as keyof ProposalBoard;
     empty[column].push(card);
+  }
+
+  const partnershipRows = await db
+    .select({
+      id: sleepingPartnerships.id,
+      userLowId: sleepingPartnerships.userLowId,
+      userHighId: sleepingPartnerships.userHighId,
+      proposedById: sleepingPartnerships.proposedById,
+      proposerName: users.displayName,
+    })
+    .from(sleepingPartnerships)
+    .innerJoin(users, eq(sleepingPartnerships.proposedById, users.id))
+    .where(eq(sleepingPartnerships.status, "proposed"));
+
+  if (partnershipRows.length > 0) {
+    const partnerIds = new Set<string>();
+    for (const row of partnershipRows) {
+      partnerIds.add(row.userLowId);
+      partnerIds.add(row.userHighId);
+    }
+    const partnerRows = await db
+      .select({ id: users.id, displayName: users.displayName })
+      .from(users)
+      .where(inArray(users.id, [...partnerIds]));
+    const partnerMap = new Map(partnerRows.map((row) => [row.id, row.displayName]));
+
+    for (const row of partnershipRows) {
+      const isParticipant =
+        row.userLowId === viewerId || row.userHighId === viewerId;
+      if (!isParticipant && !isAdmin) continue;
+
+      const partnerId =
+        row.userLowId === viewerId ? row.userHighId : row.userLowId;
+      const partnerName = partnerMap.get(partnerId) ?? "Partner";
+      const isIncoming = row.proposedById !== viewerId;
+
+      empty.proposed.push({
+        id: `${PARTNERSHIP_CARD_PREFIX}${row.id}`,
+        title: `Sleeping partnership with ${partnerName}`,
+        description: isIncoming
+          ? `${row.proposerName} proposed a sleeping partnership with you.`
+          : `Awaiting ${partnerName}'s response.`,
+        proposalType: "event",
+        state: "proposed",
+        proposerId: row.proposedById,
+        proposerName: row.proposerName,
+        locationName: null,
+        scheduledStartAt: null,
+        scheduledEndAt: null,
+        atRisk: false,
+        isPoll: false,
+        eventPrivacy: "open",
+        isContentMasked: false,
+        needsViewerAction: isIncoming,
+        inviteeCount: 1,
+        respondedCount: isIncoming ? 0 : 0,
+        isPastSchedule: false,
+        cardKind: "partnership",
+        partnershipId: row.id,
+        partnerName,
+      });
+    }
   }
 
   return empty;
@@ -699,7 +774,58 @@ function mapPlaceOption(row: {
 }
 
 /**
- * Places the current user may attach to a proposal draft (accepted residency).
+ * Location IDs the user may schedule at — own residency plus sleeping partners' places (PC-43).
+ */
+async function getEligibleLocationIdsForUser(
+  db: ReturnType<typeof getDb>,
+  userId: string,
+): Promise<string[]> {
+  const directRows = await db
+    .select({ locationId: locationResidents.locationId })
+    .from(locationResidents)
+    .where(
+      and(eq(locationResidents.userId, userId), eq(locationResidents.status, "accepted")),
+    );
+
+  const partnershipRows = await db
+    .select({
+      userLowId: sleepingPartnerships.userLowId,
+      userHighId: sleepingPartnerships.userHighId,
+    })
+    .from(sleepingPartnerships)
+    .where(
+      and(
+        eq(sleepingPartnerships.status, "accepted"),
+        or(
+          eq(sleepingPartnerships.userLowId, userId),
+          eq(sleepingPartnerships.userHighId, userId),
+        ),
+      ),
+    );
+
+  const partnerIds = partnershipRows.map((row) =>
+    row.userLowId === userId ? row.userHighId : row.userLowId,
+  );
+
+  let networkLocationIds: string[] = [];
+  if (partnerIds.length > 0) {
+    const partnerResidency = await db
+      .select({ locationId: locationResidents.locationId })
+      .from(locationResidents)
+      .where(
+        and(
+          inArray(locationResidents.userId, partnerIds),
+          eq(locationResidents.status, "accepted"),
+        ),
+      );
+    networkLocationIds = partnerResidency.map((row) => row.locationId);
+  }
+
+  return [...new Set([...directRows.map((row) => row.locationId), ...networkLocationIds])];
+}
+
+/**
+ * Places the current user may attach to a proposal draft (direct + sleeping network residency).
  */
 export async function listProposalPlaceOptionsAction(): Promise<ProposalPlaceOption[]> {
   await ensureDbReady();
@@ -721,17 +847,7 @@ export async function listProposalPlaceOptionsAction(): Promise<ProposalPlaceOpt
     return all.map(mapPlaceOption);
   }
 
-  const residentRows = await db
-    .select({ locationId: locationResidents.locationId })
-    .from(locationResidents)
-    .where(
-      and(
-        eq(locationResidents.userId, session.user.id),
-        eq(locationResidents.status, "accepted"),
-      ),
-    );
-
-  const locationIds = residentRows.map((row) => row.locationId);
+  const locationIds = await getEligibleLocationIdsForUser(db, session.user.id);
   if (locationIds.length === 0) return [];
 
   const placeRows = await db
@@ -751,7 +867,11 @@ async function assertLocationAllowed(
   userId: string,
   role: string,
   locationId: string | undefined,
+  locationText?: string,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (locationId && locationText?.trim()) {
+    return { ok: false, error: "Choose either a registered place or custom location text, not both." };
+  }
   if (!locationId) return { ok: true };
 
   const [place] = await db.select().from(locations).where(eq(locations.id, locationId)).limit(1);
@@ -763,20 +883,13 @@ async function assertLocationAllowed(
     return { ok: true };
   }
 
-  const [resident] = await db
-    .select({ id: locationResidents.id })
-    .from(locationResidents)
-    .where(
-      and(
-        eq(locationResidents.locationId, locationId),
-        eq(locationResidents.userId, userId),
-        eq(locationResidents.status, "accepted"),
-      ),
-    )
-    .limit(1);
-
-  if (!resident) {
-    return { ok: false, error: "You can only schedule at places you are associated with." };
+  const eligibleIds = await getEligibleLocationIdsForUser(db, userId);
+  if (!eligibleIds.includes(locationId)) {
+    return {
+      ok: false,
+      error:
+        "You can only schedule at places you or your sleeping partners are associated with.",
+    };
   }
 
   return { ok: true };
@@ -1509,6 +1622,7 @@ export async function createDraftProposalAction(
     session.user.id,
     session.user.role,
     parsed.data.locationId,
+    parsed.data.locationText,
   );
   if (!locationCheck.ok) {
     return { ok: false, message: locationCheck.error };
@@ -1523,6 +1637,7 @@ export async function createDraftProposalAction(
   const recurrenceJson = isRecurring
     ? serializeRecurrenceRule(parsed.data.recurrenceRule)
     : null;
+  const locationText = parsed.data.locationText?.trim() || null;
 
   await db.insert(proposals).values({
     id: proposalId,
@@ -1532,6 +1647,7 @@ export async function createDraftProposalAction(
     state: "draft",
     proposerId: session.user.id,
     locationId: parsed.data.locationId ?? null,
+    locationText,
     notes: parsed.data.notes ?? null,
     intentionalSolo,
     isPoll,
@@ -1593,6 +1709,7 @@ export async function updateDraftProposalAction(
     session.user.id,
     session.user.role,
     parsed.data.locationId,
+    parsed.data.locationText,
   );
   if (!locationCheck.ok) {
     return { ok: false, message: locationCheck.error };
@@ -1618,6 +1735,7 @@ export async function updateDraftProposalAction(
     .where(eq(proposalTimeSlots.proposalId, proposal.id));
 
   const afterLocationId = parsed.data.locationId ?? null;
+  const afterLocationText = parsed.data.locationText?.trim() || null;
   const afterSlots =
     parsed.data.timeSlots?.map((slot) => ({
       startAt: slot.startAt,
@@ -1639,6 +1757,7 @@ export async function updateDraftProposalAction(
       description: parsed.data.description,
       proposalType: parsed.data.proposalType,
       locationId: afterLocationId,
+      locationText: afterLocationText,
       notes: parsed.data.notes ?? null,
       intentionalSolo: Boolean(parsed.data.intentionalSolo),
       isPoll: Boolean(isPoll),
@@ -1676,6 +1795,7 @@ function shouldAutoResolveOnSubmit(
   intentionalSolo: boolean,
   requiredInviteeCount: number,
 ): boolean {
+  if (intentionalSolo) return true;
   if (requiredInviteeCount === 0) return true;
   if (proposalType !== "sleeping") return false;
   return intentionalSolo;
@@ -1840,6 +1960,7 @@ export async function getProposalDetailAction(
       proposerId: proposals.proposerId,
       proposerName: users.displayName,
       locationId: proposals.locationId,
+      locationText: proposals.locationText,
       locationName: locations.name,
       intentionalSolo: proposals.intentionalSolo,
       isPoll: proposals.isPoll,
@@ -1968,7 +2089,8 @@ export async function getProposalDetailAction(
       proposerId: row.proposerId,
       proposerName: row.proposerName,
       locationId: masked ? null : row.locationId ?? null,
-      locationName: display.locationName ?? null,
+      locationText: masked ? null : row.locationText ?? null,
+      locationName: display.locationName ?? display.locationText ?? null,
       intentionalSolo: row.intentionalSolo,
       isPoll: row.isPoll,
       eventPrivacy: row.eventPrivacy,

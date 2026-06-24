@@ -223,6 +223,11 @@ export function ProposalDetailDialog({
       const result = await redraftProposalAction(proposalId);
       setMessage(result.message);
       if (!result.ok) return;
+      const detailResult = await getProposalDetailAction(proposalId);
+      if (detailResult.ok && detailResult.detail) {
+        onEdit(detailResult.detail);
+        return;
+      }
       reloadDetail(proposalId);
       router.refresh();
     });
