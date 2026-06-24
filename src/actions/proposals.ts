@@ -139,6 +139,8 @@ export interface ProposalBoard {
 export interface ProposalPlaceOption {
   id: string;
   name: string;
+  bedroomCount: number;
+  bedroomNames: string[];
 }
 
 export interface ProposalInviteeView {
@@ -665,6 +667,37 @@ export async function listProposalBoardAction(): Promise<ProposalBoard> {
   return empty;
 }
 
+/** Parses bedroom label JSON stored on locations (PC-40). */
+function parseBedroomNames(raw: string | null): string[] {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    return Array.isArray(parsed)
+      ? parsed.filter((value): value is string => typeof value === "string")
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+function mapPlaceOption(row: {
+  id: string;
+  name: string;
+  bedroomCount: number;
+  bedroomNames: string | null;
+}): ProposalPlaceOption {
+  const names = parseBedroomNames(row.bedroomNames);
+  return {
+    id: row.id,
+    name: row.name,
+    bedroomCount: row.bedroomCount,
+    bedroomNames:
+      names.length > 0
+        ? names
+        : Array.from({ length: row.bedroomCount }, (_, index) => `Bedroom ${index + 1}`),
+  };
+}
+
 /**
  * Places the current user may attach to a proposal draft (accepted residency).
  */
@@ -676,12 +709,16 @@ export async function listProposalPlaceOptionsAction(): Promise<ProposalPlaceOpt
   const db = getDb();
   const isAdmin = await userHasAdminAccess(session.user.role);
 
+  const placeSelect = {
+    id: locations.id,
+    name: locations.name,
+    bedroomCount: locations.bedroomCount,
+    bedroomNames: locations.bedroomNames,
+  };
+
   if (isAdmin) {
-    const all = await db
-      .select({ id: locations.id, name: locations.name })
-      .from(locations)
-      .orderBy(asc(locations.name));
-    return all;
+    const all = await db.select(placeSelect).from(locations).orderBy(asc(locations.name));
+    return all.map(mapPlaceOption);
   }
 
   const residentRows = await db
@@ -698,12 +735,12 @@ export async function listProposalPlaceOptionsAction(): Promise<ProposalPlaceOpt
   if (locationIds.length === 0) return [];
 
   const placeRows = await db
-    .select({ id: locations.id, name: locations.name })
+    .select(placeSelect)
     .from(locations)
     .where(inArray(locations.id, locationIds))
     .orderBy(asc(locations.name));
 
-  return placeRows;
+  return placeRows.map(mapPlaceOption);
 }
 
 /**
@@ -863,6 +900,137 @@ async function revertProposalToDraft(
 }
 
 /**
+ * Builds schedule windows for collision checks from slots or resolved times (PC-40).
+ */
+async function proposalScheduleWindows(
+  db: ReturnType<typeof getDb>,
+  proposalId: string,
+  scheduledStartAt: string | null,
+  scheduledEndAt: string | null,
+): Promise<{ start: string; end: string | null }[]> {
+  const slots = await db
+    .select({ startAt: proposalTimeSlots.startAt, endAt: proposalTimeSlots.endAt })
+    .from(proposalTimeSlots)
+    .where(eq(proposalTimeSlots.proposalId, proposalId));
+
+  if (slots.length > 0) {
+    return slots.map((slot) => ({ start: slot.startAt, end: slot.endAt }));
+  }
+  if (scheduledStartAt) {
+    return [{ start: scheduledStartAt, end: scheduledEndAt }];
+  }
+  return [];
+}
+
+/**
+ * On resolve, auto-declines overlapping pending proposals into proposer review (PC-40).
+ * Conflicting items revert to draft with at-risk flag and a system comment.
+ */
+async function autoDeclineCollidingProposals(
+  db: ReturnType<typeof getDb>,
+  resolved: typeof proposals.$inferSelect,
+  scheduleStart: string | null,
+  scheduleEnd: string | null,
+  actorUserId: string,
+): Promise<void> {
+  if (!scheduleStart) return;
+
+  const resolvedInvitees = await db
+    .select({ userId: proposalInvitees.userId })
+    .from(proposalInvitees)
+    .where(eq(proposalInvitees.proposalId, resolved.id));
+  const resolvedStakeholders = new Set<string>([
+    resolved.proposerId,
+    ...resolvedInvitees.map((row) => row.userId),
+  ]);
+
+  const pending = await db
+    .select()
+    .from(proposals)
+    .where(eq(proposals.state, "proposed"));
+
+  const allInvitees = await db
+    .select({
+      proposalId: proposalInvitees.proposalId,
+      userId: proposalInvitees.userId,
+    })
+    .from(proposalInvitees);
+  const inviteesByProposal = new Map<string, string[]>();
+  for (const row of allInvitees) {
+    const list = inviteesByProposal.get(row.proposalId) ?? [];
+    list.push(row.userId);
+    inviteesByProposal.set(row.proposalId, list);
+  }
+
+  const now = new Date().toISOString();
+  const expiresAt = new Date(Date.now() + AT_RISK_TTL_MS).toISOString();
+
+  for (const other of pending) {
+    if (other.id === resolved.id) continue;
+
+    const otherStakeholders = new Set<string>([
+      other.proposerId,
+      ...(inviteesByProposal.get(other.id) ?? []),
+    ]);
+    const sharesStakeholder = [...resolvedStakeholders].some((id) =>
+      otherStakeholders.has(id),
+    );
+    if (!sharesStakeholder) continue;
+
+    const otherWindows = await proposalScheduleWindows(
+      db,
+      other.id,
+      other.scheduledStartAt,
+      other.scheduledEndAt,
+    );
+    if (otherWindows.length === 0) continue;
+
+    const overlaps = otherWindows.some((window) =>
+      intervalsOverlap(scheduleStart, scheduleEnd, window.start, window.end),
+    );
+    if (!overlaps) continue;
+
+    await db
+      .update(proposals)
+      .set({
+        state: "draft",
+        atRisk: true,
+        atRiskExpiresAt: expiresAt,
+        scheduledStartAt: null,
+        scheduledEndAt: null,
+        winningSlotId: null,
+        updatedAt: now,
+      })
+      .where(eq(proposals.id, other.id));
+
+    await resetInviteeVotes(db, other.id);
+
+    await db.insert(proposalComments).values({
+      id: `pc-${randomUUID()}`,
+      proposalId: other.id,
+      authorId: other.proposerId,
+      body: `Auto-declined due to resolution of Proposal ID ${resolved.id}.`,
+      createdAt: now,
+    });
+
+    await logProposalTransition(
+      db,
+      other.id,
+      actorUserId,
+      "proposal.auto_declined_collision",
+      resolved.id,
+    );
+
+    await notifyUser(
+      other.proposerId,
+      "proposal_collision_auto_decline",
+      `Proposal "${other.title}" was auto-declined because "${resolved.title}" was scheduled.`,
+      { proposalId: other.id, resolvedProposalId: resolved.id },
+    );
+  }
+}
+
+/**
  * Resolves a proposal when all required invitees have approved (PC-40).
  * Poll proposals pick the winning time slot from per-slot vote tallies.
  */
@@ -934,6 +1102,8 @@ async function resolveProposal(
       { proposalId: proposal.id },
     );
   }
+
+  await autoDeclineCollidingProposals(db, proposal, scheduleStart, scheduleEnd, actorUserId);
 }
 
 /**

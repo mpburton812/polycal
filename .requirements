@@ -59,3 +59,4 @@
 2026-06-24 | 28b026d | PC-40 | shared proposal card theme and draft dialog layout | src/components/proposals/ProposalCard.tsx
 2026-06-24 | 703cdac | PC-40 | poll rules, privacy masking, recurrence, and bedroom locks | src/actions/proposals.ts
 2026-06-24 | f5b49fb | PC-40 | add Playwright E2E suite, CI workflow, and promotion gates | src/lib/seed/reset-test-database.ts
+2026-06-24 | 720db88 | PC-40 | Phase 4 close-out — collision engine, notification inbox, bedroom picker | src/actions/notifications.ts
