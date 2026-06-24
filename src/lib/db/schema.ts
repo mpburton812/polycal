@@ -163,6 +163,14 @@ export const proposals = sqliteTable("proposals", {
   atRisk: integer("at_risk", { mode: "boolean" }).notNull().default(false),
   atRiskExpiresAt: text("at_risk_expires_at"),
   parentProposalId: text("parent_proposal_id"),
+  /** JSON recurrence pattern: daily|weekly|monthly|yearly, interval, count (2–52). */
+  recurrenceRule: text("recurrence_rule"),
+  occurrenceIndex: integer("occurrence_index"),
+  isRecurrenceParent: integer("is_recurrence_parent", { mode: "boolean" })
+    .notNull()
+    .default(false),
+  /** Place bedroom index for sleeping proposals (MVP place-level lock when unset). */
+  bedroomIndex: integer("bedroom_index"),
   batchGroupId: text("batch_group_id"),
   winningSlotId: text("winning_slot_id"),
   notes: text("notes"),

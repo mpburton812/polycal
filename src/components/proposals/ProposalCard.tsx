@@ -101,7 +101,11 @@ export function ProposalCard({
           )}
         </Stack>
 
-        {timeLabel && (
+          {proposal.isContentMasked && (
+            <Chip size="small" label="Private" variant="outlined" sx={{ mt: 1 }} />
+          )}
+
+        {timeLabel && !proposal.isContentMasked && (
           <Stack direction="row" spacing={0.5} alignItems="center" sx={{ mt: 1 }}>
             <AccessTimeIcon sx={{ fontSize: 16, color: "text.secondary" }} />
             <Typography variant="body2" color="text.secondary">
@@ -110,7 +114,7 @@ export function ProposalCard({
           </Stack>
         )}
 
-        {proposal.locationName && (
+        {proposal.locationName && !proposal.isContentMasked && (
           <Stack direction="row" spacing={0.5} alignItems="center" sx={{ mt: 0.5 }}>
             <LocationOnOutlinedIcon sx={{ fontSize: 16, color: "text.secondary" }} />
             <Typography variant="body2" color="text.secondary">

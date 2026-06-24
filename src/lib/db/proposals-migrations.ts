@@ -14,6 +14,10 @@ export async function applyProposalsMigrations(sql: Client): Promise<void> {
   await ensureColumn(sql, "proposals", "batch_group_id", "TEXT");
   await ensureColumn(sql, "proposals", "winning_slot_id", "TEXT");
   await ensureColumn(sql, "proposals", "at_risk_expires_at", "TEXT");
+  await ensureColumn(sql, "proposals", "recurrence_rule", "TEXT");
+  await ensureColumn(sql, "proposals", "occurrence_index", "INTEGER");
+  await ensureColumn(sql, "proposals", "is_recurrence_parent", "INTEGER NOT NULL DEFAULT 0");
+  await ensureColumn(sql, "proposals", "bedroom_index", "INTEGER");
 
   await sql.execute(`
     CREATE TABLE IF NOT EXISTS proposal_invitees (

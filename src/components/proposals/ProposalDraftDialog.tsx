@@ -143,6 +143,11 @@ export function ProposalDraftDialog({
   const [rangeEnd, setRangeEnd] = useState("");
   const [nightsPattern, setNightsPattern] = useState<"every" | "weekdays" | "weekends">("every");
   const [eventPrivacy, setEventPrivacy] = useState<"open" | "private" | "super_private">("open");
+  const [isRecurring, setIsRecurring] = useState(false);
+  const [recurrencePattern, setRecurrencePattern] = useState<
+    "daily" | "weekly" | "monthly" | "yearly"
+  >("weekly");
+  const [recurrenceCount, setRecurrenceCount] = useState(4);
   const [slots, setSlots] = useState<SlotDraft[]>([{ startAt: "", endAt: "", label: "" }]);
   const [inviteeMode, setInviteeMode] = useState<Record<string, InviteeSelection>>({});
   const [error, setError] = useState<string | null>(null);
@@ -180,6 +185,11 @@ export function ProposalDraftDialog({
       setIntentionalSolo(initialDetail.intentionalSolo);
       setIsPoll(initialDetail.isPoll);
       setEventPrivacy(initialDetail.eventPrivacy);
+      setIsRecurring(initialDetail.isRecurrenceParent);
+      if (initialDetail.recurrenceRule) {
+        setRecurrencePattern(initialDetail.recurrenceRule.pattern);
+        setRecurrenceCount(initialDetail.recurrenceRule.count);
+      }
       setSlots(
         initialDetail.timeSlots.length > 0
           ? initialDetail.timeSlots.map((slot) => ({
@@ -207,6 +217,9 @@ export function ProposalDraftDialog({
       setRangeEnd("");
       setNightsPattern("every");
       setEventPrivacy("open");
+      setIsRecurring(false);
+      setRecurrencePattern("weekly");
+      setRecurrenceCount(4);
       setSlots([{ startAt: "", endAt: "", label: "" }]);
       setInviteeMode({});
     }
@@ -253,6 +266,11 @@ export function ProposalDraftDialog({
       intentionalSolo: proposalType === "sleeping" ? intentionalSolo : false,
       isPoll: proposalType === "event" ? isPoll : false,
       eventPrivacy,
+      isRecurring: !batchMode && isRecurring,
+      recurrenceRule:
+        !batchMode && isRecurring
+          ? { pattern: recurrencePattern, interval: 1, count: recurrenceCount }
+          : undefined,
       invitees,
       timeSlots,
     };
@@ -567,6 +585,55 @@ export function ProposalDraftDialog({
                   >
                     Add poll option
                   </Button>
+                )}
+              </>
+            )}
+            {!batchMode && !isPoll && (
+              <>
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      checked={isRecurring}
+                      onChange={(event) => setIsRecurring(event.target.checked)}
+                      sx={{ color: POLY_GREEN, "&.Mui-checked": { color: POLY_GREEN } }}
+                    />
+                  }
+                  label="Recurring series (events and sleeping)"
+                />
+                {isRecurring && (
+                  <Stack direction="row" spacing={1}>
+                    <FormControl fullWidth size="small">
+                      <InputLabel id="recurrence-pattern-label">Pattern</InputLabel>
+                      <Select
+                        labelId="recurrence-pattern-label"
+                        label="Pattern"
+                        value={recurrencePattern}
+                        onChange={(event) =>
+                          setRecurrencePattern(
+                            event.target.value as "daily" | "weekly" | "monthly" | "yearly",
+                          )
+                        }
+                      >
+                        <MenuItem value="daily">Daily</MenuItem>
+                        <MenuItem value="weekly">Weekly</MenuItem>
+                        <MenuItem value="monthly">Monthly</MenuItem>
+                        <MenuItem value="yearly">Yearly</MenuItem>
+                      </Select>
+                    </FormControl>
+                    <TextField
+                      label="Occurrences"
+                      type="number"
+                      size="small"
+                      value={recurrenceCount}
+                      onChange={(event) =>
+                        setRecurrenceCount(
+                          Math.min(52, Math.max(2, Number(event.target.value) || 2)),
+                        )
+                      }
+                      inputProps={{ min: 2, max: 52 }}
+                      sx={{ width: 140 }}
+                    />
+                  </Stack>
                 )}
               </>
             )}
