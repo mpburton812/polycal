@@ -45,3 +45,4 @@
 2026-06-23 | 30353d0 | PC-20 | fixed environment banner colors independent of theme | src/components/layout/DevBar.tsx
 2026-06-23 | afc8be2 | PC-35 | People and Places UX and admin force reload | src/actions/admin.ts
 2026-06-23 | 79fc854 | PC-35 | use static z-index in AppShell sticky header | src/components/layout/AppShell.tsx
+2026-06-24 | f83a76c | PC-35 | correct username availability validation and error messages | src/actions/users.ts

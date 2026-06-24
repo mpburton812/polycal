@@ -16,20 +16,34 @@ import {
   generateTemporaryPassword,
 } from "@/lib/users/credentials";
 
+/** Shared username rules for provisioned active accounts. */
+const usernameSchema = z
+  .string()
+  .trim()
+  .min(2, "Username must be at least 2 characters.")
+  .max(32, "Username must be 32 characters or fewer.")
+  .regex(
+    /^[a-z0-9._-]+$/i,
+    "Username may only contain letters, numbers, and these characters: . _ -",
+  );
+
 const activeUserSchema = z.object({
-  username: z
+  username: usernameSchema,
+  displayName: z
     .string()
     .trim()
-    .min(2)
-    .max(32)
-    .regex(/^[a-z0-9._-]+$/i, "Username may only contain letters, numbers, . _ -"),
-  displayName: z.string().trim().min(1).max(80),
+    .min(1, "Display name is required.")
+    .max(80, "Display name must be 80 characters or fewer."),
   role: z.enum(["admin", "user"]),
   avatarKey: z.string().optional(),
 });
 
 const passiveUserSchema = z.object({
-  displayName: z.string().trim().min(1).max(80),
+  displayName: z
+    .string()
+    .trim()
+    .min(1, "Display name is required.")
+    .max(80, "Display name must be 80 characters or fewer."),
   avatarKey: z.string().optional(),
 });
 
@@ -72,6 +86,30 @@ function slugify(value: string): string {
     .slice(0, 24);
 }
 
+/** Turns Zod issues into a single user-facing sentence. */
+function formatZodError(error: z.ZodError): string {
+  if (error.issues.length === 0) {
+    return "One or more fields are invalid.";
+  }
+
+  return error.issues
+    .map((issue) => {
+      const field = issue.path.at(-1);
+      const label =
+        field === "username"
+          ? "Username"
+          : field === "displayName"
+            ? "Display name"
+            : field === "role"
+              ? "Role"
+              : field
+                ? String(field)
+                : "Input";
+      return `${label}: ${issue.message}`;
+    })
+    .join(" ");
+}
+
 /**
  * Lists active and passive users for the People tab (PC-35/36).
  */
@@ -110,7 +148,7 @@ export async function createActiveUserAction(
   const session = await auth();
   const parsed = activeUserSchema.safeParse(input);
   if (!parsed.success) {
-    return { ok: false, message: parsed.error.issues[0]?.message ?? "Invalid input." };
+    return { ok: false, message: formatZodError(parsed.error) };
   }
 
   await ensureDbReady();
@@ -164,13 +202,10 @@ export async function createActiveUserAction(
   };
 }
 
-const usernameCheckSchema = z.object({
-  username: z
-    .string()
-    .trim()
-    .min(2)
-    .max(32)
-    .regex(/^[a-z0-9._-]+$/i, "Username may only contain letters, numbers, . _ -"),
+const updateProvisionedUsernameSchema = z.object({
+  userId: z.string().min(1, "User id is required."),
+  username: usernameSchema,
+  temporaryPassword: z.string().min(8, "Temporary password is missing or too short."),
 });
 
 /**
@@ -179,17 +214,17 @@ const usernameCheckSchema = z.object({
 export async function checkUsernameAvailableAction(
   username: string,
 ): Promise<{ available: boolean; message: string }> {
-  const parsed = usernameCheckSchema.safeParse(username);
+  const parsed = usernameSchema.safeParse(username);
   if (!parsed.success) {
     return {
       available: false,
-      message: parsed.error.issues[0]?.message ?? "Invalid username.",
+      message: formatZodError(parsed.error),
     };
   }
 
   await ensureDbReady();
   const db = getDb();
-  const normalized = parsed.data.username.toLowerCase();
+  const normalized = parsed.data.toLowerCase();
   const [existing] = await db
     .select({ id: users.id })
     .from(users)
@@ -203,12 +238,6 @@ export async function checkUsernameAvailableAction(
   return { available: true, message: "Username is available." };
 }
 
-const updateProvisionedUsernameSchema = z.object({
-  userId: z.string().min(1),
-  username: usernameCheckSchema.shape.username,
-  temporaryPassword: z.string().min(8),
-});
-
 /**
  * Updates username for a freshly provisioned user and returns refreshed credentials (PC-35).
  */
@@ -221,7 +250,7 @@ export async function updateProvisionedUsernameAction(
 
   const parsed = updateProvisionedUsernameSchema.safeParse(input);
   if (!parsed.success) {
-    return { ok: false, message: parsed.error.issues[0]?.message ?? "Invalid input." };
+    return { ok: false, message: formatZodError(parsed.error) };
   }
 
   await ensureDbReady();
@@ -281,7 +310,7 @@ export async function createPassiveUserAction(
   const session = await auth();
   const parsed = passiveUserSchema.safeParse(input);
   if (!parsed.success) {
-    return { ok: false, message: parsed.error.issues[0]?.message ?? "Invalid input." };
+    return { ok: false, message: formatZodError(parsed.error) };
   }
 
   await ensureDbReady();
