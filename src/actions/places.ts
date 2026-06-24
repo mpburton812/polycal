@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { auth } from "@/lib/auth";
+import { userHasAdminAccess } from "@/lib/admin-access";
 import { logUserActivity } from "@/lib/audit";
 import { getDb } from "@/lib/db/client";
 import { ensureDbReady } from "@/lib/db/ensure-ready";
@@ -294,6 +295,10 @@ export async function proposeResidencyAction(
   const session = await auth();
   if (!session?.user) {
     return { ok: false, message: "Sign in required." };
+  }
+
+  if (!(await userHasAdminAccess(session.user.role)) && targetUserId !== session.user.id) {
+    return { ok: false, message: "You can only associate yourself with a place." };
   }
 
   await ensureDbReady();

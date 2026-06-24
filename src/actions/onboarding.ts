@@ -7,7 +7,8 @@ import { auth } from "@/lib/auth";
 import { logUserActivity } from "@/lib/audit";
 import { getDb } from "@/lib/db/client";
 import { ensureDbReady } from "@/lib/db/ensure-ready";
-import { users } from "@/lib/db/schema";
+import { polyGroup, users } from "@/lib/db/schema";
+import { DEFAULT_ONBOARDING_WELCOME_MESSAGE } from "@/types/poly-group";
 
 export interface OnboardingStatus {
   needsOnboarding: boolean;
@@ -43,7 +44,11 @@ export async function getOnboardingStatusAction(): Promise<OnboardingStatus | nu
 /**
  * Marks first-login onboarding complete after wizard finishes (PC-10).
  */
-export async function completeOnboardingAction(): Promise<{ ok: boolean; message: string }> {
+export async function completeOnboardingAction(): Promise<{
+  ok: boolean;
+  message: string;
+  welcomeMessage?: string;
+}> {
   const session = await auth();
   if (!session?.user?.id) {
     return { ok: false, message: "Not signed in." };
@@ -71,7 +76,11 @@ export async function completeOnboardingAction(): Promise<{ ok: boolean; message
     .set({ onboardingComplete: true, updatedAt: now })
     .where(eq(users.id, session.user.id));
 
+  const [group] = await db.select().from(polyGroup).where(eq(polyGroup.id, 1)).limit(1);
+  const welcomeMessage =
+    group?.onboardingWelcomeMessage?.trim() || DEFAULT_ONBOARDING_WELCOME_MESSAGE;
+
   await logUserActivity(session.user.id, "onboarding.complete");
   revalidatePath("/");
-  return { ok: true, message: "Welcome to PolyCal!" };
+  return { ok: true, message: "Onboarding complete.", welcomeMessage };
 }

@@ -28,11 +28,23 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         username: { label: "Username", type: "text" },
         password: { label: "Password", type: "password" },
         impersonateUserId: { label: "Impersonate", type: "text" },
+        impersonateSecret: { label: "Impersonate secret", type: "password" },
       },
       async authorize(raw) {
         await ensureDbReady();
 
-        if (raw?.impersonateUserId && isNonProductionEnvironment()) {
+        if (raw?.impersonateUserId) {
+          const impersonationSecret =
+            process.env.AUTH_IMPERSONATION_SECRET ?? process.env.AUTH_SECRET;
+          const secretOk =
+            impersonationSecret &&
+            typeof raw.impersonateSecret === "string" &&
+            raw.impersonateSecret === impersonationSecret;
+
+          if (!isNonProductionEnvironment() && !secretOk) {
+            return null;
+          }
+
           const db = getDb();
           const [row] = await db
             .select()
