@@ -3,11 +3,13 @@
 import {
   Alert,
   Button,
+  Checkbox,
   Dialog,
   DialogActions,
   DialogContent,
   DialogTitle,
   FormControl,
+  FormControlLabel,
   InputLabel,
   MenuItem,
   Select,
@@ -29,6 +31,12 @@ import {
 import type { PersonSummary } from "@/actions/users";
 
 type InviteeSelection = "none" | "required" | "optional";
+
+interface SlotDraft {
+  startAt: string;
+  endAt: string;
+  label: string;
+}
 
 interface ProposalDraftDialogProps {
   open: boolean;
@@ -74,8 +82,9 @@ export function ProposalDraftDialog({
   const [notes, setNotes] = useState("");
   const [locationId, setLocationId] = useState("");
   const [intentionalSolo, setIntentionalSolo] = useState(false);
-  const [startAt, setStartAt] = useState("");
-  const [endAt, setEndAt] = useState("");
+  const [isPoll, setIsPoll] = useState(false);
+  const [eventPrivacy, setEventPrivacy] = useState<"open" | "private" | "super_private">("open");
+  const [slots, setSlots] = useState<SlotDraft[]>([{ startAt: "", endAt: "", label: "" }]);
   const [inviteeMode, setInviteeMode] = useState<Record<string, InviteeSelection>>({});
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -93,9 +102,17 @@ export function ProposalDraftDialog({
       setNotes(initialDetail.notes ?? "");
       setLocationId(initialDetail.locationId ?? "");
       setIntentionalSolo(initialDetail.intentionalSolo);
-      const primarySlot = initialDetail.timeSlots[0];
-      setStartAt(toLocalInput(primarySlot?.startAt));
-      setEndAt(toLocalInput(primarySlot?.endAt));
+      setIsPoll(initialDetail.isPoll);
+      setEventPrivacy(initialDetail.eventPrivacy);
+      setSlots(
+        initialDetail.timeSlots.length > 0
+          ? initialDetail.timeSlots.map((slot) => ({
+              startAt: toLocalInput(slot.startAt),
+              endAt: toLocalInput(slot.endAt),
+              label: slot.label ?? "",
+            }))
+          : [{ startAt: "", endAt: "", label: "" }],
+      );
       const modes: Record<string, InviteeSelection> = {};
       for (const invitee of initialDetail.invitees) {
         modes[invitee.userId] = invitee.role;
@@ -108,8 +125,9 @@ export function ProposalDraftDialog({
       setNotes("");
       setLocationId("");
       setIntentionalSolo(false);
-      setStartAt("");
-      setEndAt("");
+      setIsPoll(false);
+      setEventPrivacy("open");
+      setSlots([{ startAt: "", endAt: "", label: "" }]);
       setInviteeMode({});
     }
     setError(null);
@@ -134,10 +152,17 @@ export function ProposalDraftDialog({
       .filter(([, role]) => role === "required" || role === "optional")
       .map(([userId, role]) => ({ userId, role: role as "required" | "optional" }));
 
-    const startIso = localInputToIso(startAt);
-    const endIso = localInputToIso(endAt);
-    const timeSlots =
-      startIso !== undefined ? [{ startAt: startIso, endAt: endIso }] : [];
+    const timeSlots = slots
+      .map((slot) => {
+        const startIso = localInputToIso(slot.startAt);
+        if (!startIso) return null;
+        return {
+          startAt: startIso,
+          endAt: localInputToIso(slot.endAt),
+          label: slot.label.trim() || undefined,
+        };
+      })
+      .filter((slot) => slot !== null);
 
     const payload = {
       title,
@@ -146,6 +171,8 @@ export function ProposalDraftDialog({
       locationId: locationId || undefined,
       notes: notes || undefined,
       intentionalSolo: proposalType === "sleeping" ? intentionalSolo : false,
+      isPoll: proposalType === "event" ? isPoll : false,
+      eventPrivacy,
       invitees,
       timeSlots,
     };
@@ -204,22 +231,83 @@ export function ProposalDraftDialog({
             multiline
             minRows={2}
           />
-          <TextField
-            label="Start"
-            type="datetime-local"
-            value={startAt}
-            onChange={(event) => setStartAt(event.target.value)}
-            fullWidth
-            InputLabelProps={{ shrink: true }}
-          />
-          <TextField
-            label="End (optional)"
-            type="datetime-local"
-            value={endAt}
-            onChange={(event) => setEndAt(event.target.value)}
-            fullWidth
-            InputLabelProps={{ shrink: true }}
-          />
+          <FormControl fullWidth>
+            <InputLabel id="proposal-privacy-label">Privacy</InputLabel>
+            <Select
+              labelId="proposal-privacy-label"
+              label="Privacy"
+              value={eventPrivacy}
+              onChange={(event) =>
+                setEventPrivacy(event.target.value as "open" | "private" | "super_private")
+              }
+            >
+              <MenuItem value="open">Open</MenuItem>
+              <MenuItem value="private">Private</MenuItem>
+              <MenuItem value="super_private">Super private</MenuItem>
+            </Select>
+          </FormControl>
+          {proposalType === "event" && (
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={isPoll}
+                  onChange={(event) => setIsPoll(event.target.checked)}
+                />
+              }
+              label="Time poll (multiple slot options)"
+            />
+          )}
+          <Typography variant="subtitle2">
+            {isPoll ? "Poll time slots" : "Time window"}
+          </Typography>
+          {slots.map((slot, index) => (
+            <Stack key={`slot-${index}`} spacing={1} sx={{ p: 1.5, border: 1, borderColor: "divider", borderRadius: 1 }}>
+              {isPoll && (
+                <TextField
+                  label={`Option ${index + 1} label`}
+                  value={slot.label}
+                  onChange={(event) => {
+                    const next = [...slots];
+                    next[index] = { ...next[index], label: event.target.value };
+                    setSlots(next);
+                  }}
+                  fullWidth
+                />
+              )}
+              <TextField
+                label="Start"
+                type="datetime-local"
+                value={slot.startAt}
+                onChange={(event) => {
+                  const next = [...slots];
+                  next[index] = { ...next[index], startAt: event.target.value };
+                  setSlots(next);
+                }}
+                fullWidth
+                InputLabelProps={{ shrink: true }}
+              />
+              <TextField
+                label="End (optional)"
+                type="datetime-local"
+                value={slot.endAt}
+                onChange={(event) => {
+                  const next = [...slots];
+                  next[index] = { ...next[index], endAt: event.target.value };
+                  setSlots(next);
+                }}
+                fullWidth
+                InputLabelProps={{ shrink: true }}
+              />
+            </Stack>
+          ))}
+          {isPoll && slots.length < 5 && (
+            <Button
+              size="small"
+              onClick={() => setSlots([...slots, { startAt: "", endAt: "", label: "" }])}
+            >
+              Add poll option
+            </Button>
+          )}
           <FormControl fullWidth>
             <InputLabel id="proposal-place-label">Location (optional)</InputLabel>
             <Select

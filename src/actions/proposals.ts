@@ -13,11 +13,13 @@ import { ensureDbReady } from "@/lib/db/ensure-ready";
 import {
   locationResidents,
   locations,
+  proposalComments,
   proposalInvitees,
   proposalStateLog,
   proposalTimeSlots,
   proposals,
   users,
+  type EventPrivacyLevel,
   type InviteeRole,
   type InviteeVoteStatus,
   type ProposalState,
@@ -44,8 +46,15 @@ const draftProposalSchema = z.object({
   locationId: z.string().optional(),
   notes: z.string().trim().max(500).optional(),
   intentionalSolo: z.boolean().optional(),
+  isPoll: z.boolean().optional(),
+  eventPrivacy: z.enum(["open", "private", "super_private"]).optional(),
   invitees: z.array(inviteeInputSchema).optional(),
   timeSlots: z.array(timeSlotInputSchema).max(10).optional(),
+});
+
+const commentSchema = z.object({
+  proposalId: z.string().min(1),
+  body: z.string().trim().min(1, "Comment cannot be empty.").max(2000),
 });
 
 const voteSchema = z.object({
@@ -107,14 +116,35 @@ export interface ProposalDetail {
   locationId: string | null;
   locationName: string | null;
   intentionalSolo: boolean;
+  isPoll: boolean;
+  eventPrivacy: EventPrivacyLevel;
   scheduledStartAt: string | null;
   scheduledEndAt: string | null;
   atRisk: boolean;
   invitees: ProposalInviteeView[];
   timeSlots: ProposalTimeSlotView[];
+  comments: ProposalCommentView[];
+  stateLog: ProposalStateLogView[];
   canEdit: boolean;
   canVote: boolean;
+  canComment: boolean;
+  canCancel: boolean;
+  canRedraft: boolean;
   viewerVoteStatus: InviteeVoteStatus | null;
+}
+
+export interface ProposalCommentView {
+  id: string;
+  authorName: string;
+  body: string;
+  createdAt: string;
+}
+
+export interface ProposalStateLogView {
+  action: string;
+  actorName: string | null;
+  details: string | null;
+  createdAt: string;
 }
 
 const APPROVING_VOTES: InviteeVoteStatus[] = ["accept", "abstain", "accept_suboptimal"];
@@ -149,6 +179,29 @@ function viewerCanSeeProposal(
   if (isAdmin) return true;
   if (proposerId === viewerId) return true;
   return inviteeUserIds.includes(viewerId);
+}
+
+/** Notifies proposer and all invitees on a proposal (PC-40). */
+async function notifyProposalStakeholders(
+  db: ReturnType<typeof getDb>,
+  proposal: typeof proposals.$inferSelect,
+  notificationType: string,
+  message: string,
+  extra?: Record<string, unknown>,
+): Promise<void> {
+  const invitees = await db
+    .select({ userId: proposalInvitees.userId })
+    .from(proposalInvitees)
+    .where(eq(proposalInvitees.proposalId, proposal.id));
+
+  const notifyIds = new Set<string>([proposal.proposerId, ...invitees.map((row) => row.userId)]);
+  for (const userId of notifyIds) {
+    await notifyUser(userId, notificationType, message, {
+      proposalId: proposal.id,
+      proposalTitle: proposal.title,
+      ...extra,
+    });
+  }
 }
 
 /**
@@ -536,6 +589,8 @@ export async function createDraftProposalAction(
   const now = new Date().toISOString();
   const proposalId = `prop-${randomUUID()}`;
   const intentionalSolo = Boolean(parsed.data.intentionalSolo);
+  const isPoll = Boolean(parsed.data.isPoll) || (parsed.data.timeSlots?.length ?? 0) > 1;
+  const eventPrivacy = parsed.data.eventPrivacy ?? "open";
 
   await db.insert(proposals).values({
     id: proposalId,
@@ -547,6 +602,8 @@ export async function createDraftProposalAction(
     locationId: parsed.data.locationId ?? null,
     notes: parsed.data.notes ?? null,
     intentionalSolo,
+    isPoll,
+    eventPrivacy,
     createdAt: now,
     updatedAt: now,
   });
@@ -606,6 +663,10 @@ export async function updateDraftProposalAction(
   }
 
   const now = new Date().toISOString();
+  const isPoll =
+    parsed.data.isPoll !== undefined
+      ? parsed.data.isPoll
+      : (parsed.data.timeSlots?.length ?? 0) > 1;
   await db
     .update(proposals)
     .set({
@@ -615,6 +676,8 @@ export async function updateDraftProposalAction(
       locationId: parsed.data.locationId ?? null,
       notes: parsed.data.notes ?? null,
       intentionalSolo: Boolean(parsed.data.intentionalSolo),
+      isPoll: Boolean(isPoll),
+      eventPrivacy: parsed.data.eventPrivacy ?? proposal.eventPrivacy,
       updatedAt: now,
     })
     .where(eq(proposals.id, proposal.id));
@@ -765,6 +828,8 @@ export async function getProposalDetailAction(
       locationId: proposals.locationId,
       locationName: locations.name,
       intentionalSolo: proposals.intentionalSolo,
+      isPoll: proposals.isPoll,
+      eventPrivacy: proposals.eventPrivacy,
       scheduledStartAt: proposals.scheduledStartAt,
       scheduledEndAt: proposals.scheduledEndAt,
       atRisk: proposals.atRisk,
@@ -809,6 +874,33 @@ export async function getProposalDetailAction(
 
   const viewerInvitee = inviteeRows.find((invitee) => invitee.userId === session.user.id);
 
+  const commentRows = await db
+    .select({
+      id: proposalComments.id,
+      body: proposalComments.body,
+      createdAt: proposalComments.createdAt,
+      authorName: users.displayName,
+    })
+    .from(proposalComments)
+    .innerJoin(users, eq(proposalComments.authorId, users.id))
+    .where(eq(proposalComments.proposalId, proposalId))
+    .orderBy(asc(proposalComments.createdAt));
+
+  const logRows = await db
+    .select({
+      action: proposalStateLog.action,
+      details: proposalStateLog.details,
+      createdAt: proposalStateLog.createdAt,
+      actorName: users.displayName,
+    })
+    .from(proposalStateLog)
+    .leftJoin(users, eq(proposalStateLog.actorUserId, users.id))
+    .where(eq(proposalStateLog.proposalId, proposalId))
+    .orderBy(asc(proposalStateLog.createdAt));
+
+  const isProposer = row.proposerId === session.user.id;
+  const canManage = isProposer || isAdmin;
+
   return {
     ok: true,
     message: "Loaded.",
@@ -824,6 +916,8 @@ export async function getProposalDetailAction(
       locationId: row.locationId ?? null,
       locationName: row.locationName ?? null,
       intentionalSolo: row.intentionalSolo,
+      isPoll: row.isPoll,
+      eventPrivacy: row.eventPrivacy,
       scheduledStartAt: row.scheduledStartAt ?? null,
       scheduledEndAt: row.scheduledEndAt ?? null,
       atRisk: row.atRisk,
@@ -839,11 +933,29 @@ export async function getProposalDetailAction(
         endAt: slot.endAt ?? null,
         label: slot.label ?? null,
       })),
-      canEdit: row.state === "draft" && row.proposerId === session.user.id,
+      comments: commentRows.map((comment) => ({
+        id: comment.id,
+        authorName: comment.authorName,
+        body: comment.body,
+        createdAt: comment.createdAt,
+      })),
+      stateLog: logRows.map((entry) => ({
+        action: entry.action,
+        actorName: entry.actorName ?? null,
+        details: entry.details ?? null,
+        createdAt: entry.createdAt,
+      })),
+      canEdit: row.state === "draft" && isProposer,
       canVote:
         row.state === "proposed" &&
         viewerInvitee !== undefined &&
         viewerInvitee.voteStatus === "not_seen",
+      canComment:
+        row.state !== "draft" &&
+        row.state !== "archived" &&
+        viewerCanSeeProposal(session.user.id, isAdmin, row.proposerId, inviteeUserIds),
+      canCancel: canManage && (row.state === "proposed" || row.state === "resolved"),
+      canRedraft: isProposer && row.state === "resolved",
       viewerVoteStatus: viewerInvitee?.voteStatus ?? null,
     },
   };
@@ -954,6 +1066,7 @@ export async function deleteDraftProposalAction(
 
   await db.delete(proposalTimeSlots).where(eq(proposalTimeSlots.proposalId, proposalId));
   await db.delete(proposalInvitees).where(eq(proposalInvitees.proposalId, proposalId));
+  await db.delete(proposalComments).where(eq(proposalComments.proposalId, proposalId));
   await db.delete(proposalStateLog).where(eq(proposalStateLog.proposalId, proposalId));
   await db.delete(proposals).where(eq(proposals.id, proposalId));
 
@@ -961,4 +1074,144 @@ export async function deleteDraftProposalAction(
   revalidatePath("/proposals");
 
   return { ok: true, message: "Draft deleted." };
+}
+
+/**
+ * Adds a comment on a visible proposal (PC-40).
+ */
+export async function addProposalCommentAction(
+  input: z.infer<typeof commentSchema>,
+): Promise<{ ok: boolean; message: string }> {
+  const session = await auth();
+  if (!session?.user) {
+    return { ok: false, message: "Sign in required." };
+  }
+
+  const parsed = commentSchema.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, message: parsed.error.issues[0]?.message ?? "Invalid comment." };
+  }
+
+  await ensureDbReady();
+  const db = getDb();
+  const detail = await getProposalDetailAction(parsed.data.proposalId);
+  if (!detail.ok || !detail.detail?.canComment) {
+    return { ok: false, message: "You cannot comment on this proposal." };
+  }
+
+  const now = new Date().toISOString();
+  await db.insert(proposalComments).values({
+    id: `pc-${randomUUID()}`,
+    proposalId: parsed.data.proposalId,
+    authorId: session.user.id,
+    body: parsed.data.body,
+    createdAt: now,
+  });
+
+  await logProposalTransition(db, parsed.data.proposalId, session.user.id, "proposal.comment_added");
+  revalidatePath("/proposals");
+
+  return { ok: true, message: "Comment added." };
+}
+
+/**
+ * Archives a proposed or resolved proposal (proposer or admin, PC-40).
+ */
+export async function cancelProposalAction(
+  proposalId: string,
+): Promise<{ ok: boolean; message: string }> {
+  const session = await auth();
+  if (!session?.user) {
+    return { ok: false, message: "Sign in required." };
+  }
+
+  await ensureDbReady();
+  const db = getDb();
+  const [proposal] = await db
+    .select()
+    .from(proposals)
+    .where(eq(proposals.id, proposalId))
+    .limit(1);
+
+  if (!proposal || (proposal.state !== "proposed" && proposal.state !== "resolved")) {
+    return { ok: false, message: "Proposal cannot be cancelled." };
+  }
+
+  const isAdmin = await userHasAdminAccess(session.user.role);
+  if (proposal.proposerId !== session.user.id && !isAdmin) {
+    return { ok: false, message: "Only the proposer or an admin can cancel." };
+  }
+
+  const now = new Date().toISOString();
+  await db
+    .update(proposals)
+    .set({
+      state: "archived",
+      scheduledStartAt: null,
+      scheduledEndAt: null,
+      atRisk: false,
+      updatedAt: now,
+    })
+    .where(eq(proposals.id, proposalId));
+
+  await logProposalTransition(db, proposalId, session.user.id, "proposal.cancelled");
+  await notifyProposalStakeholders(
+    db,
+    proposal,
+    "proposal_cancelled",
+    `Proposal "${proposal.title}" was cancelled.`,
+  );
+
+  revalidatePath("/proposals");
+  revalidatePath("/schedule");
+
+  return { ok: true, message: "Proposal cancelled and archived." };
+}
+
+/**
+ * Moves a resolved proposal back to drafts with an at-risk calendar flag (PC-40).
+ */
+export async function redraftProposalAction(
+  proposalId: string,
+): Promise<{ ok: boolean; message: string }> {
+  const session = await auth();
+  if (!session?.user) {
+    return { ok: false, message: "Sign in required." };
+  }
+
+  await ensureDbReady();
+  const db = getDb();
+  const [proposal] = await db
+    .select()
+    .from(proposals)
+    .where(eq(proposals.id, proposalId))
+    .limit(1);
+
+  if (!proposal || proposal.state !== "resolved" || proposal.proposerId !== session.user.id) {
+    return { ok: false, message: "Proposal cannot be re-drafted." };
+  }
+
+  const now = new Date().toISOString();
+  await db
+    .update(proposals)
+    .set({
+      state: "draft",
+      atRisk: true,
+      updatedAt: now,
+    })
+    .where(eq(proposals.id, proposalId));
+
+  await resetInviteeVotes(db, proposalId);
+  await logProposalTransition(db, proposalId, session.user.id, "proposal.redrafted");
+  await notifyProposalStakeholders(
+    db,
+    proposal,
+    "proposal_redrafted",
+    `Proposal "${proposal.title}" was moved back to drafts for editing.`,
+  );
+
+  revalidatePath("/proposals");
+  revalidatePath("/schedule");
+
+  return { ok: true, message: "Proposal moved to drafts. Calendar entry flagged at-risk until resubmitted." };
 }

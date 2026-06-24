@@ -50,6 +50,16 @@ export async function applyProposalsMigrations(sql: Client): Promise<void> {
       created_at TEXT NOT NULL
     );
   `);
+
+  await sql.execute(`
+    CREATE TABLE IF NOT EXISTS proposal_comments (
+      id TEXT PRIMARY KEY NOT NULL,
+      proposal_id TEXT NOT NULL REFERENCES proposals(id),
+      author_id TEXT NOT NULL REFERENCES users(id),
+      body TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    );
+  `);
 }
 
 async function ensureColumn(
