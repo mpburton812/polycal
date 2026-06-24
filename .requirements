@@ -51,3 +51,4 @@
 2026-06-24 | cc9fed8 | PC-8 | admin tab, profile gaps, passive activation and onboarding | src/actions/admin.ts
 2026-06-24 | 9e5e40e | PC-8 | admin tab, profile gaps, passive activation and onboarding | src/actions/admin.ts
 2026-06-24 | f175bec | PC-8 | refine admin user mgmt, people UX, and onboarding welcome | src/actions/admin.ts
+2026-06-24 | 24de1f6 | PC-35 | fix people/places UX and first-login password | src/actions/places.ts

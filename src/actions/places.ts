@@ -33,6 +33,7 @@ export interface PlaceSummary {
   bedroomNames: string[];
   residentCount: number;
   residents: ResidentView[];
+  createdById: string | null;
 }
 
 export interface ResidentView {
@@ -126,6 +127,7 @@ export async function listPlacesAction(): Promise<PlaceSummary[]> {
       residentCount: placeResidents.filter((resident) => resident.status === "accepted")
         .length,
       residents: mapResidentRows(placeResidents, viewerId),
+      createdById: row.createdById ?? null,
     };
   });
 }
@@ -167,6 +169,17 @@ export async function createPlaceAction(
     createdById: session.user.id,
     createdAt: now,
     updatedAt: now,
+  });
+
+  await db.insert(locationResidents).values({
+    id: `lr-${randomUUID()}`,
+    locationId: placeId,
+    userId: session.user.id,
+    status: "accepted",
+    proposedById: session.user.id,
+    createdAt: now,
+    updatedAt: now,
+    respondedAt: now,
   });
 
   await logUserActivity(session.user.id, "places.create", placeId);
@@ -211,8 +224,8 @@ export async function updatePlaceAction(
   input: z.infer<typeof updatePlaceSchema>,
 ): Promise<{ ok: boolean; message: string }> {
   const session = await auth();
-  if (!session?.user || session.user.role !== "admin") {
-    return { ok: false, message: "Admin access required." };
+  if (!session?.user) {
+    return { ok: false, message: "Sign in required." };
   }
 
   const parsed = updatePlaceSchema.safeParse(input);
@@ -229,6 +242,11 @@ export async function updatePlaceAction(
     .limit(1);
   if (!place) {
     return { ok: false, message: "Place not found." };
+  }
+
+  const isAdmin = await userHasAdminAccess(session.user.role);
+  if (!isAdmin && place.createdById !== session.user.id) {
+    return { ok: false, message: "You can only edit places you created." };
   }
 
   if (await isPlaceNameTaken(db, parsed.data.name, parsed.data.placeId)) {
@@ -307,6 +325,11 @@ export async function proposeResidencyAction(
   const [target] = await db.select().from(users).where(eq(users.id, targetUserId)).limit(1);
   if (!place || !target || target.status !== "active") {
     return { ok: false, message: "Place or user not found." };
+  }
+
+  const isAdmin = await userHasAdminAccess(session.user.role);
+  if (!isAdmin && place.createdById !== session.user.id) {
+    return { ok: false, message: "You cannot associate with this place." };
   }
 
   const [existing] = await db

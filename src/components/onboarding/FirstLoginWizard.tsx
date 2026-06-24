@@ -28,6 +28,7 @@ import { completeOnboardingAction } from "@/actions/onboarding";
 import { proposePartnershipAction } from "@/actions/partnerships";
 import {
   changePasswordAction,
+  setInitialPasswordAction,
   updateNotificationPrefsAction,
   updateProfilePreferencesAction,
 } from "@/actions/profile";
@@ -83,8 +84,11 @@ export function FirstLoginWizard({
     event.preventDefault();
     setError(null);
     const formData = new FormData(event.currentTarget);
+
     startTransition(async () => {
-      const result = await changePasswordAction(formData);
+      const result = mustChangePassword
+        ? await setInitialPasswordAction(formData)
+        : await changePasswordAction(formData);
       if (!result.ok) {
         setError(result.error);
         return;
@@ -184,13 +188,15 @@ export function FirstLoginWizard({
       {activeStep === 0 && (
         <Box component="form" onSubmit={handlePasswordSubmit}>
           <Stack spacing={2}>
-            <TextField
-              name="currentPassword"
-              label="Current password"
-              type="password"
-              required
-              fullWidth
-            />
+            {!mustChangePassword && (
+              <TextField
+                name="currentPassword"
+                label="Current password"
+                type="password"
+                required
+                fullWidth
+              />
+            )}
             <TextField
               name="newPassword"
               label="New password"
