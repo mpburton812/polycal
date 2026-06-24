@@ -1,4 +1,4 @@
-# .requirements — PolyCal requirement traceability log
+﻿# .requirements â€” PolyCal requirement traceability log
 #
 # Full workflow: docs/REQUIREMENTS-WORKFLOW.md
 #
@@ -30,7 +30,7 @@
 2026-06-18 | f2e64c4 | PC-5 | require GitHub PR for feature to dev promotion | .cursorrules
 2026-06-18 | 335f798 | PC-5 | add merge feature shortcut for dev promotion | README.md
 2026-06-18 | 0ce8a0a | PC-5 | Windows compatibility for merge-feature CLI | scripts/merge-feature.ts
-2026-06-23 | ef2bd2a | PC-20 | Phase 0 scaffold — shell, auth, DB, dev bar, PWA | src/actions/dev.ts
+2026-06-23 | ef2bd2a | PC-20 | Phase 0 scaffold â€” shell, auth, DB, dev bar, PWA | src/actions/dev.ts
 2026-06-23 | ca48194 | PC-20 | resolve npm audit findings via overrides | package.json
 2026-06-23 | 316265c | PC-20 | add workflow config for PC Jira project | .workflow.json
 2026-06-23 | d1b8107 | PC-21 | edge-safe middleware for Vercel deploy | src/lib/auth.config.ts
@@ -46,3 +46,4 @@
 2026-06-23 | afc8be2 | PC-35 | People and Places UX and admin force reload | src/actions/admin.ts
 2026-06-23 | 79fc854 | PC-35 | use static z-index in AppShell sticky header | src/components/layout/AppShell.tsx
 2026-06-24 | f83a76c | PC-35 | correct username availability validation and error messages | src/actions/users.ts
+2026-06-24 | d23d1a1 | PC-35 | lock add-person dialog after create and add admin user edit/delete | src/actions/users.ts

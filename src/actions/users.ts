@@ -2,7 +2,7 @@
 
 import { hash } from "bcryptjs";
 import { randomUUID } from "node:crypto";
-import { asc, eq } from "drizzle-orm";
+import { asc, eq, or } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
@@ -10,7 +10,14 @@ import { auth } from "@/lib/auth";
 import { logUserActivity } from "@/lib/audit";
 import { getDb } from "@/lib/db/client";
 import { ensureDbReady } from "@/lib/db/ensure-ready";
-import { polyGroup, users, type UserRole } from "@/lib/db/schema";
+import {
+  locationResidents,
+  polyGroup,
+  proposals,
+  sleepingPartnerships,
+  users,
+  type UserRole,
+} from "@/lib/db/schema";
 import {
   buildLoginInstructions,
   generateTemporaryPassword,
@@ -62,6 +69,22 @@ export interface CreateUserResult {
   loginInstructions?: string;
   temporaryPassword?: string;
   userId?: string;
+}
+
+export interface UserActionResult {
+  ok: boolean;
+  message: string;
+}
+
+/**
+ * Ensures the caller is an admin; used for user lifecycle management.
+ */
+async function requireAdminSession() {
+  const session = await auth();
+  if (!session?.user || session.user.role !== "admin") {
+    return null;
+  }
+  return session;
 }
 
 /**
@@ -213,6 +236,7 @@ const updateProvisionedUsernameSchema = z.object({
  */
 export async function checkUsernameAvailableAction(
   username: string,
+  excludeUserId?: string,
 ): Promise<{ available: boolean; message: string }> {
   const parsed = usernameSchema.safeParse(username);
   if (!parsed.success) {
@@ -231,7 +255,7 @@ export async function checkUsernameAvailableAction(
     .where(eq(users.username, normalized))
     .limit(1);
 
-  if (existing) {
+  if (existing && existing.id !== excludeUserId) {
     return { available: false, message: "Username is already in use." };
   }
 
@@ -349,6 +373,152 @@ export async function createPassiveUserAction(
     message: `Created passive profile ${parsed.data.displayName}.`,
     userId,
   };
+}
+
+const adminUpdateUserSchema = z.object({
+  userId: z.string().min(1, "User id is required."),
+  displayName: z
+    .string()
+    .trim()
+    .min(1, "Display name is required.")
+    .max(80, "Display name must be 80 characters or fewer."),
+  avatarKey: z.string().optional(),
+  role: z.enum(["admin", "user"]).optional(),
+  username: usernameSchema.optional(),
+});
+
+/**
+ * Updates any network member (admin only, PC-35).
+ */
+export async function updateUserAction(
+  input: z.infer<typeof adminUpdateUserSchema>,
+): Promise<UserActionResult> {
+  const session = await requireAdminSession();
+  if (!session) {
+    return { ok: false, message: "Admin access required." };
+  }
+
+  const parsed = adminUpdateUserSchema.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, message: formatZodError(parsed.error) };
+  }
+
+  await ensureDbReady();
+  const db = getDb();
+  const [user] = await db
+    .select()
+    .from(users)
+    .where(eq(users.id, parsed.data.userId))
+    .limit(1);
+
+  if (!user || user.status !== "active") {
+    return { ok: false, message: "User not found." };
+  }
+
+  const now = new Date().toISOString();
+  const updates: {
+    displayName: string;
+    avatarKey?: string;
+    role?: "admin" | "user";
+    username?: string;
+    updatedAt: string;
+  } = {
+    displayName: parsed.data.displayName,
+    updatedAt: now,
+  };
+
+  if (parsed.data.avatarKey) {
+    updates.avatarKey = parsed.data.avatarKey;
+  }
+
+  if (user.role !== "passive") {
+    if (parsed.data.role) {
+      updates.role = parsed.data.role;
+    }
+    if (parsed.data.username) {
+      const username = parsed.data.username.toLowerCase();
+      const availability = await checkUsernameAvailableAction(username, user.id);
+      if (!availability.available) {
+        return { ok: false, message: availability.message };
+      }
+      updates.username = username;
+    }
+  }
+
+  await db.update(users).set(updates).where(eq(users.id, user.id));
+
+  await logUserActivity(
+    session.user.id,
+    "users.admin_update",
+    JSON.stringify({ userId: user.id, updates }),
+  );
+
+  revalidatePath("/people-places");
+  revalidatePath("/admin");
+  revalidatePath("/api/dev/users");
+  revalidatePath("/profile");
+
+  return { ok: true, message: `Updated ${parsed.data.displayName}.` };
+}
+
+/**
+ * Soft-deletes a user and removes their graph edges (admin only, PC-35).
+ */
+export async function deleteUserAction(userId: string): Promise<UserActionResult> {
+  const session = await requireAdminSession();
+  if (!session) {
+    return { ok: false, message: "Admin access required." };
+  }
+
+  if (userId === session.user.id) {
+    return { ok: false, message: "You cannot delete your own account." };
+  }
+
+  await ensureDbReady();
+  const db = getDb();
+  const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+  if (!user || user.status !== "active") {
+    return { ok: false, message: "User not found." };
+  }
+
+  await db
+    .delete(sleepingPartnerships)
+    .where(
+      or(
+        eq(sleepingPartnerships.userLowId, userId),
+        eq(sleepingPartnerships.userHighId, userId),
+        eq(sleepingPartnerships.proposedById, userId),
+      ),
+    );
+
+  await db
+    .delete(locationResidents)
+    .where(
+      or(
+        eq(locationResidents.userId, userId),
+        eq(locationResidents.proposedById, userId),
+      ),
+    );
+
+  await db.delete(proposals).where(eq(proposals.proposerId, userId));
+
+  const now = new Date().toISOString();
+  await db
+    .update(users)
+    .set({ status: "deleted", updatedAt: now })
+    .where(eq(users.id, userId));
+
+  await logUserActivity(
+    session.user.id,
+    "users.admin_delete",
+    JSON.stringify({ userId, username: user.username }),
+  );
+
+  revalidatePath("/people-places");
+  revalidatePath("/admin");
+  revalidatePath("/api/dev/users");
+
+  return { ok: true, message: `Deleted ${user.displayName}.` };
 }
 
 export async function getProvisioningPolicyAction(): Promise<{
