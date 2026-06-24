@@ -5,6 +5,7 @@ import { listPlacesAction } from "@/actions/places";
 import { listPeopleAction, getProvisioningPolicyAction } from "@/actions/users";
 import { PeoplePlacesClient } from "@/components/people-places/PeoplePlacesClient";
 import { auth } from "@/lib/auth";
+import { userHasAdminAccess } from "@/lib/admin-access";
 
 export default async function PeoplePlacesPage() {
   const session = await auth();
@@ -12,10 +13,11 @@ export default async function PeoplePlacesPage() {
     redirect("/login");
   }
 
-  const [people, places, policy] = await Promise.all([
+  const [people, places, policy, hasAdminAccess] = await Promise.all([
     listPeopleAction(),
     listPlacesAction(),
     getProvisioningPolicyAction(),
+    userHasAdminAccess(session.user.role),
   ]);
 
   return (
@@ -31,7 +33,7 @@ export default async function PeoplePlacesPage() {
         places={places}
         currentUserId={session.user.id}
         canProvision={policy.canProvision}
-        isAdmin={policy.isAdmin}
+        isAdmin={hasAdminAccess}
       />
     </>
   );

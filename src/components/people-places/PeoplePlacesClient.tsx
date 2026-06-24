@@ -24,6 +24,8 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState, useTransition } from "react";
 
 import {
+  activatePassiveUserAction,
+  adminResetPasswordAction,
   checkUsernameAvailableAction,
   createActiveUserAction,
   createPassiveUserAction,
@@ -319,12 +321,14 @@ function PersonDetail({
   people,
   currentUserId,
   isAdmin,
+  canProvision,
   onUserDeleted,
 }: {
   person: PersonSummary;
   people: PersonSummary[];
   currentUserId: string;
   isAdmin: boolean;
+  canProvision: boolean;
   onUserDeleted: () => void;
 }) {
   const router = useRouter();
@@ -344,6 +348,15 @@ function PersonDetail({
     available: boolean;
     message: string;
   }>({ checked: false, available: false, message: "" });
+  const [activateOpen, setActivateOpen] = useState(false);
+  const [activateUsername, setActivateUsername] = useState("");
+  const [activateRole, setActivateRole] = useState<"user" | "admin">("user");
+  const [activateUsernameStatus, setActivateUsernameStatus] = useState<{
+    checked: boolean;
+    available: boolean;
+    message: string;
+  }>({ checked: false, available: false, message: "" });
+  const [credentials, setCredentials] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
   const candidates = useMemo(
@@ -383,10 +396,52 @@ function PersonDetail({
     });
   }
 
+  function checkActivateUsername() {
+    if (!activateUsername.trim()) {
+      setActivateUsernameStatus({ checked: false, available: false, message: "" });
+      return;
+    }
+    startTransition(async () => {
+      const result = await checkUsernameAvailableAction(activateUsername);
+      setActivateUsernameStatus({
+        checked: true,
+        available: result.available,
+        message: result.message,
+      });
+    });
+  }
+
   return (
     <Stack spacing={1.5} sx={{ mt: 2 }}>
+      {credentials && (
+        <Alert severity="success">
+          <Typography variant="body2" sx={{ whiteSpace: "pre-wrap", mb: 1 }}>
+            {credentials}
+          </Typography>
+          <Button
+            size="small"
+            onClick={() => void navigator.clipboard.writeText(credentials)}
+          >
+            Copy instructions
+          </Button>
+        </Alert>
+      )}
+      {person.role === "passive" && canProvision && (
+        <Button
+          size="small"
+          variant="contained"
+          onClick={() => {
+            setActivateUsername("");
+            setActivateRole("user");
+            setActivateUsernameStatus({ checked: false, available: false, message: "" });
+            setActivateOpen(true);
+          }}
+        >
+          Activate passive user
+        </Button>
+      )}
       {isAdmin && (
-        <Stack direction="row" spacing={1}>
+        <Stack direction="row" spacing={1} flexWrap="wrap">
           <Button
             size="small"
             variant="outlined"
@@ -405,6 +460,23 @@ function PersonDetail({
           >
             Edit user
           </Button>
+          {person.role !== "passive" && (
+            <Button
+              size="small"
+              variant="outlined"
+              onClick={() =>
+                startTransition(async () => {
+                  const result = await adminResetPasswordAction({ userId: person.id });
+                  setMessage(result.message);
+                  if (result.loginInstructions) {
+                    setCredentials(result.loginInstructions);
+                  }
+                })
+              }
+            >
+              Reset password
+            </Button>
+          )}
           <Button
             size="small"
             color="error"
@@ -644,6 +716,75 @@ function PersonDetail({
             }
           >
             Save
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={activateOpen} onClose={() => setActivateOpen(false)} fullWidth maxWidth="sm">
+        <DialogTitle>Activate passive user</DialogTitle>
+        <DialogContent>
+          <Stack spacing={2} sx={{ mt: 1 }}>
+            <Typography variant="body2" color="text.secondary">
+              Convert {person.displayName} to an active user with login credentials.
+              Previously auto-accepted partnerships will require formal acceptance on first login.
+            </Typography>
+            <TextField
+              label="Username"
+              value={activateUsername}
+              onChange={(e) => {
+                setActivateUsername(e.target.value);
+                setActivateUsernameStatus({ checked: false, available: false, message: "" });
+              }}
+              onBlur={() => checkActivateUsername()}
+              required
+              fullWidth
+              error={activateUsernameStatus.checked && !activateUsernameStatus.available}
+              helperText={
+                activateUsernameStatus.checked
+                  ? activateUsernameStatus.message
+                  : "Availability is checked when you leave this field."
+              }
+            />
+            <FormControl fullWidth>
+              <InputLabel id={`activate-role-${person.id}`}>Role</InputLabel>
+              <Select
+                labelId={`activate-role-${person.id}`}
+                label="Role"
+                value={activateRole}
+                onChange={(e) => setActivateRole(e.target.value as "user" | "admin")}
+              >
+                <MenuItem value="user">User</MenuItem>
+                <MenuItem value="admin">Admin</MenuItem>
+              </Select>
+            </FormControl>
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setActivateOpen(false)}>Cancel</Button>
+          <Button
+            variant="contained"
+            disabled={
+              pending ||
+              !activateUsernameStatus.checked ||
+              !activateUsernameStatus.available
+            }
+            onClick={() =>
+              startTransition(async () => {
+                const result = await activatePassiveUserAction({
+                  userId: person.id,
+                  username: activateUsername,
+                  role: activateRole,
+                });
+                setMessage(result.message);
+                if (result.ok && result.loginInstructions) {
+                  setCredentials(result.loginInstructions);
+                  setActivateOpen(false);
+                  router.refresh();
+                }
+              })
+            }
+          >
+            Activate
           </Button>
         </DialogActions>
       </Dialog>
@@ -968,6 +1109,7 @@ export function PeoplePlacesClient({
                   people={people}
                   currentUserId={currentUserId}
                   isAdmin={isAdmin}
+                  canProvision={canProvision}
                   onUserDeleted={() => setSelectedPersonId(null)}
                 />
               )}

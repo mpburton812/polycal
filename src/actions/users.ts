@@ -2,7 +2,7 @@
 
 import { hash } from "bcryptjs";
 import { randomUUID } from "node:crypto";
-import { asc, eq, or } from "drizzle-orm";
+import { asc, eq, ne, or } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
@@ -61,6 +61,17 @@ export interface PersonSummary {
   role: UserRole;
   status: string;
   avatarKey: string | null;
+}
+
+export interface AdminUserRow {
+  id: string;
+  displayName: string;
+  username: string;
+  gender: string | null;
+  role: UserRole;
+  status: string;
+  lastLoginAt: string | null;
+  loginCount: number;
 }
 
 export interface CreateUserResult {
@@ -202,6 +213,7 @@ export async function createActiveUserAction(
     avatarKey: parsed.data.avatarKey ?? "bird_blue",
     theme: "mint",
     loginCount: 0,
+    onboardingComplete: false,
     createdAt: now,
     updatedAt: now,
   });
@@ -505,7 +517,16 @@ export async function deleteUserAction(userId: string): Promise<UserActionResult
   const now = new Date().toISOString();
   await db
     .update(users)
-    .set({ status: "deleted", updatedAt: now })
+    .set({
+      status: "deleted",
+      displayName: "Former User",
+      username: `deleted-${userId.slice(-8)}`,
+      passwordHash: await hash(randomUUID(), 12),
+      notificationEmail: null,
+      emailVerifiedAt: null,
+      sessionVersion: user.sessionVersion + 1,
+      updatedAt: now,
+    })
     .where(eq(users.id, userId));
 
   await logUserActivity(
@@ -519,6 +540,231 @@ export async function deleteUserAction(userId: string): Promise<UserActionResult
   revalidatePath("/api/dev/users");
 
   return { ok: true, message: `Deleted ${user.displayName}.` };
+}
+
+/**
+ * Lists users for the admin management table (PC-31).
+ */
+export async function listAdminUsersAction(): Promise<AdminUserRow[]> {
+  const session = await requireAdminSession();
+  if (!session) return [];
+
+  await ensureDbReady();
+  const db = getDb();
+  const rows = await db
+    .select({
+      id: users.id,
+      displayName: users.displayName,
+      username: users.username,
+      gender: users.gender,
+      role: users.role,
+      status: users.status,
+      lastLoginAt: users.lastLoginAt,
+      loginCount: users.loginCount,
+    })
+    .from(users)
+    .where(ne(users.status, "deleted"))
+    .orderBy(asc(users.displayName));
+
+  return rows;
+}
+
+/**
+ * Pauses a user account and invalidates active sessions (PC-31).
+ */
+export async function pauseUserAction(userId: string): Promise<UserActionResult> {
+  const session = await requireAdminSession();
+  if (!session) return { ok: false, message: "Admin access required." };
+  if (userId === session.user.id) {
+    return { ok: false, message: "You cannot pause your own account." };
+  }
+
+  await ensureDbReady();
+  const db = getDb();
+  const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+  if (!user || user.status !== "active") {
+    return { ok: false, message: "User not found or not active." };
+  }
+
+  const now = new Date().toISOString();
+  await db
+    .update(users)
+    .set({
+      status: "paused",
+      sessionVersion: user.sessionVersion + 1,
+      updatedAt: now,
+    })
+    .where(eq(users.id, userId));
+
+  await logUserActivity(session.user.id, "users.admin_pause", JSON.stringify({ userId }));
+  revalidatePath("/admin");
+  revalidatePath("/people-places");
+  return { ok: true, message: `Paused ${user.displayName}.` };
+}
+
+/**
+ * Resumes a paused user account (PC-31).
+ */
+export async function resumeUserAction(userId: string): Promise<UserActionResult> {
+  const session = await requireAdminSession();
+  if (!session) return { ok: false, message: "Admin access required." };
+
+  await ensureDbReady();
+  const db = getDb();
+  const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+  if (!user || user.status !== "paused") {
+    return { ok: false, message: "User is not paused." };
+  }
+
+  const now = new Date().toISOString();
+  await db
+    .update(users)
+    .set({ status: "active", updatedAt: now })
+    .where(eq(users.id, userId));
+
+  await logUserActivity(session.user.id, "users.admin_resume", JSON.stringify({ userId }));
+  revalidatePath("/admin");
+  revalidatePath("/people-places");
+  return { ok: true, message: `Resumed ${user.displayName}.` };
+}
+
+const adminResetPasswordSchema = z.object({
+  userId: z.string().min(1),
+});
+
+/**
+ * Resets an active user's password and returns clipboard instructions (PC-10).
+ */
+export async function adminResetPasswordAction(
+  input: z.infer<typeof adminResetPasswordSchema>,
+): Promise<CreateUserResult> {
+  const session = await requireAdminSession();
+  if (!session) return { ok: false, message: "Admin access required." };
+
+  const parsed = adminResetPasswordSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, message: "Invalid input." };
+
+  await ensureDbReady();
+  const db = getDb();
+  const [user] = await db
+    .select()
+    .from(users)
+    .where(eq(users.id, parsed.data.userId))
+    .limit(1);
+
+  if (!user || user.role === "passive" || user.status !== "active") {
+    return { ok: false, message: "Active user not found." };
+  }
+
+  const tempPassword = generateTemporaryPassword();
+  const passwordHash = await hash(tempPassword, 12);
+  const now = new Date().toISOString();
+
+  await db
+    .update(users)
+    .set({
+      passwordHash,
+      mustChangePassword: true,
+      sessionVersion: user.sessionVersion + 1,
+      updatedAt: now,
+    })
+    .where(eq(users.id, user.id));
+
+  await logUserActivity(
+    session.user.id,
+    "users.admin_reset_password",
+    JSON.stringify({ userId: user.id }),
+  );
+
+  revalidatePath("/admin");
+  revalidatePath("/people-places");
+
+  return {
+    ok: true,
+    message: `Password reset for ${user.displayName}. Copy instructions to share securely.`,
+    userId: user.id,
+    temporaryPassword: tempPassword,
+    loginInstructions: buildLoginInstructions({
+      username: user.username,
+      password: tempPassword,
+    }),
+  };
+}
+
+const activatePassiveSchema = z.object({
+  userId: z.string().min(1),
+  username: usernameSchema,
+  role: z.enum(["admin", "user"]).default("user"),
+});
+
+/**
+ * Converts a passive profile into an active user with login credentials (PC-10).
+ */
+export async function activatePassiveUserAction(
+  input: z.infer<typeof activatePassiveSchema>,
+): Promise<CreateUserResult> {
+  if (!(await canProvisionUsers())) {
+    return { ok: false, message: "You do not have permission to activate users." };
+  }
+
+  const session = await auth();
+  const parsed = activatePassiveSchema.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, message: formatZodError(parsed.error) };
+  }
+
+  await ensureDbReady();
+  const db = getDb();
+  const [user] = await db
+    .select()
+    .from(users)
+    .where(eq(users.id, parsed.data.userId))
+    .limit(1);
+
+  if (!user || user.role !== "passive" || user.status !== "active") {
+    return { ok: false, message: "Passive profile not found." };
+  }
+
+  const username = parsed.data.username.toLowerCase();
+  const availability = await checkUsernameAvailableAction(username);
+  if (!availability.available) {
+    return { ok: false, message: availability.message };
+  }
+
+  const tempPassword = generateTemporaryPassword();
+  const passwordHash = await hash(tempPassword, 12);
+  const now = new Date().toISOString();
+
+  await db
+    .update(users)
+    .set({
+      username,
+      passwordHash,
+      role: parsed.data.role,
+      mustChangePassword: true,
+      onboardingComplete: false,
+      activatedFromPassiveAt: now,
+      updatedAt: now,
+    })
+    .where(eq(users.id, user.id));
+
+  await logUserActivity(
+    session?.user?.id ?? null,
+    "users.activate_passive",
+    JSON.stringify({ userId: user.id, username }),
+  );
+
+  revalidatePath("/people-places");
+  revalidatePath("/admin");
+  revalidatePath("/api/dev/users");
+
+  return {
+    ok: true,
+    message: `Activated ${user.displayName} as an active user.`,
+    userId: user.id,
+    temporaryPassword: tempPassword,
+    loginInstructions: buildLoginInstructions({ username, password: tempPassword }),
+  };
 }
 
 export async function getProvisioningPolicyAction(): Promise<{
