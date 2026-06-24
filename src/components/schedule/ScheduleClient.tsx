@@ -118,6 +118,12 @@ export function ScheduleClient({
     saveScheduleViewState(viewState);
   }, [viewState]);
 
+  useEffect(() => {
+    const monday = startOfWeekMonday(new Date(initialWeekStartIso));
+    setViewState((current) => ({ ...current, weekStartIso: monday.toISOString() }));
+    setPayload(initialPayload);
+  }, [initialWeekStartIso, initialPayload]);
+
   const filteredEvents = useMemo(
     () =>
       filterScheduleEvents(

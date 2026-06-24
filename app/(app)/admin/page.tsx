@@ -11,7 +11,7 @@ import { AdminTestDataPanel } from "@/components/admin/AdminTestDataPanel";
 import { AdminUserManagementPanel } from "@/components/admin/AdminUserManagementPanel";
 import { auth } from "@/lib/auth";
 import { userHasAdminAccess } from "@/lib/admin-access";
-import { getAppEnvironment, getBuildBranch, getBuildSha, isNonProductionEnvironment } from "@/lib/env";
+import { isNonProductionEnvironment } from "@/lib/env";
 
 export default async function AdminPage() {
   const session = await auth();
@@ -34,15 +34,8 @@ export default async function AdminPage() {
       <Typography variant="h5" component="h1" gutterBottom>
         Admin
       </Typography>
-      <Typography color="text.secondary" sx={{ mb: 3 }}>
-        Poly group settings, user management, and system log (PC-30–32).
-      </Typography>
       <Stack spacing={3}>
-        <AdminForceReloadPanel
-          environment={getAppEnvironment()}
-          buildSha={getBuildSha()}
-          buildBranch={getBuildBranch()}
-        />
+        <AdminForceReloadPanel />
         <AdminPolyGroupSettingsPanel initialSettings={settings} />
         <AdminUserManagementPanel users={adminUsers} currentUserId={session.user.id} />
         <AdminActivityLogPanel entries={logEntries} />

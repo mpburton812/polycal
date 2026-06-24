@@ -51,7 +51,7 @@ const recurrenceRuleSchema = z.object({
 
 const draftProposalSchema = z.object({
   title: z.string().trim().min(1, "Title is required.").max(200),
-  description: z.string().trim().min(1, "Description is required.").max(2000),
+  description: z.string().trim().max(2000).optional(),
   proposalType: z.enum(["event", "sleeping"]),
   locationId: z.string().optional(),
   locationText: z.string().trim().max(200).optional(),
@@ -84,7 +84,7 @@ const slotVoteSchema = z.object({
 
 const batchSleepingSchema = z.object({
   title: z.string().trim().min(1).max(200),
-  description: z.string().trim().min(1).max(2000),
+  description: z.string().trim().max(2000).optional(),
   locationId: z.string().optional(),
   locationText: z.string().trim().max(200).optional(),
   notes: z.string().trim().max(500).optional(),
@@ -97,6 +97,7 @@ const batchSleepingSchema = z.object({
 
 const attendeeUpdateSchema = z.object({
   proposalId: z.string().min(1),
+  addRequired: z.array(z.string().min(1)).optional(),
   addOptional: z.array(z.string().min(1)).optional(),
   removeUserIds: z.array(z.string().min(1)).optional(),
 });
@@ -728,7 +729,7 @@ export async function listProposalBoardAction(): Promise<ProposalBoard> {
         isPoll: false,
         eventPrivacy: "open",
         isContentMasked: false,
-        needsViewerAction: isIncoming,
+        needsViewerAction: isIncoming && isParticipant,
         inviteeCount: 1,
         respondedCount: isIncoming ? 0 : 0,
         isPastSchedule: false,
@@ -1826,8 +1827,8 @@ export async function submitProposalAction(
     return { ok: false, message: "Draft not found." };
   }
 
-  if (!proposal.title.trim() || !proposal.description?.trim()) {
-    return { ok: false, message: "Title and description are required before submitting." };
+  if (!proposal.title.trim()) {
+    return { ok: false, message: "Title is required before submitting." };
   }
 
   if (!confirm) {
@@ -2575,8 +2576,8 @@ export async function updateResolvedAttendeesAction(
     }
   }
 
-  for (const userId of parsed.data.addOptional ?? []) {
-    if (userId === proposal.proposerId) continue;
+  async function addAttendee(userId: string, role: InviteeRole): Promise<void> {
+    if (userId === proposal.proposerId) return;
 
     const [existing] = await db
       .select({ id: proposalInvitees.id })
@@ -2591,7 +2592,7 @@ export async function updateResolvedAttendeesAction(
         id: `pi-${randomUUID()}`,
         proposalId: proposal.id,
         userId,
-        role: "optional",
+        role,
         voteStatus: "not_seen",
         createdAt: now,
       });
@@ -2599,6 +2600,14 @@ export async function updateResolvedAttendeesAction(
         proposalId: proposal.id,
       });
     }
+  }
+
+  for (const userId of parsed.data.addRequired ?? []) {
+    await addAttendee(userId, "required");
+  }
+
+  for (const userId of parsed.data.addOptional ?? []) {
+    await addAttendee(userId, "optional");
   }
 
   await logProposalTransition(db, proposal.id, session.user.id, "proposal.attendees_updated");

@@ -60,8 +60,18 @@ import {
   typeChipSx,
 } from "./proposalCardTheme";
 
-function voteLabel(status: string): string {
-  if (status === "not_seen") return "Not yet viewed";
+const VOTE_STATUS_LABELS: Record<InviteeVoteStatus, string> = {
+  not_seen: "Not yet viewed",
+  accept: "Accepted",
+  abstain: "Abstained",
+  decline: "Declined",
+  accept_suboptimal: "Accepted sub-optimal",
+};
+
+function voteLabel(status: InviteeVoteStatus | string): string {
+  if (status in VOTE_STATUS_LABELS) {
+    return VOTE_STATUS_LABELS[status as InviteeVoteStatus];
+  }
   return status.replaceAll("_", " ");
 }
 
@@ -95,6 +105,7 @@ export function ProposalDetailDialog({
   const [conflictWarnings, setConflictWarnings] = useState<ProposalConflictWarning[]>([]);
   const [showConflictConfirm, setShowConflictConfirm] = useState(false);
   const [addAttendeeId, setAddAttendeeId] = useState("");
+  const [addAttendeeRole, setAddAttendeeRole] = useState<"required" | "optional">("required");
   const [cancelScopeOpen, setCancelScopeOpen] = useState(false);
   const [pending, startTransition] = useTransition();
 
@@ -248,12 +259,14 @@ export function ProposalDetailDialog({
     });
   }
 
-  function handleAddOptionalAttendee() {
+  function handleAddAttendee() {
     if (!proposalId || !addAttendeeId.trim()) return;
     startTransition(async () => {
       const result = await updateResolvedAttendeesAction({
         proposalId,
-        addOptional: [addAttendeeId.trim()],
+        ...(addAttendeeRole === "required"
+          ? { addRequired: [addAttendeeId.trim()] }
+          : { addOptional: [addAttendeeId.trim()] }),
       });
       setMessage(result.message);
       if (!result.ok) return;
@@ -523,12 +536,12 @@ export function ProposalDetailDialog({
               )}
 
               {detail.canManageAttendees && (
-                <Stack direction="row" spacing={1} alignItems="center">
-                  <FormControl size="small" sx={{ flex: 1 }}>
-                    <InputLabel id="add-attendee-label">Add optional attendee</InputLabel>
+                <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
+                  <FormControl size="small" sx={{ flex: 1, minWidth: 160 }}>
+                    <InputLabel id="add-attendee-label">Add attendee</InputLabel>
                     <Select
                       labelId="add-attendee-label"
-                      label="Add optional attendee"
+                      label="Add attendee"
                       value={addAttendeeId}
                       onChange={(e) => setAddAttendeeId(e.target.value)}
                     >
@@ -546,11 +559,25 @@ export function ProposalDetailDialog({
                         ))}
                     </Select>
                   </FormControl>
+                  <FormControl size="small" sx={{ minWidth: 120 }}>
+                    <InputLabel id="add-attendee-role-label">Role</InputLabel>
+                    <Select
+                      labelId="add-attendee-role-label"
+                      label="Role"
+                      value={addAttendeeRole}
+                      onChange={(e) =>
+                        setAddAttendeeRole(e.target.value as "required" | "optional")
+                      }
+                    >
+                      <MenuItem value="required">Required</MenuItem>
+                      <MenuItem value="optional">Optional</MenuItem>
+                    </Select>
+                  </FormControl>
                   <Button
                     variant="outlined"
                     size="small"
                     disabled={pending || !addAttendeeId}
-                    onClick={handleAddOptionalAttendee}
+                    onClick={handleAddAttendee}
                   >
                     Add
                   </Button>
