@@ -213,6 +213,19 @@ export const proposalStateLog = sqliteTable("proposal_state_log", {
   createdAt: text("created_at").notNull(),
 });
 
+/** Threaded discussion on a proposal (PC-40). */
+export const proposalComments = sqliteTable("proposal_comments", {
+  id: text("id").primaryKey(),
+  proposalId: text("proposal_id")
+    .notNull()
+    .references(() => proposals.id),
+  authorId: text("author_id")
+    .notNull()
+    .references(() => users.id),
+  body: text("body").notNull(),
+  createdAt: text("created_at").notNull(),
+});
+
 /** Undirected sleeping partnership edge with proposal workflow (PC-36). */
 export const sleepingPartnerships = sqliteTable("sleeping_partnerships", {
   id: text("id").primaryKey(),
@@ -263,6 +276,7 @@ export const schema = {
   proposalInvitees,
   proposalTimeSlots,
   proposalStateLog,
+  proposalComments,
   sleepingPartnerships,
   locationResidents,
 };
