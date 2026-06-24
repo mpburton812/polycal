@@ -17,29 +17,18 @@ import {
 
 import { type ProposalCard as ProposalCardData } from "@/actions/proposals";
 
-const POLY_GREEN = "#004d40";
-const POLY_GREEN_LIGHT = "#e0f2f1";
-
-function formatTimeRange(start: string | null, end: string | null): string | null {
-  if (!start) return null;
-  const startLabel = new Date(start).toLocaleString(undefined, {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  });
-  if (!end) return startLabel;
-  const endLabel = new Date(end).toLocaleString(undefined, {
-    hour: "numeric",
-    minute: "2-digit",
-  });
-  return `${startLabel} – ${endLabel}`;
-}
-
-function typeBadgeLabel(type: string): string {
-  return type === "sleeping" ? "SLEEPING PROPOSAL" : "EVENT PROPOSAL";
-}
+import {
+  formatTimeRange,
+  POLY_GREEN,
+  POLY_GREEN_LIGHT,
+  PAST_SCHEDULE_BG,
+  PAST_SCHEDULE_ICON,
+  PAST_SCHEDULE_TEXT,
+  primaryButtonSx,
+  proposalCardSx,
+  typeBadgeLabel,
+  typeChipSx,
+} from "./proposalCardTheme";
 
 function stateBadgeLabel(state: string): string {
   return state.toUpperCase();
@@ -77,8 +66,7 @@ export function ProposalCard({
     <Card
       variant="outlined"
       sx={{
-        borderLeft: `4px solid ${POLY_GREEN}`,
-        borderRadius: 2,
+        ...proposalCardSx,
         cursor: "pointer",
         transition: "box-shadow 0.2s",
         "&:hover": { boxShadow: 3 },
@@ -90,13 +78,7 @@ export function ProposalCard({
           <Chip
             label={typeBadgeLabel(proposal.proposalType)}
             size="small"
-            sx={{
-              bgcolor: POLY_GREEN_LIGHT,
-              color: POLY_GREEN,
-              fontWeight: 700,
-              fontSize: "0.65rem",
-              letterSpacing: 0.5,
-            }}
+            sx={typeChipSx}
           />
           <Typography variant="caption" color="text.secondary" sx={{ textAlign: "right" }}>
             PROPOSED BY {proposal.proposerName.toUpperCase()}
@@ -142,15 +124,15 @@ export function ProposalCard({
             sx={{
               mt: 1.5,
               p: 1,
-              bgcolor: "#fff8e1",
+              bgcolor: PAST_SCHEDULE_BG,
               borderRadius: 1,
               display: "flex",
               alignItems: "center",
               gap: 0.5,
             }}
           >
-            <WarningAmberIcon sx={{ fontSize: 18, color: "#f9a825" }} />
-            <Typography variant="body2" sx={{ color: "#f57f17", fontWeight: 500 }}>
+            <WarningAmberIcon sx={{ fontSize: 18, color: PAST_SCHEDULE_ICON }} />
+            <Typography variant="body2" sx={{ color: PAST_SCHEDULE_TEXT, fontWeight: 500 }}>
               Past schedule
             </Typography>
           </Box>
@@ -182,7 +164,7 @@ export function ProposalCard({
             <Button
               variant="contained"
               size="small"
-              sx={{ bgcolor: POLY_GREEN, "&:hover": { bgcolor: "#00332c" } }}
+              sx={primaryButtonSx}
               onClick={() => onContinueEdit(proposal.id)}
             >
               Continue Editing
