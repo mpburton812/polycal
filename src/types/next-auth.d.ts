@@ -7,6 +7,7 @@ declare module "next-auth" {
       id: string;
       role: UserRole;
       mustChangePassword: boolean;
+      onboardingComplete: boolean;
       displayName: string;
       avatarKey?: string;
       theme?: string;
@@ -16,6 +17,8 @@ declare module "next-auth" {
   interface User {
     role: UserRole;
     mustChangePassword: boolean;
+    onboardingComplete: boolean;
+    sessionVersion: number;
     displayName: string;
     avatarKey?: string;
     theme?: string;
@@ -27,9 +30,12 @@ declare module "next-auth/jwt" {
     id: string;
     role: UserRole;
     mustChangePassword: boolean;
+    onboardingComplete: boolean;
+    sessionVersion: number;
     displayName: string;
     avatarKey?: string;
     theme?: string;
+    error?: string;
   }
 }
 

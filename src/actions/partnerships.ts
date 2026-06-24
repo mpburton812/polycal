@@ -146,6 +146,7 @@ export async function proposePartnershipAction(
         proposedById: proposerId,
         updatedAt: now,
         respondedAt: autoAccept ? now : null,
+        passiveAutoAccepted: autoAccept,
       })
       .where(eq(sleepingPartnerships.id, existing.id));
   } else {
@@ -158,6 +159,7 @@ export async function proposePartnershipAction(
       createdAt: now,
       updatedAt: now,
       respondedAt: autoAccept ? now : null,
+      passiveAutoAccepted: autoAccept,
     });
   }
 

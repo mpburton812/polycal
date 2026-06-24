@@ -38,6 +38,13 @@ export const users = sqliteTable("users", {
   theme: text("theme").notNull().default("mint"),
   loginCount: integer("login_count").notNull().default(0),
   lastLoginAt: text("last_login_at"),
+  gender: text("gender"),
+  notificationEmail: text("notification_email"),
+  emailVerifiedAt: text("email_verified_at"),
+  notificationPrefsJson: text("notification_prefs_json"),
+  onboardingComplete: integer("onboarding_complete", { mode: "boolean" }).notNull().default(true),
+  sessionVersion: integer("session_version").notNull().default(0),
+  activatedFromPassiveAt: text("activated_from_passive_at"),
   createdAt: text("created_at").notNull(),
   updatedAt: text("updated_at").notNull(),
 });
@@ -49,6 +56,26 @@ export const polyGroup = sqliteTable("poly_group", {
   allowUserProvisioning: integer("allow_user_provisioning", { mode: "boolean" })
     .notNull()
     .default(false),
+  allowGroupNameProposals: integer("allow_group_name_proposals", { mode: "boolean" })
+    .notNull()
+    .default(false),
+  groupNameChangeMode: text("group_name_change_mode").notNull().default("admin_only"),
+  powerManagementMode: text("power_management_mode").notNull().default("admin_user"),
+  roleSnapshotsJson: text("role_snapshots_json"),
+  eventPrivacyOpen: integer("event_privacy_open", { mode: "boolean" }).notNull().default(true),
+  eventPrivacyPrivate: integer("event_privacy_private", { mode: "boolean" }).notNull().default(true),
+  eventPrivacySuperPrivate: integer("event_privacy_super_private", { mode: "boolean" })
+    .notNull()
+    .default(true),
+  adminCanSeePrivate: integer("admin_can_see_private", { mode: "boolean" }).notNull().default(false),
+  adminCanSeeSuperPrivate: integer("admin_can_see_super_private", { mode: "boolean" })
+    .notNull()
+    .default(false),
+  auditLogVisibility: text("audit_log_visibility").notNull().default("admin_only"),
+  hideSleepingArrangements: integer("hide_sleeping_arrangements", { mode: "boolean" })
+    .notNull()
+    .default(false),
+  logTailLength: integer("log_tail_length").notNull().default(100),
   updatedAt: text("updated_at").notNull(),
 });
 
@@ -74,6 +101,7 @@ export const userActivityLog = sqliteTable("user_activity_log", {
   userId: text("user_id").references(() => users.id),
   action: text("action").notNull(),
   details: text("details"),
+  eventType: text("event_type").notNull().default("user"),
   createdAt: text("created_at").notNull(),
 });
 
@@ -131,6 +159,9 @@ export const sleepingPartnerships = sqliteTable("sleeping_partnerships", {
   createdAt: text("created_at").notNull(),
   updatedAt: text("updated_at").notNull(),
   respondedAt: text("responded_at"),
+  passiveAutoAccepted: integer("passive_auto_accepted", { mode: "boolean" })
+    .notNull()
+    .default(false),
 });
 
 /** User residency at a place — active users must accept (PC-37). */

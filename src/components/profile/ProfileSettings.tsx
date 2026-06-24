@@ -5,8 +5,10 @@ import {
   Avatar,
   Box,
   Button,
+  Checkbox,
   FormControl,
   FormControlLabel,
+  FormGroup,
   FormLabel,
   Paper,
   Radio,
@@ -16,11 +18,13 @@ import {
   Typography,
 } from "@mui/material";
 import { useRouter } from "next/navigation";
-import { useSession } from "next-auth/react";
+import { signOut, useSession } from "next-auth/react";
 import { useState, useTransition } from "react";
 
 import {
   changePasswordAction,
+  updateDisplayNameAction,
+  updateNotificationPrefsAction,
   updateProfilePreferencesAction,
 } from "@/actions/profile";
 import { AVATAR_OPTIONS } from "@/lib/constants/avatars";
@@ -29,30 +33,43 @@ import {
   USER_THEME_LABELS,
   type UserThemeId,
 } from "@/lib/constants/themes";
+import type { NotificationPrefs } from "@/types/notification-prefs";
 
 export function ProfileSettings({
+  initialDisplayName,
   initialAvatarKey,
   initialTheme,
+  initialNotificationPrefs,
   mustChangePassword,
 }: {
+  initialDisplayName: string;
   initialAvatarKey: string | null;
   initialTheme: string;
+  initialNotificationPrefs: NotificationPrefs;
   mustChangePassword: boolean;
 }) {
   const router = useRouter();
   const { update } = useSession();
+  const [displayName, setDisplayName] = useState(initialDisplayName);
   const [avatarKey, setAvatarKey] = useState(initialAvatarKey ?? "bird_blue");
   const [theme, setTheme] = useState<UserThemeId>(
     (USER_THEME_IDS.includes(initialTheme as UserThemeId)
       ? initialTheme
       : "mint") as UserThemeId,
   );
+  const [notificationPrefs, setNotificationPrefs] = useState(initialNotificationPrefs);
   const [passwordMessage, setPasswordMessage] = useState<string | null>(null);
   const [prefsMessage, setPrefsMessage] = useState<string | null>(null);
+  const [nameMessage, setNameMessage] = useState<string | null>(null);
+  const [notifMessage, setNotifMessage] = useState<string | null>(null);
   const [passwordError, setPasswordError] = useState<string | null>(null);
   const [prefsError, setPrefsError] = useState<string | null>(null);
+  const [nameError, setNameError] = useState<string | null>(null);
+  const [notifError, setNotifError] = useState<string | null>(null);
   const [passwordPending, startPasswordTransition] = useTransition();
   const [prefsPending, startPrefsTransition] = useTransition();
+  const [namePending, startNameTransition] = useTransition();
+  const [notifPending, startNotifTransition] = useTransition();
 
   function handlePasswordSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -95,8 +112,55 @@ export function ProfileSettings({
     });
   }
 
+  function handleDisplayNameSave() {
+    setNameError(null);
+    setNameMessage(null);
+    startNameTransition(async () => {
+      const result = await updateDisplayNameAction(displayName);
+      if (!result.ok) {
+        setNameError(result.error);
+        return;
+      }
+      setNameMessage("Display name updated.");
+      await update({ user: { displayName } });
+      router.refresh();
+    });
+  }
+
+  function handleNotificationSave() {
+    setNotifError(null);
+    setNotifMessage(null);
+    startNotifTransition(async () => {
+      const result = await updateNotificationPrefsAction(notificationPrefs);
+      if (!result.ok) {
+        setNotifError(result.error);
+        return;
+      }
+      setNotifMessage("Notification preferences saved.");
+    });
+  }
+
   return (
     <Stack spacing={3}>
+      <Paper sx={{ p: 3 }}>
+        <Typography variant="h6" gutterBottom>
+          Display name
+        </Typography>
+        {nameError && <Alert severity="error" sx={{ mb: 2 }}>{nameError}</Alert>}
+        {nameMessage && <Alert severity="success" sx={{ mb: 2 }}>{nameMessage}</Alert>}
+        <Stack direction="row" spacing={2} alignItems="flex-start">
+          <TextField
+            label="Display name"
+            value={displayName}
+            onChange={(e) => setDisplayName(e.target.value)}
+            fullWidth
+          />
+          <Button variant="contained" onClick={handleDisplayNameSave} disabled={namePending}>
+            Save
+          </Button>
+        </Stack>
+      </Paper>
+
       <Paper sx={{ p: 3 }}>
         <Typography variant="h6" gutterBottom>
           Password
@@ -207,6 +271,74 @@ export function ProfileSettings({
             {prefsPending ? "Saving…" : "Save preferences"}
           </Button>
         </Box>
+      </Paper>
+
+      <Paper sx={{ p: 3 }}>
+        <Typography variant="h6" gutterBottom>
+          Notifications
+        </Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+          Email and SMS delivery will be enabled in a future release (PC-19).
+        </Typography>
+        {notifError && <Alert severity="error" sx={{ mb: 2 }}>{notifError}</Alert>}
+        {notifMessage && <Alert severity="success" sx={{ mb: 2 }}>{notifMessage}</Alert>}
+        <FormControlLabel
+          control={
+            <Checkbox
+              checked={notificationPrefs.globalEnabled}
+              onChange={(e) =>
+                setNotificationPrefs({ ...notificationPrefs, globalEnabled: e.target.checked })
+              }
+            />
+          }
+          label="Enable notifications"
+        />
+        <FormGroup sx={{ mb: 2 }}>
+          <FormControlLabel
+            control={
+              <Checkbox
+                checked={notificationPrefs.channels.device}
+                onChange={(e) =>
+                  setNotificationPrefs({
+                    ...notificationPrefs,
+                    channels: { ...notificationPrefs.channels, device: e.target.checked },
+                  })
+                }
+              />
+            }
+            label="In-app / device"
+          />
+          <FormControlLabel
+            control={
+              <Checkbox
+                checked={notificationPrefs.channels.email}
+                onChange={(e) =>
+                  setNotificationPrefs({
+                    ...notificationPrefs,
+                    channels: { ...notificationPrefs.channels, email: e.target.checked },
+                  })
+                }
+              />
+            }
+            label="Email"
+          />
+        </FormGroup>
+        <Button variant="contained" onClick={handleNotificationSave} disabled={notifPending}>
+          {notifPending ? "Saving…" : "Save notification preferences"}
+        </Button>
+      </Paper>
+
+      <Paper sx={{ p: 3 }}>
+        <Typography variant="h6" gutterBottom>
+          Session
+        </Typography>
+        <Button
+          variant="outlined"
+          color="inherit"
+          onClick={() => void signOut({ callbackUrl: "/login" })}
+        >
+          Log out
+        </Button>
       </Paper>
     </Stack>
   );
