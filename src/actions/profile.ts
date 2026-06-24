@@ -20,14 +20,21 @@ import {
 
 const passwordSchema = z
   .object({
-    currentPassword: z.string().min(1).max(128),
-    newPassword: z.string().min(8).max(128),
-    confirmPassword: z.string().min(8).max(128),
+    currentPassword: z.string().min(1, "Enter your current password."),
+    newPassword: z
+      .string()
+      .min(8, "New password must be at least 8 characters.")
+      .max(128, "New password must be 128 characters or fewer."),
+    confirmPassword: z.string().min(1, "Confirm your new password."),
   })
   .refine((data) => data.newPassword === data.confirmPassword, {
-    message: "Passwords do not match",
+    message: "New password and confirmation do not match.",
     path: ["confirmPassword"],
   });
+
+function formatPasswordErrors(error: z.ZodError): string {
+  return error.issues.map((issue) => issue.message).join(" ");
+}
 
 const AVATAR_KEYS = AVATAR_OPTIONS.map((option) => option.key);
 
@@ -58,7 +65,7 @@ export async function changePasswordAction(
     confirmPassword: formData.get("confirmPassword"),
   });
   if (!parsed.success) {
-    return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid input." };
+    return { ok: false, error: formatPasswordErrors(parsed.error) };
   }
 
   await ensureDbReady();

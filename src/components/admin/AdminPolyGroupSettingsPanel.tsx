@@ -240,6 +240,17 @@ export function AdminPolyGroupSettingsPanel({
           }
           helperText="0 hides the log; max 1000 entries"
         />
+        <TextField
+          label="First-login welcome message"
+          value={settings.onboardingWelcomeMessage}
+          onChange={(e) =>
+            setSettings({ ...settings, onboardingWelcomeMessage: e.target.value })
+          }
+          multiline
+          minRows={4}
+          fullWidth
+          helperText="Shown to users when they finish first-login onboarding."
+        />
         <Button variant="contained" onClick={save} disabled={pending}>
           {pending ? "Saving…" : "Save settings"}
         </Button>

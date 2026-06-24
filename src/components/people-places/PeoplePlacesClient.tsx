@@ -24,14 +24,10 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState, useTransition } from "react";
 
 import {
-  activatePassiveUserAction,
-  adminResetPasswordAction,
   checkUsernameAvailableAction,
   createActiveUserAction,
   createPassiveUserAction,
-  deleteUserAction,
   updateProvisionedUsernameAction,
-  updateUserAction,
   type PersonSummary,
 } from "@/actions/users";
 import {
@@ -321,473 +317,163 @@ function PersonDetail({
   people,
   currentUserId,
   isAdmin,
-  canProvision,
-  onUserDeleted,
 }: {
   person: PersonSummary;
   people: PersonSummary[];
   currentUserId: string;
   isAdmin: boolean;
-  canProvision: boolean;
-  onUserDeleted: () => void;
 }) {
   const router = useRouter();
   const [partnerships, setPartnerships] = useState<PartnershipView[]>([]);
-  const [loaded, setLoaded] = useState(false);
+  const [partnershipsLoading, setPartnershipsLoading] = useState(false);
   const [partnerTarget, setPartnerTarget] = useState("");
   const [message, setMessage] = useState<string | null>(null);
-  const [editOpen, setEditOpen] = useState(false);
-  const [editDisplayName, setEditDisplayName] = useState(person.displayName);
-  const [editUsername, setEditUsername] = useState(person.username);
-  const [editRole, setEditRole] = useState<"user" | "admin">(
-    person.role === "admin" ? "admin" : "user",
-  );
-  const [editAvatarKey, setEditAvatarKey] = useState(person.avatarKey ?? AVATAR_OPTIONS[0].key);
-  const [editUsernameStatus, setEditUsernameStatus] = useState<{
-    checked: boolean;
-    available: boolean;
-    message: string;
-  }>({ checked: false, available: false, message: "" });
-  const [activateOpen, setActivateOpen] = useState(false);
-  const [activateUsername, setActivateUsername] = useState("");
-  const [activateRole, setActivateRole] = useState<"user" | "admin">("user");
-  const [activateUsernameStatus, setActivateUsernameStatus] = useState<{
-    checked: boolean;
-    available: boolean;
-    message: string;
-  }>({ checked: false, available: false, message: "" });
-  const [credentials, setCredentials] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+
+  const canViewPartnerships = isAdmin || person.id === currentUserId;
 
   const candidates = useMemo(
     () => people.filter((row) => row.id !== person.id),
     [people, person.id],
   );
 
-  useEffect(() => {
-    setEditDisplayName(person.displayName);
-    setEditUsername(person.username);
-    setEditRole(person.role === "admin" ? "admin" : "user");
-    setEditAvatarKey(person.avatarKey ?? AVATAR_OPTIONS[0].key);
-    setEditUsernameStatus({ checked: false, available: false, message: "" });
-  }, [person]);
-
   function loadPartnerships() {
+    setPartnershipsLoading(true);
     startTransition(async () => {
       const rows = await listPartnershipsForUserAction(person.id);
       setPartnerships(rows);
-      setLoaded(true);
+      setPartnershipsLoading(false);
     });
   }
 
-  function checkEditUsername() {
-    if (person.role === "passive" || !editUsername.trim()) {
-      setEditUsernameStatus({ checked: false, available: false, message: "" });
-      return;
+  useEffect(() => {
+    if (canViewPartnerships) {
+      loadPartnerships();
+    } else {
+      setPartnerships([]);
     }
-
-    startTransition(async () => {
-      const result = await checkUsernameAvailableAction(editUsername, person.id);
-      setEditUsernameStatus({
-        checked: true,
-        available: result.available,
-        message: result.message,
-      });
-    });
-  }
-
-  function checkActivateUsername() {
-    if (!activateUsername.trim()) {
-      setActivateUsernameStatus({ checked: false, available: false, message: "" });
-      return;
-    }
-    startTransition(async () => {
-      const result = await checkUsernameAvailableAction(activateUsername);
-      setActivateUsernameStatus({
-        checked: true,
-        available: result.available,
-        message: result.message,
-      });
-    });
-  }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reload when selected person changes
+  }, [person.id, canViewPartnerships]);
 
   return (
     <Stack spacing={1.5} sx={{ mt: 2 }}>
-      {credentials && (
-        <Alert severity="success">
-          <Typography variant="body2" sx={{ whiteSpace: "pre-wrap", mb: 1 }}>
-            {credentials}
-          </Typography>
-          <Button
-            size="small"
-            onClick={() => void navigator.clipboard.writeText(credentials)}
-          >
-            Copy instructions
-          </Button>
-        </Alert>
-      )}
-      {person.role === "passive" && canProvision && (
-        <Button
-          size="small"
-          variant="contained"
-          onClick={() => {
-            setActivateUsername("");
-            setActivateRole("user");
-            setActivateUsernameStatus({ checked: false, available: false, message: "" });
-            setActivateOpen(true);
-          }}
-        >
-          Activate passive user
-        </Button>
-      )}
-      {isAdmin && (
-        <Stack direction="row" spacing={1} flexWrap="wrap">
-          <Button
-            size="small"
-            variant="outlined"
-            onClick={() => {
-              setEditDisplayName(person.displayName);
-              setEditUsername(person.username);
-              setEditRole(person.role === "admin" ? "admin" : "user");
-              setEditAvatarKey(person.avatarKey ?? AVATAR_OPTIONS[0].key);
-              setEditUsernameStatus(
-                person.role === "passive"
-                  ? { checked: false, available: false, message: "" }
-                  : { checked: true, available: true, message: "Username unchanged." },
-              );
-              setEditOpen(true);
-            }}
-          >
-            Edit user
-          </Button>
-          {person.role !== "passive" && (
-            <Button
-              size="small"
-              variant="outlined"
-              onClick={() =>
-                startTransition(async () => {
-                  const result = await adminResetPasswordAction({ userId: person.id });
-                  setMessage(result.message);
-                  if (result.loginInstructions) {
-                    setCredentials(result.loginInstructions);
-                  }
-                })
-              }
-            >
-              Reset password
-            </Button>
-          )}
-          <Button
-            size="small"
-            color="error"
-            disabled={person.id === currentUserId}
-            onClick={() =>
-              startTransition(async () => {
-                if (
-                  !window.confirm(
-                    `Delete ${person.displayName}? Their partnerships and place links will be removed.`,
-                  )
-                ) {
-                  return;
-                }
-                const result = await deleteUserAction(person.id);
-                setMessage(result.message);
-                if (result.ok) {
-                  onUserDeleted();
-                  router.refresh();
-                }
-              })
-            }
-          >
-            Delete user
-          </Button>
-        </Stack>
-      )}
-
-      {!loaded ? (
-        <Button size="small" onClick={loadPartnerships}>
-          Load sleeping partners
-        </Button>
-      ) : (
+      {canViewPartnerships && (
         <>
           <Typography variant="subtitle2">Sleeping partners</Typography>
-      {partnerships.length === 0 && (
-        <Typography variant="body2" color="text.secondary">
-          No partnerships yet.
-        </Typography>
-      )}
-      {partnerships.map((row) => (
-        <Stack key={row.id} direction="row" spacing={1} alignItems="center">
-          <Chip size="small" label={row.status} color={row.status === "accepted" ? "success" : "warning"} />
-          <Typography variant="body2">{row.partnerName}</Typography>
-          {row.isIncoming && (
-            <>
+          {partnershipsLoading && (
+            <Typography variant="body2" color="text.secondary">
+              Loading…
+            </Typography>
+          )}
+          {!partnershipsLoading && partnerships.length === 0 && (
+            <Typography variant="body2" color="text.secondary">
+              No partnerships yet.
+            </Typography>
+          )}
+          {partnerships.map((row) => (
+            <Stack key={row.id} direction="row" spacing={1} alignItems="center">
+              <Chip
+                size="small"
+                label={row.status}
+                color={row.status === "accepted" ? "success" : "warning"}
+              />
+              <Typography variant="body2">{row.partnerName}</Typography>
+              {row.isIncoming && person.id === currentUserId && (
+                <>
+                  <Button
+                    size="small"
+                    onClick={() =>
+                      startTransition(async () => {
+                        const result = await respondPartnershipAction({
+                          partnershipId: row.id,
+                          accept: true,
+                        });
+                        setMessage(result.message);
+                        loadPartnerships();
+                        router.refresh();
+                      })
+                    }
+                  >
+                    Accept
+                  </Button>
+                  <Button
+                    size="small"
+                    color="inherit"
+                    onClick={() =>
+                      startTransition(async () => {
+                        const result = await respondPartnershipAction({
+                          partnershipId: row.id,
+                          accept: false,
+                        });
+                        setMessage(result.message);
+                        loadPartnerships();
+                        router.refresh();
+                      })
+                    }
+                  >
+                    Decline
+                  </Button>
+                </>
+              )}
+              {row.status === "accepted" && (person.id === currentUserId || isAdmin) && (
+                <Button
+                  size="small"
+                  color="error"
+                  onClick={() =>
+                    startTransition(async () => {
+                      const result = await removePartnershipAction(row.id);
+                      setMessage(result.message);
+                      loadPartnerships();
+                      router.refresh();
+                    })
+                  }
+                >
+                  Remove
+                </Button>
+              )}
+            </Stack>
+          ))}
+          {(person.id === currentUserId || isAdmin) && person.role !== "passive" && (
+            <Stack direction="row" spacing={1} alignItems="center">
+              <FormControl size="small" sx={{ minWidth: 180 }}>
+                <InputLabel id={`partner-${person.id}`}>Propose partner</InputLabel>
+                <Select
+                  labelId={`partner-${person.id}`}
+                  label="Propose partner"
+                  value={partnerTarget}
+                  onChange={(event) => setPartnerTarget(event.target.value)}
+                >
+                  {candidates.map((row) => (
+                    <MenuItem key={row.id} value={row.id}>
+                      {row.displayName}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
               <Button
                 size="small"
+                variant="outlined"
+                disabled={!partnerTarget || pending}
                 onClick={() =>
                   startTransition(async () => {
-                    const result = await respondPartnershipAction({
-                      partnershipId: row.id,
-                      accept: true,
-                    });
+                    const result = await proposePartnershipAction(
+                      partnerTarget,
+                      person.id !== currentUserId ? person.id : undefined,
+                    );
                     setMessage(result.message);
+                    setPartnerTarget("");
                     loadPartnerships();
                     router.refresh();
                   })
                 }
               >
-                Accept
+                Propose
               </Button>
-              <Button
-                size="small"
-                color="inherit"
-                onClick={() =>
-                  startTransition(async () => {
-                    const result = await respondPartnershipAction({
-                      partnershipId: row.id,
-                      accept: false,
-                    });
-                    setMessage(result.message);
-                    loadPartnerships();
-                    router.refresh();
-                  })
-                }
-              >
-                Decline
-              </Button>
-            </>
+            </Stack>
           )}
-          {(row.status === "accepted" && (person.id === currentUserId || isAdmin)) && (
-            <Button
-              size="small"
-              color="error"
-              onClick={() =>
-                startTransition(async () => {
-                  const result = await removePartnershipAction(row.id);
-                  setMessage(result.message);
-                  loadPartnerships();
-                  router.refresh();
-                })
-              }
-            >
-              Remove
-            </Button>
-          )}
-        </Stack>
-      ))}
-      {(person.id === currentUserId || isAdmin) && person.role !== "passive" && (
-        <Stack direction="row" spacing={1} alignItems="center">
-          <FormControl size="small" sx={{ minWidth: 180 }}>
-            <InputLabel id={`partner-${person.id}`}>Propose partner</InputLabel>
-            <Select
-              labelId={`partner-${person.id}`}
-              label="Propose partner"
-              value={partnerTarget}
-              onChange={(event) => setPartnerTarget(event.target.value)}
-            >
-              {candidates.map((row) => (
-                <MenuItem key={row.id} value={row.id}>
-                  {row.displayName}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-          <Button
-            size="small"
-            variant="outlined"
-            disabled={!partnerTarget || pending}
-            onClick={() =>
-              startTransition(async () => {
-                const result = await proposePartnershipAction(
-                  partnerTarget,
-                  person.id !== currentUserId ? person.id : undefined,
-                );
-                setMessage(result.message);
-                setPartnerTarget("");
-                loadPartnerships();
-                router.refresh();
-              })
-            }
-          >
-            Propose
-          </Button>
-        </Stack>
-      )}
         </>
       )}
       {message && <Alert severity="info">{message}</Alert>}
-
-      <Dialog open={editOpen} onClose={() => setEditOpen(false)} fullWidth maxWidth="sm">
-        <DialogTitle>Edit user</DialogTitle>
-        <DialogContent>
-          <Stack spacing={2} sx={{ mt: 1 }}>
-            <TextField
-              label="Display name"
-              value={editDisplayName}
-              onChange={(event) => setEditDisplayName(event.target.value)}
-              fullWidth
-              required
-            />
-            {person.role !== "passive" && (
-              <>
-                <TextField
-                  label="Username"
-                  value={editUsername}
-                  onChange={(event) => {
-                    setEditUsername(event.target.value);
-                    setEditUsernameStatus({ checked: false, available: false, message: "" });
-                  }}
-                  onBlur={() => checkEditUsername()}
-                  fullWidth
-                  required
-                  error={editUsernameStatus.checked && !editUsernameStatus.available}
-                  helperText={
-                    editUsernameStatus.checked
-                      ? editUsernameStatus.message
-                      : "Availability is checked when you leave this field."
-                  }
-                />
-                <FormControl fullWidth>
-                  <InputLabel id={`edit-role-${person.id}`}>Role</InputLabel>
-                  <Select
-                    labelId={`edit-role-${person.id}`}
-                    label="Role"
-                    value={editRole}
-                    onChange={(event) => setEditRole(event.target.value as "user" | "admin")}
-                  >
-                    <MenuItem value="user">User</MenuItem>
-                    <MenuItem value="admin">Admin</MenuItem>
-                  </Select>
-                </FormControl>
-              </>
-            )}
-            <FormControl fullWidth>
-              <InputLabel id={`edit-avatar-${person.id}`}>Avatar</InputLabel>
-              <Select
-                labelId={`edit-avatar-${person.id}`}
-                label="Avatar"
-                value={editAvatarKey}
-                onChange={(event) => setEditAvatarKey(event.target.value)}
-              >
-                {AVATAR_OPTIONS.map((option) => (
-                  <MenuItem key={option.key} value={option.key}>
-                    {option.label}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          </Stack>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setEditOpen(false)}>Cancel</Button>
-          <Button
-            variant="contained"
-            disabled={
-              pending ||
-              !editDisplayName.trim() ||
-              (person.role !== "passive" &&
-                editUsername !== person.username &&
-                (!editUsernameStatus.checked || !editUsernameStatus.available))
-            }
-            onClick={() =>
-              startTransition(async () => {
-                if (
-                  person.role !== "passive" &&
-                  editUsername !== person.username &&
-                  (!editUsernameStatus.checked || !editUsernameStatus.available)
-                ) {
-                  setMessage("Check username availability before saving.");
-                  return;
-                }
-                const result = await updateUserAction({
-                  userId: person.id,
-                  displayName: editDisplayName,
-                  avatarKey: editAvatarKey,
-                  ...(person.role !== "passive"
-                    ? { username: editUsername, role: editRole }
-                    : {}),
-                });
-                setMessage(result.message);
-                if (result.ok) {
-                  setEditOpen(false);
-                  router.refresh();
-                }
-              })
-            }
-          >
-            Save
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      <Dialog open={activateOpen} onClose={() => setActivateOpen(false)} fullWidth maxWidth="sm">
-        <DialogTitle>Activate passive user</DialogTitle>
-        <DialogContent>
-          <Stack spacing={2} sx={{ mt: 1 }}>
-            <Typography variant="body2" color="text.secondary">
-              Convert {person.displayName} to an active user with login credentials.
-              Previously auto-accepted partnerships will require formal acceptance on first login.
-            </Typography>
-            <TextField
-              label="Username"
-              value={activateUsername}
-              onChange={(e) => {
-                setActivateUsername(e.target.value);
-                setActivateUsernameStatus({ checked: false, available: false, message: "" });
-              }}
-              onBlur={() => checkActivateUsername()}
-              required
-              fullWidth
-              error={activateUsernameStatus.checked && !activateUsernameStatus.available}
-              helperText={
-                activateUsernameStatus.checked
-                  ? activateUsernameStatus.message
-                  : "Availability is checked when you leave this field."
-              }
-            />
-            <FormControl fullWidth>
-              <InputLabel id={`activate-role-${person.id}`}>Role</InputLabel>
-              <Select
-                labelId={`activate-role-${person.id}`}
-                label="Role"
-                value={activateRole}
-                onChange={(e) => setActivateRole(e.target.value as "user" | "admin")}
-              >
-                <MenuItem value="user">User</MenuItem>
-                <MenuItem value="admin">Admin</MenuItem>
-              </Select>
-            </FormControl>
-          </Stack>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setActivateOpen(false)}>Cancel</Button>
-          <Button
-            variant="contained"
-            disabled={
-              pending ||
-              !activateUsernameStatus.checked ||
-              !activateUsernameStatus.available
-            }
-            onClick={() =>
-              startTransition(async () => {
-                const result = await activatePassiveUserAction({
-                  userId: person.id,
-                  username: activateUsername,
-                  role: activateRole,
-                });
-                setMessage(result.message);
-                if (result.ok && result.loginInstructions) {
-                  setCredentials(result.loginInstructions);
-                  setActivateOpen(false);
-                  router.refresh();
-                }
-              })
-            }
-          >
-            Activate
-          </Button>
-        </DialogActions>
-      </Dialog>
     </Stack>
   );
 }
@@ -935,37 +621,57 @@ function PlaceDetail({
         </Stack>
       ))}
       <Stack direction="row" spacing={1} alignItems="center">
-        <FormControl size="small" sx={{ minWidth: 180 }}>
-          <InputLabel id={`resident-${place.id}`}>Add resident</InputLabel>
-          <Select
-            labelId={`resident-${place.id}`}
-            label="Add resident"
-            value={targetUserId}
-            onChange={(event) => setTargetUserId(event.target.value)}
+        {isAdmin ? (
+          <>
+            <FormControl size="small" sx={{ minWidth: 180 }}>
+              <InputLabel id={`resident-${place.id}`}>Add resident</InputLabel>
+              <Select
+                labelId={`resident-${place.id}`}
+                label="Add resident"
+                value={targetUserId}
+                onChange={(event) => setTargetUserId(event.target.value)}
+              >
+                {people.map((row) => (
+                  <MenuItem key={row.id} value={row.id}>
+                    {row.displayName}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            <Button
+              size="small"
+              variant="outlined"
+              disabled={!targetUserId || pending}
+              onClick={() =>
+                startTransition(async () => {
+                  const result = await proposeResidencyAction(place.id, targetUserId);
+                  setMessage(result.message);
+                  setTargetUserId("");
+                  refreshResidents();
+                  router.refresh();
+                })
+              }
+            >
+              Associate
+            </Button>
+          </>
+        ) : (
+          <Button
+            size="small"
+            variant="outlined"
+            disabled={pending}
+            onClick={() =>
+              startTransition(async () => {
+                const result = await proposeResidencyAction(place.id, currentUserId);
+                setMessage(result.message);
+                refreshResidents();
+                router.refresh();
+              })
+            }
           >
-            {people.map((row) => (
-              <MenuItem key={row.id} value={row.id}>
-                {row.displayName}
-              </MenuItem>
-            ))}
-          </Select>
-        </FormControl>
-        <Button
-          size="small"
-          variant="outlined"
-          disabled={!targetUserId || pending}
-          onClick={() =>
-            startTransition(async () => {
-              const result = await proposeResidencyAction(place.id, targetUserId);
-              setMessage(result.message);
-              setTargetUserId("");
-              refreshResidents();
-              router.refresh();
-            })
-          }
-        >
-          Associate
-        </Button>
+            Associate me with this place
+          </Button>
+        )}
       </Stack>
       {message && <Alert severity="info">{message}</Alert>}
 
@@ -1097,10 +803,10 @@ export function PeoplePlacesClient({
               <Stack direction="row" spacing={2} alignItems="center">
                 <PersonAvatar avatarKey={person.avatarKey} name={person.displayName} />
                 <Box sx={{ flex: 1 }}>
-                  <Typography fontWeight={600}>{person.displayName}</Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    @{person.username} · {person.role}
-                  </Typography>
+                  <Stack direction="row" spacing={1} alignItems="baseline">
+                    <Typography fontWeight={600}>{person.displayName}</Typography>
+                    <Chip size="small" label={person.role} variant="outlined" />
+                  </Stack>
                 </Box>
               </Stack>
               {selectedPersonId === person.id && selectedPerson && (
@@ -1109,8 +815,6 @@ export function PeoplePlacesClient({
                   people={people}
                   currentUserId={currentUserId}
                   isAdmin={isAdmin}
-                  canProvision={canProvision}
-                  onUserDeleted={() => setSelectedPersonId(null)}
                 />
               )}
             </Box>
