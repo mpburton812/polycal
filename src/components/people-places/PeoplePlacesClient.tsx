@@ -24,10 +24,12 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState, useTransition } from "react";
 
 import {
+  checkUsernameAvailableAction,
   createActiveUserAction,
   createPassiveUserAction,
-  checkUsernameAvailableAction,
+  deleteUserAction,
   updateProvisionedUsernameAction,
+  updateUserAction,
   type PersonSummary,
 } from "@/actions/users";
 import {
@@ -96,7 +98,11 @@ function CreateUserDialog({
   }>({ checked: false, available: false, message: "" });
   const [createdUserId, setCreatedUserId] = useState<string | null>(null);
   const [temporaryPassword, setTemporaryPassword] = useState<string | null>(null);
+  const [creationComplete, setCreationComplete] = useState(false);
   const [pending, startTransition] = useTransition();
+
+  const showActiveCredentials = mode === "active" && Boolean(instructions);
+  const formLocked = creationComplete || showActiveCredentials;
 
   if (!canProvision) return null;
 
@@ -109,6 +115,7 @@ function CreateUserDialog({
     setUsernameStatus({ checked: false, available: false, message: "" });
     setCreatedUserId(null);
     setTemporaryPassword(null);
+    setCreationComplete(false);
   }
 
   function handleClose() {
@@ -153,6 +160,10 @@ function CreateUserDialog({
   }
 
   function handleSubmit() {
+    if (creationComplete || showActiveCredentials) {
+      return;
+    }
+
     if (mode === "active" && (!usernameStatus.checked || !usernameStatus.available)) {
       setMessage("Check username availability before creating the account.");
       return;
@@ -170,6 +181,7 @@ function CreateUserDialog({
         setTemporaryPassword(result.temporaryPassword ?? null);
       }
       if (result.ok) {
+        setCreationComplete(true);
         router.refresh();
       }
     });
@@ -189,6 +201,7 @@ function CreateUserDialog({
           <Tabs
             value={mode}
             onChange={(_, value) => {
+              if (formLocked) return;
               setMode(value);
               if (value === "passive") {
                 setInstructions(null);
@@ -211,6 +224,7 @@ function CreateUserDialog({
               onBlur={() => checkUsername()}
               required
               fullWidth
+              disabled={formLocked}
               error={usernameStatus.checked && !usernameStatus.available}
               helperText={
                 usernameStatus.checked
@@ -225,9 +239,10 @@ function CreateUserDialog({
             onChange={(event) => setDisplayName(event.target.value)}
             required
             fullWidth
+            disabled={formLocked}
           />
           {mode === "active" && (
-            <FormControl fullWidth>
+            <FormControl fullWidth disabled={formLocked}>
               <InputLabel id="create-user-role">Role</InputLabel>
               <Select
                 labelId="create-user-role"
@@ -240,7 +255,7 @@ function CreateUserDialog({
               </Select>
             </FormControl>
           )}
-          <FormControl fullWidth>
+          <FormControl fullWidth disabled={formLocked}>
             <InputLabel id="create-user-avatar">Avatar</InputLabel>
             <Select
               labelId="create-user-avatar"
@@ -269,13 +284,31 @@ function CreateUserDialog({
         </Stack>
       </DialogContent>
       <DialogActions>
-        {mode === "active" && instructions && (
-          <Button onClick={() => void copyInstructions()}>Copy instructions</Button>
+        {showActiveCredentials ? (
+          <>
+            <Button onClick={() => void copyInstructions()}>Copy instructions</Button>
+            <Button variant="contained" onClick={handleClose}>
+              Close
+            </Button>
+          </>
+        ) : creationComplete ? (
+          <Button variant="contained" onClick={handleClose}>
+            Close
+          </Button>
+        ) : (
+          <>
+            <Button onClick={handleClose}>Cancel</Button>
+            <Button
+              variant="contained"
+              onClick={handleSubmit}
+              disabled={
+                pending || (mode === "active" && (!usernameStatus.checked || !usernameStatus.available))
+              }
+            >
+              Create
+            </Button>
+          </>
         )}
-        <Button onClick={handleClose}>Close</Button>
-        <Button variant="contained" onClick={handleSubmit} disabled={pending || (mode === "active" && (!usernameStatus.checked || !usernameStatus.available))}>
-          Create
-        </Button>
       </DialogActions>
     </Dialog>
   );
@@ -286,23 +319,45 @@ function PersonDetail({
   people,
   currentUserId,
   isAdmin,
+  onUserDeleted,
 }: {
   person: PersonSummary;
   people: PersonSummary[];
   currentUserId: string;
   isAdmin: boolean;
+  onUserDeleted: () => void;
 }) {
   const router = useRouter();
   const [partnerships, setPartnerships] = useState<PartnershipView[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [partnerTarget, setPartnerTarget] = useState("");
   const [message, setMessage] = useState<string | null>(null);
+  const [editOpen, setEditOpen] = useState(false);
+  const [editDisplayName, setEditDisplayName] = useState(person.displayName);
+  const [editUsername, setEditUsername] = useState(person.username);
+  const [editRole, setEditRole] = useState<"user" | "admin">(
+    person.role === "admin" ? "admin" : "user",
+  );
+  const [editAvatarKey, setEditAvatarKey] = useState(person.avatarKey ?? AVATAR_OPTIONS[0].key);
+  const [editUsernameStatus, setEditUsernameStatus] = useState<{
+    checked: boolean;
+    available: boolean;
+    message: string;
+  }>({ checked: false, available: false, message: "" });
   const [pending, startTransition] = useTransition();
 
   const candidates = useMemo(
     () => people.filter((row) => row.id !== person.id),
     [people, person.id],
   );
+
+  useEffect(() => {
+    setEditDisplayName(person.displayName);
+    setEditUsername(person.username);
+    setEditRole(person.role === "admin" ? "admin" : "user");
+    setEditAvatarKey(person.avatarKey ?? AVATAR_OPTIONS[0].key);
+    setEditUsernameStatus({ checked: false, available: false, message: "" });
+  }, [person]);
 
   function loadPartnerships() {
     startTransition(async () => {
@@ -312,17 +367,78 @@ function PersonDetail({
     });
   }
 
-  if (!loaded) {
-    return (
-      <Button size="small" onClick={loadPartnerships} sx={{ mt: 1 }}>
-        Load sleeping partners
-      </Button>
-    );
+  function checkEditUsername() {
+    if (person.role === "passive" || !editUsername.trim()) {
+      setEditUsernameStatus({ checked: false, available: false, message: "" });
+      return;
+    }
+
+    startTransition(async () => {
+      const result = await checkUsernameAvailableAction(editUsername, person.id);
+      setEditUsernameStatus({
+        checked: true,
+        available: result.available,
+        message: result.message,
+      });
+    });
   }
 
   return (
     <Stack spacing={1.5} sx={{ mt: 2 }}>
-      <Typography variant="subtitle2">Sleeping partners</Typography>
+      {isAdmin && (
+        <Stack direction="row" spacing={1}>
+          <Button
+            size="small"
+            variant="outlined"
+            onClick={() => {
+              setEditDisplayName(person.displayName);
+              setEditUsername(person.username);
+              setEditRole(person.role === "admin" ? "admin" : "user");
+              setEditAvatarKey(person.avatarKey ?? AVATAR_OPTIONS[0].key);
+              setEditUsernameStatus(
+                person.role === "passive"
+                  ? { checked: false, available: false, message: "" }
+                  : { checked: true, available: true, message: "Username unchanged." },
+              );
+              setEditOpen(true);
+            }}
+          >
+            Edit user
+          </Button>
+          <Button
+            size="small"
+            color="error"
+            disabled={person.id === currentUserId}
+            onClick={() =>
+              startTransition(async () => {
+                if (
+                  !window.confirm(
+                    `Delete ${person.displayName}? Their partnerships and place links will be removed.`,
+                  )
+                ) {
+                  return;
+                }
+                const result = await deleteUserAction(person.id);
+                setMessage(result.message);
+                if (result.ok) {
+                  onUserDeleted();
+                  router.refresh();
+                }
+              })
+            }
+          >
+            Delete user
+          </Button>
+        </Stack>
+      )}
+
+      {!loaded ? (
+        <Button size="small" onClick={loadPartnerships}>
+          Load sleeping partners
+        </Button>
+      ) : (
+        <>
+          <Typography variant="subtitle2">Sleeping partners</Typography>
       {partnerships.length === 0 && (
         <Typography variant="body2" color="text.secondary">
           No partnerships yet.
@@ -425,7 +541,112 @@ function PersonDetail({
           </Button>
         </Stack>
       )}
+        </>
+      )}
       {message && <Alert severity="info">{message}</Alert>}
+
+      <Dialog open={editOpen} onClose={() => setEditOpen(false)} fullWidth maxWidth="sm">
+        <DialogTitle>Edit user</DialogTitle>
+        <DialogContent>
+          <Stack spacing={2} sx={{ mt: 1 }}>
+            <TextField
+              label="Display name"
+              value={editDisplayName}
+              onChange={(event) => setEditDisplayName(event.target.value)}
+              fullWidth
+              required
+            />
+            {person.role !== "passive" && (
+              <>
+                <TextField
+                  label="Username"
+                  value={editUsername}
+                  onChange={(event) => {
+                    setEditUsername(event.target.value);
+                    setEditUsernameStatus({ checked: false, available: false, message: "" });
+                  }}
+                  onBlur={() => checkEditUsername()}
+                  fullWidth
+                  required
+                  error={editUsernameStatus.checked && !editUsernameStatus.available}
+                  helperText={
+                    editUsernameStatus.checked
+                      ? editUsernameStatus.message
+                      : "Availability is checked when you leave this field."
+                  }
+                />
+                <FormControl fullWidth>
+                  <InputLabel id={`edit-role-${person.id}`}>Role</InputLabel>
+                  <Select
+                    labelId={`edit-role-${person.id}`}
+                    label="Role"
+                    value={editRole}
+                    onChange={(event) => setEditRole(event.target.value as "user" | "admin")}
+                  >
+                    <MenuItem value="user">User</MenuItem>
+                    <MenuItem value="admin">Admin</MenuItem>
+                  </Select>
+                </FormControl>
+              </>
+            )}
+            <FormControl fullWidth>
+              <InputLabel id={`edit-avatar-${person.id}`}>Avatar</InputLabel>
+              <Select
+                labelId={`edit-avatar-${person.id}`}
+                label="Avatar"
+                value={editAvatarKey}
+                onChange={(event) => setEditAvatarKey(event.target.value)}
+              >
+                {AVATAR_OPTIONS.map((option) => (
+                  <MenuItem key={option.key} value={option.key}>
+                    {option.label}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setEditOpen(false)}>Cancel</Button>
+          <Button
+            variant="contained"
+            disabled={
+              pending ||
+              !editDisplayName.trim() ||
+              (person.role !== "passive" &&
+                editUsername !== person.username &&
+                (!editUsernameStatus.checked || !editUsernameStatus.available))
+            }
+            onClick={() =>
+              startTransition(async () => {
+                if (
+                  person.role !== "passive" &&
+                  editUsername !== person.username &&
+                  (!editUsernameStatus.checked || !editUsernameStatus.available)
+                ) {
+                  setMessage("Check username availability before saving.");
+                  return;
+                }
+                const result = await updateUserAction({
+                  userId: person.id,
+                  displayName: editDisplayName,
+                  avatarKey: editAvatarKey,
+                  ...(person.role !== "passive"
+                    ? { username: editUsername, role: editRole }
+                    : {}),
+                });
+                setMessage(result.message);
+                if (result.ok) {
+                  setEditOpen(false);
+                  router.refresh();
+                }
+              })
+            }
+          >
+            Save
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Stack>
   );
 }
@@ -747,6 +968,7 @@ export function PeoplePlacesClient({
                   people={people}
                   currentUserId={currentUserId}
                   isAdmin={isAdmin}
+                  onUserDeleted={() => setSelectedPersonId(null)}
                 />
               )}
             </Box>
