@@ -219,3 +219,65 @@ export async function updateNotificationPrefsAction(
   revalidatePath("/profile");
   return { ok: true };
 }
+
+/**
+ * Sets password on first login without re-entering the temporary password (PC-10).
+ */
+export async function setInitialPasswordAction(
+  formData: FormData,
+): Promise<ActionResult> {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return { ok: false, error: "Not signed in." };
+  }
+
+  const newPassword = String(formData.get("newPassword") ?? "");
+  const confirmPassword = String(formData.get("confirmPassword") ?? "");
+
+  const initialPasswordSchema = z
+    .object({
+      newPassword: z
+        .string()
+        .min(8, "New password must be at least 8 characters.")
+        .max(128, "New password must be 128 characters or fewer."),
+      confirmPassword: z.string().min(1, "Confirm your new password."),
+    })
+    .refine((data) => data.newPassword === data.confirmPassword, {
+      message: "New password and confirmation do not match.",
+      path: ["confirmPassword"],
+    });
+
+  const parsed = initialPasswordSchema.safeParse({ newPassword, confirmPassword });
+  if (!parsed.success) {
+    return { ok: false, error: formatPasswordErrors(parsed.error) };
+  }
+
+  await ensureDbReady();
+  const db = getDb();
+  const [row] = await db
+    .select()
+    .from(users)
+    .where(eq(users.id, session.user.id))
+    .limit(1);
+  if (!row) {
+    return { ok: false, error: "User not found." };
+  }
+  if (!row.mustChangePassword) {
+    return { ok: false, error: "Use the profile page to change your password." };
+  }
+
+  const passwordHash = await hash(parsed.data.newPassword, 12);
+  const now = new Date().toISOString();
+  await db
+    .update(users)
+    .set({
+      passwordHash,
+      mustChangePassword: false,
+      updatedAt: now,
+    })
+    .where(eq(users.id, session.user.id));
+
+  await logUserActivity(session.user.id, "profile.password_change", "first-login");
+  revalidatePath("/profile");
+  return { ok: true };
+}

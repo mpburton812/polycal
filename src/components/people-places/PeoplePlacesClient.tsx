@@ -66,6 +66,20 @@ function normalizePlaceName(name: string): string {
   return name.trim().toLowerCase();
 }
 
+/** Keeps bedroom label array aligned with count, preserving user-entered names. */
+function syncBedroomNames(count: number, existing: string[]): string[] {
+  const safeCount = Math.max(0, Math.min(20, count));
+  return Array.from({ length: safeCount }, (_, index) => {
+    const value = existing[index]?.trim();
+    return value || `Bedroom ${index + 1}`;
+  });
+}
+
+function bedroomLabelsForForm(count: number, existing: string[]): string[] {
+  const safeCount = Math.max(0, Math.min(20, count));
+  return Array.from({ length: safeCount }, (_, index) => existing[index] ?? "");
+}
+
 function residentStatusColor(status: string): "success" | "warning" | "default" {
   if (status === "accepted") return "success";
   if (status === "proposed") return "warning";
@@ -356,7 +370,7 @@ function PersonDetail({
   }, [person.id, canViewPartnerships]);
 
   return (
-    <Stack spacing={1.5} sx={{ mt: 2 }}>
+    <Stack spacing={1.5} sx={{ mt: 2 }} onClick={(event) => event.stopPropagation()}>
       {canViewPartnerships && (
         <>
           <Typography variant="subtitle2">Sleeping partners</Typography>
@@ -442,6 +456,8 @@ function PersonDetail({
                   label="Propose partner"
                   value={partnerTarget}
                   onChange={(event) => setPartnerTarget(event.target.value)}
+                  onClick={(event) => event.stopPropagation()}
+                  MenuProps={{ disablePortal: false }}
                 >
                   {candidates.map((row) => (
                     <MenuItem key={row.id} value={row.id}>
@@ -501,14 +517,23 @@ function PlaceDetail({
   const [editName, setEditName] = useState(place.name);
   const [editAddress, setEditAddress] = useState(place.address ?? "");
   const [editBedroomCount, setEditBedroomCount] = useState(place.bedroomCount);
+  const [editBedroomLabels, setEditBedroomLabels] = useState<string[]>(
+    bedroomLabelsForForm(place.bedroomCount, place.bedroomNames),
+  );
   const [editNameWarning, setEditNameWarning] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+
+  const canEditPlace = isAdmin || place.createdById === currentUserId;
+  const isResident = residents.some(
+    (row) => row.userId === currentUserId && row.status === "accepted",
+  );
 
   useEffect(() => {
     setResidents(place.residents);
     setEditName(place.name);
     setEditAddress(place.address ?? "");
     setEditBedroomCount(place.bedroomCount);
+    setEditBedroomLabels(bedroomLabelsForForm(place.bedroomCount, place.bedroomNames));
   }, [place]);
 
   function refreshResidents() {
@@ -531,40 +556,47 @@ function PlaceDetail({
 
   return (
     <Stack spacing={1} sx={{ mt: 1 }}>
-      {isAdmin && (
+      {canEditPlace && (
         <Stack direction="row" spacing={1}>
-          <Button
-            size="small"
-            variant="outlined"
-            onClick={() => {
-              setEditName(place.name);
-              setEditAddress(place.address ?? "");
-              setEditBedroomCount(place.bedroomCount);
-              setEditNameWarning(null);
-              setEditOpen(true);
-            }}
-          >
-            Edit place
-          </Button>
-          <Button
-            size="small"
-            color="error"
-            onClick={() =>
-              startTransition(async () => {
-                if (!window.confirm(`Delete ${place.name}? This cannot be undone.`)) {
-                  return;
-                }
-                const result = await deletePlaceAction(place.id);
-                setMessage(result.message);
-                if (result.ok) {
-                  onPlaceUpdated();
-                  router.refresh();
-                }
-              })
-            }
-          >
-            Delete place
-          </Button>
+          {canEditPlace && (
+            <Button
+              size="small"
+              variant="outlined"
+              onClick={() => {
+                setEditName(place.name);
+                setEditAddress(place.address ?? "");
+                setEditBedroomCount(place.bedroomCount);
+                setEditBedroomLabels(
+                  bedroomLabelsForForm(place.bedroomCount, place.bedroomNames),
+                );
+                setEditNameWarning(null);
+                setEditOpen(true);
+              }}
+            >
+              Edit place
+            </Button>
+          )}
+          {isAdmin && (
+            <Button
+              size="small"
+              color="error"
+              onClick={() =>
+                startTransition(async () => {
+                  if (!window.confirm(`Delete ${place.name}? This cannot be undone.`)) {
+                    return;
+                  }
+                  const result = await deletePlaceAction(place.id);
+                  setMessage(result.message);
+                  if (result.ok) {
+                    onPlaceUpdated();
+                    router.refresh();
+                  }
+                })
+              }
+            >
+              Delete place
+            </Button>
+          )}
         </Stack>
       )}
       {place.bedroomNames.length > 0 && (
@@ -620,59 +652,46 @@ function PlaceDetail({
           )}
         </Stack>
       ))}
-      <Stack direction="row" spacing={1} alignItems="center">
-        {isAdmin ? (
-          <>
-            <FormControl size="small" sx={{ minWidth: 180 }}>
-              <InputLabel id={`resident-${place.id}`}>Add resident</InputLabel>
-              <Select
-                labelId={`resident-${place.id}`}
-                label="Add resident"
-                value={targetUserId}
-                onChange={(event) => setTargetUserId(event.target.value)}
-              >
-                {people.map((row) => (
-                  <MenuItem key={row.id} value={row.id}>
-                    {row.displayName}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-            <Button
-              size="small"
-              variant="outlined"
-              disabled={!targetUserId || pending}
-              onClick={() =>
-                startTransition(async () => {
-                  const result = await proposeResidencyAction(place.id, targetUserId);
-                  setMessage(result.message);
-                  setTargetUserId("");
-                  refreshResidents();
-                  router.refresh();
-                })
-              }
+      {isAdmin && (
+        <Stack direction="row" spacing={1} alignItems="center">
+          <FormControl size="small" sx={{ minWidth: 180 }}>
+            <InputLabel id={`resident-${place.id}`}>Add resident</InputLabel>
+            <Select
+              labelId={`resident-${place.id}`}
+              label="Add resident"
+              value={targetUserId}
+              onChange={(event) => setTargetUserId(event.target.value)}
             >
-              Associate
-            </Button>
-          </>
-        ) : (
+              {people.map((row) => (
+                <MenuItem key={row.id} value={row.id}>
+                  {row.displayName}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
           <Button
             size="small"
             variant="outlined"
-            disabled={pending}
+            disabled={!targetUserId || pending}
             onClick={() =>
               startTransition(async () => {
-                const result = await proposeResidencyAction(place.id, currentUserId);
+                const result = await proposeResidencyAction(place.id, targetUserId);
                 setMessage(result.message);
+                setTargetUserId("");
                 refreshResidents();
                 router.refresh();
               })
             }
           >
-            Associate me with this place
+            Associate
           </Button>
-        )}
-      </Stack>
+        </Stack>
+      )}
+      {!isAdmin && isResident && (
+        <Typography variant="caption" color="text.secondary">
+          You are associated with this place.
+        </Typography>
+      )}
       {message && <Alert severity="info">{message}</Alert>}
 
       <Dialog open={editOpen} onClose={() => setEditOpen(false)} fullWidth maxWidth="sm">
@@ -701,10 +720,33 @@ function PlaceDetail({
               label="Bedrooms"
               type="number"
               value={editBedroomCount}
-              onChange={(event) => setEditBedroomCount(Number(event.target.value))}
+              onChange={(event) => {
+                const count = Number(event.target.value);
+                setEditBedroomCount(count);
+                setEditBedroomLabels((current) => syncBedroomNames(count, current));
+              }}
               inputProps={{ min: 0, max: 20 }}
               fullWidth
             />
+            {editBedroomCount > 0 && (
+              <Stack spacing={1}>
+                <Typography variant="subtitle2">Bedroom names (optional)</Typography>
+                {editBedroomLabels.map((label, index) => (
+                  <TextField
+                    key={`edit-bedroom-${index}`}
+                    label={`Bedroom ${index + 1} name`}
+                    value={label}
+                    placeholder={`Bedroom ${index + 1}`}
+                    onChange={(event) => {
+                      const next = [...editBedroomLabels];
+                      next[index] = event.target.value;
+                      setEditBedroomLabels(next);
+                    }}
+                    fullWidth
+                  />
+                ))}
+              </Stack>
+            )}
           </Stack>
         </DialogContent>
         <DialogActions>
@@ -720,6 +762,7 @@ function PlaceDetail({
                   name: editName,
                   address: editAddress || undefined,
                   bedroomCount: editBedroomCount,
+                  bedroomNames: syncBedroomNames(editBedroomCount, editBedroomLabels),
                 });
                 setMessage(result.message);
                 if (result.ok) {
@@ -755,6 +798,7 @@ export function PeoplePlacesClient({
   const [placeName, setPlaceName] = useState("");
   const [placeAddress, setPlaceAddress] = useState("");
   const [bedroomCount, setBedroomCount] = useState(1);
+  const [bedroomLabels, setBedroomLabels] = useState<string[]>([""]);
   const [placeNameWarning, setPlaceNameWarning] = useState<string | null>(null);
   const [placeMessage, setPlaceMessage] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -786,7 +830,9 @@ export function PeoplePlacesClient({
 
       {tab === 0 && (
         <Stack spacing={1}>
-          {people.map((person) => (
+          {people.map((person) => {
+            const canExpand = isAdmin || person.id === currentUserId;
+            return (
             <Box
               key={person.id}
               sx={{
@@ -794,13 +840,20 @@ export function PeoplePlacesClient({
                 border: 1,
                 borderColor: selectedPersonId === person.id ? "primary.main" : "divider",
                 borderRadius: 1,
-                cursor: "pointer",
               }}
-              onClick={() =>
-                setSelectedPersonId((current) => (current === person.id ? null : person.id))
-              }
             >
-              <Stack direction="row" spacing={2} alignItems="center">
+              <Stack
+                direction="row"
+                spacing={2}
+                alignItems="center"
+                onClick={() => {
+                  if (!canExpand) return;
+                  setSelectedPersonId((current) =>
+                    current === person.id ? null : person.id,
+                  );
+                }}
+                sx={{ cursor: canExpand ? "pointer" : "default" }}
+              >
                 <PersonAvatar avatarKey={person.avatarKey} name={person.displayName} />
                 <Box sx={{ flex: 1 }}>
                   <Stack direction="row" spacing={1} alignItems="baseline">
@@ -809,7 +862,7 @@ export function PeoplePlacesClient({
                   </Stack>
                 </Box>
               </Stack>
-              {selectedPersonId === person.id && selectedPerson && (
+              {canExpand && selectedPersonId === person.id && selectedPerson && (
                 <PersonDetail
                   person={selectedPerson}
                   people={people}
@@ -818,7 +871,8 @@ export function PeoplePlacesClient({
                 />
               )}
             </Box>
-          ))}
+          );
+          })}
         </Stack>
       )}
 
@@ -850,10 +904,33 @@ export function PeoplePlacesClient({
               label="Bedrooms"
               type="number"
               value={bedroomCount}
-              onChange={(event) => setBedroomCount(Number(event.target.value))}
+              onChange={(event) => {
+                const count = Number(event.target.value);
+                setBedroomCount(count);
+                setBedroomLabels((current) => bedroomLabelsForForm(count, current));
+              }}
               inputProps={{ min: 0, max: 20 }}
               fullWidth
             />
+            {bedroomCount > 0 && (
+              <Stack spacing={1}>
+                <Typography variant="subtitle2">Bedroom names (optional)</Typography>
+                {bedroomLabels.map((label, index) => (
+                  <TextField
+                    key={`new-bedroom-${index}`}
+                    label={`Bedroom ${index + 1} name`}
+                    value={label}
+                    placeholder={`Bedroom ${index + 1}`}
+                    onChange={(event) => {
+                      const next = [...bedroomLabels];
+                      next[index] = event.target.value;
+                      setBedroomLabels(next);
+                    }}
+                    fullWidth
+                  />
+                ))}
+              </Stack>
+            )}
             <Button
               variant="contained"
               disabled={!placeName.trim() || Boolean(placeNameWarning) || pending}
@@ -864,11 +941,14 @@ export function PeoplePlacesClient({
                     name: placeName,
                     address: placeAddress || undefined,
                     bedroomCount,
+                    bedroomNames: syncBedroomNames(bedroomCount, bedroomLabels),
                   });
                   setPlaceMessage(result.message);
                   if (result.ok) {
                     setPlaceName("");
                     setPlaceAddress("");
+                    setBedroomCount(1);
+                    setBedroomLabels([""]);
                     setPlaceNameWarning(null);
                     router.refresh();
                   }
