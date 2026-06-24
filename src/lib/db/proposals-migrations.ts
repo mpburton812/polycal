@@ -18,6 +18,7 @@ export async function applyProposalsMigrations(sql: Client): Promise<void> {
   await ensureColumn(sql, "proposals", "occurrence_index", "INTEGER");
   await ensureColumn(sql, "proposals", "is_recurrence_parent", "INTEGER NOT NULL DEFAULT 0");
   await ensureColumn(sql, "proposals", "bedroom_index", "INTEGER");
+  await ensureColumn(sql, "proposals", "location_text", "TEXT");
 
   await sql.execute(`
     CREATE TABLE IF NOT EXISTS proposal_invitees (
@@ -87,6 +88,18 @@ export async function applyProposalsMigrations(sql: Client): Promise<void> {
       log_id INTEGER NOT NULL REFERENCES user_activity_log(id),
       dismissed_at TEXT NOT NULL,
       PRIMARY KEY (user_id, log_id)
+    );
+  `);
+
+  await sql.execute(`
+    CREATE TABLE IF NOT EXISTS push_subscriptions (
+      id TEXT PRIMARY KEY NOT NULL,
+      user_id TEXT NOT NULL REFERENCES users(id),
+      endpoint TEXT NOT NULL UNIQUE,
+      p256dh TEXT NOT NULL,
+      auth TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
     );
   `);
 }

@@ -1,6 +1,7 @@
 "use server";
 
 import { compare, hash } from "bcryptjs";
+import { randomUUID } from "node:crypto";
 import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
@@ -218,6 +219,80 @@ export async function updateNotificationPrefsAction(
   await logUserActivity(session.user.id, "profile.notification_prefs_update");
   revalidatePath("/profile");
   return { ok: true };
+}
+
+const notificationEmailSchema = z.string().trim().email("Enter a valid email address.");
+
+/**
+ * Saves notification email and issues a verification token (PC-43).
+ * Email delivery is logged until SMTP is configured.
+ */
+export async function updateNotificationEmailAction(
+  email: string,
+): Promise<{ ok: true; verificationUrl?: string } | { ok: false; error: string }> {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return { ok: false, error: "Not signed in." };
+  }
+
+  const parsed = notificationEmailSchema.safeParse(email);
+  if (!parsed.success) {
+    return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid email." };
+  }
+
+  await ensureDbReady();
+  const db = getDb();
+  const token = `ev-${randomUUID()}`;
+  const now = new Date().toISOString();
+
+  await db
+    .update(users)
+    .set({
+      notificationEmail: parsed.data,
+      emailVerifiedAt: null,
+      emailVerificationToken: token,
+      updatedAt: now,
+    })
+    .where(eq(users.id, session.user.id));
+
+  const baseUrl = process.env.NEXTAUTH_URL ?? "http://localhost:3000";
+  const verificationUrl = `${baseUrl}/api/verify-email?token=${token}`;
+
+  await logUserActivity(
+    session.user.id,
+    "profile.notification_email_pending",
+    JSON.stringify({ email: parsed.data, verificationUrl }),
+  );
+
+  revalidatePath("/profile");
+  return { ok: true, verificationUrl };
+}
+
+/**
+ * Loads notification email state for the signed-in user (PC-43).
+ */
+export async function getNotificationEmailAction(): Promise<{
+  email: string | null;
+  verified: boolean;
+}> {
+  const session = await auth();
+  if (!session?.user?.id) return { email: null, verified: false };
+
+  await ensureDbReady();
+  const db = getDb();
+  const [row] = await db
+    .select({
+      notificationEmail: users.notificationEmail,
+      emailVerifiedAt: users.emailVerifiedAt,
+    })
+    .from(users)
+    .where(eq(users.id, session.user.id))
+    .limit(1);
+
+  return {
+    email: row?.notificationEmail ?? null,
+    verified: Boolean(row?.emailVerifiedAt),
+  };
 }
 
 /**

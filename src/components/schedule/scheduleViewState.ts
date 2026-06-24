@@ -24,25 +24,32 @@ const DEFAULT_STATE = (): ScheduleViewState => ({
  * Reads persisted schedule UI preferences from localStorage (PC-42).
  */
 export function loadScheduleViewState(): ScheduleViewState {
-  if (typeof window === "undefined") return DEFAULT_STATE();
+  const defaults = DEFAULT_STATE();
+  if (typeof window === "undefined") return defaults;
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return DEFAULT_STATE();
+    if (!raw) return defaults;
     const parsed = JSON.parse(raw) as Partial<ScheduleViewState>;
     return {
-      ...DEFAULT_STATE(),
-      ...parsed,
-      filterMode: parsed.filterMode ?? "whole",
+      ...defaults,
+      compact: parsed.compact ?? defaults.compact,
+      filterMode: parsed.filterMode ?? defaults.filterMode,
+      filterPersonId: parsed.filterPersonId ?? defaults.filterPersonId,
+      planningOpen: parsed.planningOpen ?? defaults.planningOpen,
+      // Week anchor always resets to the current week; only other prefs persist (PC-43).
+      weekStartIso: defaults.weekStartIso,
     };
   } catch {
-    return DEFAULT_STATE();
+    return defaults;
   }
 }
 
 /**
  * Persists schedule UI preferences for the next visit (PC-42).
+ * Week anchor is intentionally excluded so the calendar opens on the current week.
  */
 export function saveScheduleViewState(state: ScheduleViewState): void {
   if (typeof window === "undefined") return;
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  const { weekStartIso: _week, ...persisted } = state;
+  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(persisted));
 }

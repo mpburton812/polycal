@@ -2,7 +2,7 @@ import { expect, test } from "./helpers/test";
 
 import { login } from "./helpers/auth";
 import { DEMO, USERS } from "./helpers/constants";
-import { goToProposals, openProposalCard, selectProposalTab } from "./helpers/navigation";
+import { goToProposals, selectProposalTab } from "./helpers/navigation";
 
 function proposalCard(page: import("@playwright/test").Page, title: string) {
   return page.locator(".MuiCard-root").filter({
@@ -24,6 +24,11 @@ test.describe("Proposal draft workflows", () => {
     await page.getByLabel("Description").fill("Automated E2E draft creation.");
     await page.getByRole("button", { name: "Create draft" }).click();
 
+    const dialog = page.getByRole("dialog");
+    await expect(dialog.getByRole("button", { name: "Submit" })).toBeVisible();
+    await dialog.getByRole("button", { name: "Cancel" }).click();
+    await expect(dialog).toBeHidden();
+
     const card = proposalCard(page, title);
     await expect(card).toBeVisible();
     await expect(card.getByText("DRAFT", { exact: true })).toBeVisible();
@@ -36,6 +41,10 @@ test.describe("Proposal draft workflows", () => {
     await page.getByRole("button", { name: "Continue Editing" }).first().click();
     await page.getByLabel("Title").fill(updatedTitle);
     await page.getByRole("button", { name: "Save draft" }).click();
+
+    const dialog = page.getByRole("dialog");
+    await expect(dialog.getByRole("button", { name: "Submit" })).toBeVisible();
+    await dialog.getByRole("button", { name: "Cancel" }).click();
 
     await expect(proposalCard(page, updatedTitle)).toBeVisible();
   });
@@ -62,10 +71,10 @@ test.describe("Proposal submit and conflict warnings", () => {
     await page.getByRole("button", { name: /Leia Organa/i }).click();
     await page.getByRole("button", { name: "Create draft" }).click();
 
-    await openProposalCard(page, title);
-    await page.getByRole("dialog").getByRole("button", { name: "Submit" }).click();
-    // Successful submit closes the detail dialog.
-    await expect(page.getByRole("dialog")).toBeHidden({ timeout: 15_000 });
+    const dialog = page.getByRole("dialog");
+    await expect(dialog.getByRole("button", { name: "Submit" })).toBeVisible();
+    await dialog.getByRole("button", { name: "Submit" }).click();
+    await expect(dialog).toBeHidden({ timeout: 15_000 });
 
     await selectProposalTab(page, "Proposed");
     await expect(proposalCard(page, title)).toBeVisible();

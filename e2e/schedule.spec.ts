@@ -25,7 +25,7 @@ test.describe("Schedule calendar", () => {
   test("opens proposal detail from calendar block", async ({ page }) => {
     await page.getByRole("button", { name: /Yavin 4 victory celebration/i }).click();
     await expect(page.getByRole("dialog")).toBeVisible();
-    await expect(page.getByText("Yavin 4 victory celebration")).toBeVisible();
+    await expect(page.getByRole("dialog").getByRole("heading", { name: "Yavin 4 victory celebration" })).toBeVisible();
   });
 
   test("planning mode lists accessible proposals", async ({ page }) => {

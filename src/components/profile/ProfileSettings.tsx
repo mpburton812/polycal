@@ -24,6 +24,7 @@ import { useState, useTransition } from "react";
 import {
   changePasswordAction,
   updateDisplayNameAction,
+  updateNotificationEmailAction,
   updateNotificationPrefsAction,
   updateProfilePreferencesAction,
 } from "@/actions/profile";
@@ -40,12 +41,16 @@ export function ProfileSettings({
   initialAvatarKey,
   initialTheme,
   initialNotificationPrefs,
+  initialNotificationEmail,
+  initialEmailVerified,
   mustChangePassword,
 }: {
   initialDisplayName: string;
   initialAvatarKey: string | null;
   initialTheme: string;
   initialNotificationPrefs: NotificationPrefs;
+  initialNotificationEmail: string | null;
+  initialEmailVerified: boolean;
   mustChangePassword: boolean;
 }) {
   const router = useRouter();
@@ -58,6 +63,9 @@ export function ProfileSettings({
       : "mint") as UserThemeId,
   );
   const [notificationPrefs, setNotificationPrefs] = useState(initialNotificationPrefs);
+  const [notificationEmail, setNotificationEmail] = useState(initialNotificationEmail ?? "");
+  const [emailVerified, setEmailVerified] = useState(initialEmailVerified);
+  const [emailMessage, setEmailMessage] = useState<string | null>(null);
   const [passwordMessage, setPasswordMessage] = useState<string | null>(null);
   const [prefsMessage, setPrefsMessage] = useState<string | null>(null);
   const [nameMessage, setNameMessage] = useState<string | null>(null);
@@ -137,6 +145,24 @@ export function ProfileSettings({
         return;
       }
       setNotifMessage("Notification preferences saved.");
+    });
+  }
+
+  function handleNotificationEmailSave() {
+    setEmailMessage(null);
+    setNotifError(null);
+    startNotifTransition(async () => {
+      const result = await updateNotificationEmailAction(notificationEmail);
+      if (!result.ok) {
+        setNotifError(result.error);
+        return;
+      }
+      setEmailVerified(false);
+      setEmailMessage(
+        result.verificationUrl
+          ? `Verification link generated (dev): ${result.verificationUrl}`
+          : "Verification email queued.",
+      );
     });
   }
 
@@ -278,8 +304,28 @@ export function ProfileSettings({
           Notifications
         </Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-          Email and SMS delivery will be enabled in a future release (PC-19).
+          In-app notifications are live. Email delivery queues when your address is verified.
         </Typography>
+        <Stack direction="row" spacing={2} alignItems="flex-start" sx={{ mb: 2 }}>
+          <TextField
+            label="Notification email"
+            type="email"
+            value={notificationEmail}
+            onChange={(e) => setNotificationEmail(e.target.value)}
+            fullWidth
+            helperText={
+              emailVerified
+                ? "Verified"
+                : notificationEmail
+                  ? "Pending verification"
+                  : "Optional"
+            }
+          />
+          <Button variant="outlined" onClick={handleNotificationEmailSave} disabled={notifPending}>
+            Save email
+          </Button>
+        </Stack>
+        {emailMessage && <Alert severity="info" sx={{ mb: 2 }}>{emailMessage}</Alert>}
         {notifError && <Alert severity="error" sx={{ mb: 2 }}>{notifError}</Alert>}
         {notifMessage && <Alert severity="success" sx={{ mb: 2 }}>{notifMessage}</Alert>}
         <FormControlLabel
