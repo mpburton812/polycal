@@ -24,8 +24,7 @@ export default async function ProposalsPage() {
         Proposals
       </Typography>
       <Typography color="text.secondary" sx={{ mb: 3 }}>
-        Draft, submit, and track proposals across your network. Voting and scheduling
-        details expand in upcoming Phase 4 milestones.
+        Draft, submit, vote, and resolve proposals. Click any card for details and actions.
       </Typography>
       <ProposalsClient
         board={board}

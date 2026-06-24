@@ -18,39 +18,64 @@ import {
   Typography,
 } from "@mui/material";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 
-import { createDraftProposalAction } from "@/actions/proposals";
-import type { ProposalPlaceOption } from "@/actions/proposals";
+import {
+  createDraftProposalAction,
+  updateDraftProposalAction,
+  type ProposalDetail,
+  type ProposalPlaceOption,
+} from "@/actions/proposals";
 import type { PersonSummary } from "@/actions/users";
 
 type InviteeSelection = "none" | "required" | "optional";
 
-interface CreateProposalDialogProps {
+interface ProposalDraftDialogProps {
   open: boolean;
   onClose: () => void;
   people: PersonSummary[];
   places: ProposalPlaceOption[];
   currentUserId: string;
+  /** When set, dialog edits an existing draft instead of creating one. */
+  initialDetail?: ProposalDetail | null;
+}
+
+function toLocalInput(iso: string | null | undefined): string {
+  if (!iso) return "";
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "";
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+function localInputToIso(value: string): string | undefined {
+  if (!value) return undefined;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return undefined;
+  return date.toISOString();
 }
 
 /**
- * Draft creation dialog — event/sleeping types with invitee weighting (PC-40).
+ * Create or edit a proposal draft with invitees and an optional time window (PC-40).
  */
-export function CreateProposalDialog({
+export function ProposalDraftDialog({
   open,
   onClose,
   people,
   places,
   currentUserId,
-}: CreateProposalDialogProps) {
+  initialDetail,
+}: ProposalDraftDialogProps) {
   const router = useRouter();
+  const isEdit = Boolean(initialDetail);
   const [proposalType, setProposalType] = useState<"event" | "sleeping">("event");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [notes, setNotes] = useState("");
   const [locationId, setLocationId] = useState("");
   const [intentionalSolo, setIntentionalSolo] = useState(false);
+  const [startAt, setStartAt] = useState("");
+  const [endAt, setEndAt] = useState("");
   const [inviteeMode, setInviteeMode] = useState<Record<string, InviteeSelection>>({});
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -59,19 +84,38 @@ export function CreateProposalDialog({
     (person) => person.id !== currentUserId && person.status === "active",
   );
 
-  function resetForm() {
-    setProposalType("event");
-    setTitle("");
-    setDescription("");
-    setNotes("");
-    setLocationId("");
-    setIntentionalSolo(false);
-    setInviteeMode({});
+  useEffect(() => {
+    if (!open) return;
+    if (initialDetail) {
+      setProposalType(initialDetail.proposalType);
+      setTitle(initialDetail.title);
+      setDescription(initialDetail.description ?? "");
+      setNotes(initialDetail.notes ?? "");
+      setLocationId(initialDetail.locationId ?? "");
+      setIntentionalSolo(initialDetail.intentionalSolo);
+      const primarySlot = initialDetail.timeSlots[0];
+      setStartAt(toLocalInput(primarySlot?.startAt));
+      setEndAt(toLocalInput(primarySlot?.endAt));
+      const modes: Record<string, InviteeSelection> = {};
+      for (const invitee of initialDetail.invitees) {
+        modes[invitee.userId] = invitee.role;
+      }
+      setInviteeMode(modes);
+    } else {
+      setProposalType("event");
+      setTitle("");
+      setDescription("");
+      setNotes("");
+      setLocationId("");
+      setIntentionalSolo(false);
+      setStartAt("");
+      setEndAt("");
+      setInviteeMode({});
+    }
     setError(null);
-  }
+  }, [open, initialDetail]);
 
   function handleClose() {
-    resetForm();
     onClose();
   }
 
@@ -84,22 +128,32 @@ export function CreateProposalDialog({
     });
   }
 
-  function handleCreate() {
+  function handleSave() {
     setError(null);
     const invitees = Object.entries(inviteeMode)
       .filter(([, role]) => role === "required" || role === "optional")
       .map(([userId, role]) => ({ userId, role: role as "required" | "optional" }));
 
+    const startIso = localInputToIso(startAt);
+    const endIso = localInputToIso(endAt);
+    const timeSlots =
+      startIso !== undefined ? [{ startAt: startIso, endAt: endIso }] : [];
+
+    const payload = {
+      title,
+      description,
+      proposalType,
+      locationId: locationId || undefined,
+      notes: notes || undefined,
+      intentionalSolo: proposalType === "sleeping" ? intentionalSolo : false,
+      invitees,
+      timeSlots,
+    };
+
     startTransition(async () => {
-      const result = await createDraftProposalAction({
-        title,
-        description,
-        proposalType,
-        locationId: locationId || undefined,
-        notes: notes || undefined,
-        intentionalSolo: proposalType === "sleeping" ? intentionalSolo : false,
-        invitees,
-      });
+      const result = isEdit && initialDetail
+        ? await updateDraftProposalAction({ ...payload, proposalId: initialDetail.id })
+        : await createDraftProposalAction(payload);
       if (!result.ok) {
         setError(result.message);
         return;
@@ -111,7 +165,7 @@ export function CreateProposalDialog({
 
   return (
     <Dialog open={open} onClose={handleClose} fullWidth maxWidth="sm">
-      <DialogTitle>New proposal</DialogTitle>
+      <DialogTitle>{isEdit ? "Edit draft" : "New proposal"}</DialogTitle>
       <DialogContent>
         <Stack spacing={2} sx={{ mt: 1 }}>
           <FormControl fullWidth>
@@ -149,6 +203,22 @@ export function CreateProposalDialog({
             fullWidth
             multiline
             minRows={2}
+          />
+          <TextField
+            label="Start"
+            type="datetime-local"
+            value={startAt}
+            onChange={(event) => setStartAt(event.target.value)}
+            fullWidth
+            InputLabelProps={{ shrink: true }}
+          />
+          <TextField
+            label="End (optional)"
+            type="datetime-local"
+            value={endAt}
+            onChange={(event) => setEndAt(event.target.value)}
+            fullWidth
+            InputLabelProps={{ shrink: true }}
           />
           <FormControl fullWidth>
             <InputLabel id="proposal-place-label">Location (optional)</InputLabel>
@@ -209,7 +279,7 @@ export function CreateProposalDialog({
         <Button
           variant="contained"
           disabled={!title.trim() || !description.trim() || pending}
-          onClick={handleCreate}
+          onClick={handleSave}
         >
           Save draft
         </Button>

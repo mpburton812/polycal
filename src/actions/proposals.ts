@@ -7,6 +7,7 @@ import { z } from "zod";
 
 import { auth } from "@/lib/auth";
 import { userHasAdminAccess } from "@/lib/admin-access";
+import { logUserActivity } from "@/lib/audit";
 import { getDb } from "@/lib/db/client";
 import { ensureDbReady } from "@/lib/db/ensure-ready";
 import {
@@ -14,9 +15,11 @@ import {
   locations,
   proposalInvitees,
   proposalStateLog,
+  proposalTimeSlots,
   proposals,
   users,
   type InviteeRole,
+  type InviteeVoteStatus,
   type ProposalState,
   type ProposalType,
 } from "@/lib/db/schema";
@@ -28,6 +31,12 @@ const inviteeInputSchema = z.object({
   role: z.enum(["required", "optional"]),
 });
 
+const timeSlotInputSchema = z.object({
+  startAt: z.string().min(1),
+  endAt: z.string().optional(),
+  label: z.string().trim().max(120).optional(),
+});
+
 const draftProposalSchema = z.object({
   title: z.string().trim().min(1, "Title is required.").max(200),
   description: z.string().trim().min(1, "Description is required.").max(2000),
@@ -36,6 +45,12 @@ const draftProposalSchema = z.object({
   notes: z.string().trim().max(500).optional(),
   intentionalSolo: z.boolean().optional(),
   invitees: z.array(inviteeInputSchema).optional(),
+  timeSlots: z.array(timeSlotInputSchema).max(10).optional(),
+});
+
+const voteSchema = z.object({
+  proposalId: z.string().min(1),
+  vote: z.enum(["accept", "abstain", "decline", "accept_suboptimal"]),
 });
 
 export interface ProposalCard {
@@ -65,6 +80,44 @@ export interface ProposalPlaceOption {
   id: string;
   name: string;
 }
+
+export interface ProposalInviteeView {
+  userId: string;
+  displayName: string;
+  role: InviteeRole;
+  voteStatus: InviteeVoteStatus;
+}
+
+export interface ProposalTimeSlotView {
+  id: string;
+  startAt: string;
+  endAt: string | null;
+  label: string | null;
+}
+
+export interface ProposalDetail {
+  id: string;
+  title: string;
+  description: string | null;
+  notes: string | null;
+  proposalType: ProposalType;
+  state: ProposalState;
+  proposerId: string;
+  proposerName: string;
+  locationId: string | null;
+  locationName: string | null;
+  intentionalSolo: boolean;
+  scheduledStartAt: string | null;
+  scheduledEndAt: string | null;
+  atRisk: boolean;
+  invitees: ProposalInviteeView[];
+  timeSlots: ProposalTimeSlotView[];
+  canEdit: boolean;
+  canVote: boolean;
+  viewerVoteStatus: InviteeVoteStatus | null;
+}
+
+const APPROVING_VOTES: InviteeVoteStatus[] = ["accept", "abstain", "accept_suboptimal"];
 
 /**
  * Appends an immutable state transition entry for proposal audit (PC-40).
@@ -292,6 +345,165 @@ async function replaceInvitees(
   }
 }
 
+async function replaceTimeSlots(
+  db: ReturnType<typeof getDb>,
+  proposalId: string,
+  slots: { startAt: string; endAt?: string; label?: string }[],
+): Promise<void> {
+  await db.delete(proposalTimeSlots).where(eq(proposalTimeSlots.proposalId, proposalId));
+  const now = new Date().toISOString();
+
+  for (let index = 0; index < slots.length; index += 1) {
+    const slot = slots[index];
+    await db.insert(proposalTimeSlots).values({
+      id: `pts-${randomUUID()}`,
+      proposalId,
+      startAt: slot.startAt,
+      endAt: slot.endAt ?? null,
+      label: slot.label ?? null,
+      sortOrder: index,
+      createdAt: now,
+    });
+  }
+}
+
+function scheduleFromSlots(
+  slots: { startAt: string; endAt: string | null }[],
+): { start: string | null; end: string | null } {
+  if (slots.length === 0) return { start: null, end: null };
+  const sorted = [...slots].sort((a, b) => a.startAt.localeCompare(b.startAt));
+  return { start: sorted[0].startAt, end: sorted[0].endAt };
+}
+
+async function resetInviteeVotes(db: ReturnType<typeof getDb>, proposalId: string): Promise<void> {
+  const now = new Date().toISOString();
+  await db
+    .update(proposalInvitees)
+    .set({ voteStatus: "not_seen", respondedAt: null })
+    .where(eq(proposalInvitees.proposalId, proposalId));
+  await db.update(proposals).set({ updatedAt: now }).where(eq(proposals.id, proposalId));
+}
+
+/**
+ * Moves a proposed item back to drafts after a required decline (PC-40).
+ */
+async function revertProposalToDraft(
+  db: ReturnType<typeof getDb>,
+  proposal: typeof proposals.$inferSelect,
+  actorUserId: string,
+  reason: string,
+): Promise<void> {
+  const now = new Date().toISOString();
+  const noteLine = `Returned to drafts: ${reason}.`;
+
+  await db
+    .update(proposals)
+    .set({
+      state: "draft",
+      atRisk: false,
+      notes: proposal.notes?.trim() ? `${proposal.notes.trim()}\n${noteLine}` : noteLine,
+      updatedAt: now,
+    })
+    .where(eq(proposals.id, proposal.id));
+
+  await resetInviteeVotes(db, proposal.id);
+  await logProposalTransition(db, proposal.id, actorUserId, "proposal.reverted_to_draft", reason);
+
+  const invitees = await db
+    .select({ userId: proposalInvitees.userId })
+    .from(proposalInvitees)
+    .where(eq(proposalInvitees.proposalId, proposal.id));
+
+  const notifyIds = new Set<string>([proposal.proposerId, ...invitees.map((row) => row.userId)]);
+  for (const userId of notifyIds) {
+    await notifyUser(
+      userId,
+      "proposal_reverted_to_draft",
+      `Proposal "${proposal.title}" was moved back to drafts.`,
+      { proposalId: proposal.id, reason },
+    );
+  }
+}
+
+/**
+ * Resolves a proposal when all required invitees have approved (PC-40).
+ */
+async function resolveProposal(
+  db: ReturnType<typeof getDb>,
+  proposal: typeof proposals.$inferSelect,
+  actorUserId: string,
+): Promise<void> {
+  const slots = await db
+    .select({ startAt: proposalTimeSlots.startAt, endAt: proposalTimeSlots.endAt })
+    .from(proposalTimeSlots)
+    .where(eq(proposalTimeSlots.proposalId, proposal.id));
+
+  const schedule = scheduleFromSlots(slots);
+  const now = new Date().toISOString();
+
+  await db
+    .update(proposals)
+    .set({
+      state: "resolved",
+      scheduledStartAt: schedule.start,
+      scheduledEndAt: schedule.end,
+      updatedAt: now,
+    })
+    .where(eq(proposals.id, proposal.id));
+
+  await logProposalTransition(db, proposal.id, actorUserId, "proposal.resolved");
+
+  const invitees = await db
+    .select({ userId: proposalInvitees.userId })
+    .from(proposalInvitees)
+    .where(eq(proposalInvitees.proposalId, proposal.id));
+
+  const notifyIds = new Set<string>([proposal.proposerId, ...invitees.map((row) => row.userId)]);
+  for (const userId of notifyIds) {
+    await notifyUser(
+      userId,
+      "proposal_resolved",
+      `Proposal "${proposal.title}" was approved and scheduled.`,
+      { proposalId: proposal.id },
+    );
+  }
+}
+
+/**
+ * Checks whether a proposed item should resolve or revert after a vote (PC-40).
+ */
+async function evaluateProposalAfterVote(
+  db: ReturnType<typeof getDb>,
+  proposalId: string,
+  actorUserId: string,
+): Promise<void> {
+  const [proposal] = await db
+    .select()
+    .from(proposals)
+    .where(eq(proposals.id, proposalId))
+    .limit(1);
+  if (!proposal || proposal.state !== "proposed") return;
+
+  const invitees = await db
+    .select()
+    .from(proposalInvitees)
+    .where(eq(proposalInvitees.proposalId, proposalId));
+
+  const required = invitees.filter((row) => row.role === "required");
+  const declinedRequired = required.find((row) => row.voteStatus === "decline");
+  if (declinedRequired) {
+    await revertProposalToDraft(db, proposal, actorUserId, "A required invitee declined.");
+    return;
+  }
+
+  const pendingRequired = required.filter((row) => row.voteStatus === "not_seen");
+  if (pendingRequired.length > 0) return;
+
+  if (required.length === 0 || required.every((row) => APPROVING_VOTES.includes(row.voteStatus))) {
+    await resolveProposal(db, proposal, actorUserId);
+  }
+}
+
 /**
  * Creates a new draft proposal for the signed-in user (PC-40).
  */
@@ -341,6 +553,10 @@ export async function createDraftProposalAction(
 
   if (parsed.data.invitees?.length) {
     await replaceInvitees(db, proposalId, session.user.id, parsed.data.invitees);
+  }
+
+  if (parsed.data.timeSlots) {
+    await replaceTimeSlots(db, proposalId, parsed.data.timeSlots);
   }
 
   await logProposalTransition(db, proposalId, session.user.id, "draft.created");
@@ -407,6 +623,10 @@ export async function updateDraftProposalAction(
     await replaceInvitees(db, proposal.id, session.user.id, parsed.data.invitees);
   }
 
+  if (parsed.data.timeSlots) {
+    await replaceTimeSlots(db, proposal.id, parsed.data.timeSlots);
+  }
+
   await logProposalTransition(db, proposal.id, session.user.id, "draft.updated");
   revalidatePath("/proposals");
 
@@ -414,15 +634,16 @@ export async function updateDraftProposalAction(
 }
 
 /**
- * Returns true when a sleeping proposal should auto-resolve (sole proposer invitee).
+ * Returns true when a proposal should auto-resolve on submit (solo sleeping or no required invitees).
  */
-function shouldAutoResolveSleeping(
+function shouldAutoResolveOnSubmit(
   proposalType: ProposalType,
   intentionalSolo: boolean,
   requiredInviteeCount: number,
 ): boolean {
+  if (requiredInviteeCount === 0) return true;
   if (proposalType !== "sleeping") return false;
-  return intentionalSolo || requiredInviteeCount === 0;
+  return intentionalSolo;
 }
 
 /**
@@ -458,18 +679,29 @@ export async function submitProposalAction(
     .where(eq(proposalInvitees.proposalId, proposalId));
 
   const requiredCount = invitees.filter((row) => row.role === "required").length;
-  const autoResolve = shouldAutoResolveSleeping(
+  const autoResolve = shouldAutoResolveOnSubmit(
     proposal.proposalType,
     proposal.intentionalSolo,
     requiredCount,
   );
 
+  const slots = await db
+    .select({ startAt: proposalTimeSlots.startAt, endAt: proposalTimeSlots.endAt })
+    .from(proposalTimeSlots)
+    .where(eq(proposalTimeSlots.proposalId, proposalId));
+
+  const schedule = autoResolve ? scheduleFromSlots(slots) : { start: null, end: null };
   const now = new Date().toISOString();
   const nextState: ProposalState = autoResolve ? "resolved" : "proposed";
 
   await db
     .update(proposals)
-    .set({ state: nextState, updatedAt: now })
+    .set({
+      state: nextState,
+      scheduledStartAt: schedule.start,
+      scheduledEndAt: schedule.end,
+      updatedAt: now,
+    })
     .where(eq(proposals.id, proposalId));
 
   await logProposalTransition(
@@ -500,7 +732,233 @@ export async function submitProposalAction(
   return {
     ok: true,
     message: autoResolve
-      ? "Sleeping proposal auto-approved and resolved."
+      ? "Proposal auto-approved and resolved."
       : "Proposal submitted to your network.",
   };
+}
+
+/**
+ * Loads proposal detail for view, edit, or voting (PC-40).
+ */
+export async function getProposalDetailAction(
+  proposalId: string,
+): Promise<{ ok: boolean; message: string; detail?: ProposalDetail }> {
+  const session = await auth();
+  if (!session?.user) {
+    return { ok: false, message: "Sign in required." };
+  }
+
+  await ensureDbReady();
+  const db = getDb();
+  const isAdmin = await userHasAdminAccess(session.user.role);
+
+  const [row] = await db
+    .select({
+      id: proposals.id,
+      title: proposals.title,
+      description: proposals.description,
+      notes: proposals.notes,
+      proposalType: proposals.proposalType,
+      state: proposals.state,
+      proposerId: proposals.proposerId,
+      proposerName: users.displayName,
+      locationId: proposals.locationId,
+      locationName: locations.name,
+      intentionalSolo: proposals.intentionalSolo,
+      scheduledStartAt: proposals.scheduledStartAt,
+      scheduledEndAt: proposals.scheduledEndAt,
+      atRisk: proposals.atRisk,
+    })
+    .from(proposals)
+    .innerJoin(users, eq(proposals.proposerId, users.id))
+    .leftJoin(locations, eq(proposals.locationId, locations.id))
+    .where(eq(proposals.id, proposalId))
+    .limit(1);
+
+  if (!row) {
+    return { ok: false, message: "Proposal not found." };
+  }
+
+  const inviteeRows = await db
+    .select({
+      userId: proposalInvitees.userId,
+      displayName: users.displayName,
+      role: proposalInvitees.role,
+      voteStatus: proposalInvitees.voteStatus,
+    })
+    .from(proposalInvitees)
+    .innerJoin(users, eq(proposalInvitees.userId, users.id))
+    .where(eq(proposalInvitees.proposalId, proposalId));
+
+  const inviteeUserIds = inviteeRows.map((invitee) => invitee.userId);
+  if (row.state === "draft" && row.proposerId !== session.user.id) {
+    return { ok: false, message: "Proposal not found." };
+  }
+  if (
+    row.state !== "draft" &&
+    !viewerCanSeeProposal(session.user.id, isAdmin, row.proposerId, inviteeUserIds)
+  ) {
+    return { ok: false, message: "Proposal not found." };
+  }
+
+  const slotRows = await db
+    .select()
+    .from(proposalTimeSlots)
+    .where(eq(proposalTimeSlots.proposalId, proposalId))
+    .orderBy(asc(proposalTimeSlots.sortOrder));
+
+  const viewerInvitee = inviteeRows.find((invitee) => invitee.userId === session.user.id);
+
+  return {
+    ok: true,
+    message: "Loaded.",
+    detail: {
+      id: row.id,
+      title: row.title,
+      description: row.description,
+      notes: row.notes,
+      proposalType: row.proposalType,
+      state: row.state,
+      proposerId: row.proposerId,
+      proposerName: row.proposerName,
+      locationId: row.locationId ?? null,
+      locationName: row.locationName ?? null,
+      intentionalSolo: row.intentionalSolo,
+      scheduledStartAt: row.scheduledStartAt ?? null,
+      scheduledEndAt: row.scheduledEndAt ?? null,
+      atRisk: row.atRisk,
+      invitees: inviteeRows.map((invitee) => ({
+        userId: invitee.userId,
+        displayName: invitee.displayName,
+        role: invitee.role,
+        voteStatus: invitee.voteStatus,
+      })),
+      timeSlots: slotRows.map((slot) => ({
+        id: slot.id,
+        startAt: slot.startAt,
+        endAt: slot.endAt ?? null,
+        label: slot.label ?? null,
+      })),
+      canEdit: row.state === "draft" && row.proposerId === session.user.id,
+      canVote:
+        row.state === "proposed" &&
+        viewerInvitee !== undefined &&
+        viewerInvitee.voteStatus === "not_seen",
+      viewerVoteStatus: viewerInvitee?.voteStatus ?? null,
+    },
+  };
+}
+
+/**
+ * Records an invitee vote and advances workflow when thresholds are met (PC-40).
+ */
+export async function castProposalVoteAction(
+  input: z.infer<typeof voteSchema>,
+): Promise<{ ok: boolean; message: string }> {
+  const session = await auth();
+  if (!session?.user) {
+    return { ok: false, message: "Sign in required." };
+  }
+
+  const parsed = voteSchema.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, message: "Invalid vote." };
+  }
+
+  await ensureDbReady();
+  const db = getDb();
+
+  const [proposal] = await db
+    .select()
+    .from(proposals)
+    .where(eq(proposals.id, parsed.data.proposalId))
+    .limit(1);
+  if (!proposal || proposal.state !== "proposed") {
+    return { ok: false, message: "Proposal is not open for voting." };
+  }
+
+  const [invitee] = await db
+    .select()
+    .from(proposalInvitees)
+    .where(
+      and(
+        eq(proposalInvitees.proposalId, parsed.data.proposalId),
+        eq(proposalInvitees.userId, session.user.id),
+      ),
+    )
+    .limit(1);
+
+  if (!invitee) {
+    return { ok: false, message: "You are not an invitee on this proposal." };
+  }
+
+  if (invitee.voteStatus !== "not_seen" && invitee.role === "required") {
+    return { ok: false, message: "You have already voted on this proposal." };
+  }
+
+  const now = new Date().toISOString();
+  await db
+    .update(proposalInvitees)
+    .set({
+      voteStatus: parsed.data.vote,
+      respondedAt: now,
+    })
+    .where(eq(proposalInvitees.id, invitee.id));
+
+  await logProposalTransition(
+    db,
+    proposal.id,
+    session.user.id,
+    "proposal.vote_cast",
+    JSON.stringify({ vote: parsed.data.vote, role: invitee.role }),
+  );
+
+  await notifyUser(proposal.proposerId, "proposal_vote_cast", `A vote was cast on "${proposal.title}".`, {
+    proposalId: proposal.id,
+    voterId: session.user.id,
+    vote: parsed.data.vote,
+  });
+
+  if (invitee.role === "required") {
+    await evaluateProposalAfterVote(db, proposal.id, session.user.id);
+  }
+
+  revalidatePath("/proposals");
+  revalidatePath("/schedule");
+
+  return { ok: true, message: "Vote recorded." };
+}
+
+/**
+ * Deletes a draft owned by the signed-in user (PC-40).
+ */
+export async function deleteDraftProposalAction(
+  proposalId: string,
+): Promise<{ ok: boolean; message: string }> {
+  const session = await auth();
+  if (!session?.user) {
+    return { ok: false, message: "Sign in required." };
+  }
+
+  await ensureDbReady();
+  const db = getDb();
+  const [proposal] = await db
+    .select()
+    .from(proposals)
+    .where(eq(proposals.id, proposalId))
+    .limit(1);
+
+  if (!proposal || proposal.proposerId !== session.user.id || proposal.state !== "draft") {
+    return { ok: false, message: "Draft not found." };
+  }
+
+  await db.delete(proposalTimeSlots).where(eq(proposalTimeSlots.proposalId, proposalId));
+  await db.delete(proposalInvitees).where(eq(proposalInvitees.proposalId, proposalId));
+  await db.delete(proposalStateLog).where(eq(proposalStateLog.proposalId, proposalId));
+  await db.delete(proposals).where(eq(proposals.id, proposalId));
+
+  await logUserActivity(session.user.id, "proposals.draft_delete", proposalId);
+  revalidatePath("/proposals");
+
+  return { ok: true, message: "Draft deleted." };
 }
