@@ -1,9 +1,17 @@
 "use client";
 
+import AccessTimeIcon from "@mui/icons-material/AccessTime";
+import EventNoteOutlinedIcon from "@mui/icons-material/EventNoteOutlined";
+import LocationOnOutlinedIcon from "@mui/icons-material/LocationOnOutlined";
+import NotesOutlinedIcon from "@mui/icons-material/NotesOutlined";
+import PollOutlinedIcon from "@mui/icons-material/PollOutlined";
 import {
   Alert,
   Box,
   Button,
+  Card,
+  CardActions,
+  CardContent,
   Chip,
   Dialog,
   DialogActions,
@@ -21,8 +29,6 @@ import {
   TableHead,
   TableRow,
   TextField,
-  ToggleButton,
-  ToggleButtonGroup,
   Typography,
 } from "@mui/material";
 import { useRouter } from "next/navigation";
@@ -33,6 +39,7 @@ import {
   cancelProposalAction,
   castProposalVoteAction,
   castSlotVoteAction,
+  cloneProposalAction,
   deleteDraftProposalAction,
   getProposalDetailAction,
   redraftProposalAction,
@@ -44,14 +51,14 @@ import {
 import type { InviteeVoteStatus } from "@/lib/db/schema";
 import type { PersonSummary } from "@/actions/users";
 
-const POLY_GREEN = "#004d40";
-
-function formatWhen(start: string | null, end: string | null): string | null {
-  if (!start) return null;
-  const startLabel = new Date(start).toLocaleString();
-  if (!end) return startLabel;
-  return `${startLabel} – ${new Date(end).toLocaleString()}`;
-}
+import {
+  formatTimeRange,
+  POLY_GREEN,
+  primaryButtonSx,
+  proposalCardSx,
+  typeBadgeLabel,
+  typeChipSx,
+} from "./proposalCardTheme";
 
 function voteLabel(status: string): string {
   if (status === "not_seen") return "Not yet viewed";
@@ -88,6 +95,7 @@ export function ProposalDetailDialog({
   const [conflictWarnings, setConflictWarnings] = useState<ProposalConflictWarning[]>([]);
   const [showConflictConfirm, setShowConflictConfirm] = useState(false);
   const [addAttendeeId, setAddAttendeeId] = useState("");
+  const [cancelScopeOpen, setCancelScopeOpen] = useState(false);
   const [pending, startTransition] = useTransition();
 
   function reloadDetail(id: string) {
@@ -172,14 +180,38 @@ export function ProposalDetailDialog({
     });
   }
 
-  function handleCancel() {
-    if (!proposalId || !window.confirm("Cancel this proposal? It will be archived.")) return;
+  function handleCancel(scope: "occurrence" | "series" = "occurrence") {
+    if (!proposalId) return;
     startTransition(async () => {
-      const result = await cancelProposalAction(proposalId);
+      const result = await cancelProposalAction(proposalId, scope);
       setMessage(result.message);
+      setCancelScopeOpen(false);
       if (!result.ok) return;
       reloadDetail(proposalId);
       router.refresh();
+    });
+  }
+
+  function handleCancelClick() {
+    if (!detail) return;
+    if (detail.isRecurring) {
+      setCancelScopeOpen(true);
+      return;
+    }
+    if (!window.confirm("Cancel this proposal? It will be archived.")) return;
+    handleCancel("occurrence");
+  }
+
+  function handleClone() {
+    if (!proposalId) return;
+    startTransition(async () => {
+      const result = await cloneProposalAction(proposalId);
+      setMessage(result.message);
+      if (!result.ok) return;
+      router.refresh();
+      if (result.newProposalId) {
+        reloadDetail(result.newProposalId);
+      }
     });
   }
 
@@ -241,36 +273,47 @@ export function ProposalDetailDialog({
   }
 
   const whenLabel = detail
-    ? formatWhen(detail.scheduledStartAt, detail.scheduledEndAt) ??
+    ? formatTimeRange(detail.scheduledStartAt, detail.scheduledEndAt) ??
       (detail.timeSlots[0]
-        ? formatWhen(detail.timeSlots[0].startAt, detail.timeSlots[0].endAt)
+        ? formatTimeRange(detail.timeSlots[0].startAt, detail.timeSlots[0].endAt)
         : null)
     : null;
 
   const isPollMatrix = detail?.isPoll && (detail.timeSlots.length ?? 0) > 1;
 
   return (
-    <Dialog open={open} onClose={onClose} fullWidth maxWidth="md">
-      <DialogTitle>{detail?.title ?? "Proposal"}</DialogTitle>
-      <DialogContent>
-        <Stack spacing={2} sx={{ mt: 1 }}>
-          {error && <Alert severity="error">{error}</Alert>}
-          {message && <Alert severity="info">{message}</Alert>}
+    <>
+    <Dialog
+      open={open}
+      onClose={onClose}
+      fullWidth
+      maxWidth="md"
+      PaperProps={{ sx: { bgcolor: "transparent", boxShadow: "none", overflow: "visible" } }}
+    >
+      <Card variant="outlined" sx={{ ...proposalCardSx, bgcolor: "background.paper" }}>
+        <CardContent sx={{ pb: 1 }}>
+          {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+          {message && <Alert severity="info" sx={{ mb: 2 }}>{message}</Alert>}
+          {detail?.isContentMasked && (
+            <Alert severity="warning" sx={{ mb: 2 }}>
+              This is a private event. Details are hidden because you are not an invitee.
+            </Alert>
+          )}
           {showConflictConfirm && conflictWarnings.length > 0 && (
-            <Alert severity="warning">
+            <Alert severity="warning" sx={{ mb: 2 }}>
               <Typography variant="subtitle2" gutterBottom>
                 Schedule conflicts
               </Typography>
               {conflictWarnings.map((w, i) => (
                 <Typography key={`${w.userId}-${i}`} variant="body2">
-                  {w.displayName} overlaps with &quot;{w.conflictingTitle}&quot; (
-                  {w.conflictingState})
+                  {w.conflictKind === "place_asset" ? "Place" : w.displayName} overlaps with
+                  &quot;{w.conflictingTitle}&quot; ({w.conflictingState})
                 </Typography>
               ))}
               <Button
                 size="small"
                 variant="contained"
-                sx={{ mt: 1, bgcolor: POLY_GREEN }}
+                sx={{ mt: 1, ...primaryButtonSx }}
                 onClick={() => handleSubmit(true)}
                 disabled={pending}
               >
@@ -278,33 +321,62 @@ export function ProposalDetailDialog({
               </Button>
             </Alert>
           )}
+
           {detail && (
             <>
-              <Stack direction="row" spacing={1} flexWrap="wrap">
-                <Chip size="small" label={detail.proposalType} />
-                <Chip size="small" label={detail.state} variant="outlined" />
-                <Chip size="small" label={detail.eventPrivacy} variant="outlined" />
-                {detail.isPoll && <Chip size="small" label="Poll" color="info" />}
+              <Stack direction="row" justifyContent="space-between" alignItems="flex-start" sx={{ mb: 1 }}>
+                <Chip label={typeBadgeLabel(detail.proposalType)} size="small" sx={typeChipSx} />
+                <Typography variant="caption" color="text.secondary" sx={{ textAlign: "right" }}>
+                  PROPOSED BY {detail.proposerName.toUpperCase()}
+                </Typography>
+              </Stack>
+
+              <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" sx={{ mb: 1 }}>
+                <Typography variant="h6" component="h2" sx={{ fontSize: "1.1rem", fontWeight: 600 }}>
+                  {detail.title}
+                </Typography>
+                <Chip label={detail.state.toUpperCase()} size="small" variant="outlined" sx={{ fontWeight: 600, fontSize: "0.65rem" }} />
+                {detail.isPoll && (
+                  <Chip icon={<PollOutlinedIcon sx={{ fontSize: "14px !important" }} />} label="Poll" size="small" sx={{ bgcolor: POLY_GREEN, color: "#fff", fontSize: "0.65rem" }} />
+                )}
                 {detail.atRisk && <Chip size="small" label="At risk" color="warning" />}
+                {detail.isRecurring && <Chip size="small" label="Recurring" variant="outlined" />}
                 {detail.winningSlotId && (
-                  <Chip size="small" label="Winning slot chosen" sx={{ bgcolor: POLY_GREEN, color: "#fff" }} />
+                  <Chip size="small" label="Winning slot" sx={{ bgcolor: POLY_GREEN, color: "#fff" }} />
                 )}
               </Stack>
-              <Typography variant="body2">{detail.description}</Typography>
-              {detail.notes && (
-                <Typography variant="body2" color="text.secondary">
-                  Notes: {detail.notes}
-                </Typography>
+
+              {!detail.isContentMasked && detail.description && (
+                <Stack direction="row" spacing={0.5} alignItems="flex-start" sx={{ mb: 1 }}>
+                  <EventNoteOutlinedIcon sx={{ fontSize: 18, color: "text.secondary", mt: 0.25 }} />
+                  <Typography variant="body2">{detail.description}</Typography>
+                </Stack>
               )}
-              <Typography variant="body2" color="text.secondary">
-                Proposer: {detail.proposerName}
-                {detail.locationName ? ` · ${detail.locationName}` : ""}
-              </Typography>
+
               {whenLabel && (
-                <Typography variant="body2" color="text.secondary">
-                  When: {whenLabel}
-                </Typography>
+                <Stack direction="row" spacing={0.5} alignItems="center" sx={{ mt: 0.5 }}>
+                  <AccessTimeIcon sx={{ fontSize: 16, color: "text.secondary" }} />
+                  <Typography variant="body2" color="text.secondary">{whenLabel}</Typography>
+                </Stack>
               )}
+
+              {detail.locationName && (
+                <Stack direction="row" spacing={0.5} alignItems="center" sx={{ mt: 0.5 }}>
+                  <LocationOnOutlinedIcon sx={{ fontSize: 16, color: "text.secondary" }} />
+                  <Typography variant="body2" color="text.secondary">{detail.locationName}</Typography>
+                </Stack>
+              )}
+
+              {detail.notes && (
+                <Stack direction="row" spacing={0.5} alignItems="flex-start" sx={{ mt: 1 }}>
+                  <NotesOutlinedIcon sx={{ fontSize: 16, color: "text.secondary", mt: 0.25 }} />
+                  <Typography variant="body2" color="text.secondary">{detail.notes}</Typography>
+                </Stack>
+              )}
+
+              <Stack direction="row" spacing={1} flexWrap="wrap" sx={{ mt: 1 }}>
+                <Chip size="small" label={detail.eventPrivacy} variant="outlined" />
+              </Stack>
 
               {isPollMatrix && (
                 <>
@@ -334,7 +406,7 @@ export function ProposalDetailDialog({
                             <TableRow key={slot.id} sx={detail.winningSlotId === slot.id ? { bgcolor: "#e8f5e9" } : undefined}>
                               <TableCell>
                                 {slot.label ? `${slot.label}: ` : ""}
-                                {formatWhen(slot.startAt, slot.endAt)}
+                                {formatTimeRange(slot.startAt, slot.endAt)}
                               </TableCell>
                               {(["accept", "accept_suboptimal", "abstain", "decline"] as const).map(
                                 (vote) => (
@@ -562,40 +634,63 @@ export function ProposalDetailDialog({
               )}
             </>
           )}
-        </Stack>
+        </CardContent>
+        <CardActions sx={{ px: 2, pb: 2, pt: 0, flexWrap: "wrap", gap: 1 }}>
+          {detail?.canCancel && (
+            <Button color="error" onClick={handleCancelClick} disabled={pending}>
+              Cancel
+            </Button>
+          )}
+          {detail?.canClone && (
+            <Button onClick={handleClone} disabled={pending}>
+              Clone
+            </Button>
+          )}
+          {detail?.canRedraft && (
+            <Button onClick={handleRedraft} disabled={pending}>
+              Re-draft
+            </Button>
+          )}
+          {detail?.canEdit && (
+            <>
+              <Button color="error" onClick={handleDelete} disabled={pending}>
+                Delete
+              </Button>
+              <Button onClick={() => onEdit(detail)} disabled={pending}>
+                Edit
+              </Button>
+              <Button
+                variant="contained"
+                onClick={() => handleSubmit(false)}
+                disabled={pending}
+                sx={primaryButtonSx}
+              >
+                Submit
+              </Button>
+            </>
+          )}
+          <Button onClick={onClose}>Close</Button>
+        </CardActions>
+      </Card>
+    </Dialog>
+    <Dialog open={cancelScopeOpen} onClose={() => setCancelScopeOpen(false)}>
+      <DialogTitle>Cancel recurring proposal</DialogTitle>
+      <DialogContent>
+        <Typography variant="body2" sx={{ mt: 1 }}>
+          Apply cancellation to this occurrence only, or the entire series?
+        </Typography>
       </DialogContent>
       <DialogActions>
-        {detail?.canCancel && (
-          <Button color="error" onClick={handleCancel} disabled={pending}>
-            Cancel
-          </Button>
-        )}
-        {detail?.canRedraft && (
-          <Button onClick={handleRedraft} disabled={pending}>
-            Re-draft
-          </Button>
-        )}
-        {detail?.canEdit && (
-          <>
-            <Button color="error" onClick={handleDelete} disabled={pending}>
-              Delete
-            </Button>
-            <Button onClick={() => onEdit(detail)} disabled={pending}>
-              Edit
-            </Button>
-            <Button
-              variant="contained"
-              onClick={() => handleSubmit(false)}
-              disabled={pending}
-              sx={{ bgcolor: POLY_GREEN }}
-            >
-              Submit
-            </Button>
-          </>
-        )}
-        <Button onClick={onClose}>Close</Button>
+        <Button onClick={() => setCancelScopeOpen(false)}>Back</Button>
+        <Button color="error" onClick={() => handleCancel("occurrence")} disabled={pending}>
+          This occurrence only
+        </Button>
+        <Button color="error" variant="contained" onClick={() => handleCancel("series")} disabled={pending}>
+          Entire series
+        </Button>
       </DialogActions>
     </Dialog>
+    </>
   );
 }
 
