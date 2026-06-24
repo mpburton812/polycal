@@ -67,3 +67,4 @@
 2026-06-24 | pending | PC-43 | Notification email verification hook on profile | src/actions/profile.ts
 2026-06-24 | pending | PC-43 | Solo event toggle and post-create Submit in draft dialog | src/components/proposals/ProposalDraftDialog.tsx
 2026-06-24 | pending | PC-43 | Calendar blocks show stakeholders; week anchor resets to today | src/components/schedule/ScheduleEventBlock.tsx
+2026-06-24 | fc0c8aa | PC-43 | Phase 5 notifications and proposal UX fixes | src/actions/partnerships.ts
