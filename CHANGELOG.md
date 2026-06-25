@@ -8,6 +8,12 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- PC-48: Attendee-update one-click notifications (maintain accept / decline) after proposer removes required invitees; at-risk resolved flow with proposer options, tentative calendar styling, and auto-cancel enforcement.
+- PC-48: Recurring series archive when past final child occurrence; cron enforcement API (`/api/cron/enforcement`) protected by `CRON_SECRET`.
+- PC-48: User-selectable timezone in profile; schedule display normalization; admin reschedule from calendar detail.
+- PC-48: Places list collapsible by default (name, bedrooms, residents summary); clone proposal opens draft editor.
+- PC-48: MUI X date/time pickers with analog clock for event draft start/end times; calendar picker for sleeping dates.
+
 - Phase 9 enforcement (PC-46): admin-configurable proposed TTL, at-risk TTL, archive grace, and redraft deadline; proposed expiration, auto-archive after event end, centralized enforcement runner; overlap acknowledge/decline flow for voters.
 
 ### Fixed

@@ -62,6 +62,7 @@ import {
   PAST_SCHEDULE_ICON,
   PAST_SCHEDULE_TEXT,
 } from "./proposalCardTheme";
+import { ProposalScheduleField } from "./ProposalScheduleFields";
 
 type InviteeSelection = "none" | "required" | "optional";
 
@@ -738,23 +739,17 @@ export function ProposalDraftDialog({
             )}
             {batchMode ? (
               <>
-                <TextField
+                <ProposalScheduleField
                   label="Range start"
-                  type={proposalType === "sleeping" ? "date" : "datetime-local"}
+                  mode={proposalType === "sleeping" ? "date" : "datetime"}
                   value={rangeStart}
-                  onChange={(event) => setRangeStart(event.target.value)}
-                  fullWidth
-                  size="small"
-                  InputLabelProps={{ shrink: true }}
+                  onChange={setRangeStart}
                 />
-                <TextField
+                <ProposalScheduleField
                   label="Range end"
-                  type={proposalType === "sleeping" ? "date" : "datetime-local"}
+                  mode={proposalType === "sleeping" ? "date" : "datetime"}
                   value={rangeEnd}
-                  onChange={(event) => setRangeEnd(event.target.value)}
-                  fullWidth
-                  size="small"
-                  InputLabelProps={{ shrink: true }}
+                  onChange={setRangeEnd}
                 />
                 <FormControl fullWidth size="small">
                   <InputLabel id="nights-pattern-label">Nights pattern</InputLabel>
@@ -800,33 +795,27 @@ export function ProposalDraftDialog({
                       />
                     )}
                     <Stack spacing={1}>
-                      <TextField
+                      <ProposalScheduleField
                         label={proposalType === "sleeping" ? "Night of" : "Start"}
-                        type={proposalType === "sleeping" ? "date" : "datetime-local"}
+                        mode={proposalType === "sleeping" ? "date" : "datetime"}
                         value={slot.startAt}
-                        onChange={(event) => {
-                          const next = [...slots];
-                          next[index] = { ...next[index], startAt: event.target.value };
-                          setSlots(next);
+                        onChange={(next) => {
+                          const updated = [...slots];
+                          updated[index] = { ...updated[index], startAt: next };
+                          setSlots(updated);
                         }}
-                        fullWidth
-                        size="small"
-                        InputLabelProps={{ shrink: true }}
                       />
-                      <TextField
+                      <ProposalScheduleField
                         label={
                           proposalType === "sleeping" ? "Through (optional)" : "End (optional)"
                         }
-                        type={proposalType === "sleeping" ? "date" : "datetime-local"}
+                        mode={proposalType === "sleeping" ? "date" : "datetime"}
                         value={slot.endAt}
-                        onChange={(event) => {
-                          const next = [...slots];
-                          next[index] = { ...next[index], endAt: event.target.value };
-                          setSlots(next);
+                        onChange={(next) => {
+                          const updated = [...slots];
+                          updated[index] = { ...updated[index], endAt: next };
+                          setSlots(updated);
                         }}
-                        fullWidth
-                        size="small"
-                        InputLabelProps={{ shrink: true }}
                       />
                     </Stack>
                   </Box>

@@ -52,56 +52,70 @@ export function eventInRange(
   return intervalsOverlap(startAt, eventEnd, rangeStart, rangeEnd);
 }
 
-/** Formats a day column header (e.g. "Mon 6/24"). */
-export function formatDayHeader(date: Date): string {
-  return date.toLocaleDateString(undefined, { weekday: "short", month: "numeric", day: "numeric" });
+/** Formats a day column header (e.g. "Mon 6/24") in the viewer timezone. */
+export function formatDayHeader(date: Date, timeZone = "UTC"): string {
+  return date.toLocaleDateString(undefined, {
+    weekday: "short",
+    month: "numeric",
+    day: "numeric",
+    timeZone,
+  });
 }
 
-/** Formats a time or date span for calendar blocks. */
+/** Formats a time or date span for calendar blocks in the viewer timezone. */
 export function formatEventTime(
   startAt: string,
   endAt: string | null,
   proposalType: "event" | "sleeping" = "event",
+  timeZone = "UTC",
 ): string {
   if (proposalType === "sleeping") {
     const dateOpts: Intl.DateTimeFormatOptions = {
       weekday: "short",
       month: "short",
       day: "numeric",
+      timeZone,
     };
     const start = new Date(startAt);
     const startLabel = start.toLocaleDateString(undefined, dateOpts);
     if (!endAt) return startLabel;
     const end = new Date(endAt);
     const sameDay =
-      start.getFullYear() === end.getFullYear() &&
-      start.getMonth() === end.getMonth() &&
-      start.getDate() === end.getDate();
+      start.toLocaleDateString(undefined, { timeZone }) ===
+      end.toLocaleDateString(undefined, { timeZone });
     if (sameDay) return startLabel;
     return `${startLabel} – ${end.toLocaleDateString(undefined, dateOpts)}`;
   }
 
   const start = new Date(startAt);
   const end = endAt ? new Date(endAt) : null;
-  const dateOpts: Intl.DateTimeFormatOptions = { hour: "numeric", minute: "2-digit" };
+  const dateOpts: Intl.DateTimeFormatOptions = {
+    hour: "numeric",
+    minute: "2-digit",
+    timeZone,
+  };
   if (!end || end.getTime() === start.getTime()) {
     return start.toLocaleTimeString(undefined, dateOpts);
   }
   const sameDay =
-    start.getFullYear() === end.getFullYear() &&
-    start.getMonth() === end.getMonth() &&
-    start.getDate() === end.getDate();
+    start.toLocaleDateString(undefined, { timeZone }) ===
+    end.toLocaleDateString(undefined, { timeZone });
   if (sameDay) {
     return `${start.toLocaleTimeString(undefined, dateOpts)} – ${end.toLocaleTimeString(undefined, dateOpts)}`;
   }
   return `${start.toLocaleString(undefined, { month: "short", day: "numeric", ...dateOpts })} – ${end.toLocaleString(undefined, { month: "short", day: "numeric", ...dateOpts })}`;
 }
 
-/** ISO date key yyyy-mm-dd in local timezone for grouping. */
-export function localDateKey(iso: string): string {
-  const date = new Date(iso);
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, "0");
-  const d = String(date.getDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
+/** ISO date key yyyy-mm-dd in the viewer timezone for grouping. */
+export function localDateKey(iso: string, timeZone = "UTC"): string {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date(iso));
+  const year = parts.find((p) => p.type === "year")?.value ?? "1970";
+  const month = parts.find((p) => p.type === "month")?.value ?? "01";
+  const day = parts.find((p) => p.type === "day")?.value ?? "01";
+  return `${year}-${month}-${day}`;
 }

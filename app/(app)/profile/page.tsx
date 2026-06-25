@@ -8,6 +8,7 @@ import { auth } from "@/lib/auth";
 import { getDb } from "@/lib/db/client";
 import { ensureDbReady } from "@/lib/db/ensure-ready";
 import { users } from "@/lib/db/schema";
+import { resolveTimezone } from "@/lib/schedule/timezone";
 
 export default async function ProfilePage() {
   const session = await auth();
@@ -21,6 +22,7 @@ export default async function ProfilePage() {
     .select({
       avatarKey: users.avatarKey,
       theme: users.theme,
+      timezone: users.timezone,
       mustChangePassword: users.mustChangePassword,
       displayName: users.displayName,
     })
@@ -43,6 +45,7 @@ export default async function ProfilePage() {
         initialDisplayName={row?.displayName ?? session.user.displayName}
         initialAvatarKey={row?.avatarKey ?? null}
         initialTheme={row?.theme ?? "mint"}
+        initialTimezone={resolveTimezone(row?.timezone)}
         initialNotificationPrefs={notificationPrefs}
         initialNotificationEmail={notificationEmail.email}
         initialEmailVerified={notificationEmail.verified}

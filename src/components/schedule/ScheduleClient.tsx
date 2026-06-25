@@ -52,6 +52,7 @@ interface ScheduleClientProps {
   places: ProposalPlaceOption[];
   currentUserId: string;
   acceptedPartnerIds: string[];
+  timeZone: string;
 }
 
 /**
@@ -64,6 +65,7 @@ export function ScheduleClient({
   places,
   currentUserId,
   acceptedPartnerIds,
+  timeZone,
 }: ScheduleClientProps) {
   const router = useRouter();
   const [viewState, setViewState] = useState<ScheduleViewState>(() => ({
@@ -287,7 +289,10 @@ export function ScheduleClient({
           ■ Sleeping
         </Typography>
         <Typography variant="caption" color="#c62828">
-          ■ Conflict / at risk
+          ■ Conflict
+        </Typography>
+        <Typography variant="caption" color="#e65100">
+          ■ At risk / tentative
         </Typography>
       </Stack>
 
@@ -296,6 +301,7 @@ export function ScheduleClient({
         dayCount={dayCount}
         events={filteredEvents}
         compact={viewState.compact}
+        timeZone={timeZone}
         onEventClick={openProposal}
       />
 
