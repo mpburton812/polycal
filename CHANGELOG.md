@@ -8,6 +8,8 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- PC-49: Optional poll invitees keep the proposal in Proposed until they vote; banner and tailored notification when required attendees have already approved and scheduled.
+
 - PC-48: Attendee-update one-click notifications (maintain accept / decline) after proposer removes required invitees; at-risk resolved flow with proposer options, tentative calendar styling, and auto-cancel enforcement.
 - PC-48: Recurring series archive when past final child occurrence; cron enforcement API (`/api/cron/enforcement`) protected by `CRON_SECRET`.
 - PC-48: User-selectable timezone in profile; schedule display normalization; admin reschedule from calendar detail.
@@ -17,6 +19,8 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Phase 9 enforcement (PC-46): admin-configurable proposed TTL, at-risk TTL, archive grace, and redraft deadline; proposed expiration, auto-archive after event end, centralized enforcement runner; overlap acknowledge/decline flow for voters.
 
 ### Fixed
+
+- PC-49: Poll matrix time slots show label and date/time on separate lines; proposal detail dialog scrolls to reach All responses.
 
 - Draft proposal submit now surfaces schedule conflicts in a confirmation dialog and at the top of the draft card (PC-47).
 - People & Places: Add place uses a dialog button matching Add person (PC-47).
