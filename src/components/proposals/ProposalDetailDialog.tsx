@@ -250,7 +250,7 @@ export function ProposalDetailDialog({
       setMessage(result.message);
       setCancelScopeOpen(false);
       if (!result.ok) return;
-      reloadDetail(proposalId);
+      onClose();
       router.refresh();
     });
   }
