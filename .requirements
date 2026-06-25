@@ -80,3 +80,4 @@
 2026-06-25 | 77d33ea | PC-48 | fix strict mode on voting E2E assertion | e2e/proposals-voting.spec.ts
 2026-06-25 | 976dc59 | PC-49 | poll optional voting UX and matrix readability | src/actions/proposals.ts
 2026-06-25 | 7261426 | PC-50 | partnership copy, network alerts, cancel close | src/actions/partnerships.ts
+2026-06-25 | 0304a5d | PC-51 | add Render enforcement cron blueprint and script | CHANGELOG.md
