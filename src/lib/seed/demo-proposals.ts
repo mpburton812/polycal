@@ -9,6 +9,7 @@ import {
   type ProposalType,
 } from "@/lib/db/schema";
 import { isNonProductionEnvironment } from "@/lib/env";
+import { usesTestFamilySeed } from "@/lib/seed/seed-profile";
 import { randomUUID } from "node:crypto";
 
 interface DemoTimeSlot {
@@ -150,6 +151,9 @@ export async function seedDemoProposals(options?: {
   force?: boolean;
 }): Promise<{ seeded: boolean; count: number }> {
   if (!isNonProductionEnvironment()) {
+    return { seeded: false, count: 0 };
+  }
+  if (usesTestFamilySeed()) {
     return { seeded: false, count: 0 };
   }
 

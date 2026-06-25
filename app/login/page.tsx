@@ -2,7 +2,7 @@ import { Box, Button, Paper, TextField, Typography } from "@mui/material";
 import { redirect } from "next/navigation";
 
 import { auth, signIn } from "@/lib/auth";
-import { isNonProductionEnvironment } from "@/lib/env";
+import { getNonProductionLoginHint } from "@/lib/seed/login-hint";
 
 interface LoginPageProps {
   searchParams: Promise<{ error?: string; callbackUrl?: string }>;
@@ -18,6 +18,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   }
 
   const params = await searchParams;
+  const loginHint = getNonProductionLoginHint();
 
   async function loginAction(formData: FormData) {
     "use server";
@@ -81,9 +82,9 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
             Sign in
           </Button>
         </Box>
-        {isNonProductionEnvironment() && (
+        {loginHint && (
           <Typography variant="caption" display="block" sx={{ mt: 2 }}>
-            Non-production seed: luke / ChangeMe123!
+            {loginHint}
           </Typography>
         )}
       </Paper>

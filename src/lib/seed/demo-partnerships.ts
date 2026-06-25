@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 
 import { getDb } from "@/lib/db/client";
 import { isNonProductionEnvironment } from "@/lib/env";
+import { usesTestFamilySeed } from "@/lib/seed/seed-profile";
 import { sleepingPartnerships, users } from "@/lib/db/schema";
 import { canonicalUserPair } from "@/lib/users/pair";
 
@@ -18,6 +19,9 @@ export async function seedDemoPartnerships(options?: {
   force?: boolean;
 }): Promise<{ count: number }> {
   if (!isNonProductionEnvironment()) {
+    return { count: 0 };
+  }
+  if (usesTestFamilySeed()) {
     return { count: 0 };
   }
 

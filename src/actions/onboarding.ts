@@ -5,10 +5,20 @@ import { revalidatePath } from "next/cache";
 
 import { auth } from "@/lib/auth";
 import { logUserActivity } from "@/lib/audit";
+import { AVATAR_OPTIONS, isCustomAvatarKey, type AvatarKey } from "@/lib/constants/avatars";
+import { isUserThemeId, type UserThemeId } from "@/lib/constants/themes";
 import { getDb } from "@/lib/db/client";
 import { ensureDbReady } from "@/lib/db/ensure-ready";
 import { polyGroup, users } from "@/lib/db/schema";
+import { resolveTimezone } from "@/lib/schedule/timezone";
 import { DEFAULT_ONBOARDING_WELCOME_MESSAGE } from "@/types/poly-group";
+
+const AVATAR_KEYS = AVATAR_OPTIONS.map((option) => option.key);
+
+function isValidAvatarKey(value: string): value is AvatarKey | `custom:${string}` {
+  if (AVATAR_KEYS.includes(value as AvatarKey)) return true;
+  return isCustomAvatarKey(value);
+}
 
 export interface OnboardingStatus {
   needsOnboarding: boolean;
@@ -39,6 +49,45 @@ export async function getOnboardingStatusAction(): Promise<OnboardingStatus | nu
     needsOnboarding: !row.onboardingComplete,
     mustChangePassword: row.mustChangePassword,
   };
+}
+
+/**
+ * Persists avatar and theme during first-login onboarding without FormData (PC-52 E2E).
+ */
+export async function saveOnboardingPreferencesAction(input: {
+  avatarKey: string;
+  theme: string;
+}): Promise<{ ok: boolean; error?: string }> {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return { ok: false, error: "Not signed in." };
+  }
+
+  if (!isValidAvatarKey(input.avatarKey) || !isUserThemeId(input.theme)) {
+    return { ok: false, error: "Invalid avatar or theme selection." };
+  }
+
+  await ensureDbReady();
+  const db = getDb();
+  const now = new Date().toISOString();
+  await db
+    .update(users)
+    .set({
+      avatarKey: input.avatarKey,
+      theme: input.theme as UserThemeId,
+      timezone: resolveTimezone("UTC"),
+      updatedAt: now,
+    })
+    .where(eq(users.id, session.user.id));
+
+  await logUserActivity(
+    session.user.id,
+    "onboarding.preferences",
+    `${input.avatarKey}, ${input.theme}, UTC`,
+  );
+
+  revalidatePath("/profile");
+  return { ok: true };
 }
 
 /**

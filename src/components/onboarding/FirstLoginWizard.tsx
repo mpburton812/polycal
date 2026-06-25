@@ -24,13 +24,12 @@ import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { useState, useTransition } from "react";
 
-import { completeOnboardingAction } from "@/actions/onboarding";
+import { completeOnboardingAction, saveOnboardingPreferencesAction } from "@/actions/onboarding";
 import { proposePartnershipAction } from "@/actions/partnerships";
 import {
   changePasswordAction,
   setInitialPasswordAction,
   updateNotificationPrefsAction,
-  updateProfilePreferencesAction,
 } from "@/actions/profile";
 import { AVATAR_OPTIONS } from "@/lib/constants/avatars";
 import {
@@ -101,13 +100,10 @@ export function FirstLoginWizard({
 
   function saveAvatarAndTheme() {
     setError(null);
-    const formData = new FormData();
-    formData.set("avatarKey", avatarKey);
-    formData.set("theme", theme);
     startTransition(async () => {
-      const result = await updateProfilePreferencesAction(formData);
+      const result = await saveOnboardingPreferencesAction({ avatarKey, theme });
       if (!result.ok) {
-        setError(result.error);
+        setError(result.error ?? "Could not save preferences.");
         return;
       }
       await update({ user: { avatarKey, theme } });
