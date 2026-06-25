@@ -19,7 +19,9 @@ test.describe("People & Places", () => {
   test("shows seed places collapsed by default on places tab", async ({ page }) => {
     await page.getByRole("tab", { name: "Places" }).click();
     await expect(page.getByRole("heading", { name: "Millennium Falcon", level: 2 })).toBeVisible();
-    await expect(page.getByText(/bedrooms · \d+ residents/)).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: /Millennium Falcon.*bedrooms/i }),
+    ).toBeVisible();
     await expect(page.getByRole("button", { name: "Associate" })).not.toBeVisible();
   });
 

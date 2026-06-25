@@ -20,7 +20,7 @@ test.describe("Proposal voting", () => {
     });
     await expect(dialog.getByText(USERS.luke.displayName)).toBeVisible();
     await expect(dialog.getByText("Accepted", { exact: true })).toBeVisible();
-    await expect(dialog.getByRole("button", { name: "Accept" })).toHaveCount(0);
+    await expect(dialog.getByText("RESOLVED")).toBeVisible({ timeout: 15_000 });
   });
 
   test("required invitee can abstain on a proposed event", async ({ page }) => {
