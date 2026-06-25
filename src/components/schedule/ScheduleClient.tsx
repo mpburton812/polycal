@@ -27,6 +27,7 @@ import {
 } from "@/actions/schedule";
 import type { PersonSummary } from "@/actions/users";
 import { PlanningModeDrawer } from "@/components/schedule/PlanningModeDrawer";
+import { ScheduleHeatmap } from "@/components/schedule/ScheduleHeatmap";
 import { ScheduleWeekView } from "@/components/schedule/ScheduleWeekView";
 import {
   loadScheduleViewState,
@@ -164,12 +165,25 @@ export function ScheduleClient({
 
   return (
     <Box sx={{ pb: 2 }}>
+      <Box
+        sx={{
+          position: "sticky",
+          top: 0,
+          zIndex: 2,
+          bgcolor: "background.default",
+          pt: 0.5,
+          pb: 1,
+          borderBottom: 1,
+          borderColor: "divider",
+          mb: 1,
+        }}
+      >
       <Stack
         direction={{ xs: "column", sm: "row" }}
         spacing={1}
         alignItems={{ sm: "center" }}
         justifyContent="space-between"
-        sx={{ mb: 2 }}
+        sx={{ mb: 1 }}
       >
         <Stack direction="row" alignItems="center" spacing={0.5}>
           <IconButton aria-label="Previous period" onClick={() => shiftWeek(-1)} disabled={pending}>
@@ -295,6 +309,13 @@ export function ScheduleClient({
           ■ At risk / tentative
         </Typography>
       </Stack>
+      </Box>
+
+      <ScheduleHeatmap
+        events={filteredEvents}
+        weekStartIso={viewState.weekStartIso}
+        dayCount={dayCount}
+      />
 
       <ScheduleWeekView
         weekStart={weekStart}

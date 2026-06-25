@@ -43,6 +43,7 @@ const settingsSchema = z.object({
   atRiskTtlHours: z.number().int().min(1).max(8760),
   archiveGraceHours: z.number().int().min(0).max(8760),
   redraftDeadlineHours: z.number().int().min(1).max(168),
+  recoveryMaxHours: z.number().int().min(1).max(8760),
 });
 
 function rowToSettings(row: typeof polyGroup.$inferSelect): PolyGroupSettings {
@@ -66,6 +67,7 @@ function rowToSettings(row: typeof polyGroup.$inferSelect): PolyGroupSettings {
     atRiskTtlHours: row.atRiskTtlHours ?? 168,
     archiveGraceHours: row.archiveGraceHours ?? 24,
     redraftDeadlineHours: row.redraftDeadlineHours ?? 24,
+    recoveryMaxHours: row.recoveryMaxHours ?? 48,
   };
 }
 
@@ -196,6 +198,7 @@ export async function updatePolyGroupSettingsAction(
       atRiskTtlHours: parsed.data.atRiskTtlHours,
       archiveGraceHours: parsed.data.archiveGraceHours,
       redraftDeadlineHours: parsed.data.redraftDeadlineHours,
+      recoveryMaxHours: parsed.data.recoveryMaxHours,
       updatedAt: now,
     })
     .where(eq(polyGroup.id, 1));

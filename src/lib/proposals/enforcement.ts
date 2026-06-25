@@ -4,6 +4,7 @@ import { and, asc, desc, eq, inArray } from "drizzle-orm";
 
 import { getDb } from "@/lib/db/client";
 import { notifyUser } from "@/lib/notifications";
+import { expirePendingRecoveryProposals } from "@/lib/proposals/pending-recovery";
 import {
   polyGroup,
   proposalInvitees,
@@ -18,6 +19,8 @@ export interface EnforcementSettings {
   atRiskTtlHours: number;
   archiveGraceHours: number;
   redraftDeadlineHours: number;
+  /** Hours to hold calendar when required invitees drop to zero (PC-53). */
+  recoveryMaxHours: number;
 }
 
 const DEFAULT_ENFORCEMENT: EnforcementSettings = {
@@ -25,6 +28,7 @@ const DEFAULT_ENFORCEMENT: EnforcementSettings = {
   atRiskTtlHours: 168,
   archiveGraceHours: 24,
   redraftDeadlineHours: 24,
+  recoveryMaxHours: 48,
 };
 
 type Db = ReturnType<typeof getDb>;
@@ -41,6 +45,7 @@ export async function loadEnforcementSettings(db: Db): Promise<EnforcementSettin
     atRiskTtlHours: row.atRiskTtlHours ?? DEFAULT_ENFORCEMENT.atRiskTtlHours,
     archiveGraceHours: row.archiveGraceHours ?? DEFAULT_ENFORCEMENT.archiveGraceHours,
     redraftDeadlineHours: row.redraftDeadlineHours ?? DEFAULT_ENFORCEMENT.redraftDeadlineHours,
+    recoveryMaxHours: row.recoveryMaxHours ?? DEFAULT_ENFORCEMENT.recoveryMaxHours,
   };
 }
 
@@ -370,6 +375,7 @@ async function autoCancelUnresolvedAtRiskResolved(db: Db): Promise<void> {
  */
 export async function runProposalEnforcement(db: Db): Promise<void> {
   const settings = await loadEnforcementSettings(db);
+  await expirePendingRecoveryProposals(db);
   await expireAtRiskProposals(db);
   await expireProposedProposals(db, settings);
   await archivePastResolvedProposals(db, settings);

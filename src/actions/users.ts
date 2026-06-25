@@ -21,6 +21,7 @@ import {
   type UserRole,
 } from "@/lib/db/schema";
 import { notifyUser } from "@/lib/notifications";
+import { enterPendingRecoveryIfNeeded } from "@/lib/proposals/pending-recovery";
 import {
   buildLoginInstructions,
   generateTemporaryPassword,
@@ -245,31 +246,7 @@ async function demoteOrRemoveInviteeFromActiveProposals(
       );
 
     if (remainingRequired.length === 0) {
-      const noteLine = `Returned to drafts: participant ${reason}.`;
-      await db
-        .update(proposals)
-        .set({
-          state: "draft",
-          atRisk: false,
-          notes: proposal.notes?.trim() ? `${proposal.notes.trim()}\n${noteLine}` : noteLine,
-          updatedAt: now,
-        })
-        .where(eq(proposals.id, row.proposalId));
-
-      const stakeholders = await db
-        .select({ userId: proposalInvitees.userId })
-        .from(proposalInvitees)
-        .where(eq(proposalInvitees.proposalId, row.proposalId));
-
-      const notifyIds = new Set<string>([proposal.proposerId, ...stakeholders.map((s) => s.userId)]);
-      for (const notifyId of notifyIds) {
-        await notifyUser(
-          notifyId,
-          "proposal_reverted_to_draft",
-          `Proposal "${proposal.title}" was moved back to drafts.`,
-          { proposalId: row.proposalId, reason },
-        );
-      }
+      await enterPendingRecoveryIfNeeded(db, row.proposalId, `participant ${reason}.`);
     } else if (row.role === "required") {
       const notifyIds = new Set<string>([
         proposal.proposerId,
@@ -615,6 +592,7 @@ const adminUpdateUserSchema = z.object({
   avatarKey: z.string().optional(),
   role: z.enum(["admin", "user"]).optional(),
   username: usernameSchema.optional(),
+  gender: z.string().trim().max(40).optional().nullable(),
 });
 
 /**
@@ -651,6 +629,7 @@ export async function updateUserAction(
     avatarKey?: string;
     role?: "admin" | "user";
     username?: string;
+    gender?: string | null;
     updatedAt: string;
   } = {
     displayName: parsed.data.displayName,
@@ -659,6 +638,10 @@ export async function updateUserAction(
 
   if (parsed.data.avatarKey) {
     updates.avatarKey = parsed.data.avatarKey;
+  }
+
+  if (parsed.data.gender !== undefined) {
+    updates.gender = parsed.data.gender?.trim() || null;
   }
 
   if (user.role !== "passive") {

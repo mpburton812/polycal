@@ -344,6 +344,19 @@ export function AdminPolyGroupSettingsPanel({
           }
           helperText="At-risk resolved events return to proposed within this window"
         />
+        <TextField
+          label="Missing-invitee recovery (hours)"
+          type="number"
+          inputProps={{ min: 1, max: 8760 }}
+          value={settings.recoveryMaxHours}
+          onChange={(e) =>
+            setSettings({
+              ...settings,
+              recoveryMaxHours: Math.min(8760, Math.max(1, Number(e.target.value) || 1)),
+            })
+          }
+          helperText="Resolved events hold calendar this long when all required invitees are removed"
+        />
         <Button variant="contained" onClick={save} disabled={pending}>
           {pending ? "Saving…" : "Save settings"}
         </Button>

@@ -327,7 +327,7 @@ export function FirstLoginWizard({
                   }
                 />
               }
-              label="Email (verification coming in a later release)"
+              label="Email (sends verification link when Resend is configured)"
             />
             <FormControlLabel
               control={
