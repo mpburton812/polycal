@@ -9,6 +9,7 @@ import { scheduleBlockSx, scheduleBlockVariant } from "@/lib/schedule/colors";
 interface ScheduleEventBlockProps {
   event: ScheduleEvent;
   compact?: boolean;
+  timeZone?: string;
   onClick: () => void;
 }
 
@@ -23,7 +24,12 @@ function formatStakeholders(event: ScheduleEvent): string | null {
 /**
  * Clickable calendar block with tentative/confirmed color coding (PC-42).
  */
-export function ScheduleEventBlock({ event, compact = false, onClick }: ScheduleEventBlockProps) {
+export function ScheduleEventBlock({
+  event,
+  compact = false,
+  timeZone = "UTC",
+  onClick,
+}: ScheduleEventBlockProps) {
   const variant = scheduleBlockVariant({
     state: event.state,
     proposalType: event.proposalType,
@@ -33,7 +39,7 @@ export function ScheduleEventBlock({ event, compact = false, onClick }: Schedule
   });
   const colors = scheduleBlockSx(variant);
   const stakeholders = formatStakeholders(event);
-  const timeLabel = formatEventTime(event.startAt, event.endAt, event.proposalType);
+  const timeLabel = formatEventTime(event.startAt, event.endAt, event.proposalType, timeZone);
 
   return (
     <Box

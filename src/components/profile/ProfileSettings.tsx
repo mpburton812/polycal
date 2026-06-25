@@ -10,9 +10,11 @@ import {
   FormControlLabel,
   FormGroup,
   FormLabel,
+  MenuItem,
   Paper,
   Radio,
   RadioGroup,
+  Select,
   Stack,
   TextField,
   Typography,
@@ -35,12 +37,17 @@ import {
   USER_THEME_LABELS,
   type UserThemeId,
 } from "@/lib/constants/themes";
+import {
+  COMMON_TIMEZONES,
+  resolveTimezone,
+} from "@/lib/schedule/timezone";
 import type { NotificationPrefs } from "@/types/notification-prefs";
 
 export function ProfileSettings({
   initialDisplayName,
   initialAvatarKey,
   initialTheme,
+  initialTimezone,
   initialNotificationPrefs,
   initialNotificationEmail,
   initialEmailVerified,
@@ -49,6 +56,7 @@ export function ProfileSettings({
   initialDisplayName: string;
   initialAvatarKey: string | null;
   initialTheme: string;
+  initialTimezone: string;
   initialNotificationPrefs: NotificationPrefs;
   initialNotificationEmail: string | null;
   initialEmailVerified: boolean;
@@ -63,6 +71,7 @@ export function ProfileSettings({
       ? initialTheme
       : "mint") as UserThemeId,
   );
+  const [timezone, setTimezone] = useState(resolveTimezone(initialTimezone));
   const [notificationPrefs, setNotificationPrefs] = useState(initialNotificationPrefs);
   const [notificationEmail, setNotificationEmail] = useState(initialNotificationEmail ?? "");
   const [emailVerified, setEmailVerified] = useState(initialEmailVerified);
@@ -112,6 +121,7 @@ export function ProfileSettings({
     const formData = new FormData();
     formData.set("avatarKey", avatarKey);
     formData.set("theme", theme);
+    formData.set("timezone", timezone);
 
     startPrefsTransition(async () => {
       const result = await updateProfilePreferencesAction(formData);
@@ -341,6 +351,24 @@ export function ProfileSettings({
                 />
               ))}
             </RadioGroup>
+          </FormControl>
+
+          <FormControl fullWidth sx={{ mb: 2 }}>
+            <FormLabel component="legend" sx={{ mb: 1 }}>
+              Time zone
+            </FormLabel>
+            <Select
+              value={timezone}
+              onChange={(event) => setTimezone(resolveTimezone(event.target.value))}
+              size="small"
+              aria-label="Time zone"
+            >
+              {COMMON_TIMEZONES.map((tz) => (
+                <MenuItem key={tz} value={tz}>
+                  {tz.replaceAll("_", " ")}
+                </MenuItem>
+              ))}
+            </Select>
           </FormControl>
 
           <Button type="submit" variant="contained" disabled={prefsPending}>

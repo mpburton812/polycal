@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import { and, asc, eq, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, inArray } from "drizzle-orm";
 
 import { getDb } from "@/lib/db/client";
 import { notifyUser } from "@/lib/notifications";
@@ -47,6 +47,23 @@ export async function loadEnforcementSettings(db: Db): Promise<EnforcementSettin
 /** ISO timestamp for at-risk draft/archive TTL based on poly group settings. */
 export function atRiskExpiresAtIso(settings: EnforcementSettings, fromMs = Date.now()): string {
   return new Date(fromMs + settings.atRiskTtlHours * 60 * 60 * 1000).toISOString();
+}
+
+/**
+ * Computes at-risk expiry as the earlier of TTL-from-now or T-minus redraft deadline (PC-48).
+ */
+export function computeAtRiskExpiresAt(
+  settings: EnforcementSettings,
+  scheduledStartAt: string | null,
+  fromMs = Date.now(),
+): string {
+  const ttlExpiryMs = fromMs + settings.atRiskTtlHours * 60 * 60 * 1000;
+  if (!scheduledStartAt) {
+    return new Date(ttlExpiryMs).toISOString();
+  }
+  const eventStartMs = new Date(scheduledStartAt).getTime();
+  const beforeEventMs = eventStartMs - settings.redraftDeadlineHours * 60 * 60 * 1000;
+  return new Date(Math.min(ttlExpiryMs, beforeEventMs)).toISOString();
 }
 
 async function logSystemTransition(
@@ -245,14 +262,120 @@ async function processRedraftDeadlines(db: Db, settings: EnforcementSettings): P
 }
 
 /**
- * Runs all proposal enforcement jobs (call on board load and detail fetch) (PC-46).
+ * Archives recurring series parents after the final child occurrence end date (PC-48 / spec §11).
+ */
+async function archiveExpiredRecurrenceSeries(db: Db, settings: EnforcementSettings): Promise<void> {
+  const now = new Date();
+  const graceMs = settings.archiveGraceHours * 60 * 60 * 1000;
+  const parents = await db
+    .select()
+    .from(proposals)
+    .where(and(eq(proposals.state, "resolved"), eq(proposals.isRecurrenceParent, true)));
+
+  for (const parent of parents) {
+    const children = await db
+      .select({
+        id: proposals.id,
+        state: proposals.state,
+        scheduledEndAt: proposals.scheduledEndAt,
+        scheduledStartAt: proposals.scheduledStartAt,
+      })
+      .from(proposals)
+      .where(eq(proposals.parentProposalId, parent.id))
+      .orderBy(desc(proposals.occurrenceIndex));
+
+    if (children.length === 0) continue;
+
+    let finalEndMs = 0;
+    for (const child of children) {
+      const endAt = child.scheduledEndAt ?? child.scheduledStartAt;
+      if (!endAt) continue;
+      finalEndMs = Math.max(finalEndMs, new Date(endAt).getTime());
+    }
+    if (finalEndMs === 0 || now.getTime() <= finalEndMs + graceMs) continue;
+
+    const nowIso = now.toISOString();
+    const idsToArchive = [parent.id, ...children.filter((c) => c.state === "resolved").map((c) => c.id)];
+
+    for (const id of idsToArchive) {
+      await db
+        .update(proposals)
+        .set({ state: "archived", atRisk: false, atRiskExpiresAt: null, updatedAt: nowIso })
+        .where(eq(proposals.id, id));
+      await logSystemTransition(
+        db,
+        id,
+        "proposal.recurrence_series_archived",
+        "Recurring series archived after final occurrence end.",
+      );
+    }
+  }
+}
+
+/**
+ * Auto-cancels unresolved at-risk resolved events past expiry or event start (PC-48 / spec §9).
+ */
+async function autoCancelUnresolvedAtRiskResolved(db: Db): Promise<void> {
+  const nowIso = new Date().toISOString();
+  const atRiskResolved = await db
+    .select()
+    .from(proposals)
+    .where(and(eq(proposals.state, "resolved"), eq(proposals.atRisk, true)));
+
+  for (const proposal of atRiskResolved) {
+    const expiredByTtl = Boolean(proposal.atRiskExpiresAt && proposal.atRiskExpiresAt <= nowIso);
+    const eventStarted = Boolean(
+      proposal.scheduledStartAt && proposal.scheduledStartAt <= nowIso,
+    );
+    if (!expiredByTtl && !eventStarted) continue;
+
+    await db
+      .update(proposals)
+      .set({
+        state: "archived",
+        atRisk: false,
+        atRiskExpiresAt: null,
+        scheduledStartAt: null,
+        scheduledEndAt: null,
+        updatedAt: nowIso,
+      })
+      .where(eq(proposals.id, proposal.id));
+
+    await logSystemTransition(
+      db,
+      proposal.id,
+      "proposal.at_risk_auto_cancelled",
+      "At-risk event auto-cancelled after TTL or event start without resolution.",
+    );
+
+    const invitees = await db
+      .select({ userId: proposalInvitees.userId })
+      .from(proposalInvitees)
+      .where(eq(proposalInvitees.proposalId, proposal.id));
+
+    const notifyIds = new Set<string>([proposal.proposerId, ...invitees.map((row) => row.userId)]);
+    for (const userId of notifyIds) {
+      await notifyUser(
+        userId,
+        "proposal_at_risk_cancelled",
+        `Proposal "${proposal.title}" was auto-cancelled because at-risk status was not resolved.`,
+        { proposalId: proposal.id },
+      );
+    }
+  }
+}
+
+/**
+ * Runs all proposal enforcement jobs (call on board load, detail fetch, and cron) (PC-46/48).
  */
 export async function runProposalEnforcement(db: Db): Promise<void> {
   const settings = await loadEnforcementSettings(db);
   await expireAtRiskProposals(db);
   await expireProposedProposals(db, settings);
   await archivePastResolvedProposals(db, settings);
+  await archiveExpiredRecurrenceSeries(db, settings);
   await processRedraftDeadlines(db, settings);
+  await autoCancelUnresolvedAtRiskResolved(db);
 }
 
 /** Returns true when two ISO intervals overlap (open end uses start as instant). */

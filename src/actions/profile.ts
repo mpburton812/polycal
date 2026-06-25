@@ -9,6 +9,7 @@ import { z } from "zod";
 import { auth } from "@/lib/auth";
 import { logUserActivity } from "@/lib/audit";
 import { isUserThemeId, type UserThemeId } from "@/lib/constants/themes";
+import { resolveTimezone } from "@/lib/schedule/timezone";
 import { AVATAR_OPTIONS, isCustomAvatarKey, type AvatarKey } from "@/lib/constants/avatars";
 import { getDb } from "@/lib/db/client";
 import { ensureDbReady } from "@/lib/db/ensure-ready";
@@ -49,6 +50,7 @@ function isValidAvatarKey(value: string): value is AvatarKey | `custom:${string}
 const preferencesSchema = z.object({
   avatarKey: z.string().refine(isValidAvatarKey, "Invalid avatar"),
   theme: z.string().refine(isUserThemeId, "Invalid theme"),
+  timezone: z.string().min(1).max(64),
 });
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
@@ -120,10 +122,13 @@ export async function updateProfilePreferencesAction(
   const parsed = preferencesSchema.safeParse({
     avatarKey: formData.get("avatarKey"),
     theme: formData.get("theme"),
+    timezone: formData.get("timezone"),
   });
   if (!parsed.success) {
-    return { ok: false, error: "Invalid avatar or theme selection." };
+    return { ok: false, error: "Invalid avatar, theme, or timezone selection." };
   }
+
+  const timezone = resolveTimezone(parsed.data.timezone);
 
   await ensureDbReady();
   const db = getDb();
@@ -133,6 +138,7 @@ export async function updateProfilePreferencesAction(
     .set({
       avatarKey: parsed.data.avatarKey,
       theme: parsed.data.theme as UserThemeId,
+      timezone,
       updatedAt: now,
     })
     .where(eq(users.id, session.user.id));
@@ -140,7 +146,7 @@ export async function updateProfilePreferencesAction(
   await logUserActivity(
     session.user.id,
     "profile.preferences_update",
-    `${parsed.data.avatarKey}, ${parsed.data.theme}`,
+    `${parsed.data.avatarKey}, ${parsed.data.theme}, ${timezone}`,
   );
 
   revalidatePath("/profile");

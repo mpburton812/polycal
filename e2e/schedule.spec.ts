@@ -35,6 +35,21 @@ test.describe("Schedule calendar", () => {
     await expect(drawer.getByText("Rescue Han from carbonite")).toBeVisible();
   });
 
+  test("opens on the current week by default", async ({ page }) => {
+    const monday = new Date();
+    const day = monday.getDay();
+    const diff = day === 0 ? -6 : 1 - day;
+    monday.setDate(monday.getDate() + diff);
+    monday.setHours(0, 0, 0, 0);
+    const fmt: Intl.DateTimeFormatOptions = { month: "short", day: "numeric" };
+    const expectedStart = monday.toLocaleDateString(undefined, fmt);
+    await expect(page.getByText(new RegExp(expectedStart.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")))).toBeVisible();
+  });
+
+  test("shows at-risk legend label", async ({ page }) => {
+    await expect(page.getByText(/At risk \/ tentative/i)).toBeVisible();
+  });
+
   test("switches to compact two-week view", async ({ page }) => {
     await page.getByRole("button", { name: "2 weeks" }).click();
     await expect(page.getByRole("button", { name: "2 weeks" })).toHaveAttribute("aria-pressed", "true");

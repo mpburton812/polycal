@@ -17,6 +17,7 @@ interface ScheduleWeekViewProps {
   dayCount: number;
   events: ScheduleEvent[];
   compact: boolean;
+  timeZone?: string;
   onEventClick: (proposalId: string) => void;
 }
 
@@ -28,6 +29,7 @@ export function ScheduleWeekView({
   dayCount,
   events,
   compact,
+  timeZone = "UTC",
   onEventClick,
 }: ScheduleWeekViewProps) {
   const days = useMemo(() => {
@@ -38,10 +40,10 @@ export function ScheduleWeekView({
   const eventsByDay = useMemo(() => {
     const map = new Map<string, ScheduleEvent[]>();
     for (const day of days) {
-      map.set(localDateKey(day.toISOString()), []);
+      map.set(localDateKey(day.toISOString(), timeZone), []);
     }
     for (const event of events) {
-      const key = localDateKey(event.startAt);
+      const key = localDateKey(event.startAt, timeZone);
       const list = map.get(key);
       if (list) list.push(event);
     }
@@ -49,13 +51,13 @@ export function ScheduleWeekView({
       list.sort((a, b) => a.startAt.localeCompare(b.startAt));
     }
     return map;
-  }, [days, events]);
+  }, [days, events, timeZone]);
 
   if (compact) {
     return (
       <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
         {days.map((day) => {
-          const key = localDateKey(day.toISOString());
+          const key = localDateKey(day.toISOString(), timeZone);
           const dayEvents = eventsByDay.get(key) ?? [];
           return (
             <Box
@@ -73,7 +75,7 @@ export function ScheduleWeekView({
                 variant="caption"
                 sx={{ minWidth: 72, fontWeight: 600, color: "text.secondary" }}
               >
-                {formatDayHeader(day)}
+                {formatDayHeader(day, timeZone)}
               </Typography>
               <Box sx={{ flex: 1, display: "flex", flexWrap: "wrap", gap: 0.5 }}>
                 {dayEvents.length === 0 ? (
@@ -86,6 +88,7 @@ export function ScheduleWeekView({
                       <ScheduleEventBlock
                         event={event}
                         compact
+                        timeZone={timeZone}
                         onClick={() => onEventClick(event.proposalId)}
                       />
                     </Box>
@@ -114,7 +117,7 @@ export function ScheduleWeekView({
       {days.map((day) => {
         const key = localDateKey(day.toISOString());
         const dayEvents = eventsByDay.get(key) ?? [];
-        const isToday = localDateKey(new Date().toISOString()) === key;
+        const isToday = localDateKey(new Date().toISOString(), timeZone) === key;
         return (
           <Box
             key={key}
@@ -128,7 +131,7 @@ export function ScheduleWeekView({
             }}
           >
             <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1 }}>
-              {formatDayHeader(day)}
+              {formatDayHeader(day, timeZone)}
             </Typography>
             {dayEvents.length === 0 ? (
               <Typography variant="caption" color="text.disabled">
@@ -139,6 +142,7 @@ export function ScheduleWeekView({
                 <ScheduleEventBlock
                   key={event.id}
                   event={event}
+                  timeZone={timeZone}
                   onClick={() => onEventClick(event.proposalId)}
                 />
               ))

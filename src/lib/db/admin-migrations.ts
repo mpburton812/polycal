@@ -26,6 +26,7 @@ export async function applyAdminMigrations(sql: Client): Promise<void> {
   await ensureColumn(sql, "users", "onboarding_complete", "INTEGER NOT NULL DEFAULT 1");
   await ensureColumn(sql, "users", "session_version", "INTEGER NOT NULL DEFAULT 0");
   await ensureColumn(sql, "users", "activated_from_passive_at", "TEXT");
+  await ensureColumn(sql, "users", "timezone", "TEXT NOT NULL DEFAULT 'UTC'");
 
   await ensureColumn(sql, "user_activity_log", "event_type", "TEXT NOT NULL DEFAULT 'user'");
   await ensureColumn(sql, "sleeping_partnerships", "passive_auto_accepted", "INTEGER NOT NULL DEFAULT 0");

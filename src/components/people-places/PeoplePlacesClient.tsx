@@ -49,6 +49,7 @@ import {
   type PlaceSummary,
   type ResidentView,
 } from "@/actions/places";
+import { AdminCollapsibleSection } from "@/components/admin/AdminCollapsibleSection";
 import { AVATAR_OPTIONS, avatarSrcForKey } from "@/lib/constants/avatars";
 
 interface PeoplePlacesClientProps {
@@ -1071,16 +1072,20 @@ export function PeoplePlacesClient({
       {tab === 1 && (
         <Stack spacing={2}>
           {places.map((place) => (
-            <Box key={place.id} sx={{ p: 2, border: 1, borderColor: "divider", borderRadius: 1 }}>
-              <Typography fontWeight={600}>{place.name}</Typography>
+            <AdminCollapsibleSection
+              key={place.id}
+              title={place.name}
+              headerAction={
+                <Typography variant="caption" color="text.secondary" sx={{ mr: 1 }}>
+                  {place.bedroomCount} bedrooms · {place.residentCount} residents
+                </Typography>
+              }
+            >
               {place.address && (
-                <Typography variant="body2" color="text.secondary">
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
                   {place.address}
                 </Typography>
               )}
-              <Typography variant="caption" color="text.secondary">
-                {place.bedroomCount} bedrooms · {place.residentCount} residents
-              </Typography>
               <PlaceDetail
                 place={place}
                 people={people}
@@ -1089,7 +1094,7 @@ export function PeoplePlacesClient({
                 existingPlaceNames={existingPlaceNames}
                 onPlaceUpdated={() => router.refresh()}
               />
-            </Box>
+            </AdminCollapsibleSection>
           ))}
         </Stack>
       )}
