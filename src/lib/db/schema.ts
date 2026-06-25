@@ -86,6 +86,8 @@ export const polyGroup = sqliteTable("poly_group", {
   atRiskTtlHours: integer("at_risk_ttl_hours").notNull().default(168),
   archiveGraceHours: integer("archive_grace_hours").notNull().default(24),
   redraftDeadlineHours: integer("redraft_deadline_hours").notNull().default(24),
+  /** Hours to hold resolved calendar blocks when required invitees drop to zero (PC-53). */
+  recoveryMaxHours: integer("recovery_max_hours").notNull().default(48),
   updatedAt: text("updated_at").notNull(),
 });
 
@@ -172,6 +174,8 @@ export const proposals = sqliteTable("proposals", {
   isPoll: integer("is_poll", { mode: "boolean" }).notNull().default(false),
   atRisk: integer("at_risk", { mode: "boolean" }).notNull().default(false),
   atRiskExpiresAt: text("at_risk_expires_at"),
+  /** When set on resolved proposals, calendar hold until invitees/solo are restored (PC-53). */
+  pendingRecoveryUntil: text("pending_recovery_until"),
   parentProposalId: text("parent_proposal_id"),
   /** JSON recurrence pattern: daily|weekly|monthly|yearly, interval, count (2–52). */
   recurrenceRule: text("recurrence_rule"),
