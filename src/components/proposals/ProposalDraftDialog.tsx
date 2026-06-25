@@ -18,6 +18,9 @@ import {
   Checkbox,
   Chip,
   Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   Divider,
   FormControl,
   FormControlLabel,
@@ -31,7 +34,7 @@ import {
   Typography,
 } from "@mui/material";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState, useTransition, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition, type ReactNode } from "react";
 
 import {
   createBatchSleepingProposalsAction,
@@ -39,6 +42,7 @@ import {
   getProposalDetailAction,
   submitProposalAction,
   updateDraftProposalAction,
+  type ProposalConflictWarning,
   type ProposalDetail,
   type ProposalPlaceOption,
 } from "@/actions/proposals";
@@ -145,6 +149,19 @@ function SectionHeader({
   );
 }
 
+function ConflictWarningList({ warnings }: { warnings: ProposalConflictWarning[] }) {
+  return (
+    <>
+      {warnings.map((warning, index) => (
+        <Typography key={`${warning.userId}-${index}`} variant="body2" sx={{ mb: 0.5 }}>
+          {warning.conflictKind === "place_asset" ? "Place" : warning.displayName} overlaps with
+          &quot;{warning.conflictingTitle}&quot; ({warning.conflictingState})
+        </Typography>
+      ))}
+    </>
+  );
+}
+
 /**
  * Create or edit a proposal draft using the graphical card layout (PC-40).
  */
@@ -186,7 +203,11 @@ export function ProposalDraftDialog({
   const [slots, setSlots] = useState<SlotDraft[]>([{ startAt: "", endAt: "", label: "" }]);
   const [inviteeMode, setInviteeMode] = useState<Record<string, InviteeSelection>>({});
   const [error, setError] = useState<string | null>(null);
+  const [conflictWarnings, setConflictWarnings] = useState<ProposalConflictWarning[]>([]);
+  const [showConflictConfirm, setShowConflictConfirm] = useState(false);
+  const [conflictDialogOpen, setConflictDialogOpen] = useState(false);
   const [pending, startTransition] = useTransition();
+  const contentRef = useRef<HTMLDivElement>(null);
 
   const candidates = people.filter(
     (person) => person.id !== currentUserId && person.status === "active",
@@ -483,22 +504,33 @@ export function ProposalDraftDialog({
     });
   }
 
-  function handleSubmit() {
+  function handleSubmit(confirm = false) {
     const proposalId = initialDetail?.id ?? savedDraftId;
     if (!proposalId) return;
     setError(null);
     startTransition(async () => {
-      const result = await submitProposalAction(proposalId, false);
+      const result = await submitProposalAction(proposalId, confirm);
+      if (!result.ok && result.warnings && result.warnings.length > 0) {
+        setConflictWarnings(result.warnings);
+        setShowConflictConfirm(true);
+        setConflictDialogOpen(true);
+        contentRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+        return;
+      }
       if (!result.ok) {
         setError(result.message);
         return;
       }
+      setConflictWarnings([]);
+      setShowConflictConfirm(false);
+      setConflictDialogOpen(false);
       handleClose();
       router.refresh();
     });
   }
 
   return (
+    <>
     <Dialog
       open={open}
       onClose={handleClose}
@@ -510,7 +542,7 @@ export function ProposalDraftDialog({
       }}
     >
       <Card variant="outlined" sx={{ ...proposalCardSx, bgcolor: "background.paper", maxHeight: "92vh", display: "flex", flexDirection: "column" }}>
-        <CardContent sx={{ pb: 1, overflow: "auto", flex: 1 }}>
+        <CardContent ref={contentRef} sx={{ pb: 1, overflow: "auto", flex: 1 }}>
           <Stack direction="row" justifyContent="space-between" alignItems="flex-start" sx={{ mb: 1.5 }}>
             <Chip label={typeBadgeLabel(proposalType)} size="small" sx={typeChipSx} />
             <Typography variant="caption" color="text.secondary" sx={{ textAlign: "right" }}>
@@ -575,6 +607,24 @@ export function ProposalDraftDialog({
                 </Typography>
               </Box>
             </Box>
+          )}
+
+          {showConflictConfirm && conflictWarnings.length > 0 && (
+            <Alert severity="warning" sx={{ mb: 2 }}>
+              <Typography variant="subtitle2" gutterBottom>
+                Schedule conflicts
+              </Typography>
+              <ConflictWarningList warnings={conflictWarnings} />
+              <Button
+                size="small"
+                variant="contained"
+                sx={{ mt: 1, ...primaryButtonSx }}
+                onClick={() => handleSubmit(true)}
+                disabled={pending}
+              >
+                Submit anyway
+              </Button>
+            </Alert>
           )}
 
           <SectionHeader
@@ -1044,7 +1094,7 @@ export function ProposalDraftDialog({
             <Button
               variant="contained"
               disabled={!title.trim() || pending}
-              onClick={handleSubmit}
+              onClick={() => handleSubmit()}
               sx={primaryButtonSx}
             >
               Submit
@@ -1053,5 +1103,41 @@ export function ProposalDraftDialog({
         </CardActions>
       </Card>
     </Dialog>
+
+    <Dialog
+      open={conflictDialogOpen}
+      onClose={() => setConflictDialogOpen(false)}
+      fullWidth
+      maxWidth="xs"
+      aria-labelledby="draft-conflict-dialog-title"
+    >
+      <DialogTitle id="draft-conflict-dialog-title">Schedule conflicts detected</DialogTitle>
+      <DialogContent>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+          This proposal overlaps with existing calendar items. Review the conflicts below, then
+          confirm if you still want to submit.
+        </Typography>
+        <Alert severity="warning">
+          <ConflictWarningList warnings={conflictWarnings} />
+        </Alert>
+      </DialogContent>
+      <DialogActions sx={{ px: 3, pb: 2 }}>
+        <Button onClick={() => setConflictDialogOpen(false)} color="inherit">
+          Review draft
+        </Button>
+        <Button
+          variant="contained"
+          onClick={() => {
+            setConflictDialogOpen(false);
+            handleSubmit(true);
+          }}
+          disabled={pending}
+          sx={primaryButtonSx}
+        >
+          Submit anyway
+        </Button>
+      </DialogActions>
+    </Dialog>
+    </>
   );
 }

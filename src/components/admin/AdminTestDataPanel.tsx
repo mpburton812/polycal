@@ -3,7 +3,6 @@
 import {
   Alert,
   Button,
-  Paper,
   Stack,
   Typography,
 } from "@mui/material";
@@ -11,6 +10,7 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
 import { resetTestDatabaseAction } from "@/actions/admin";
+import { AdminCollapsibleSection } from "@/components/admin/AdminCollapsibleSection";
 
 /**
  * Admin control to wipe and reseed non-production databases (PC-29).
@@ -41,10 +41,7 @@ export function AdminTestDataPanel() {
   }
 
   return (
-    <Paper sx={{ p: 3 }}>
-      <Typography variant="h6" gutterBottom>
-        Test data
-      </Typography>
+    <AdminCollapsibleSection title="Test data">
       <Typography color="text.secondary" sx={{ mb: 2 }}>
         Wipes Turso data and reloads Star Wars users, locations, and demo
         proposals. Available only in feature, dev, and test environments.
@@ -69,6 +66,6 @@ export function AdminTestDataPanel() {
           {pending ? "Resetting…" : "Reset test database"}
         </Button>
       </Stack>
-    </Paper>
+    </AdminCollapsibleSection>
   );
 }

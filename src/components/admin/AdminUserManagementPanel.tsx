@@ -21,7 +21,6 @@ import {
   IconButton,
   InputLabel,
   MenuItem,
-  Paper,
   Select,
   Stack,
   Table,
@@ -37,6 +36,7 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
 import { adminImpersonateUserAction } from "@/actions/admin";
+import { AdminCollapsibleSection } from "@/components/admin/AdminCollapsibleSection";
 import type { AdminUserRow } from "@/actions/users";
 import {
   activatePassiveUserAction,
@@ -130,10 +130,7 @@ export function AdminUserManagementPanel({
   }
 
   return (
-    <Paper sx={{ p: 3 }}>
-      <Typography variant="h6" gutterBottom>
-        User management
-      </Typography>
+    <AdminCollapsibleSection title="User management">
       {message && (
         <Alert severity={messageSeverity} sx={{ mb: 2 }} onClose={() => setMessage(null)}>
           {message}
@@ -160,7 +157,6 @@ export function AdminUserManagementPanel({
               <TableCell>Role</TableCell>
               <TableCell>Status</TableCell>
               <TableCell>Last login</TableCell>
-              <TableCell align="right">Logins</TableCell>
               <TableCell>Actions</TableCell>
             </TableRow>
           </TableHead>
@@ -181,7 +177,6 @@ export function AdminUserManagementPanel({
                     ? new Date(user.lastLoginAt).toLocaleString()
                     : "Never"}
                 </TableCell>
-                <TableCell align="right">{user.loginCount}</TableCell>
                 <TableCell>
                   <Stack direction="row" spacing={0.25} flexWrap="wrap" useFlexGap>
                     <Tooltip title="Edit">
@@ -516,6 +511,6 @@ export function AdminUserManagementPanel({
           </Button>
         </DialogActions>
       </Dialog>
-    </Paper>
+    </AdminCollapsibleSection>
   );
 }
