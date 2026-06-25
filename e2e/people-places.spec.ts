@@ -21,10 +21,19 @@ test.describe("People & Places", () => {
     await expect(page.getByText("Millennium Falcon")).toBeVisible();
   });
 
+  test("shows Add place button on places tab", async ({ page }) => {
+    await page.getByRole("tab", { name: "Places" }).click();
+    await expect(page.getByRole("button", { name: "Add place" })).toBeVisible();
+  });
+
   test("admin can create a new place", async ({ page }) => {
     await page.getByRole("tab", { name: "Places" }).click();
-    await page.getByLabel("Home name").fill(`E2E Hideout ${Date.now()}`);
-    await page.getByRole("button", { name: "Create place" }).click();
-    await expect(page.getByText(/Created place/i)).toBeVisible({ timeout: 15_000 });
+    const placeName = `E2E Hideout ${Date.now()}`;
+    await page.getByRole("button", { name: "Add place" }).click();
+    const dialog = page.getByRole("dialog");
+    await dialog.getByLabel("Home name").fill(placeName);
+    await dialog.getByRole("button", { name: "Create place" }).click();
+    await expect(dialog).toBeHidden({ timeout: 15_000 });
+    await expect(page.getByText(placeName)).toBeVisible({ timeout: 15_000 });
   });
 });

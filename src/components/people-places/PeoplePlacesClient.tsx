@@ -850,6 +850,138 @@ function PlaceDetail({
   );
 }
 
+function CreatePlaceDialog({
+  open,
+  onClose,
+  existingPlaceNames,
+}: {
+  open: boolean;
+  onClose: () => void;
+  existingPlaceNames: string[];
+}) {
+  const router = useRouter();
+  const [placeName, setPlaceName] = useState("");
+  const [placeAddress, setPlaceAddress] = useState("");
+  const [bedroomCount, setBedroomCount] = useState(1);
+  const [bedroomLabels, setBedroomLabels] = useState<string[]>([""]);
+  const [placeNameWarning, setPlaceNameWarning] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+
+  function reset() {
+    setPlaceName("");
+    setPlaceAddress("");
+    setBedroomCount(1);
+    setBedroomLabels([""]);
+    setPlaceNameWarning(null);
+    setMessage(null);
+  }
+
+  function handleClose() {
+    reset();
+    onClose();
+  }
+
+  function validateNewPlaceName(name: string) {
+    const taken = existingPlaceNames.some(
+      (existing) => normalizePlaceName(existing) === normalizePlaceName(name),
+    );
+    setPlaceNameWarning(taken ? "A place with this name is already in use." : null);
+    return !taken;
+  }
+
+  function handleCreate() {
+    startTransition(async () => {
+      if (!validateNewPlaceName(placeName)) return;
+      const result = await createPlaceAction({
+        name: placeName,
+        address: placeAddress || undefined,
+        bedroomCount,
+        bedroomNames: syncBedroomNames(bedroomCount, bedroomLabels),
+      });
+      setMessage(result.message);
+      if (result.ok) {
+        router.refresh();
+        handleClose();
+      }
+    });
+  }
+
+  return (
+    <Dialog open={open} onClose={handleClose} fullWidth maxWidth="sm">
+      <DialogTitle>Add place</DialogTitle>
+      <DialogContent>
+        <Stack spacing={2} sx={{ mt: 1 }}>
+          <TextField
+            label="Home name"
+            value={placeName}
+            onChange={(event) => {
+              setPlaceName(event.target.value);
+              setPlaceNameWarning(null);
+            }}
+            onBlur={() => {
+              if (placeName.trim()) validateNewPlaceName(placeName);
+            }}
+            error={Boolean(placeNameWarning)}
+            helperText={placeNameWarning ?? undefined}
+            fullWidth
+          />
+          <TextField
+            label="Address (optional)"
+            value={placeAddress}
+            onChange={(event) => setPlaceAddress(event.target.value)}
+            fullWidth
+          />
+          <TextField
+            label="Bedrooms"
+            type="number"
+            value={bedroomCount}
+            onChange={(event) => {
+              const count = Number(event.target.value);
+              setBedroomCount(count);
+              setBedroomLabels((current) => bedroomLabelsForForm(count, current));
+            }}
+            inputProps={{ min: 0, max: 20 }}
+            fullWidth
+          />
+          {bedroomCount > 0 && (
+            <Stack spacing={1}>
+              <Typography variant="subtitle2">Bedroom names (optional)</Typography>
+              {bedroomLabels.map((label, index) => (
+                <TextField
+                  key={`new-bedroom-${index}`}
+                  label={`Bedroom ${index + 1} name`}
+                  value={label}
+                  placeholder={`Bedroom ${index + 1}`}
+                  onChange={(event) => {
+                    const next = [...bedroomLabels];
+                    next[index] = event.target.value;
+                    setBedroomLabels(next);
+                  }}
+                  fullWidth
+                />
+              ))}
+            </Stack>
+          )}
+          {message && <Alert severity={message.includes("Created") ? "success" : "info"}>{message}</Alert>}
+        </Stack>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={handleClose} color="inherit">
+          Cancel
+        </Button>
+        <Button
+          variant="contained"
+          disabled={!placeName.trim() || Boolean(placeNameWarning) || pending}
+          onClick={handleCreate}
+        >
+          Create place
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
 /**
  * Client shell for People & Places tab (PC-35–37).
  */
@@ -863,25 +995,11 @@ export function PeoplePlacesClient({
   const router = useRouter();
   const [tab, setTab] = useState(0);
   const [createOpen, setCreateOpen] = useState(false);
+  const [createPlaceOpen, setCreatePlaceOpen] = useState(false);
   const [selectedPersonId, setSelectedPersonId] = useState<string | null>(null);
-  const [placeName, setPlaceName] = useState("");
-  const [placeAddress, setPlaceAddress] = useState("");
-  const [bedroomCount, setBedroomCount] = useState(1);
-  const [bedroomLabels, setBedroomLabels] = useState<string[]>([""]);
-  const [placeNameWarning, setPlaceNameWarning] = useState<string | null>(null);
-  const [placeMessage, setPlaceMessage] = useState<string | null>(null);
-  const [pending, startTransition] = useTransition();
 
   const selectedPerson = people.find((row) => row.id === selectedPersonId) ?? null;
   const existingPlaceNames = useMemo(() => places.map((place) => place.name), [places]);
-
-  function validateNewPlaceName(name: string) {
-    const taken = existingPlaceNames.some(
-      (existing) => normalizePlaceName(existing) === normalizePlaceName(name),
-    );
-    setPlaceNameWarning(taken ? "A place with this name is already in use." : null);
-    return !taken;
-  }
 
   return (
     <Box>
@@ -893,6 +1011,11 @@ export function PeoplePlacesClient({
         {canProvision && tab === 0 && (
           <Button variant="contained" onClick={() => setCreateOpen(true)}>
             Add person
+          </Button>
+        )}
+        {tab === 1 && (
+          <Button variant="contained" onClick={() => setCreatePlaceOpen(true)}>
+            Add place
           </Button>
         )}
       </Stack>
@@ -947,88 +1070,6 @@ export function PeoplePlacesClient({
 
       {tab === 1 && (
         <Stack spacing={2}>
-          <Stack spacing={1.5} sx={{ p: 2, border: 1, borderColor: "divider", borderRadius: 1 }}>
-            <Typography variant="subtitle1">Add place</Typography>
-            <TextField
-              label="Home name"
-              value={placeName}
-              onChange={(event) => {
-                setPlaceName(event.target.value);
-                setPlaceNameWarning(null);
-              }}
-              onBlur={() => {
-                if (placeName.trim()) validateNewPlaceName(placeName);
-              }}
-              error={Boolean(placeNameWarning)}
-              helperText={placeNameWarning ?? undefined}
-              fullWidth
-            />
-            <TextField
-              label="Address (optional)"
-              value={placeAddress}
-              onChange={(event) => setPlaceAddress(event.target.value)}
-              fullWidth
-            />
-            <TextField
-              label="Bedrooms"
-              type="number"
-              value={bedroomCount}
-              onChange={(event) => {
-                const count = Number(event.target.value);
-                setBedroomCount(count);
-                setBedroomLabels((current) => bedroomLabelsForForm(count, current));
-              }}
-              inputProps={{ min: 0, max: 20 }}
-              fullWidth
-            />
-            {bedroomCount > 0 && (
-              <Stack spacing={1}>
-                <Typography variant="subtitle2">Bedroom names (optional)</Typography>
-                {bedroomLabels.map((label, index) => (
-                  <TextField
-                    key={`new-bedroom-${index}`}
-                    label={`Bedroom ${index + 1} name`}
-                    value={label}
-                    placeholder={`Bedroom ${index + 1}`}
-                    onChange={(event) => {
-                      const next = [...bedroomLabels];
-                      next[index] = event.target.value;
-                      setBedroomLabels(next);
-                    }}
-                    fullWidth
-                  />
-                ))}
-              </Stack>
-            )}
-            <Button
-              variant="contained"
-              disabled={!placeName.trim() || Boolean(placeNameWarning) || pending}
-              onClick={() =>
-                startTransition(async () => {
-                  if (!validateNewPlaceName(placeName)) return;
-                  const result = await createPlaceAction({
-                    name: placeName,
-                    address: placeAddress || undefined,
-                    bedroomCount,
-                    bedroomNames: syncBedroomNames(bedroomCount, bedroomLabels),
-                  });
-                  setPlaceMessage(result.message);
-                  if (result.ok) {
-                    setPlaceName("");
-                    setPlaceAddress("");
-                    setBedroomCount(1);
-                    setBedroomLabels([""]);
-                    setPlaceNameWarning(null);
-                    router.refresh();
-                  }
-                })
-              }
-            >
-              Create place
-            </Button>
-            {placeMessage && <Alert severity="info">{placeMessage}</Alert>}
-          </Stack>
-
           {places.map((place) => (
             <Box key={place.id} sx={{ p: 2, border: 1, borderColor: "divider", borderRadius: 1 }}>
               <Typography fontWeight={600}>{place.name}</Typography>
@@ -1057,6 +1098,11 @@ export function PeoplePlacesClient({
         open={createOpen}
         onClose={() => setCreateOpen(false)}
         canProvision={canProvision}
+      />
+      <CreatePlaceDialog
+        open={createPlaceOpen}
+        onClose={() => setCreatePlaceOpen(false)}
+        existingPlaceNames={existingPlaceNames}
       />
     </Box>
   );
