@@ -38,6 +38,7 @@ import {
   runProposalEnforcement,
 } from "@/lib/proposals/enforcement";
 import { PARTNERSHIP_CARD_PREFIX } from "@/lib/proposals/constants";
+import { buildPartnershipProposalCopy } from "@/lib/partnerships/copy";
 import type { UserRole } from "@/types/user";
 
 const inviteeInputSchema = z.object({
@@ -747,6 +748,7 @@ export async function listProposalBoardAction(): Promise<ProposalBoard> {
       userLowId: sleepingPartnerships.userLowId,
       userHighId: sleepingPartnerships.userHighId,
       proposedById: sleepingPartnerships.proposedById,
+      initiatedByUserId: sleepingPartnerships.initiatedByUserId,
       proposerName: users.displayName,
     })
     .from(sleepingPartnerships)
@@ -758,6 +760,7 @@ export async function listProposalBoardAction(): Promise<ProposalBoard> {
     for (const row of partnershipRows) {
       partnerIds.add(row.userLowId);
       partnerIds.add(row.userHighId);
+      if (row.initiatedByUserId) partnerIds.add(row.initiatedByUserId);
     }
     const partnerRows = await db
       .select({ id: users.id, displayName: users.displayName })
@@ -773,18 +776,31 @@ export async function listProposalBoardAction(): Promise<ProposalBoard> {
       const partnerId =
         row.userLowId === viewerId ? row.userHighId : row.userLowId;
       const partnerName = partnerMap.get(partnerId) ?? "Partner";
-      const isIncoming = row.proposedById !== viewerId;
+      const lowName = partnerMap.get(row.userLowId) ?? "Member";
+      const highName = partnerMap.get(row.userHighId) ?? "Member";
+      const initiatedByName = row.initiatedByUserId
+        ? (partnerMap.get(row.initiatedByUserId) ?? null)
+        : null;
+      const copy = buildPartnershipProposalCopy({
+        viewerId,
+        userLowId: row.userLowId,
+        userHighId: row.userHighId,
+        proposedById: row.proposedById,
+        proposerName: row.proposerName,
+        initiatedByName,
+        partnerName,
+        lowName,
+        highName,
+      });
 
       empty.proposed.push({
         id: `${PARTNERSHIP_CARD_PREFIX}${row.id}`,
         title: `Sleeping partnership with ${partnerName}`,
-        description: isIncoming
-          ? `${row.proposerName} proposed a sleeping partnership with you.`
-          : `Awaiting ${partnerName}'s response.`,
+        description: copy.description,
         proposalType: "event",
         state: "proposed",
         proposerId: row.proposedById,
-        proposerName: row.proposerName,
+        proposerName: copy.proposerDisplayName,
         locationName: null,
         scheduledStartAt: null,
         scheduledEndAt: null,
@@ -792,9 +808,9 @@ export async function listProposalBoardAction(): Promise<ProposalBoard> {
         isPoll: false,
         eventPrivacy: "open",
         isContentMasked: false,
-        needsViewerAction: isIncoming && isParticipant,
+        needsViewerAction: copy.needsViewerAction,
         inviteeCount: 1,
-        respondedCount: isIncoming ? 0 : 0,
+        respondedCount: copy.needsViewerAction ? 0 : 0,
         isPastSchedule: false,
         cardKind: "partnership",
         partnershipId: row.id,

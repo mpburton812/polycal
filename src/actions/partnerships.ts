@@ -12,6 +12,7 @@ import { ensureDbReady } from "@/lib/db/ensure-ready";
 import { sleepingPartnerships, users } from "@/lib/db/schema";
 import { canonicalUserPair } from "@/lib/users/pair";
 import { notifyUser } from "@/lib/notifications";
+import { notifySleepingNetworkOfPartnershipChange } from "@/lib/partnerships/network-notify";
 
 export interface PartnershipView {
   id: string;
@@ -139,6 +140,8 @@ export async function proposePartnershipAction(
   const autoAccept = target.role === "passive";
   const status = autoAccept ? "accepted" : "proposed";
   const partnershipId = existing?.id ?? `sp-${randomUUID()}`;
+  const initiatedByUserId =
+    subjectUserId && session.user.id !== proposerId ? session.user.id : null;
 
   if (existing) {
     await db
@@ -146,6 +149,7 @@ export async function proposePartnershipAction(
       .set({
         status,
         proposedById: proposerId,
+        initiatedByUserId,
         updatedAt: now,
         respondedAt: autoAccept ? now : null,
         passiveAutoAccepted: autoAccept,
@@ -158,6 +162,7 @@ export async function proposePartnershipAction(
       userHighId,
       status,
       proposedById: proposerId,
+      initiatedByUserId,
       createdAt: now,
       updatedAt: now,
       respondedAt: autoAccept ? now : null,
@@ -183,6 +188,14 @@ export async function proposePartnershipAction(
       "partnership_proposed",
       `${proposer?.displayName ?? "Someone"} proposed a sleeping partnership with you.`,
       { partnershipId, proposerId, partnerId: targetUserId },
+    );
+  } else {
+    await notifySleepingNetworkOfPartnershipChange(
+      db,
+      userLowId,
+      userHighId,
+      `${proposer?.displayName ?? "Someone"} established a sleeping partnership with ${target.displayName}.`,
+      { partnershipId, userLowId, userHighId },
     );
   }
 
@@ -301,6 +314,18 @@ export async function respondPartnershipAction(
     .from(users)
     .where(eq(users.id, session.user.id))
     .limit(1);
+  const [lowUser] = await db
+    .select({ displayName: users.displayName })
+    .from(users)
+    .where(eq(users.id, row.userLowId))
+    .limit(1);
+  const [highUser] = await db
+    .select({ displayName: users.displayName })
+    .from(users)
+    .where(eq(users.id, row.userHighId))
+    .limit(1);
+  const lowName = lowUser?.displayName ?? "a member";
+  const highName = highUser?.displayName ?? "a member";
 
   await notifyUser(
     row.proposedById,
@@ -308,6 +333,16 @@ export async function respondPartnershipAction(
     `${responder?.displayName ?? "Someone"} ${parsed.data.accept ? "accepted" : "declined"} your sleeping partnership proposal.`,
     { partnershipId: row.id, partnerId },
   );
+
+  if (parsed.data.accept) {
+    await notifySleepingNetworkOfPartnershipChange(
+      db,
+      row.userLowId,
+      row.userHighId,
+      `${responder?.displayName ?? "Someone"} accepted the sleeping partnership between ${lowName} and ${highName}.`,
+      { partnershipId: row.id, userLowId: row.userLowId, userHighId: row.userHighId },
+    );
+  }
 
   await logUserActivity(
     session.user.id,
@@ -354,7 +389,34 @@ export async function removePartnershipAction(
     return { ok: false, message: "Not allowed." };
   }
 
+  const [lowUser] = await db
+    .select({ displayName: users.displayName })
+    .from(users)
+    .where(eq(users.id, row.userLowId))
+    .limit(1);
+  const [highUser] = await db
+    .select({ displayName: users.displayName })
+    .from(users)
+    .where(eq(users.id, row.userHighId))
+    .limit(1);
+  const [actor] = await db
+    .select({ displayName: users.displayName })
+    .from(users)
+    .where(eq(users.id, session.user.id))
+    .limit(1);
+
   await db.delete(sleepingPartnerships).where(eq(sleepingPartnerships.id, partnershipId));
+
+  if (row.status === "accepted") {
+    await notifySleepingNetworkOfPartnershipChange(
+      db,
+      row.userLowId,
+      row.userHighId,
+      `${actor?.displayName ?? "Someone"} removed the sleeping partnership between ${lowUser?.displayName ?? "a member"} and ${highUser?.displayName ?? "a member"}.`,
+      { partnershipId, userLowId: row.userLowId, userHighId: row.userHighId },
+    );
+  }
+
   await logUserActivity(session.user.id, "partnership.remove", partnershipId);
   revalidatePath("/people-places");
 

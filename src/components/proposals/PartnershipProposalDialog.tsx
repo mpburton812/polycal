@@ -85,7 +85,7 @@ export function PartnershipProposalDialog({
             </Typography>
           )}
           <Typography variant="caption" color="text.secondary">
-            Proposed by {card.proposerName}
+            {card.proposerName === "You" ? "Proposed by you" : `Proposed by ${card.proposerName}`}
           </Typography>
           {message && (
             <Alert severity={message.includes("cannot") ? "warning" : "info"}>{message}</Alert>
