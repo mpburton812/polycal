@@ -69,6 +69,7 @@ export function AdminUserManagementPanel({
   const [editDisplayName, setEditDisplayName] = useState("");
   const [editUsername, setEditUsername] = useState("");
   const [editRole, setEditRole] = useState<"user" | "admin">("user");
+  const [editGender, setEditGender] = useState("");
   const [editAvatarKey, setEditAvatarKey] = useState<string>(AVATAR_OPTIONS[0].key);
   const [editUsernameStatus, setEditUsernameStatus] = useState({
     checked: false,
@@ -97,6 +98,7 @@ export function AdminUserManagementPanel({
     setEditDisplayName(user.displayName);
     setEditUsername(user.username);
     setEditRole(user.role === "admin" ? "admin" : "user");
+    setEditGender(user.gender ?? "");
     setEditAvatarKey(AVATAR_OPTIONS[0].key);
     setEditUsernameStatus(
       user.role === "passive"
@@ -154,6 +156,7 @@ export function AdminUserManagementPanel({
           <TableHead>
             <TableRow>
               <TableCell>Name</TableCell>
+              <TableCell>Gender</TableCell>
               <TableCell>Role</TableCell>
               <TableCell>Status</TableCell>
               <TableCell>Last login</TableCell>
@@ -164,6 +167,7 @@ export function AdminUserManagementPanel({
             {users.map((user) => (
               <TableRow key={user.id}>
                 <TableCell>{user.displayName}</TableCell>
+                <TableCell>{user.gender ?? "—"}</TableCell>
                 <TableCell>{user.role}</TableCell>
                 <TableCell>
                   <Chip
@@ -361,6 +365,13 @@ export function AdminUserManagementPanel({
               fullWidth
               required
             />
+            <TextField
+              label="Gender"
+              value={editGender}
+              onChange={(e) => setEditGender(e.target.value)}
+              fullWidth
+              helperText="Optional — shown in admin user list."
+            />
             {editUser?.role !== "passive" && (
               <>
                 <TextField
@@ -427,6 +438,7 @@ export function AdminUserManagementPanel({
                   userId: editUser.id,
                   displayName: editDisplayName,
                   avatarKey: editAvatarKey,
+                  gender: editGender.trim() || null,
                   ...(editUser.role !== "passive"
                     ? { username: editUsername, role: editRole }
                     : {}),

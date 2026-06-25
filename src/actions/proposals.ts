@@ -1948,14 +1948,13 @@ export async function updateDraftProposalAction(
  * Returns true when a proposal should auto-resolve on submit (solo sleeping or no required invitees).
  */
 function shouldAutoResolveOnSubmit(
-  proposalType: ProposalType,
+  _proposalType: ProposalType,
   intentionalSolo: boolean,
   requiredInviteeCount: number,
 ): boolean {
   if (intentionalSolo) return true;
-  if (requiredInviteeCount === 0) return true;
-  if (proposalType !== "sleeping") return false;
-  return intentionalSolo;
+  if (requiredInviteeCount === 0) return false;
+  return false;
 }
 
 /**
@@ -2004,6 +2003,13 @@ export async function submitProposalAction(
     .where(eq(proposalInvitees.proposalId, proposalId));
 
   const requiredCount = invitees.filter((row) => row.role === "required").length;
+  if (requiredCount === 0 && !proposal.intentionalSolo) {
+    return {
+      ok: false,
+      message: "Add at least one required invitee or enable solo before submitting.",
+    };
+  }
+
   const autoResolve = shouldAutoResolveOnSubmit(
     proposal.proposalType,
     proposal.intentionalSolo,

@@ -1,4 +1,5 @@
 import { logUserActivity } from "@/lib/audit";
+import { sendEmail } from "@/lib/email/send";
 import { getDb } from "@/lib/db/client";
 import { ensureDbReady } from "@/lib/db/ensure-ready";
 import { users } from "@/lib/db/schema";
@@ -145,4 +146,31 @@ async function maybeQueueEmailNotification(
     }),
     "system",
   );
+
+  try {
+    const result = await sendEmail({
+      to: row.notificationEmail,
+      subject: `PolyCal: ${formatPushTitle(notificationType)}`,
+      html: `<p>${message}</p>`,
+    });
+    if (result.sent) {
+      await logUserActivity(
+        userId,
+        "notification.email_sent",
+        JSON.stringify({ to: row.notificationEmail, notificationType }),
+        "system",
+      );
+    }
+  } catch (error) {
+    await logUserActivity(
+      userId,
+      "notification.email_failed",
+      JSON.stringify({
+        to: row.notificationEmail,
+        notificationType,
+        error: error instanceof Error ? error.message : "send failed",
+      }),
+      "error",
+    );
+  }
 }

@@ -8,6 +8,17 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- PC-53: Pending-recovery TTL when resolved proposals lose all required invitees; admin-configurable recovery hours.
+- PC-53: Schedule network busyness heatmap (privacy-masked) and sticky week/filter toolbar.
+- PC-53: Resend email delivery for notifications and profile email verification when `RESEND_API_KEY` is set.
+- PC-53: Admin user table gender column; production admin bootstrap script (`scripts/create-prod-admin.mjs`).
+
+### Fixed
+
+- PC-53: Block submit/auto-resolve when a proposal has zero required invitees and is not marked solo.
+
+### Added
+
 - PC-52: Playwright journey for admin provisioning an active user (copy credentials, logout, first-login onboarding).
 - PC-52: Test environment scripts (`test:env:test`, `validate-test-seed`) and login hint for Burton-Thompson seed; dev/feature keep Star Wars demo data.
 - PC-51: Render Blueprint (`render.yaml`) with hourly dev/test enforcement cron jobs calling Vercel `/api/cron/enforcement`; `scripts/cron-enforcement.sh` runner; production cron template documented in Blueprint comments.

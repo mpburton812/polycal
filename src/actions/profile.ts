@@ -8,6 +8,7 @@ import { z } from "zod";
 
 import { auth } from "@/lib/auth";
 import { logUserActivity } from "@/lib/audit";
+import { sendEmail } from "@/lib/email/send";
 import { isUserThemeId, type UserThemeId } from "@/lib/constants/themes";
 import { resolveTimezone } from "@/lib/schedule/timezone";
 import { AVATAR_OPTIONS, isCustomAvatarKey, type AvatarKey } from "@/lib/constants/avatars";
@@ -280,8 +281,7 @@ export async function updateNotificationPrefsAction(
 const notificationEmailSchema = z.string().trim().email("Enter a valid email address.");
 
 /**
- * Saves notification email and issues a verification token (PC-43).
- * Email delivery is logged until SMTP is configured.
+ * Saves notification email and sends a verification link when email is configured (PC-53).
  */
 export async function updateNotificationEmailAction(
   email: string,
@@ -319,6 +319,31 @@ export async function updateNotificationEmailAction(
     "profile.notification_email_pending",
     JSON.stringify({ email: parsed.data, verificationUrl }),
   );
+
+  try {
+    const sendResult = await sendEmail({
+      to: parsed.data,
+      subject: "Verify your PolyCal notification email",
+      html: `<p>Click to verify your PolyCal notification email:</p><p><a href="${verificationUrl}">${verificationUrl}</a></p>`,
+    });
+    if (!sendResult.sent) {
+      await logUserActivity(
+        session.user.id,
+        "profile.notification_email_dev_link",
+        JSON.stringify({ verificationUrl }),
+      );
+    }
+  } catch (error) {
+    await logUserActivity(
+      session.user.id,
+      "profile.notification_email_send_failed",
+      JSON.stringify({
+        error: error instanceof Error ? error.message : "send failed",
+        verificationUrl,
+      }),
+      "error",
+    );
+  }
 
   revalidatePath("/profile");
   return { ok: true, verificationUrl };

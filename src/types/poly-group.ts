@@ -37,6 +37,7 @@ export interface PolyGroupSettings {
   atRiskTtlHours: number;
   archiveGraceHours: number;
   redraftDeadlineHours: number;
+  recoveryMaxHours: number;
 }
 
 export const DEFAULT_ONBOARDING_WELCOME_MESSAGE =
