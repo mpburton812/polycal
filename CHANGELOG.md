@@ -8,6 +8,9 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- PC-50: Sleeping network notifications when partnerships are added or removed (partners of affected users are notified).
+- PC-50: Track admin-initiated partnership proposals (`initiatedByUserId`) with accurate Kanban/detail copy.
+
 - PC-49: Optional poll invitees keep the proposal in Proposed until they vote; banner and tailored notification when required attendees have already approved and scheduled.
 
 - PC-48: Attendee-update one-click notifications (maintain accept / decline) after proposer removes required invitees; at-risk resolved flow with proposer options, tentative calendar styling, and auto-cancel enforcement.
@@ -17,6 +20,11 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - PC-48: MUI X date/time pickers with analog clock for event draft start/end times; calendar picker for sleeping dates.
 
 - Phase 9 enforcement (PC-46): admin-configurable proposed TTL, at-risk TTL, archive grace, and redraft deadline; proposed expiration, auto-archive after event end, centralized enforcement runner; overlap acknowledge/decline flow for voters.
+
+### Fixed
+
+- PC-50: Cancelling a proposal closes the detail dialog and returns to the prior view.
+- PC-50: Relationship proposal cards no longer say "with you" when the partnership is between two other named members.
 
 ### Fixed
 

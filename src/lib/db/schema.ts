@@ -315,6 +315,8 @@ export const sleepingPartnerships = sqliteTable("sleeping_partnerships", {
   proposedById: text("proposed_by_id")
     .notNull()
     .references(() => users.id),
+  /** Admin or proxy user who submitted on behalf of proposedById (PC-50). */
+  initiatedByUserId: text("initiated_by_user_id").references(() => users.id),
   createdAt: text("created_at").notNull(),
   updatedAt: text("updated_at").notNull(),
   respondedAt: text("responded_at"),

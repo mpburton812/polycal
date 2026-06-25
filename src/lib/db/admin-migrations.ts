@@ -30,6 +30,7 @@ export async function applyAdminMigrations(sql: Client): Promise<void> {
 
   await ensureColumn(sql, "user_activity_log", "event_type", "TEXT NOT NULL DEFAULT 'user'");
   await ensureColumn(sql, "sleeping_partnerships", "passive_auto_accepted", "INTEGER NOT NULL DEFAULT 0");
+  await ensureColumn(sql, "sleeping_partnerships", "initiated_by_user_id", "TEXT");
 }
 
 async function ensureColumn(
