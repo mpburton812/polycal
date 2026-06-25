@@ -44,6 +44,8 @@ export const users = sqliteTable("users", {
   emailVerifiedAt: text("email_verified_at"),
   emailVerificationToken: text("email_verification_token"),
   notificationPrefsJson: text("notification_prefs_json"),
+  /** IANA timezone for schedule display normalization (PC-48 / spec §10). */
+  timezone: text("timezone").notNull().default("UTC"),
   onboardingComplete: integer("onboarding_complete", { mode: "boolean" }).notNull().default(true),
   sessionVersion: integer("session_version").notNull().default(0),
   activatedFromPassiveAt: text("activated_from_passive_at"),

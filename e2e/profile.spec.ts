@@ -29,6 +29,11 @@ test.describe("Profile settings", () => {
     });
   });
 
+  test("shows timezone selector in preferences", async ({ page }) => {
+    await expect(page.getByLabel("Time zone")).toBeVisible();
+    await expect(page.getByLabel("Time zone")).toContainText("UTC");
+  });
+
   test("shows custom avatar upload control", async ({ page }) => {
     await expect(page.getByText("Custom avatar")).toBeVisible();
     await expect(page.getByRole("button", { name: "Upload image" })).toBeVisible();

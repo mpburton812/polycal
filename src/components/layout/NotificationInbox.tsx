@@ -19,6 +19,7 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition, type MouseEvent } from "react";
 
 import { respondPartnershipAction } from "@/actions/partnerships";
+import { respondAttendeeUpdateAction } from "@/actions/proposals";
 import {
   clearAllNotificationsAction,
   dismissNotificationAction,
@@ -78,6 +79,19 @@ export function NotificationInbox({
   function respondToPartnership(logId: number, partnershipId: string, accept: boolean) {
     startTransition(async () => {
       const result = await respondPartnershipAction({ partnershipId, accept });
+      if (!result.ok) return;
+      setItems((current) => current.filter((item) => item.id !== logId));
+      setCount((current) => Math.max(0, current - 1));
+      router.refresh();
+    });
+  }
+
+  function respondToAttendeeUpdate(logId: number, proposalId: string, maintain: boolean) {
+    startTransition(async () => {
+      const result = await respondAttendeeUpdateAction({
+        proposalId,
+        response: maintain ? "maintain" : "decline",
+      });
       if (!result.ok) return;
       setItems((current) => current.filter((item) => item.id !== logId));
       setCount((current) => Math.max(0, current - 1));
@@ -185,7 +199,28 @@ export function NotificationInbox({
                         </Button>
                       </>
                     )}
-                    {proposalId && (
+                    {item.type === "proposal_attendee_update" && proposalId && (
+                      <>
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          color="error"
+                          disabled={pending}
+                          onClick={() => respondToAttendeeUpdate(item.id, proposalId, false)}
+                        >
+                          Decline
+                        </Button>
+                        <Button
+                          size="small"
+                          variant="contained"
+                          disabled={pending}
+                          onClick={() => respondToAttendeeUpdate(item.id, proposalId, true)}
+                        >
+                          Maintain accept
+                        </Button>
+                      </>
+                    )}
+                    {proposalId && item.type !== "proposal_attendee_update" && (
                       <Button
                         size="small"
                         disabled={pending}

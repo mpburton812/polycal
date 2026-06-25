@@ -8,6 +8,11 @@ import { listPeopleAction } from "@/actions/users";
 import { ScheduleClient } from "@/components/schedule/ScheduleClient";
 import { auth } from "@/lib/auth";
 import { endOfWeekSunday, startOfWeekMonday } from "@/lib/schedule/dates";
+import { resolveTimezone } from "@/lib/schedule/timezone";
+import { users } from "@/lib/db/schema";
+import { eq } from "drizzle-orm";
+import { getDb } from "@/lib/db/client";
+import { ensureDbReady } from "@/lib/db/ensure-ready";
 
 export default async function SchedulePage() {
   const session = await auth();
@@ -17,6 +22,15 @@ export default async function SchedulePage() {
 
   const weekStart = startOfWeekMonday(new Date());
   const rangeEnd = endOfWeekSunday(weekStart);
+
+  await ensureDbReady();
+  const db = getDb();
+  const [userRow] = await db
+    .select({ timezone: users.timezone })
+    .from(users)
+    .where(eq(users.id, session.user.id))
+    .limit(1);
+  const timeZone = resolveTimezone(userRow?.timezone);
 
   const [scheduleResult, people, places, partnerships] = await Promise.all([
     listScheduleEventsAction({
@@ -47,6 +61,7 @@ export default async function SchedulePage() {
         places={places}
         currentUserId={session.user.id}
         acceptedPartnerIds={acceptedPartnerIds}
+        timeZone={timeZone}
       />
     </>
   );

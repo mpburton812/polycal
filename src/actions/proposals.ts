@@ -31,6 +31,7 @@ import {
 import { notifyUser } from "@/lib/notifications";
 import {
   atRiskExpiresAtIso,
+  computeAtRiskExpiresAt,
   detectViewerOverlapWarning,
   intervalsOverlap,
   loadEnforcementSettings,
@@ -107,6 +108,17 @@ const attendeeUpdateSchema = z.object({
   addRequired: z.array(z.string().min(1)).optional(),
   addOptional: z.array(z.string().min(1)).optional(),
   removeUserIds: z.array(z.string().min(1)).optional(),
+});
+
+const attendeeUpdateResponseSchema = z.object({
+  proposalId: z.string().min(1),
+  response: z.enum(["maintain", "decline"]),
+});
+
+const rescheduleProposalSchema = z.object({
+  proposalId: z.string().min(1),
+  scheduledStartAt: z.string().min(1),
+  scheduledEndAt: z.string().optional(),
 });
 
 export type ProposalCardKind = "proposal" | "partnership";
@@ -229,6 +241,8 @@ export interface ProposalDetail {
   canCancel: boolean;
   canRedraft: boolean;
   canClone: boolean;
+  canReschedule: boolean;
+  canRevokeAcceptance: boolean;
   viewerVoteStatus: InviteeVoteStatus | null;
   viewerSlotVotes: Record<string, InviteeVoteStatus>;
   /** True when the viewer already voted but their calendar now conflicts (PC-45/46). */
@@ -966,6 +980,55 @@ async function resetInviteeVotes(db: ReturnType<typeof getDb>, proposalId: strin
   await wipeProposalVotes(db, proposalId);
 }
 
+/**
+ * Flags a resolved proposal at-risk and returns it to proposed for re-approval (PC-48 / spec §9).
+ */
+async function enterAtRiskProposedState(
+  db: ReturnType<typeof getDb>,
+  proposal: typeof proposals.$inferSelect,
+  actorUserId: string,
+  reason: string,
+): Promise<void> {
+  const enforcement = await loadEnforcementSettings(db);
+  const expiresAt = computeAtRiskExpiresAt(enforcement, proposal.scheduledStartAt);
+  const now = new Date().toISOString();
+
+  await db
+    .update(proposals)
+    .set({
+      state: "proposed",
+      atRisk: true,
+      atRiskExpiresAt: expiresAt,
+      updatedAt: now,
+    })
+    .where(eq(proposals.id, proposal.id));
+
+  await resetInviteeVotes(db, proposal.id);
+  await logProposalTransition(db, proposal.id, actorUserId, "proposal.at_risk", reason);
+
+  await notifyUser(
+    proposal.proposerId,
+    "proposal_at_risk",
+    `Proposal "${proposal.title}" is at risk. Cancel, re-draft, or update attendees.`,
+    { proposalId: proposal.id, action: "at_risk_options" },
+  );
+
+  const invitees = await db
+    .select({ userId: proposalInvitees.userId })
+    .from(proposalInvitees)
+    .where(eq(proposalInvitees.proposalId, proposal.id));
+
+  for (const row of invitees) {
+    if (row.userId === proposal.proposerId) continue;
+    await notifyUser(
+      row.userId,
+      "proposal_at_risk",
+      `Proposal "${proposal.title}" is tentative/at risk on the calendar until re-approved.`,
+      { proposalId: proposal.id, action: "vote" },
+    );
+  }
+}
+
 /** Clears invitee votes, slot matrix votes, and winning slot (PC-40). */
 async function wipeProposalVotes(db: ReturnType<typeof getDb>, proposalId: string): Promise<void> {
   const now = new Date().toISOString();
@@ -1312,7 +1375,11 @@ async function evaluateProposalAfterVote(
 
   const declinedRequired = required.find((row) => row.voteStatus === "decline");
   if (declinedRequired) {
-    await revertProposalToDraft(db, proposal, actorUserId, "A required invitee declined.");
+    if (proposal.state === "resolved") {
+      await enterAtRiskProposedState(db, proposal, actorUserId, "A required invitee declined.");
+    } else {
+      await revertProposalToDraft(db, proposal, actorUserId, "A required invitee declined.");
+    }
     return;
   }
 
@@ -2226,6 +2293,19 @@ export async function getProposalDetailAction(
       canClone:
         isProposer &&
         (row.state === "resolved" || row.state === "proposed" || row.state === "archived"),
+      canReschedule:
+        isAdmin &&
+        canViewSensitive &&
+        (row.state === "proposed" || row.state === "resolved"),
+      canRevokeAcceptance:
+        !masked &&
+        viewerInvitee?.role === "required" &&
+        row.state === "resolved" &&
+        !row.atRisk &&
+        Boolean(
+          viewerInvitee?.voteStatus &&
+            APPROVING_VOTES.includes(viewerInvitee.voteStatus as InviteeVoteStatus),
+        ),
       viewerVoteStatus: viewerInvitee?.voteStatus ?? null,
       viewerSlotVotes: masked ? {} : viewerSlotVotes,
       hasOverlapWarning,
@@ -2346,7 +2426,7 @@ export async function acknowledgeProposalOverlapAction(
     if (proposal.state === "proposed" || (proposal.state === "resolved" && proposal.atRisk)) {
       await evaluateProposalAfterVote(db, proposal.id, session.user.id);
     } else if (proposal.state === "resolved") {
-      await revertProposalToDraft(
+      await enterAtRiskProposedState(
         db,
         proposal,
         session.user.id,
@@ -2737,6 +2817,7 @@ export async function updateResolvedAttendeesAction(
 
   const now = new Date().toISOString();
   let attendeesChanged = false;
+  let removedRequiredAttendee = false;
 
   for (const userId of parsed.data.removeUserIds ?? []) {
     const [row] = await db
@@ -2748,6 +2829,7 @@ export async function updateResolvedAttendeesAction(
       .limit(1);
 
     if (!row) continue;
+    if (row.role === "required") removedRequiredAttendee = true;
 
     await db.delete(proposalSlotVotes).where(
       and(eq(proposalSlotVotes.proposalId, proposal.id), eq(proposalSlotVotes.userId, userId)),
@@ -2784,9 +2866,11 @@ export async function updateResolvedAttendeesAction(
     attendeesChanged = true;
 
     if (role === "required") {
+      const enforcement = await loadEnforcementSettings(db);
+      const expiresAt = computeAtRiskExpiresAt(enforcement, proposal.scheduledStartAt);
       await db
         .update(proposals)
-        .set({ atRisk: true, updatedAt: now })
+        .set({ atRisk: true, atRiskExpiresAt: expiresAt, updatedAt: now })
         .where(eq(proposals.id, proposal.id));
     }
 
@@ -2804,21 +2888,24 @@ export async function updateResolvedAttendeesAction(
   }
 
   if (attendeesChanged) {
-    const remainingRequired = await db
-      .select({ userId: proposalInvitees.userId })
-      .from(proposalInvitees)
-      .where(
-        and(eq(proposalInvitees.proposalId, proposal.id), eq(proposalInvitees.role, "required")),
-      );
+    if (removedRequiredAttendee) {
+      const remainingRequired = await db
+        .select({ userId: proposalInvitees.userId, voteStatus: proposalInvitees.voteStatus })
+        .from(proposalInvitees)
+        .where(
+          and(eq(proposalInvitees.proposalId, proposal.id), eq(proposalInvitees.role, "required")),
+        );
 
-    for (const row of remainingRequired) {
-      if (row.userId === session.user.id) continue;
-      await notifyUser(
-        row.userId,
-        "proposal_attendees_updated",
-        `Attendees changed on "${proposal.title}" — review the proposal.`,
-        { proposalId: proposal.id, action: "view" },
-      );
+      for (const row of remainingRequired) {
+        if (row.userId === session.user.id) continue;
+        if (!APPROVING_VOTES.includes(row.voteStatus as InviteeVoteStatus)) continue;
+        await notifyUser(
+          row.userId,
+          "proposal_attendee_update",
+          `Attendees changed on "${proposal.title}" — maintain your acceptance or decline.`,
+          { proposalId: proposal.id, action: "attendee_update" },
+        );
+      }
     }
 
     await logProposalTransition(db, proposal.id, session.user.id, "proposal.attendees_updated");
@@ -2832,6 +2919,223 @@ export async function updateResolvedAttendeesAction(
 
 /** Alias for updateResolvedAttendeesAction (PC-45). */
 export const updateProposalAttendeesAction = updateResolvedAttendeesAction;
+
+/**
+ * One-click response for remaining required invitees after proposer removes an attendee (PC-48).
+ */
+export async function respondAttendeeUpdateAction(
+  input: z.infer<typeof attendeeUpdateResponseSchema>,
+): Promise<{ ok: boolean; message: string }> {
+  const session = await auth();
+  if (!session?.user) {
+    return { ok: false, message: "Sign in required." };
+  }
+
+  const parsed = attendeeUpdateResponseSchema.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, message: "Invalid response." };
+  }
+
+  await ensureDbReady();
+  const db = getDb();
+
+  const [proposal] = await db
+    .select()
+    .from(proposals)
+    .where(eq(proposals.id, parsed.data.proposalId))
+    .limit(1);
+
+  if (!proposal || proposal.state !== "resolved") {
+    return { ok: false, message: "Proposal is not resolved." };
+  }
+
+  const [invitee] = await db
+    .select()
+    .from(proposalInvitees)
+    .where(
+      and(
+        eq(proposalInvitees.proposalId, proposal.id),
+        eq(proposalInvitees.userId, session.user.id),
+        eq(proposalInvitees.role, "required"),
+      ),
+    )
+    .limit(1);
+
+  if (!invitee) {
+    return { ok: false, message: "You are not a required invitee on this proposal." };
+  }
+
+  if (parsed.data.response === "maintain") {
+    await logProposalTransition(
+      db,
+      proposal.id,
+      session.user.id,
+      "proposal.attendee_update_maintained",
+      "Required invitee maintained acceptance after attendee change.",
+    );
+    revalidatePath("/proposals");
+    return { ok: true, message: "Your acceptance is unchanged." };
+  }
+
+  const now = new Date().toISOString();
+  await db
+    .update(proposalInvitees)
+    .set({ voteStatus: "decline", respondedAt: now })
+    .where(eq(proposalInvitees.id, invitee.id));
+
+  await enterAtRiskProposedState(
+    db,
+    proposal,
+    session.user.id,
+    "Required invitee revoked acceptance after attendee change.",
+  );
+
+  revalidatePath("/proposals");
+  revalidatePath("/schedule");
+  return { ok: true, message: "Your decline was recorded. The event is now at risk." };
+}
+
+/**
+ * Revokes a required invitee's post-resolution acceptance, flagging the event at-risk (PC-48).
+ */
+export async function revokeResolvedAcceptanceAction(
+  proposalId: string,
+): Promise<{ ok: boolean; message: string }> {
+  const session = await auth();
+  if (!session?.user) {
+    return { ok: false, message: "Sign in required." };
+  }
+
+  await ensureDbReady();
+  const db = getDb();
+
+  const [proposal] = await db
+    .select()
+    .from(proposals)
+    .where(eq(proposals.id, proposalId))
+    .limit(1);
+
+  if (!proposal || proposal.state !== "resolved" || proposal.atRisk) {
+    return { ok: false, message: "Proposal cannot be declined." };
+  }
+
+  const [invitee] = await db
+    .select()
+    .from(proposalInvitees)
+    .where(
+      and(
+        eq(proposalInvitees.proposalId, proposalId),
+        eq(proposalInvitees.userId, session.user.id),
+        eq(proposalInvitees.role, "required"),
+      ),
+    )
+    .limit(1);
+
+  if (!invitee || !APPROVING_VOTES.includes(invitee.voteStatus as InviteeVoteStatus)) {
+    return { ok: false, message: "You have not accepted this event." };
+  }
+
+  const now = new Date().toISOString();
+  await db
+    .update(proposalInvitees)
+    .set({ voteStatus: "decline", respondedAt: now })
+    .where(eq(proposalInvitees.id, invitee.id));
+
+  await enterAtRiskProposedState(
+    db,
+    proposal,
+    session.user.id,
+    "Required invitee revoked acceptance post-resolution.",
+  );
+
+  revalidatePath("/proposals");
+  revalidatePath("/schedule");
+  return { ok: true, message: "Event flagged at risk and returned to proposed." };
+}
+
+/**
+ * Admin-only reschedule of a proposed or resolved calendar event (PC-48 / spec §10).
+ */
+export async function rescheduleProposalAction(
+  input: z.infer<typeof rescheduleProposalSchema>,
+): Promise<{ ok: boolean; message: string }> {
+  const session = await auth();
+  if (!session?.user) {
+    return { ok: false, message: "Sign in required." };
+  }
+
+  const isAdmin = await userHasAdminAccess(session.user.role);
+  if (!isAdmin) {
+    return { ok: false, message: "Admin access required." };
+  }
+
+  const parsed = rescheduleProposalSchema.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, message: "Invalid schedule times." };
+  }
+
+  await ensureDbReady();
+  const db = getDb();
+
+  const [proposal] = await db
+    .select()
+    .from(proposals)
+    .where(eq(proposals.id, parsed.data.proposalId))
+    .limit(1);
+
+  if (!proposal || (proposal.state !== "proposed" && proposal.state !== "resolved")) {
+    return { ok: false, message: "Proposal cannot be rescheduled." };
+  }
+
+  const now = new Date().toISOString();
+  await db
+    .update(proposals)
+    .set({
+      scheduledStartAt: parsed.data.scheduledStartAt,
+      scheduledEndAt: parsed.data.scheduledEndAt ?? null,
+      updatedAt: now,
+    })
+    .where(eq(proposals.id, proposal.id));
+
+  const [firstSlot] = await db
+    .select({ id: proposalTimeSlots.id })
+    .from(proposalTimeSlots)
+    .where(eq(proposalTimeSlots.proposalId, proposal.id))
+    .orderBy(asc(proposalTimeSlots.sortOrder))
+    .limit(1);
+
+  if (firstSlot) {
+    await db
+      .update(proposalTimeSlots)
+      .set({
+        startAt: parsed.data.scheduledStartAt,
+        endAt: parsed.data.scheduledEndAt ?? null,
+      })
+      .where(eq(proposalTimeSlots.id, firstSlot.id));
+  }
+
+  await logProposalTransition(
+    db,
+    proposal.id,
+    session.user.id,
+    "proposal.admin_rescheduled",
+    JSON.stringify({
+      scheduledStartAt: parsed.data.scheduledStartAt,
+      scheduledEndAt: parsed.data.scheduledEndAt ?? null,
+    }),
+  );
+
+  await notifyProposalStakeholders(
+    db,
+    proposal,
+    "proposal_rescheduled",
+    `Proposal "${proposal.title}" was rescheduled by an administrator.`,
+  );
+
+  revalidatePath("/proposals");
+  revalidatePath("/schedule");
+  return { ok: true, message: "Event rescheduled." };
+}
 
 /**
  * Deletes a draft owned by the signed-in user (PC-40).
@@ -3146,7 +3450,7 @@ export async function redraftProposalAction(
 
   const now = new Date().toISOString();
   const enforcement = await loadEnforcementSettings(db);
-  const expiresAt = atRiskExpiresAtIso(enforcement);
+  const expiresAt = computeAtRiskExpiresAt(enforcement, proposal.scheduledStartAt);
   await db
     .update(proposals)
     .set({

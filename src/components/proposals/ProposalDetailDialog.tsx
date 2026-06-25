@@ -44,6 +44,8 @@ import {
   deleteDraftProposalAction,
   getProposalDetailAction,
   redraftProposalAction,
+  rescheduleProposalAction,
+  revokeResolvedAcceptanceAction,
   submitProposalAction,
   updateResolvedAttendeesAction,
   type ProposalConflictWarning,
@@ -108,6 +110,9 @@ export function ProposalDetailDialog({
   const [addAttendeeId, setAddAttendeeId] = useState("");
   const [addAttendeeRole, setAddAttendeeRole] = useState<"required" | "optional">("required");
   const [cancelScopeOpen, setCancelScopeOpen] = useState(false);
+  const [rescheduleOpen, setRescheduleOpen] = useState(false);
+  const [rescheduleStart, setRescheduleStart] = useState("");
+  const [rescheduleEnd, setRescheduleEnd] = useState("");
   const [pending, startTransition] = useTransition();
 
   function reloadDetail(id: string) {
@@ -231,11 +236,58 @@ export function ProposalDetailDialog({
     startTransition(async () => {
       const result = await cloneProposalAction(proposalId);
       setMessage(result.message);
-      if (!result.ok) return;
-      router.refresh();
-      if (result.newProposalId) {
-        reloadDetail(result.newProposalId);
+      if (!result.ok || !result.newProposalId) return;
+      const detailResult = await getProposalDetailAction(result.newProposalId);
+      if (detailResult.ok && detailResult.detail) {
+        onClose();
+        onEdit(detailResult.detail);
+        router.refresh();
+        return;
       }
+      router.refresh();
+    });
+  }
+
+  function handleRevokeAcceptance() {
+    if (!proposalId || !window.confirm("Revoke your acceptance? The event will be flagged at risk.")) {
+      return;
+    }
+    startTransition(async () => {
+      const result = await revokeResolvedAcceptanceAction(proposalId);
+      setMessage(result.message);
+      if (!result.ok) return;
+      reloadDetail(proposalId);
+      router.refresh();
+    });
+  }
+
+  function openRescheduleDialog() {
+    if (!detail?.scheduledStartAt) return;
+    const start = new Date(detail.scheduledStartAt);
+    const end = detail.scheduledEndAt ? new Date(detail.scheduledEndAt) : start;
+    const toLocal = (date: Date) => {
+      const offset = date.getTimezoneOffset();
+      const local = new Date(date.getTime() - offset * 60_000);
+      return local.toISOString().slice(0, 16);
+    };
+    setRescheduleStart(toLocal(start));
+    setRescheduleEnd(toLocal(end));
+    setRescheduleOpen(true);
+  }
+
+  function handleReschedule() {
+    if (!proposalId || !rescheduleStart) return;
+    startTransition(async () => {
+      const result = await rescheduleProposalAction({
+        proposalId,
+        scheduledStartAt: new Date(rescheduleStart).toISOString(),
+        scheduledEndAt: rescheduleEnd ? new Date(rescheduleEnd).toISOString() : undefined,
+      });
+      setMessage(result.message);
+      if (!result.ok) return;
+      setRescheduleOpen(false);
+      reloadDetail(proposalId);
+      router.refresh();
     });
   }
 
@@ -325,6 +377,30 @@ export function ProposalDetailDialog({
         <CardContent sx={{ pb: 1 }}>
           {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
           {message && <Alert severity="info" sx={{ mb: 2 }}>{message}</Alert>}
+          {detail?.atRisk && detail.state === "resolved" && (
+            <Alert severity="warning" sx={{ mb: 2 }}>
+              This event is at risk on the calendar. Cancel, re-draft, or update attendees to resolve.
+              {(detail.canCancel || detail.canRedraft || detail.canManageAttendees) && (
+                <Stack direction="row" spacing={1} sx={{ mt: 1 }} flexWrap="wrap" useFlexGap>
+                  {detail.canCancel && (
+                    <Button size="small" color="error" onClick={handleCancelClick} disabled={pending}>
+                      Cancel event
+                    </Button>
+                  )}
+                  {detail.canRedraft && (
+                    <Button size="small" onClick={handleRedraft} disabled={pending}>
+                      Re-draft
+                    </Button>
+                  )}
+                  {detail.canManageAttendees && (
+                    <Typography variant="caption" sx={{ alignSelf: "center" }}>
+                      Use attendee controls below to modify invitees.
+                    </Typography>
+                  )}
+                </Stack>
+              )}
+            </Alert>
+          )}
           {detail?.isContentMasked && (
             <Alert severity="warning" sx={{ mb: 2 }}>
               This is a private event. Details are hidden because you are not an invitee.
@@ -657,6 +733,16 @@ export function ProposalDetailDialog({
                   </Button>
                 </Stack>
               )}
+              {detail.canRevokeAcceptance && (
+                <Button
+                  variant="outlined"
+                  color="error"
+                  disabled={pending}
+                  onClick={handleRevokeAcceptance}
+                >
+                  Revoke acceptance
+                </Button>
+              )}
               {detail.canComment && (
                 <>
                   <Divider />
@@ -741,6 +827,11 @@ export function ProposalDetailDialog({
               </Button>
             </>
           )}
+          {detail?.canReschedule && (
+            <Button onClick={openRescheduleDialog} disabled={pending}>
+              Reschedule
+            </Button>
+          )}
           <Button onClick={onClose}>Close</Button>
         </CardActions>
       </Card>
@@ -759,6 +850,35 @@ export function ProposalDetailDialog({
         </Button>
         <Button color="error" variant="contained" onClick={() => handleCancel("series")} disabled={pending}>
           Entire series
+        </Button>
+      </DialogActions>
+    </Dialog>
+    <Dialog open={rescheduleOpen} onClose={() => setRescheduleOpen(false)} fullWidth maxWidth="xs">
+      <DialogTitle>Reschedule event</DialogTitle>
+      <DialogContent>
+        <Stack spacing={2} sx={{ mt: 1 }}>
+          <TextField
+            label="Start"
+            type="datetime-local"
+            value={rescheduleStart}
+            onChange={(event) => setRescheduleStart(event.target.value)}
+            fullWidth
+            InputLabelProps={{ shrink: true }}
+          />
+          <TextField
+            label="End"
+            type="datetime-local"
+            value={rescheduleEnd}
+            onChange={(event) => setRescheduleEnd(event.target.value)}
+            fullWidth
+            InputLabelProps={{ shrink: true }}
+          />
+        </Stack>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={() => setRescheduleOpen(false)}>Cancel</Button>
+        <Button variant="contained" onClick={handleReschedule} disabled={pending || !rescheduleStart}>
+          Save
         </Button>
       </DialogActions>
     </Dialog>

@@ -73,3 +73,8 @@
 2026-06-24 | 386df9d | PC-45 | complete phases 2, 7, and 8 foundations | src/actions/poly-group.ts
 2026-06-24 | 7814576 | PC-46 | phase 9 enforcement and Playwright E2E updates | src/lib/proposals/enforcement.ts
 2026-06-25 | 39601d0 | PC-47 | fix draft conflict UX, places dialog, and admin accordions | src/components/admin/AdminActivityLogPanel.tsx
+2026-06-25 | a2d2d12 | PC-48 | attendee updates, enforcement cron, timezone, and schedule UX | src/actions/profile.ts
+2026-06-25 | 09df410 | PC-48 | attendee updates, enforcement cron, timezone, and schedule UX | src/actions/profile.ts
+2026-06-25 | f2c79bc | PC-48 | update E2E for pickers, clone draft, and collapsible places | e2e/helpers/datePickers.ts
+2026-06-25 | 0155c5a | PC-48 | fix strict mode on voting E2E assertion | e2e/proposals-voting.spec.ts
+2026-06-25 | 77d33ea | PC-48 | fix strict mode on voting E2E assertion | e2e/proposals-voting.spec.ts

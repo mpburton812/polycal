@@ -11,6 +11,7 @@ export type ScheduleBlockVariant =
   | "proposed"
   | "resolved_event"
   | "resolved_sleeping"
+  | "at_risk"
   | "conflict"
   | "masked";
 
@@ -25,7 +26,8 @@ export function scheduleBlockVariant(event: {
   atRisk: boolean;
 }): ScheduleBlockVariant {
   if (event.isContentMasked) return "masked";
-  if (event.hasOverlap || event.atRisk) return "conflict";
+  if (event.hasOverlap) return "conflict";
+  if (event.atRisk) return "at_risk";
   if (event.state === "proposed") return "proposed";
   if (event.proposalType === "sleeping") return "resolved_sleeping";
   return "resolved_event";
@@ -63,6 +65,14 @@ export function scheduleBlockSx(variant: ScheduleBlockVariant): {
         bgcolor: "rgba(198, 40, 40, 0.15)",
         color: "#b71c1c",
         border: "2px solid #c62828",
+      };
+    case "at_risk":
+      return {
+        bgcolor: "rgba(255, 152, 0, 0.2)",
+        color: "#e65100",
+        border: "2px dashed #ff9800",
+        backgroundImage:
+          "repeating-linear-gradient(-45deg, transparent, transparent 4px, rgba(255,152,0,0.1) 4px, rgba(255,152,0,0.1) 8px)",
       };
     case "masked":
       return {
