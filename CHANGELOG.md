@@ -8,6 +8,7 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- PC-51: Render Blueprint (`render.yaml`) with hourly dev/test enforcement cron jobs calling Vercel `/api/cron/enforcement`; `scripts/cron-enforcement.sh` runner; production cron template documented in Blueprint comments.
 - PC-50: Sleeping network notifications when partnerships are added or removed (partners of affected users are notified).
 - PC-50: Track admin-initiated partnership proposals (`initiatedByUserId`) with accurate Kanban/detail copy.
 
