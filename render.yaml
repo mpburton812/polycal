@@ -1,0 +1,47 @@
+# PC-51: Thin Render cron jobs that call PolyCal enforcement on Vercel.
+# Web app deploys on Vercel; these crons only curl /api/cron/enforcement.
+#
+# Production cron (Vercel production) — add manually or uncomment when ready:
+#   name: polycal-enforcement-production
+#   branch: production
+#   schedule: "*/15 * * * *"
+#   APP_URL: https://polycal-ebon.vercel.app
+
+projects:
+  - name: Poly Calendar
+    environments:
+      - name: Dev
+        services:
+          - type: cron
+            name: polycal-enforcement-dev
+            runtime: node
+            repo: https://github.com/mpburton812/polycal
+            branch: dev
+            plan: starter
+            region: oregon
+            schedule: "0 * * * *"
+            buildCommand: "true"
+            startCommand: bash scripts/cron-enforcement.sh
+            envVars:
+              - key: APP_URL
+                value: https://polycal-git-dev-michael-burton-s-projects.vercel.app
+              - key: CRON_SECRET
+                sync: false
+
+      - name: Test
+        services:
+          - type: cron
+            name: polycal-enforcement-test
+            runtime: node
+            repo: https://github.com/mpburton812/polycal
+            branch: test
+            plan: starter
+            region: oregon
+            schedule: "0 * * * *"
+            buildCommand: "true"
+            startCommand: bash scripts/cron-enforcement.sh
+            envVars:
+              - key: APP_URL
+                value: https://polycal-git-test-michael-burton-s-projects.vercel.app
+              - key: CRON_SECRET
+                sync: false

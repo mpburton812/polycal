@@ -23,7 +23,7 @@ async function main(): Promise<void> {
   const { runMigrations } = await import("../src/lib/db/migrate");
   await runMigrations();
 
-  console.log("[e2e] Seeding Star Wars + demo proposals…");
+  console.log("[e2e] Seeding Star Wars + demo proposals (local e2e.db — not polycal-test)…");
   const { resetTestDatabase } = await import("../src/lib/seed/reset-test-database");
   const result = await resetTestDatabase();
   console.log(`[e2e] Ready (${result.userCount} users, ${result.proposalCount} proposals).`);
