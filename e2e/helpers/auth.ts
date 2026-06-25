@@ -1,6 +1,7 @@
 import { type Page, expect } from "@playwright/test";
 
 import { SEED_PASSWORD } from "./constants";
+import { openProfileMenu } from "./navigation";
 
 /**
  * Signs in via the credentials form and waits for the authenticated shell.
@@ -15,6 +16,15 @@ export async function login(
   await page.getByLabel("Password").fill(password);
   await page.getByRole("button", { name: "Sign in" }).click();
   await page.waitForURL(/\/(schedule|profile|people-places|proposals|admin)/);
+}
+
+/**
+ * Signs out through the header profile menu (full user journey).
+ */
+export async function signOutViaMenu(page: Page): Promise<void> {
+  await openProfileMenu(page);
+  await page.getByRole("menuitem", { name: "Logout" }).click();
+  await page.waitForURL(/\/login/);
 }
 
 /**
