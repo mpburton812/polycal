@@ -72,3 +72,4 @@
 2026-06-24 | 10deb8f | PC-44 | admin UX, proposal polish, and header improvements | src/actions/partnerships.ts
 2026-06-24 | 386df9d | PC-45 | complete phases 2, 7, and 8 foundations | src/actions/poly-group.ts
 2026-06-24 | 7814576 | PC-46 | phase 9 enforcement and Playwright E2E updates | src/lib/proposals/enforcement.ts
+2026-06-25 | 39601d0 | PC-47 | fix draft conflict UX, places dialog, and admin accordions | src/components/admin/AdminActivityLogPanel.tsx

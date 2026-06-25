@@ -4,13 +4,12 @@ import RefreshIcon from "@mui/icons-material/Refresh";
 import {
   Alert,
   Button,
-  Paper,
   Stack,
-  Typography,
 } from "@mui/material";
 import { useState, useTransition } from "react";
 
 import { logForceReloadAction } from "@/actions/admin";
+import { AdminCollapsibleSection } from "@/components/admin/AdminCollapsibleSection";
 import { forceReloadToLatestVersion } from "@/lib/pwa/force-reload";
 
 /**
@@ -38,10 +37,7 @@ export function AdminForceReloadPanel() {
   }
 
   return (
-    <Paper sx={{ p: 3 }}>
-      <Typography variant="h6" gutterBottom>
-        Force Reload
-      </Typography>
+    <AdminCollapsibleSection title="Force Reload">
       {error && (
         <Alert severity="error" sx={{ mb: 2 }}>
           {error}
@@ -57,6 +53,6 @@ export function AdminForceReloadPanel() {
           {pending ? "Reloading…" : "Force reload newest version"}
         </Button>
       </Stack>
-    </Paper>
+    </AdminCollapsibleSection>
   );
 }

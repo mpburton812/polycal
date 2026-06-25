@@ -7,7 +7,6 @@ import {
   FormControlLabel,
   InputLabel,
   MenuItem,
-  Paper,
   Select,
   Stack,
   Switch,
@@ -22,6 +21,7 @@ import {
   proposeGroupNameChangeAction,
   updatePolyGroupSettingsAction,
 } from "@/actions/poly-group";
+import { AdminCollapsibleSection } from "@/components/admin/AdminCollapsibleSection";
 import type { PolyGroupSettings } from "@/types/poly-group";
 import {
   auditLogVisibilityLevels,
@@ -89,10 +89,7 @@ export function AdminPolyGroupSettingsPanel({
   }
 
   return (
-    <Paper sx={{ p: 3 }}>
-      <Typography variant="h6" gutterBottom>
-        Poly group settings
-      </Typography>
+    <AdminCollapsibleSection title="Poly group settings">
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
       {message && <Alert severity="success" sx={{ mb: 2 }}>{message}</Alert>}
       <Stack spacing={2}>
@@ -351,6 +348,6 @@ export function AdminPolyGroupSettingsPanel({
           {pending ? "Saving…" : "Save settings"}
         </Button>
       </Stack>
-    </Paper>
+    </AdminCollapsibleSection>
   );
 }

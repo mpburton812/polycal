@@ -9,6 +9,12 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Added
 
 - Phase 9 enforcement (PC-46): admin-configurable proposed TTL, at-risk TTL, archive grace, and redraft deadline; proposed expiration, auto-archive after event end, centralized enforcement runner; overlap acknowledge/decline flow for voters.
+
+### Fixed
+
+- Draft proposal submit now surfaces schedule conflicts in a confirmation dialog and at the top of the draft card (PC-47).
+- People & Places: Add place uses a dialog button matching Add person (PC-47).
+- Admin sections collapse by default with chevron expand/collapse; Logins column removed from user management (PC-47).
 - Phase 7 post-resolution (PC-45): required attendee removal with notifications, redraft T−24h auto-repropose, overlap warnings for voters.
 - Phase 2 profile completion (PC-45): quiet hours, alert-type toggles, custom avatar upload with API route.
 - Phase 8 admin completion (PC-45): pause/delete user proposal workflow, audit log visibility tiers, group name change proposals.
