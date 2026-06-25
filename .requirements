@@ -78,3 +78,4 @@
 2026-06-25 | f2c79bc | PC-48 | update E2E for pickers, clone draft, and collapsible places | e2e/helpers/datePickers.ts
 2026-06-25 | 0155c5a | PC-48 | fix strict mode on voting E2E assertion | e2e/proposals-voting.spec.ts
 2026-06-25 | 77d33ea | PC-48 | fix strict mode on voting E2E assertion | e2e/proposals-voting.spec.ts
+2026-06-25 | 976dc59 | PC-49 | poll optional voting UX and matrix readability | src/actions/proposals.ts

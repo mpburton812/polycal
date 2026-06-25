@@ -82,6 +82,40 @@ function formatLogAction(action: string): string {
   return action.replaceAll(".", " · ").replaceAll("_", " ");
 }
 
+/** Readable poll slot label + time on separate lines (PC-49). */
+function PollSlotTimeCell({
+  label,
+  startAt,
+  endAt,
+}: {
+  label: string | null;
+  startAt: string;
+  endAt: string | null;
+}) {
+  const time = formatTimeRange(startAt, endAt);
+  return (
+    <Stack spacing={0.25} sx={{ minWidth: 168 }}>
+      {label && (
+        <Typography variant="body2" sx={{ fontWeight: 600 }}>
+          {label}
+        </Typography>
+      )}
+      {time && (
+        <Typography variant="body2" color="text.secondary" sx={{ whiteSpace: "nowrap" }}>
+          {time}
+        </Typography>
+      )}
+    </Stack>
+  );
+}
+
+const SLOT_VOTE_LABELS: Record<"accept" | "accept_suboptimal" | "abstain" | "decline", string> = {
+  accept: "Accept",
+  accept_suboptimal: "Sub-optimal",
+  abstain: "Abstain",
+  decline: "Decline",
+};
+
 interface ProposalDetailDialogProps {
   proposalId: string | null;
   open: boolean;
@@ -373,10 +407,25 @@ export function ProposalDetailDialog({
       maxWidth="md"
       PaperProps={{ sx: { bgcolor: "transparent", boxShadow: "none", overflow: "visible" } }}
     >
-      <Card variant="outlined" sx={{ ...proposalCardSx, bgcolor: "background.paper" }}>
-        <CardContent sx={{ pb: 1 }}>
+      <Card
+        variant="outlined"
+        sx={{
+          ...proposalCardSx,
+          bgcolor: "background.paper",
+          maxHeight: "min(90vh, 900px)",
+          display: "flex",
+          flexDirection: "column",
+        }}
+      >
+        <CardContent sx={{ pb: 1, overflowY: "auto", flex: 1 }}>
           {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
           {message && <Alert severity="info" sx={{ mb: 2 }}>{message}</Alert>}
+          {detail?.optionalPollPending && (
+            <Alert severity="success" sx={{ mb: 2 }}>
+              This proposal was approved by all required attendees and scheduled. Please complete
+              your poll votes below.
+            </Alert>
+          )}
           {detail?.atRisk && detail.state === "resolved" && (
             <Alert severity="warning" sx={{ mb: 2 }}>
               This event is at risk on the calendar. Cancel, re-draft, or update attendees to resolve.
@@ -469,7 +518,12 @@ export function ProposalDetailDialog({
                 <Typography variant="h6" component="h2" sx={{ fontSize: "1.1rem", fontWeight: 600 }}>
                   {detail.title}
                 </Typography>
-                <Chip label={detail.state.toUpperCase()} size="small" variant="outlined" sx={{ fontWeight: 600, fontSize: "0.65rem" }} />
+                <Chip
+                  label={detail.displayState.toUpperCase()}
+                  size="small"
+                  variant="outlined"
+                  sx={{ fontWeight: 600, fontSize: "0.65rem" }}
+                />
                 {detail.isPoll && (
                   <Chip icon={<PollOutlinedIcon sx={{ fontSize: "14px !important" }} />} label="Poll" size="small" sx={{ bgcolor: POLY_GREEN, color: "#fff", fontSize: "0.65rem" }} />
                 )}
@@ -518,16 +572,24 @@ export function ProposalDetailDialog({
                   <Typography variant="caption" color="text.secondary">
                     Vote for each time slot. Required invitees must complete all rows before resolution.
                   </Typography>
-                  <Box sx={{ overflowX: "auto" }}>
-                    <Table size="small">
+                  <Box sx={{ overflowX: "auto", mt: 1 }}>
+                    <Table size="small" sx={{ minWidth: 520 }}>
                       <TableHead>
                         <TableRow>
-                          <TableCell>Time slot</TableCell>
-                          <TableCell align="center">Accept</TableCell>
-                          <TableCell align="center">Sub-optimal</TableCell>
-                          <TableCell align="center">Abstain</TableCell>
-                          <TableCell align="center">Decline</TableCell>
-                          <TableCell>Your vote</TableCell>
+                          <TableCell sx={{ minWidth: 180 }}>Time slot</TableCell>
+                          <TableCell align="center" sx={{ minWidth: 52, px: 0.5 }}>
+                            Accept
+                          </TableCell>
+                          <TableCell align="center" sx={{ minWidth: 52, px: 0.5 }}>
+                            Sub-opt.
+                          </TableCell>
+                          <TableCell align="center" sx={{ minWidth: 52, px: 0.5 }}>
+                            Abstain
+                          </TableCell>
+                          <TableCell align="center" sx={{ minWidth: 52, px: 0.5 }}>
+                            Decline
+                          </TableCell>
+                          <TableCell sx={{ minWidth: 100 }}>Your vote</TableCell>
                         </TableRow>
                       </TableHead>
                       <TableBody>
@@ -537,14 +599,22 @@ export function ProposalDetailDialog({
                             | undefined;
                           const canVoteRow = detail.canVoteSlots;
                           return (
-                            <TableRow key={slot.id} sx={detail.winningSlotId === slot.id ? { bgcolor: "#e8f5e9" } : undefined}>
-                              <TableCell>
-                                {slot.label ? `${slot.label}: ` : ""}
-                                {formatTimeRange(slot.startAt, slot.endAt)}
+                            <TableRow
+                              key={slot.id}
+                              sx={
+                                detail.winningSlotId === slot.id ? { bgcolor: "#e8f5e9" } : undefined
+                              }
+                            >
+                              <TableCell sx={{ verticalAlign: "top" }}>
+                                <PollSlotTimeCell
+                                  label={slot.label}
+                                  startAt={slot.startAt}
+                                  endAt={slot.endAt}
+                                />
                               </TableCell>
                               {(["accept", "accept_suboptimal", "abstain", "decline"] as const).map(
                                 (vote) => (
-                                  <TableCell key={vote} align="center">
+                                  <TableCell key={vote} align="center" sx={{ px: 0.5 }}>
                                     {canVoteRow && (
                                       <Button
                                         size="small"
@@ -557,20 +627,23 @@ export function ProposalDetailDialog({
                                               : "inherit"
                                         }
                                         disabled={pending}
+                                        aria-label={`${SLOT_VOTE_LABELS[vote]} for ${slot.label ?? formatTimeRange(slot.startAt, slot.endAt)}`}
                                         onClick={() => handleSlotVote(slot.id, vote)}
-                                        sx={
-                                          viewerVote === vote && vote === "accept"
+                                        sx={{
+                                          minWidth: 40,
+                                          px: 0.75,
+                                          ...(viewerVote === vote && vote === "accept"
                                             ? { bgcolor: POLY_GREEN }
-                                            : undefined
-                                        }
+                                            : undefined),
+                                        }}
                                       >
-                                        ·
+                                        {viewerVote === vote ? "✓" : "·"}
                                       </Button>
                                     )}
                                   </TableCell>
                                 ),
                               )}
-                              <TableCell>
+                              <TableCell sx={{ verticalAlign: "top" }}>
                                 <Chip
                                   size="small"
                                   label={viewerVote ? voteLabel(viewerVote) : "—"}
@@ -585,17 +658,19 @@ export function ProposalDetailDialog({
                   </Box>
 
                   {detail.slotVotes.length > 0 && (
-                    <Box sx={{ overflowX: "auto" }}>
-                      <Typography variant="subtitle2" sx={{ mt: 1 }}>
-                        All responses
-                      </Typography>
-                      <Table size="small">
+                    <Box sx={{ overflowX: "auto", mt: 2 }}>
+                      <Typography variant="subtitle2">All responses</Typography>
+                      <Table size="small" sx={{ minWidth: 400, mt: 0.5 }}>
                         <TableHead>
                           <TableRow>
-                            <TableCell>Invitee</TableCell>
+                            <TableCell sx={{ minWidth: 120 }}>Invitee</TableCell>
                             {detail.timeSlots.map((slot) => (
-                              <TableCell key={slot.id}>
-                                {slot.label ?? new Date(slot.startAt).toLocaleDateString()}
+                              <TableCell key={slot.id} sx={{ minWidth: 120, verticalAlign: "top" }}>
+                                <PollSlotTimeCell
+                                  label={slot.label}
+                                  startAt={slot.startAt}
+                                  endAt={slot.endAt}
+                                />
                               </TableCell>
                             ))}
                           </TableRow>

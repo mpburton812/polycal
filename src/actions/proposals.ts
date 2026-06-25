@@ -248,6 +248,10 @@ export interface ProposalDetail {
   /** True when the viewer already voted but their calendar now conflicts (PC-45/46). */
   hasOverlapWarning: boolean;
   canAcknowledgeOverlap: boolean;
+  /** Optional invitee still voting on a poll after required attendees resolved (PC-49). */
+  optionalPollPending: boolean;
+  /** Kanban/detail chip state — may show proposed while DB state is resolved (PC-49). */
+  displayState: ProposalState;
 }
 
 export interface ProposalCommentView {
@@ -414,6 +418,23 @@ function requiredCompletedPollMatrix(
     const vote = slotVotes.find((v) => v.timeSlotId === slotId && v.userId === userId);
     return vote !== undefined && vote.voteStatus !== "not_seen";
   });
+}
+
+/**
+ * True when an optional invitee still owes poll matrix votes on a resolved poll (PC-49).
+ */
+function optionalPollVotesPending(
+  proposal: { state: ProposalState; isPoll: boolean },
+  invitee: { role: InviteeRole; voteStatus: InviteeVoteStatus } | undefined,
+  pollSlotCount: number,
+): boolean {
+  return (
+    proposal.state === "resolved" &&
+    proposal.isPoll &&
+    pollSlotCount > 1 &&
+    invitee?.role === "optional" &&
+    invitee.voteStatus === "not_seen"
+  );
 }
 
 /** Advances a date by recurrence pattern for occurrence generation (PC-40 MVP). */
@@ -629,6 +650,7 @@ export async function listProposalBoardAction(): Promise<ProposalBoard> {
     .select({
       proposalId: proposalInvitees.proposalId,
       userId: proposalInvitees.userId,
+      role: proposalInvitees.role,
       voteStatus: proposalInvitees.voteStatus,
     })
     .from(proposalInvitees);
@@ -638,6 +660,19 @@ export async function listProposalBoardAction(): Promise<ProposalBoard> {
     const list = inviteesByProposal.get(row.proposalId) ?? [];
     list.push(row);
     inviteesByProposal.set(row.proposalId, list);
+  }
+
+  const pollSlotCountRows = await db
+    .select({
+      proposalId: proposalTimeSlots.proposalId,
+    })
+    .from(proposalTimeSlots)
+    .innerJoin(proposals, eq(proposalTimeSlots.proposalId, proposals.id))
+    .where(eq(proposals.isPoll, true));
+
+  const pollSlotCounts = new Map<string, number>();
+  for (const slotRow of pollSlotCountRows) {
+    pollSlotCounts.set(slotRow.proposalId, (pollSlotCounts.get(slotRow.proposalId) ?? 0) + 1);
   }
 
   const empty: ProposalBoard = { draft: [], proposed: [], resolved: [], archived: [] };
@@ -665,12 +700,16 @@ export async function listProposalBoardAction(): Promise<ProposalBoard> {
     const display = applyProposalMask(row, masked);
 
     const viewerInvitee = invitees.find((invitee) => invitee.userId === viewerId);
+    const pollSlotCount = pollSlotCounts.get(row.id) ?? 0;
+    const optionalPollPending = optionalPollVotesPending(row, viewerInvitee, pollSlotCount);
     const respondedCount = invitees.filter((inv) => inv.voteStatus !== "not_seen").length;
     const needsViewerAction =
       !masked &&
       viewerInvitee !== undefined &&
       viewerInvitee.voteStatus === "not_seen" &&
-      (row.state === "proposed" || (row.state === "resolved" && row.atRisk));
+      (row.state === "proposed" ||
+        (row.state === "resolved" && row.atRisk) ||
+        optionalPollPending);
 
     const scheduleEnd = display.scheduledEndAt ?? display.scheduledStartAt;
     const isPastSchedule = Boolean(scheduleEnd && scheduleEnd < nowIso);
@@ -680,7 +719,7 @@ export async function listProposalBoardAction(): Promise<ProposalBoard> {
       title: display.title,
       description: display.description,
       proposalType: row.proposalType,
-      state: row.state,
+      state: optionalPollPending ? "proposed" : row.state,
       proposerId: row.proposerId,
       proposerName: row.proposerName,
       locationName: display.locationName ?? display.locationText ?? null,
@@ -696,7 +735,9 @@ export async function listProposalBoardAction(): Promise<ProposalBoard> {
       isPastSchedule,
     };
 
-    const column = row.state as keyof ProposalBoard;
+    const column: keyof ProposalBoard = optionalPollPending
+      ? "proposed"
+      : (row.state as keyof ProposalBoard);
     empty[column].push(card);
   }
 
@@ -1285,18 +1326,26 @@ async function resolveProposal(
   }
 
   const invitees = await db
-    .select({ userId: proposalInvitees.userId })
+    .select({
+      userId: proposalInvitees.userId,
+      role: proposalInvitees.role,
+      voteStatus: proposalInvitees.voteStatus,
+    })
     .from(proposalInvitees)
     .where(eq(proposalInvitees.proposalId, proposal.id));
 
+  const pollMatrix = proposal.isPoll && slots.length > 1;
   const notifyIds = new Set<string>([proposal.proposerId, ...invitees.map((row) => row.userId)]);
   for (const userId of notifyIds) {
-    await notifyUser(
-      userId,
-      "proposal_resolved",
-      `Proposal "${proposal.title}" was approved and scheduled.`,
-      { proposalId: proposal.id },
-    );
+    const invitee = invitees.find((row) => row.userId === userId);
+    const optionalStillVoting =
+      pollMatrix &&
+      invitee?.role === "optional" &&
+      invitee.voteStatus === "not_seen";
+    const message = optionalStillVoting
+      ? `Proposal "${proposal.title}" was approved by all required attendees and scheduled. Please complete your poll votes.`
+      : `Proposal "${proposal.title}" was approved and scheduled.`;
+    await notifyUser(userId, "proposal_resolved", message, { proposalId: proposal.id });
   }
 
   await autoDeclineCollidingProposals(db, proposal, scheduleStart, scheduleEnd, actorUserId);
@@ -2199,6 +2248,9 @@ export async function getProposalDetailAction(
       )
     : false;
 
+  const optionalPollPending = optionalPollVotesPending(row, viewerInvitee, slotRows.length);
+  const displayState: ProposalState = optionalPollPending ? "proposed" : row.state;
+
   return {
     ok: true,
     message: "Loaded.",
@@ -2310,6 +2362,8 @@ export async function getProposalDetailAction(
       viewerSlotVotes: masked ? {} : viewerSlotVotes,
       hasOverlapWarning,
       canAcknowledgeOverlap: hasOverlapWarning,
+      optionalPollPending,
+      displayState,
     },
   };
 }
