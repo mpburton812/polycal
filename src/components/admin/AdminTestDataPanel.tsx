@@ -43,8 +43,9 @@ export function AdminTestDataPanel() {
   return (
     <AdminCollapsibleSection title="Test data">
       <Typography color="text.secondary" sx={{ mb: 2 }}>
-        Wipes Turso data and reloads Star Wars users, locations, and demo
-        proposals. Available only in feature, dev, and test environments.
+        Wipes data and reloads the environment seed profile: Star Wars fixtures on
+        feature/dev, Burton-Thompson family users and places on test. Demo
+        proposals are included only for Star Wars seeds.
       </Typography>
       {error && (
         <Alert severity="error" sx={{ mb: 2 }}>

@@ -81,3 +81,4 @@
 2026-06-25 | 976dc59 | PC-49 | poll optional voting UX and matrix readability | src/actions/proposals.ts
 2026-06-25 | 7261426 | PC-50 | partnership copy, network alerts, cancel close | src/actions/partnerships.ts
 2026-06-25 | 0304a5d | PC-51 | add Render enforcement cron blueprint and script | CHANGELOG.md
+2026-06-25 | 92f97d7 | PC-52 | Burton-Thompson test seed and environment validation scripts | src/components/admin/AdminTestDataPanel.tsx

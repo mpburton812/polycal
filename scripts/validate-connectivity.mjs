@@ -9,6 +9,8 @@ import { createClient } from "@libsql/client";
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
 
+import { TEST_FAMILY_FIXTURE, TEST_VERCEL_URL } from "./lib/test-family-fixtures.mjs";
+
 const tursoHost = "mpburton.aws-us-east-2.turso.io";
 const scope = "michael-burton-s-projects";
 
@@ -32,7 +34,7 @@ const deployments = {
     vercelEnv: "preview",
     gitBranch: "test",
     expectedDb: "polycal-test",
-    url: "https://polycal-git-test-michael-burton-s-projects.vercel.app",
+    url: TEST_VERCEL_URL,
   },
   production: {
     label: "Production",
@@ -76,8 +78,8 @@ function createTursoToken(database) {
   return output.trim().split(/\r?\n/).pop();
 }
 
-async function testTursoDirect(name, url, token) {
-  const result = { name, url, ok: false, users: null, schema: false, error: null };
+async function testTursoDirect(name, url, token, expectations) {
+  const result = { name, url, ok: false, users: null, schema: false, error: null, fixtureOk: null };
   if (!url?.trim() || !token?.trim()) {
     result.error = "missing url or token";
     return result;
@@ -90,6 +92,24 @@ async function testTursoDirect(name, url, token) {
       const users = await client.execute("SELECT COUNT(*) AS c FROM users");
       result.users = Number(users.rows[0]?.c ?? 0);
       result.schema = true;
+      if (expectations) {
+        let fixtureOk = true;
+        if (expectations.userCount != null && result.users !== expectations.userCount) {
+          fixtureOk = false;
+          result.error = `expected ${expectations.userCount} users, found ${result.users}`;
+        }
+        if (fixtureOk && expectations.usernames?.length) {
+          const names = await client.execute("SELECT username FROM users ORDER BY username");
+          const actual = names.rows.map((row) => row.username);
+          const missing = expectations.usernames.filter((username) => !actual.includes(username));
+          if (missing.length > 0) {
+            fixtureOk = false;
+            result.error = `missing usernames: ${missing.join(", ")}`;
+          }
+        }
+        result.fixtureOk = fixtureOk;
+        result.ok = result.ok && fixtureOk;
+      }
     } catch {
       result.schema = false;
       result.users = null;
@@ -132,8 +152,8 @@ function runVercelEnvCheck(target) {
   }
 }
 
-async function testHttpDeployment(name, url, expectedDb) {
-  const result = { name, url, ok: false, status: null, apiStatus: null, userCount: null, error: null };
+async function testHttpDeployment(name, url, expectedDb, expectations) {
+  const result = { name, url, ok: false, status: null, apiStatus: null, userCount: null, error: null, fixtureOk: null };
   try {
     const loginRes = await fetch(`${url}/login`, { redirect: "manual" });
     result.status = loginRes.status;
@@ -144,6 +164,21 @@ async function testHttpDeployment(name, url, expectedDb) {
       const body = await apiRes.json();
       result.userCount = body.users?.length ?? 0;
       result.ok = loginRes.status < 500 && apiRes.ok;
+      if (expectations?.loginCapableUsers != null) {
+        result.fixtureOk = result.userCount === expectations.loginCapableUsers;
+        if (!result.fixtureOk) {
+          result.error = `expected ${expectations.loginCapableUsers} login-capable users, found ${result.userCount}`;
+          result.ok = false;
+        }
+      }
+      if (expectations?.adminUsername && result.ok) {
+        const hasAdmin = body.users?.some((user) => user.username === expectations.adminUsername);
+        if (!hasAdmin) {
+          result.fixtureOk = false;
+          result.error = `missing admin user ${expectations.adminUsername}`;
+          result.ok = false;
+        }
+      }
     } else {
       result.ok = loginRes.status < 500 && loginRes.status !== 404;
       result.error = apiRes.status === 403 ? "api forbidden (may be production)" : `api ${apiRes.status}`;
@@ -175,6 +210,16 @@ const dbTargets = [
   { key: "prod", db: "polycal-prod", token: setup.TURSO_AUTH_TOKEN_PROD },
 ];
 
+const testDbExpectations = {
+  userCount: TEST_FAMILY_FIXTURE.expectedCounts.users,
+  usernames: TEST_FAMILY_FIXTURE.users.map((user) => user.username),
+};
+
+const testHttpExpectations = {
+  loginCapableUsers: TEST_FAMILY_FIXTURE.expectedCounts.loginCapableUsers,
+  adminUsername: TEST_FAMILY_FIXTURE.adminLogin.username,
+};
+
 for (const { key, db, token } of dbTargets) {
   let resolvedToken = token?.trim();
   if (!resolvedToken && db === "polycal-prod") {
@@ -191,9 +236,10 @@ for (const { key, db, token } of dbTargets) {
     continue;
   }
   const url = tursoUrl(db);
-  const r = await testTursoDirect(key, url, resolvedToken);
+  const expectations = db === "polycal-test" ? testDbExpectations : undefined;
+  const r = await testTursoDirect(key, url, resolvedToken, expectations);
   console.log(
-    `${status(r.ok)} ${key} → ${db} | schema=${r.schema} users=${r.users ?? "n/a"}${r.error ? ` | ${r.error}` : ""}`,
+    `${status(r.ok)} ${key} → ${db} | schema=${r.schema} users=${r.users ?? "n/a"}${r.fixtureOk === false ? " fixture=FAIL" : r.fixtureOk ? " fixture=ok" : ""}${r.error ? ` | ${r.error}` : ""}`,
   );
 }
 
@@ -228,9 +274,10 @@ for (const [key, target] of Object.entries(deployments)) {
   if (key === "feature") {
     continue;
   }
-  const r = await testHttpDeployment(target.label, target.url, target.expectedDb);
+  const expectations = key === "test" ? testHttpExpectations : undefined;
+  const r = await testHttpDeployment(target.label, target.url, target.expectedDb, expectations);
   console.log(
-    `${status(r.ok)} ${target.label} | /login=${r.status} /api/dev/users=${r.apiStatus} users=${r.userCount ?? "n/a"}${r.error ? ` | ${r.error}` : ""}`,
+    `${status(r.ok)} ${target.label} | /login=${r.status} /api/dev/users=${r.apiStatus} users=${r.userCount ?? "n/a"}${r.fixtureOk === false ? " fixture=FAIL" : r.fixtureOk ? " fixture=ok" : ""}${r.error ? ` | ${r.error}` : ""}`,
   );
 }
 
