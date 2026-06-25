@@ -8,6 +8,7 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- PC-52: Playwright journey for admin provisioning an active user (copy credentials, logout, first-login onboarding).
 - PC-52: Test environment scripts (`test:env:test`, `validate-test-seed`) and login hint for Burton-Thompson seed; dev/feature keep Star Wars demo data.
 - PC-51: Render Blueprint (`render.yaml`) with hourly dev/test enforcement cron jobs calling Vercel `/api/cron/enforcement`; `scripts/cron-enforcement.sh` runner; production cron template documented in Blueprint comments.
 - PC-50: Sleeping network notifications when partnerships are added or removed (partners of affected users are notified).
@@ -25,7 +26,7 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
-- PC-50: Cancelling a proposal closes the detail dialog and returns to the prior view.
+- PC-52: First-login onboarding wizard now saves avatar/theme via a dedicated server action (timezone defaults to UTC).
 - PC-50: Relationship proposal cards no longer say "with you" when the partnership is between two other named members.
 
 ### Fixed
