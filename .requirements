@@ -85,3 +85,4 @@
 2026-06-25 | 346a648 | PC-52 | Burton-Thompson test seed and environment validation scripts | src/components/admin/AdminTestDataPanel.tsx
 2026-06-25 | c0f03cc | PC-52 | admin user provisioning E2E and onboarding wizard fix | src/actions/onboarding.ts
 2026-06-25 | db52d00 | PC-53 | launch ops gaps — recovery TTL, heatmap, email, admin gender | src/actions/poly-group.ts
+2026-06-26 | 7bfd9f4 | PC-53 | proposal UX — perf, sleeping dates, activity log, attendee votes | src/actions/proposals.ts
