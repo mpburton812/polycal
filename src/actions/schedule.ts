@@ -19,7 +19,6 @@ import {
   type ProposalState,
   type ProposalType,
 } from "@/lib/db/schema";
-import { runProposalEnforcement } from "@/lib/proposals/enforcement";
 import { eventInRange, intervalsOverlap } from "@/lib/schedule/dates";
 
 const MASKED_TITLE = "Private event";
@@ -191,7 +190,6 @@ export async function listScheduleEventsAction(
 
   await ensureDbReady();
   const db = getDb();
-  await runProposalEnforcement(db);
   const viewerId = session.user.id;
   const isAdmin = await userHasAdminAccess(session.user.role);
   const privacyFlags = await getPrivacyAdminFlags(db);

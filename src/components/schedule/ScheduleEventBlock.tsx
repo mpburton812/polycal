@@ -75,6 +75,11 @@ export function ScheduleEventBlock({
           {stakeholders}
         </Typography>
       )}
+      {!compact && event.proposalType === "sleeping" && (
+        <Typography variant="caption" display="block" color="inherit" sx={{ opacity: 0.85 }}>
+          Overnight arrangement
+        </Typography>
+      )}
       {!compact && (
         <Typography variant="caption" display="block">
           {event.isTentative ? "Tentative" : "Confirmed"}

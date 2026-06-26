@@ -38,6 +38,7 @@ import {
   runProposalEnforcement,
 } from "@/lib/proposals/enforcement";
 import { PARTNERSHIP_CARD_PREFIX } from "@/lib/proposals/constants";
+import { sleepingScheduleFromSlotRows } from "@/lib/proposals/sleeping-schedule";
 import { buildPartnershipProposalCopy } from "@/lib/partnerships/copy";
 import type { UserRole } from "@/types/user";
 
@@ -619,7 +620,6 @@ export async function listProposalBoardAction(): Promise<ProposalBoard> {
   }
 
   const db = getDb();
-  await runProposalEnforcement(db);
   const viewerId = session.user.id;
   const isAdmin = await userHasAdminAccess(session.user.role);
   const privacyFlags = await getPrivacyAdminFlags(db);
@@ -1310,10 +1310,15 @@ async function resolveProposal(
     scheduleStart = winner?.startAt ?? null;
     scheduleEnd = winner?.endAt ?? null;
   } else {
-    const schedule = scheduleFromSlots(slots);
-    scheduleStart = schedule.start;
-    scheduleEnd = schedule.end;
-    winningSlotId = slots.length === 1 ? slots[0].id : null;
+    if (proposal.proposalType === "sleeping") {
+      const sleeping = sleepingScheduleFromSlotRows(slots);
+      scheduleStart = sleeping.start;
+      scheduleEnd = sleeping.end;
+    } else {
+      const schedule = scheduleFromSlots(slots);
+      scheduleStart = schedule.start;
+      scheduleEnd = schedule.end;
+    }
   }
 
   const now = new Date().toISOString();
@@ -1383,7 +1388,9 @@ async function evaluateProposalAfterVote(
     .limit(1);
   if (
     !proposal ||
-    (proposal.state !== "proposed" && !(proposal.state === "resolved" && proposal.atRisk))
+    (proposal.state !== "proposed" &&
+      !(proposal.state === "resolved" && proposal.atRisk) &&
+      !(proposal.state === "resolved" && !proposal.atRisk))
   ) {
     return;
   }
@@ -1394,6 +1401,24 @@ async function evaluateProposalAfterVote(
     .where(eq(proposalInvitees.proposalId, proposalId));
 
   const required = invitees.filter((row) => row.role === "required");
+
+  if (proposal.state === "resolved" && !proposal.atRisk) {
+    const declinedRequired = required.find((row) => row.voteStatus === "decline");
+    if (declinedRequired) {
+      await revertProposalToDraft(
+        db,
+        proposal,
+        actorUserId,
+        "A required invitee declined.",
+      );
+      return;
+    }
+
+    const pendingRequired = required.filter((row) => row.voteStatus === "not_seen");
+    if (pendingRequired.length > 0) return;
+    return;
+  }
+
   const slotRows = await db
     .select({ id: proposalTimeSlots.id })
     .from(proposalTimeSlots)
@@ -1972,6 +1997,7 @@ export async function submitProposalAction(
 
   await ensureDbReady();
   const db = getDb();
+  await runProposalEnforcement(db);
   const [proposal] = await db
     .select()
     .from(proposals)
@@ -2021,7 +2047,11 @@ export async function submitProposalAction(
     .from(proposalTimeSlots)
     .where(eq(proposalTimeSlots.proposalId, proposalId));
 
-  const schedule = autoResolve ? scheduleFromSlots(slots) : { start: null, end: null };
+  const schedule = autoResolve
+    ? proposal.proposalType === "sleeping"
+      ? sleepingScheduleFromSlotRows(slots)
+      : scheduleFromSlots(slots)
+    : { start: null, end: null };
   const now = new Date().toISOString();
   const nextState: ProposalState = autoResolve ? "resolved" : "proposed";
 
@@ -2108,10 +2138,8 @@ export async function getProposalDetailAction(
 
   await ensureDbReady();
   const db = getDb();
-  await runProposalEnforcement(db);
   const isAdmin = await userHasAdminAccess(session.user.role);
   const privacyFlags = await getPrivacyAdminFlags(db);
-  const auditLogVisibility = await getAuditLogVisibility(db);
 
   const [row] = await db
     .select({
@@ -2243,19 +2271,12 @@ export async function getProposalDetailAction(
   const canViewSensitive = !masked;
 
   const stateLogEntries = canViewSensitive
-    ? filterStateLogForViewer(
-        logRows.map((entry) => ({
-          action: entry.action,
-          actorName: entry.actorName ?? null,
-          details: entry.details ?? null,
-          createdAt: entry.createdAt,
-        })),
-        auditLogVisibility,
-        session.user.id,
-        isAdmin,
-        isProposer,
-        isInvitee,
-      )
+    ? logRows.map((entry) => ({
+        action: entry.action,
+        actorName: entry.actorName ?? null,
+        details: entry.details ?? null,
+        createdAt: entry.createdAt,
+      }))
     : [];
 
   const hasOverlapWarning = canViewSensitive
@@ -2343,6 +2364,10 @@ export async function getProposalDetailAction(
           viewerInvitee !== undefined &&
           viewerInvitee.voteStatus === "not_seen") ||
           (row.state === "resolved" &&
+            !row.atRisk &&
+            viewerInvitee?.role === "required" &&
+            viewerInvitee.voteStatus === "not_seen") ||
+          (row.state === "resolved" &&
             row.atRisk &&
             viewerInvitee?.role === "required" &&
             viewerInvitee.voteStatus === "not_seen") ||
@@ -2356,7 +2381,9 @@ export async function getProposalDetailAction(
         (row.state === "proposed" || (row.state === "resolved" && viewerInvitee.role === "optional")) &&
         pollSlotsIncomplete,
       canManageAttendees:
-        canViewSensitive && (isProposer || isAdmin) && row.state === "resolved",
+        canViewSensitive &&
+        (isProposer || isAdmin || isInvitee) &&
+        row.state === "resolved",
       canComment:
         canViewSensitive &&
         row.state !== "draft" &&
@@ -2534,6 +2561,7 @@ export async function castProposalVoteAction(
 
   await ensureDbReady();
   const db = getDb();
+  await runProposalEnforcement(db);
 
   const [proposal] = await db
     .select()
@@ -2566,9 +2594,19 @@ export async function castProposalVoteAction(
     proposal.atRisk &&
     invitee.role === "required" &&
     invitee.voteStatus === "not_seen";
+  const isPendingRequiredOnResolved =
+    proposal.state === "resolved" &&
+    !proposal.atRisk &&
+    invitee.role === "required" &&
+    invitee.voteStatus === "not_seen";
   const isProposedVote = proposal.state === "proposed" && invitee.voteStatus === "not_seen";
 
-  if (!isOptionalResolvedVote && !isAtRiskRequiredVote && !isProposedVote) {
+  if (
+    !isOptionalResolvedVote &&
+    !isAtRiskRequiredVote &&
+    !isPendingRequiredOnResolved &&
+    !isProposedVote
+  ) {
     return { ok: false, message: "Proposal is not open for voting." };
   }
 
@@ -2875,6 +2913,7 @@ export async function updateResolvedAttendeesAction(
 
   await ensureDbReady();
   const db = getDb();
+  await runProposalEnforcement(db);
   const isAdmin = await userHasAdminAccess(session.user.role);
 
   const [proposal] = await db
@@ -2887,13 +2926,37 @@ export async function updateResolvedAttendeesAction(
     return { ok: false, message: "Proposal is not resolved." };
   }
 
-  if (proposal.proposerId !== session.user.id && !isAdmin) {
-    return { ok: false, message: "Only the proposer or an admin can update attendees." };
+  const [viewerInvitee] = await db
+    .select({ userId: proposalInvitees.userId })
+    .from(proposalInvitees)
+    .where(
+      and(
+        eq(proposalInvitees.proposalId, proposal.id),
+        eq(proposalInvitees.userId, session.user.id),
+      ),
+    )
+    .limit(1);
+
+  const isInvitee = Boolean(viewerInvitee);
+  if (proposal.proposerId !== session.user.id && !isAdmin && !isInvitee) {
+    return { ok: false, message: "Only the proposer, an invitee, or an admin can update attendees." };
   }
 
   const now = new Date().toISOString();
   let attendeesChanged = false;
   let removedRequiredAttendee = false;
+  const addedRequiredNames: string[] = [];
+  const addedOptionalNames: string[] = [];
+  const removedNames: string[] = [];
+
+  async function displayNameFor(userId: string): Promise<string> {
+    const [user] = await db
+      .select({ displayName: users.displayName })
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1);
+    return user?.displayName ?? userId;
+  }
 
   for (const userId of parsed.data.removeUserIds ?? []) {
     const [row] = await db
@@ -2912,6 +2975,7 @@ export async function updateResolvedAttendeesAction(
     );
     await db.delete(proposalInvitees).where(eq(proposalInvitees.id, row.id));
     attendeesChanged = true;
+    removedNames.push(await displayNameFor(userId));
 
     await notifyUser(userId, "proposal_attendee_removed", `You were removed from "${proposal.title}".`, {
       proposalId: proposal.id,
@@ -2941,14 +3005,9 @@ export async function updateResolvedAttendeesAction(
     });
     attendeesChanged = true;
 
-    if (role === "required") {
-      const enforcement = await loadEnforcementSettings(db);
-      const expiresAt = computeAtRiskExpiresAt(enforcement, proposal.scheduledStartAt);
-      await db
-        .update(proposals)
-        .set({ atRisk: true, atRiskExpiresAt: expiresAt, updatedAt: now })
-        .where(eq(proposals.id, proposal.id));
-    }
+    const name = await displayNameFor(userId);
+    if (role === "required") addedRequiredNames.push(name);
+    else addedOptionalNames.push(name);
 
     await notifyUser(userId, "proposal_attendee_added", `You were added to "${proposal.title}".`, {
       proposalId: proposal.id,
@@ -2984,7 +3043,17 @@ export async function updateResolvedAttendeesAction(
       }
     }
 
-    await logProposalTransition(db, proposal.id, session.user.id, "proposal.attendees_updated");
+    await logProposalTransition(
+      db,
+      proposal.id,
+      session.user.id,
+      "proposal.attendees_updated",
+      JSON.stringify({
+        addedRequired: addedRequiredNames,
+        addedOptional: addedOptionalNames,
+        removedUserIds: removedNames,
+      }),
+    );
   }
 
   revalidatePath("/proposals");
