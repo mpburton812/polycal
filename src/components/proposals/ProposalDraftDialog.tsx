@@ -62,6 +62,7 @@ import {
   PAST_SCHEDULE_ICON,
   PAST_SCHEDULE_TEXT,
 } from "./proposalCardTheme";
+import { sleepingDateToStartIso } from "@/lib/proposals/sleeping-schedule";
 import { ProposalScheduleField } from "./ProposalScheduleFields";
 
 type InviteeSelection = "none" | "required" | "optional";
@@ -397,14 +398,15 @@ export function ProposalDraftDialog({
     const timeSlots = slots
       .map((slot) => {
         if (proposalType === "sleeping") {
-          const startIso = localDateToStartIso(slot.startAt);
+          const startIso = sleepingDateToStartIso(slot.startAt);
           if (!startIso) return null;
-          const endIso = slot.endAt
-            ? localDateToEndIso(slot.endAt)
-            : localDateToEndIso(slot.startAt);
+          const endIso =
+            slot.endAt && slot.endAt !== slot.startAt
+              ? sleepingDateToStartIso(slot.endAt)
+              : null;
           return {
             startAt: startIso,
-            endAt: endIso,
+            endAt: endIso ?? undefined,
             label: slot.label.trim() || undefined,
           };
         }
@@ -443,11 +445,11 @@ export function ProposalDraftDialog({
       if (batchMode && proposalType === "sleeping" && !isEdit) {
         const rangeStartIso =
           proposalType === "sleeping"
-            ? localDateToStartIso(rangeStart)
+            ? sleepingDateToStartIso(rangeStart)
             : localInputToIso(rangeStart);
         const rangeEndIso =
           proposalType === "sleeping"
-            ? localDateToEndIso(rangeEnd)
+            ? sleepingDateToStartIso(rangeEnd)
             : localInputToIso(rangeEnd);
         if (!rangeStartIso || !rangeEndIso) {
           setError("Batch mode requires a valid date range.");

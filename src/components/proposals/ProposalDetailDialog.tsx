@@ -62,6 +62,7 @@ import {
   typeBadgeLabel,
   typeChipSx,
 } from "./proposalCardTheme";
+import { formatProposalLogLine } from "@/lib/proposals/state-log-format";
 
 const VOTE_STATUS_LABELS: Record<InviteeVoteStatus, string> = {
   not_seen: "Not yet viewed",
@@ -76,10 +77,6 @@ function voteLabel(status: InviteeVoteStatus | string): string {
     return VOTE_STATUS_LABELS[status as InviteeVoteStatus];
   }
   return status.replaceAll("_", " ");
-}
-
-function formatLogAction(action: string): string {
-  return action.replaceAll(".", " · ").replaceAll("_", " ");
 }
 
 /** Readable poll slot label + time on separate lines (PC-49). */
@@ -390,9 +387,17 @@ export function ProposalDetailDialog({
   }
 
   const whenLabel = detail
-    ? formatTimeRange(detail.scheduledStartAt, detail.scheduledEndAt) ??
+    ? formatTimeRange(
+        detail.scheduledStartAt,
+        detail.scheduledEndAt,
+        detail.proposalType,
+      ) ??
       (detail.timeSlots[0]
-        ? formatTimeRange(detail.timeSlots[0].startAt, detail.timeSlots[0].endAt)
+        ? formatTimeRange(
+            detail.timeSlots[0].startAt,
+            detail.timeSlots[0].endAt,
+            detail.proposalType,
+          )
         : null)
     : null;
 
@@ -529,7 +534,7 @@ export function ProposalDetailDialog({
                 )}
                 {detail.atRisk && <Chip size="small" label="At risk" color="warning" />}
                 {detail.isRecurring && <Chip size="small" label="Recurring" variant="outlined" />}
-                {detail.winningSlotId && (
+                {detail.isPoll && detail.winningSlotId && (
                   <Chip size="small" label="Winning slot" sx={{ bgcolor: POLY_GREEN, color: "#fff" }} />
                 )}
               </Stack>
@@ -858,8 +863,7 @@ export function ProposalDetailDialog({
                   <Stack spacing={0.5}>
                     {detail.stateLog.map((entry, index) => (
                       <Typography key={`${entry.createdAt}-${index}`} variant="caption" color="text.secondary">
-                        {new Date(entry.createdAt).toLocaleString()} · {formatLogAction(entry.action)}
-                        {entry.actorName ? ` · ${entry.actorName}` : ""}
+                        {formatProposalLogLine(entry)}
                       </Typography>
                     ))}
                   </Stack>
