@@ -147,9 +147,10 @@ async function main(): Promise<void> {
 
   if (latest === 0) {
     const access = await describeJiraAccess(credentials);
-    throw new Error(
-      `No ${PROJECT_KEY} issues found via key probe (${access}). Verify GitHub secrets JIRA_BASE_URL (${credentials.baseUrl}), JIRA_EMAIL, and JIRA_API_TOKEN can read project ${PROJECT_KEY} on your Jira site.`,
+    console.warn(
+      `[jira-backfill] No visible ${PROJECT_KEY} issues (${access}). Attempting sequential create from ${PROJECT_KEY}-52…`,
     );
+    latest = 51;
   }
 
   if (latest < 51) {
