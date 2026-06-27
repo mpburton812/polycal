@@ -16,6 +16,7 @@ export async function expectInAppNotification(
   await page.reload();
   await openNotificationInbox(page);
   await expect(page.getByText(message).first()).toBeVisible({ timeout: 15_000 });
+  await page.getByRole("button", { name: "Close notifications" }).click();
 }
 
 /** Asserts the notification badge shows an unread count. */

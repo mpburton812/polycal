@@ -2,7 +2,6 @@
 
 import AddIcon from "@mui/icons-material/Add";
 import {
-  Alert,
   Box,
   Fab,
   Tab,
@@ -24,9 +23,11 @@ import type { PersonSummary } from "@/actions/users";
 
 import { ProposalCard } from "./ProposalCard";
 import { PartnershipProposalDialog } from "./PartnershipProposalDialog";
+import { ResidencyProposalDialog } from "./ResidencyProposalDialog";
 import { ProposalDetailDialog } from "./ProposalDetailDialog";
 import { ProposalDraftDialog } from "./ProposalDraftDialog";
-import { PARTNERSHIP_CARD_PREFIX } from "@/lib/proposals/constants";
+import { PARTNERSHIP_CARD_PREFIX, RESIDENCY_CARD_PREFIX } from "@/lib/proposals/constants";
+import { useToast } from "@/components/providers/ToastProvider";
 
 const TAB_KEYS = ["draft", "proposed", "resolved", "archived"] as const;
 type TabKey = (typeof TAB_KEYS)[number];
@@ -65,7 +66,9 @@ export function ProposalsClient({
   const [detailOpen, setDetailOpen] = useState(false);
   const [partnershipCard, setPartnershipCard] = useState<ProposalCardData | null>(null);
   const [partnershipOpen, setPartnershipOpen] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
+  const [residencyCard, setResidencyCard] = useState<ProposalCardData | null>(null);
+  const [residencyOpen, setResidencyOpen] = useState(false);
+  const { showToast } = useToast();
   const [, startTransition] = useTransition();
 
   const proposals = board[activeTab];
@@ -82,6 +85,12 @@ export function ProposalsClient({
       setPartnershipOpen(true);
       return;
     }
+    if (proposalId.startsWith(RESIDENCY_CARD_PREFIX)) {
+      const card = allBoardCards.find((row) => row.id === proposalId) ?? null;
+      setResidencyCard(card);
+      setResidencyOpen(true);
+      return;
+    }
     setSelectedProposalId(proposalId);
     setDetailOpen(true);
   }
@@ -90,7 +99,7 @@ export function ProposalsClient({
     startTransition(async () => {
       const result = await getProposalDetailAction(proposalId);
       if (!result.ok || !result.detail) {
-        setMessage(result.message);
+        showToast(result.message, "error");
         return;
       }
       setEditDetail(result.detail);
@@ -102,7 +111,7 @@ export function ProposalsClient({
     if (!window.confirm("Delete this draft?")) return;
     startTransition(async () => {
       const result = await deleteDraftProposalAction(proposalId);
-      setMessage(result.message);
+      showToast(result.message, result.ok ? "success" : "error");
       if (result.ok) router.refresh();
     });
   }
@@ -134,6 +143,17 @@ export function ProposalsClient({
       return;
     }
 
+    if (openId.startsWith(RESIDENCY_CARD_PREFIX)) {
+      const tabForResidency = board.draft.some((row) => row.id === openId)
+        ? "draft"
+        : "proposed";
+      setActiveTab(tabForResidency);
+      const card = allBoardCards.find((row) => row.id === openId) ?? null;
+      setResidencyCard(card);
+      setResidencyOpen(true);
+      return;
+    }
+
     const tabForState = TAB_KEYS.find((key) => board[key].some((row) => row.id === openId));
     if (tabForState) setActiveTab(tabForState);
     setSelectedProposalId(openId);
@@ -162,12 +182,6 @@ export function ProposalsClient({
           />
         ))}
       </Tabs>
-
-      {message && (
-        <Alert severity="info" sx={{ mb: 2 }} onClose={() => setMessage(null)}>
-          {message}
-        </Alert>
-      )}
 
       {proposals.length === 0 ? (
         <Typography variant="body2" color="text.secondary" sx={{ py: 4, textAlign: "center" }}>
@@ -236,6 +250,15 @@ export function ProposalsClient({
         onClose={() => {
           setPartnershipOpen(false);
           setPartnershipCard(null);
+        }}
+      />
+      <ResidencyProposalDialog
+        card={residencyCard}
+        open={residencyOpen}
+        currentUserId={currentUserId}
+        onClose={() => {
+          setResidencyOpen(false);
+          setResidencyCard(null);
         }}
       />
     </Box>

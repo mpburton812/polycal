@@ -1,6 +1,7 @@
 import { type Page, expect } from "@playwright/test";
 
 import { SEED_PASSWORD } from "./constants";
+import { completeFirstLoginOnboarding } from "./onboarding";
 import { openProfileMenu } from "./navigation";
 
 /**
@@ -73,4 +74,22 @@ export async function logout(page: Page): Promise<void> {
 /** Asserts the main bottom navigation is visible (authenticated shell). */
 export async function expectAuthenticatedShell(page: Page): Promise<void> {
   await expect(page.getByRole("navigation", { name: "Main navigation" })).toBeVisible();
+}
+
+/**
+ * Signs in and completes first-login onboarding when the seed user must change password.
+ */
+export async function loginWithOnboardingIfNeeded(
+  page: Page,
+  username: string,
+  password: string = SEED_PASSWORD,
+): Promise<void> {
+  await login(page, username, password);
+  const welcome = page.getByRole("heading", { name: "Welcome to PolyCal" });
+  if (await welcome.isVisible().catch(() => false)) {
+    await completeFirstLoginOnboarding(page, password);
+  } else if (page.url().includes("/profile")) {
+    await completeFirstLoginOnboarding(page, password);
+  }
+  await expectAuthenticatedShell(page);
 }

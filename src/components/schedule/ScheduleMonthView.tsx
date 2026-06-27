@@ -7,6 +7,11 @@ import { useMemo } from "react";
 
 import type { ScheduleEvent } from "@/actions/schedule";
 import {
+  LEVEL_COLORS,
+  busynessLevelForDay,
+  formatHeatmapDate,
+} from "@/components/schedule/ScheduleHeatmap";
+import {
   buildMonthGrid,
   eventSpanInGrid,
   startOfMonth,
@@ -18,6 +23,8 @@ interface ScheduleMonthViewProps {
   events: ScheduleEvent[];
   timeZone?: string;
   onEventClick: (proposalId: string) => void;
+  /** Switches to week view anchored on the clicked day (PC-56). */
+  onDayClick?: (day: Date) => void;
 }
 
 interface SpanBar {
@@ -41,6 +48,7 @@ export function ScheduleMonthView({
   events,
   timeZone = "UTC",
   onEventClick,
+  onDayClick,
 }: ScheduleMonthViewProps) {
   const grid = useMemo(() => buildMonthGrid(monthAnchor), [monthAnchor]);
   const monthStart = startOfMonth(monthAnchor);
@@ -140,6 +148,9 @@ export function ScheduleMonthView({
               return (
                 <Box
                   key={key}
+                  component={onDayClick ? "button" : "div"}
+                  type={onDayClick ? "button" : undefined}
+                  onClick={onDayClick ? () => onDayClick(day) : undefined}
                   sx={{
                     border: 1,
                     borderColor: "divider",
@@ -148,8 +159,32 @@ export function ScheduleMonthView({
                     bgcolor: inMonth ? "background.paper" : "action.hover",
                     opacity: inMonth ? 1 : 0.65,
                     minHeight: 72,
+                    position: "relative",
+                    textAlign: "left",
+                    cursor: onDayClick ? "pointer" : "default",
+                    width: "100%",
                   }}
                 >
+                  <Box
+                    sx={{
+                      position: "absolute",
+                      top: 4,
+                      right: 4,
+                      px: 0.5,
+                      py: 0.15,
+                      borderRadius: 0.5,
+                      bgcolor: LEVEL_COLORS[busynessLevelForDay(events, day)],
+                      border: "1px solid",
+                      borderColor: "divider",
+                      fontSize: "0.6rem",
+                      fontWeight: 600,
+                      color: "text.secondary",
+                      lineHeight: 1.2,
+                    }}
+                    aria-hidden
+                  >
+                    {formatHeatmapDate(day)}
+                  </Box>
                   <Typography variant="caption" fontWeight={600} display="block">
                     {day.getDate()}
                   </Typography>

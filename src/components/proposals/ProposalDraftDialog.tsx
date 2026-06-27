@@ -47,6 +47,7 @@ import {
   type ProposalPlaceOption,
 } from "@/actions/proposals";
 import type { PersonSummary } from "@/actions/users";
+import { useToast } from "@/components/providers/ToastProvider";
 
 import {
   POLY_GREEN,
@@ -204,7 +205,7 @@ export function ProposalDraftDialog({
   const [recurrenceCount, setRecurrenceCount] = useState(4);
   const [slots, setSlots] = useState<SlotDraft[]>([{ startAt: "", endAt: "", label: "" }]);
   const [inviteeMode, setInviteeMode] = useState<Record<string, InviteeSelection>>({});
-  const [error, setError] = useState<string | null>(null);
+  const { showToast } = useToast();
   const [conflictWarnings, setConflictWarnings] = useState<ProposalConflictWarning[]>([]);
   const [showConflictConfirm, setShowConflictConfirm] = useState(false);
   const [conflictDialogOpen, setConflictDialogOpen] = useState(false);
@@ -333,7 +334,6 @@ export function ProposalDraftDialog({
       setSlots([{ startAt: "", endAt: "", label: "" }]);
       setInviteeMode({});
     }
-    setError(null);
   }, [open, initialDetail]);
 
   function handleClose() {
@@ -390,7 +390,6 @@ export function ProposalDraftDialog({
   }
 
   function handleSave() {
-    setError(null);
     const invitees = isSoloProposal
       ? []
       : Object.entries(inviteeMode)
@@ -454,7 +453,7 @@ export function ProposalDraftDialog({
             ? sleepingDateToStartIso(rangeEnd)
             : localInputToIso(rangeEnd);
         if (!rangeStartIso || !rangeEndIso) {
-          setError("Batch mode requires a valid date range.");
+          showToast("Batch mode requires a valid date range.", "error");
           return;
         }
         const result = await createBatchSleepingProposalsAction({
@@ -469,7 +468,7 @@ export function ProposalDraftDialog({
           nightsPattern,
         });
         if (!result.ok) {
-          setError(result.message);
+          showToast(result.message, "error");
           return;
         }
         handleClose();
@@ -482,13 +481,13 @@ export function ProposalDraftDialog({
       if (isEdit && editId) {
         const result = await updateDraftProposalAction({ ...payload, proposalId: editId });
         if (!result.ok) {
-          setError(result.message);
+          showToast(result.message, "error");
           return;
         }
       } else {
         const result = await createDraftProposalAction(payload);
         if (!result.ok) {
-          setError(result.message);
+          showToast(result.message, "error");
           return;
         }
         proposalId = result.proposalId ?? null;
@@ -512,7 +511,6 @@ export function ProposalDraftDialog({
   function handleSubmit(confirm = false) {
     const proposalId = initialDetail?.id ?? savedDraftId;
     if (!proposalId) return;
-    setError(null);
     startTransition(async () => {
       const result = await submitProposalAction(proposalId, confirm);
       if (!result.ok && result.warnings && result.warnings.length > 0) {
@@ -523,9 +521,10 @@ export function ProposalDraftDialog({
         return;
       }
       if (!result.ok) {
-        setError(result.message);
+        showToast(result.message, "error");
         return;
       }
+      showToast(result.message, "success");
       setConflictWarnings([]);
       setShowConflictConfirm(false);
       setConflictDialogOpen(false);
@@ -1064,11 +1063,6 @@ export function ProposalDraftDialog({
           </Stack>
           )}
 
-          {error && (
-            <Alert severity="error" sx={{ mt: 2 }}>
-              {error}
-            </Alert>
-          )}
         </CardContent>
 
         <CardActions sx={{ px: 2, pb: 2, pt: 0, justifyContent: "flex-end", gap: 1, flexShrink: 0 }}>

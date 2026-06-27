@@ -52,6 +52,7 @@ export function formatDateRange(start: string | null, end: string | null): strin
 
 export function typeBadgeLabel(type: string, cardKind?: string): string {
   if (cardKind === "partnership") return "RELATIONSHIP PROPOSAL";
+  if (cardKind === "residency") return "RESIDENCY PROPOSAL";
   return type === "sleeping" ? "SLEEPING PROPOSAL" : "EVENT PROPOSAL";
 }
 

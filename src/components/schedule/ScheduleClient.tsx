@@ -222,6 +222,17 @@ export function ScheduleClient({
     setDetailOpen(true);
   }
 
+  function handleMonthDayClick(day: Date) {
+    const monday = startOfWeekMonday(day);
+    setViewState((current) => ({
+      ...current,
+      calendarLayout: "week",
+      weekStartIso: monday.toISOString(),
+      monthAnchorIso: day.toISOString(),
+    }));
+    refreshSchedule(monday);
+  }
+
   function handleEditFromDetail(detail: ProposalDetail) {
     setDetailOpen(false);
     setEditDetail(detail);
@@ -398,12 +409,9 @@ export function ScheduleClient({
       <ScheduleHeatmap
         events={filteredEvents}
         weekStartIso={rangeStart.toISOString()}
-        dayCount={
-          isMonthLayout
-            ? Math.ceil(
-                (rangeEnd.getTime() - rangeStart.getTime()) / (24 * 60 * 60 * 1000),
-              ) + 1
-            : dayCount
+        dayCount={dayCount}
+        layout={
+          isMonthLayout ? "month" : viewState.compact ? "twoWeek" : "week"
         }
       />
 
@@ -413,6 +421,7 @@ export function ScheduleClient({
           events={filteredEvents}
           timeZone={timeZone}
           onEventClick={openProposal}
+          onDayClick={handleMonthDayClick}
         />
       ) : (
         <ScheduleWeekView

@@ -46,7 +46,7 @@ const SEED_USERS: SeedUser[] = [
     id: "sw-chewie",
     username: "chewie",
     displayName: "Chewbacca",
-    role: "passive",
+    role: "user",
     avatarKey: "bird_green",
     mustChangePassword: false,
   },

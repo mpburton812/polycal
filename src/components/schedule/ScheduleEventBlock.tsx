@@ -21,8 +21,17 @@ function formatStakeholders(event: ScheduleEvent): string | null {
   return event.participantNames.join(", ");
 }
 
+/** Status fragment for line-one event card format (PC-56). */
+function formatStatusLabel(event: ScheduleEvent): string {
+  const parts: string[] = [];
+  parts.push(event.isTentative ? "Tentative" : "Confirmed");
+  if (event.atRisk) parts.push("At risk");
+  if (event.hasOverlap) parts.push("Conflict");
+  return parts.join(", ");
+}
+
 /**
- * Clickable calendar block with tentative/confirmed color coding (PC-42).
+ * Clickable calendar block: title, location, status on line one; date and attendees on line two (PC-56).
  */
 export function ScheduleEventBlock({
   event,
@@ -40,13 +49,26 @@ export function ScheduleEventBlock({
   const colors = scheduleBlockSx(variant);
   const stakeholders = formatStakeholders(event);
   const timeLabel = formatEventTime(event.startAt, event.endAt, event.proposalType, timeZone);
+  const statusLabel = formatStatusLabel(event);
+
+  const lineOneParts = [event.title];
+  if (!event.isContentMasked && event.locationName) {
+    lineOneParts.push(event.locationName);
+  }
+  lineOneParts.push(statusLabel);
+  const lineOne = lineOneParts.join(", ");
+
+  const lineTwoParts: string[] = [];
+  if (timeLabel) lineTwoParts.push(timeLabel);
+  if (stakeholders) lineTwoParts.push(stakeholders);
+  const lineTwo = lineTwoParts.join(", ");
 
   return (
     <Box
       component="button"
       type="button"
       onClick={onClick}
-      aria-label={`${event.title}, ${timeLabel}${stakeholders ? `, ${stakeholders}` : ""}`}
+      aria-label={`${lineOne}. ${lineTwo}`}
       sx={{
         display: "block",
         width: "100%",
@@ -64,32 +86,14 @@ export function ScheduleEventBlock({
       }}
     >
       <Typography variant={compact ? "caption" : "body2"} fontWeight={600} noWrap>
-        {event.title}
+        {lineOne}
       </Typography>
       <Typography variant="caption" display="block" noWrap>
-        {timeLabel}
-        {compact && stakeholders ? ` · ${stakeholders}` : ""}
+        {lineTwo}
       </Typography>
-      {!compact && stakeholders && (
-        <Typography variant="caption" display="block" noWrap>
-          {stakeholders}
-        </Typography>
-      )}
       {!compact && event.proposalType === "sleeping" && (
         <Typography variant="caption" display="block" color="inherit" sx={{ opacity: 0.85 }}>
           Overnight arrangement
-        </Typography>
-      )}
-      {!compact && (
-        <Typography variant="caption" display="block">
-          {event.isTentative ? "Tentative" : "Confirmed"}
-          {event.atRisk ? " · At risk" : ""}
-          {event.hasOverlap ? " · Conflict" : ""}
-        </Typography>
-      )}
-      {!compact && event.locationName && (
-        <Typography variant="caption" color="text.secondary" display="block" noWrap>
-          {event.locationName}
         </Typography>
       )}
     </Box>

@@ -27,6 +27,7 @@ export interface PartnershipView {
 const respondSchema = z.object({
   partnershipId: z.string().min(1),
   accept: z.boolean(),
+  comment: z.string().trim().max(2000).optional(),
 });
 
 /**
@@ -134,6 +135,12 @@ export async function proposePartnershipAction(
   }
   if (existing?.status === "proposed") {
     return { ok: false, message: "A partnership proposal is already pending." };
+  }
+  if (existing?.status === "declined") {
+    return {
+      ok: false,
+      message: "This sleeping partnership was declined and cannot be resubmitted.",
+    };
   }
 
   const now = new Date().toISOString();
@@ -347,8 +354,22 @@ export async function respondPartnershipAction(
   await logUserActivity(
     session.user.id,
     parsed.data.accept ? "partnership.accept" : "partnership.decline",
-    row.id,
+    JSON.stringify({
+      partnershipId: row.id,
+      lowName,
+      highName,
+      responderName: responder?.displayName,
+      comment: parsed.data.comment ?? null,
+    }),
   );
+
+  if (parsed.data.comment?.trim()) {
+    await logUserActivity(
+      session.user.id,
+      "partnership.comment",
+      JSON.stringify({ partnershipId: row.id, body: parsed.data.comment.trim() }),
+    );
+  }
 
   revalidatePath("/people-places");
   revalidatePath("/proposals");
