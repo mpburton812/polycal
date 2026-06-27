@@ -23,5 +23,8 @@ fi
 echo "[ci] Ensuring Jira backlog gap tickets PC-52..PC-56 exist"
 npx tsx scripts/backfill-jira-kanban-gap.ts || echo "[ci] Jira gap backfill skipped or failed; continuing to status sync."
 
+echo "[ci] Ensuring PC-57 launch readiness Epic and stories exist"
+npx tsx scripts/create-launch-readiness-tickets.ts || echo "[ci] Jira launch ticket create skipped or failed; continuing to status sync."
+
 echo "[ci] Jira In Progress sync for range: ${RANGE}"
 npx tsx scripts/jira-transition-issues.ts --range "${RANGE}" --status "In Progress"
