@@ -92,3 +92,4 @@
 2026-06-27 | 59047a7 | PC-55 | harden paused-user redirects and E2E admin helpers | src/lib/auth-session.ts
 2026-06-27 | 7fc19c4 | PC-55 | use heading click for admin accordion E2E helper | src/actions/proposals.ts
 2026-06-27 | 82bacc1 | PC-56 | residency Kanban workflow, toast UX, and schedule polish | src/actions/partnerships.ts
+2026-06-27 | d58a217 | PC-56 | assert vote feedback via toast in E2E specs | e2e/helpers/toast.ts
