@@ -99,3 +99,4 @@
 2026-06-27 | 3273364 | PC-56 | probe Jira keys for gap backfill instead of search API | scripts/backfill-jira-kanban-gap.ts
 2026-06-27 | f89acaa | PC-56 | improve Jira backfill diagnostics when project is invisible | scripts/backfill-jira-kanban-gap.ts
 2026-06-27 | 0310ca9 | PC-56 | wire declined residency Kanban cards to correct workflow | src/actions/proposals.ts
+2026-06-27 | 52ef03a | PC-57 | launch readiness Jira tickets and resilient Jira CI sync | .github/workflows/jira-create-launch-tickets.yml
