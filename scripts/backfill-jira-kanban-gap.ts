@@ -66,10 +66,14 @@ function parseIssueNumber(issueKey: string): number | null {
 async function getLatestIssueNumber(
   credentials: NonNullable<ReturnType<typeof loadJiraCredentials>>,
 ): Promise<number> {
-  const response = await jiraFetch(
-    credentials,
-    `/search/jql?jql=${encodeURIComponent(`project = ${PROJECT_KEY} ORDER BY key DESC`)}&maxResults=1&fields=key`,
-  );
+  const response = await jiraFetch(credentials, "/search", {
+    method: "POST",
+    body: JSON.stringify({
+      jql: `project = ${PROJECT_KEY} ORDER BY key DESC`,
+      maxResults: 1,
+      fields: ["key"],
+    }),
+  });
 
   if (!response.ok) {
     const body = await response.text();
