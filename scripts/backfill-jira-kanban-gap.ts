@@ -121,6 +121,19 @@ async function issueExists(
   return response.ok;
 }
 
+/** Sample known keys to produce actionable auth/project diagnostics. */
+async function describeJiraAccess(
+  credentials: NonNullable<ReturnType<typeof loadJiraCredentials>>,
+): Promise<string> {
+  const samples = ["PC-1", "PC-51", "PC-55"];
+  const results: string[] = [];
+  for (const issueKey of samples) {
+    const response = await jiraFetch(credentials, `/issue/${issueKey}?fields=summary`);
+    results.push(`${issueKey}=${response.status}`);
+  }
+  return results.join(", ");
+}
+
 async function main(): Promise<void> {
   const credentials = loadJiraCredentials();
   if (!credentials) {
@@ -133,8 +146,9 @@ async function main(): Promise<void> {
   console.log(`[jira-backfill] Latest ${PROJECT_KEY} issue: ${latest > 0 ? `${PROJECT_KEY}-${latest}` : "none"}`);
 
   if (latest === 0) {
+    const access = await describeJiraAccess(credentials);
     throw new Error(
-      `No ${PROJECT_KEY} issues found via key probe; create the project backlog before gap backfill.`,
+      `No ${PROJECT_KEY} issues found via key probe (${access}). Verify GitHub secrets JIRA_BASE_URL (${credentials.baseUrl}), JIRA_EMAIL, and JIRA_API_TOKEN can read project ${PROJECT_KEY} on your Jira site.`,
     );
   }
 
