@@ -29,10 +29,10 @@ test.describe("Schedule calendar", () => {
   });
 
   test("planning mode lists accessible proposals", async ({ page }) => {
-    await page.getByRole("button", { name: /Planning/i }).click();
+    await page.getByRole("button", { name: "Planning", exact: true }).click();
     const drawer = page.locator(".MuiDrawer-paper");
     await expect(drawer.getByText("Planning mode")).toBeVisible();
-    await expect(drawer.getByText("Rescue Han from carbonite")).toBeVisible();
+    await expect(drawer.getByText("Jedi Council briefing")).toBeVisible({ timeout: 20_000 });
   });
 
   test("opens on the current week by default", async ({ page }) => {

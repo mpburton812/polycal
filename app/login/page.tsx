@@ -14,6 +14,9 @@ interface LoginPageProps {
 export default async function LoginPage({ searchParams }: LoginPageProps) {
   const session = await auth();
   if (session?.user) {
+    if (session.user.accountStatus === "paused") {
+      redirect("/paused");
+    }
     redirect("/schedule");
   }
 
@@ -25,11 +28,15 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
     const username = String(formData.get("username") ?? "");
     const password = String(formData.get("password") ?? "");
     const callbackUrl = String(formData.get("callbackUrl") ?? "/schedule");
-    await signIn("credentials", {
-      username,
-      password,
-      redirectTo: callbackUrl,
-    });
+    try {
+      await signIn("credentials", {
+        username,
+        password,
+        redirectTo: callbackUrl,
+      });
+    } catch {
+      redirect("/login?error=CredentialsSignin");
+    }
   }
 
   return (

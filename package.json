@@ -19,6 +19,10 @@
     "requirements:validate": "tsx scripts/validate-jira-commits.ts",
     "requirements:validate-range": "tsx scripts/validate-jira-commits.ts --range",
     "audit:check": "npm audit --audit-level=low",
+    "test": "vitest run",
+    "test:unit": "vitest run",
+    "test:unit:watch": "vitest",
+    "test:promote": "npm run audit:check && npm run test:unit",
     "test:e2e": "tsx scripts/e2e-prepare.ts && playwright test",
     "test:e2e:ci": "npm run build && tsx scripts/e2e-prepare.ts && playwright test",
     "test:e2e:ui": "tsx scripts/e2e-prepare.ts && playwright test --ui",
@@ -41,7 +45,9 @@
     "eslint-config-next": "^16.2.9",
     "husky": "^9.1.7",
     "tsx": "^4.19.4",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "vite": "^8.1.0",
+    "vitest": "^4.1.9"
   },
   "engines": {
     "node": ">=20"

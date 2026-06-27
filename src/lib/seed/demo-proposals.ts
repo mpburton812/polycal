@@ -37,14 +37,23 @@ interface DemoProposal {
   timeSlots?: DemoTimeSlot[];
 }
 
+/** Monday 00:00 local for the week containing `date`. */
+function startOfWeekMonday(date: Date): Date {
+  const monday = new Date(date);
+  monday.setHours(0, 0, 0, 0);
+  const day = monday.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  monday.setDate(monday.getDate() + diff);
+  return monday;
+}
+
 /** Builds ISO timestamps anchored to the current week for schedule demos. */
 function scheduleWindow(
   offsetDays: number,
   startHour: number,
   durationHours: number,
 ): { startAt: string; endAt: string } {
-  const start = new Date();
-  start.setHours(0, 0, 0, 0);
+  const start = startOfWeekMonday(new Date());
   start.setDate(start.getDate() + offsetDays);
   start.setHours(startHour, 0, 0, 0);
   const end = new Date(start);

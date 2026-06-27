@@ -116,10 +116,14 @@ function viewerCanSeeProposal(
   isAdmin: boolean,
   proposerId: string,
   inviteeUserIds: string[],
+  context?: { state?: string; eventPrivacy?: EventPrivacyLevel },
 ): boolean {
   if (isAdmin) return true;
   if (proposerId === viewerId) return true;
-  return inviteeUserIds.includes(viewerId);
+  if (inviteeUserIds.includes(viewerId)) return true;
+  if (context?.state === "resolved" && context.eventPrivacy === "open") return true;
+  if (context?.state === "archived" && context.eventPrivacy === "open") return true;
+  return false;
 }
 
 async function acceptedSleepingPartnerIds(
@@ -267,7 +271,10 @@ export async function listScheduleEventsAction(
     ];
 
     if (row.state === "proposed") {
-      if (!viewerCanSeeProposal(viewerId, isAdmin, row.proposerId, inviteeUserIds)) {
+      if (!viewerCanSeeProposal(viewerId, isAdmin, row.proposerId, inviteeUserIds, {
+        state: row.state,
+        eventPrivacy: row.eventPrivacy,
+      })) {
         continue;
       }
       planningItems.push({

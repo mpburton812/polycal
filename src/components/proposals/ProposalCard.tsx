@@ -169,7 +169,10 @@ export function ProposalCard({
               variant="contained"
               size="small"
               sx={primaryButtonSx}
-              onClick={() => onContinueEdit(proposal.id)}
+              onClick={(event) => {
+                event.stopPropagation();
+                onContinueEdit(proposal.id);
+              }}
             >
               Continue Editing
             </Button>
@@ -179,7 +182,10 @@ export function ProposalCard({
               variant="outlined"
               size="small"
               color="error"
-              onClick={() => onDeleteDraft(proposal.id)}
+              onClick={(event) => {
+                event.stopPropagation();
+                onDeleteDraft(proposal.id);
+              }}
             >
               Delete Draft
             </Button>

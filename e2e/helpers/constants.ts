@@ -8,6 +8,7 @@ export const USERS = {
   yoda: { username: "yoda", displayName: "Yoda", id: "sw-yoda" },
   vader: { username: "vader", displayName: "Darth Vader", id: "sw-vader" },
   lando: { username: "lando", displayName: "Lando Calrissian", id: "sw-lando" },
+  badUser: { username: "bad_user", displayName: "Bad User", id: "sw-bad-user" },
 } as const;
 
 /** Demo proposal fixtures from `demo-proposals.ts`. */

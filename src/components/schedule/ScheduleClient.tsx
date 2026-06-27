@@ -15,8 +15,8 @@ import {
   ToggleButtonGroup,
   Typography,
 } from "@mui/material";
-import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 
 import { getProposalDetailAction } from "@/actions/proposals";
 import type { ProposalPlaceOption } from "@/actions/proposals";
@@ -28,6 +28,7 @@ import {
 import type { PersonSummary } from "@/actions/users";
 import { PlanningModeDrawer } from "@/components/schedule/PlanningModeDrawer";
 import { ScheduleHeatmap } from "@/components/schedule/ScheduleHeatmap";
+import { ScheduleMonthView } from "@/components/schedule/ScheduleMonthView";
 import { ScheduleWeekView } from "@/components/schedule/ScheduleWeekView";
 import {
   loadScheduleViewState,
@@ -43,6 +44,7 @@ import {
   endOfWeekSunday,
   startOfWeekMonday,
 } from "@/lib/schedule/dates";
+import { endOfMonth, startOfMonth } from "@/lib/schedule/month-grid";
 
 const POLY_GREEN = "#004d40";
 
@@ -69,9 +71,12 @@ export function ScheduleClient({
   timeZone,
 }: ScheduleClientProps) {
   const router = useRouter();
+  const pathname = usePathname();
+  const previousPathRef = useRef(pathname);
   const [viewState, setViewState] = useState<ScheduleViewState>(() => ({
     ...loadScheduleViewState(),
     weekStartIso: initialWeekStartIso,
+    monthAnchorIso: initialWeekStartIso,
   }));
   const [payload, setPayload] = useState<SchedulePayload>(initialPayload);
   const [pending, startTransition] = useTransition();
@@ -84,27 +89,51 @@ export function ScheduleClient({
     () => startOfWeekMonday(new Date(viewState.weekStartIso)),
     [viewState.weekStartIso],
   );
+  const monthAnchor = useMemo(
+    () => startOfMonth(new Date(viewState.monthAnchorIso)),
+    [viewState.monthAnchorIso],
+  );
   const dayCount = viewState.compact ? 14 : 7;
+  const isMonthLayout = viewState.calendarLayout === "month";
   const rangeEnd = useMemo(() => {
+    if (isMonthLayout) {
+      return endOfMonth(monthAnchor);
+    }
     if (viewState.compact) {
       const end = addDays(weekStart, 13);
       end.setHours(23, 59, 59, 999);
       return end;
     }
     return endOfWeekSunday(weekStart);
-  }, [viewState.compact, weekStart]);
+  }, [isMonthLayout, monthAnchor, viewState.compact, weekStart]);
+
+  const rangeStart = useMemo(() => {
+    if (isMonthLayout) {
+      return startOfWeekMonday(startOfMonth(monthAnchor));
+    }
+    return weekStart;
+  }, [isMonthLayout, monthAnchor, weekStart]);
 
   const rangeLabel = useMemo(() => {
+    if (isMonthLayout) {
+      return monthAnchor.toLocaleDateString(undefined, { month: "long", year: "numeric" });
+    }
     const end = addDays(weekStart, dayCount - 1);
     const fmt: Intl.DateTimeFormatOptions = { month: "short", day: "numeric" };
     return `${weekStart.toLocaleDateString(undefined, fmt)} – ${end.toLocaleDateString(undefined, fmt)}`;
-  }, [weekStart, dayCount]);
+  }, [dayCount, isMonthLayout, monthAnchor, weekStart]);
 
   const refreshSchedule = useCallback(
-    (nextWeekStart: Date) => {
-      const monday = startOfWeekMonday(nextWeekStart);
-      const end = viewState.compact ? addDays(monday, 13) : endOfWeekSunday(monday);
-      if (viewState.compact) end.setHours(23, 59, 59, 999);
+    (anchorDate: Date) => {
+      const monday = isMonthLayout
+        ? startOfWeekMonday(startOfMonth(anchorDate))
+        : startOfWeekMonday(anchorDate);
+      const end = isMonthLayout
+        ? endOfMonth(anchorDate)
+        : viewState.compact
+          ? addDays(monday, 13)
+          : endOfWeekSunday(monday);
+      if (!isMonthLayout && viewState.compact) end.setHours(23, 59, 59, 999);
 
       startTransition(async () => {
         const result = await listScheduleEventsAction({
@@ -114,7 +143,7 @@ export function ScheduleClient({
         if (result.ok) setPayload(result.payload);
       });
     },
-    [viewState.compact],
+    [isMonthLayout, viewState.compact],
   );
 
   useEffect(() => {
@@ -123,9 +152,27 @@ export function ScheduleClient({
 
   useEffect(() => {
     const monday = startOfWeekMonday(new Date(initialWeekStartIso));
-    setViewState((current) => ({ ...current, weekStartIso: monday.toISOString() }));
+    setViewState((current) => ({
+      ...current,
+      weekStartIso: monday.toISOString(),
+      monthAnchorIso: monday.toISOString(),
+    }));
     setPayload(initialPayload);
   }, [initialWeekStartIso, initialPayload]);
+
+  /** Returning to Schedule always opens the current week (PC-55). */
+  useEffect(() => {
+    if (pathname === "/schedule" && previousPathRef.current !== "/schedule") {
+      const monday = startOfWeekMonday(new Date());
+      setViewState((current) => ({
+        ...current,
+        weekStartIso: monday.toISOString(),
+        monthAnchorIso: monday.toISOString(),
+      }));
+      refreshSchedule(monday);
+    }
+    previousPathRef.current = pathname;
+  }, [pathname, refreshSchedule]);
 
   const filteredEvents = useMemo(
     () =>
@@ -145,11 +192,29 @@ export function ScheduleClient({
     ],
   );
 
-  function shiftWeek(delta: number) {
+  function shiftPeriod(delta: number) {
+    if (isMonthLayout) {
+      const next = new Date(monthAnchor);
+      next.setMonth(next.getMonth() + delta);
+      setViewState((current) => ({ ...current, monthAnchorIso: next.toISOString() }));
+      refreshSchedule(next);
+      return;
+    }
+
     const step = viewState.compact ? 14 : 7;
     const next = addDays(weekStart, delta * step);
     setViewState((current) => ({ ...current, weekStartIso: next.toISOString() }));
     refreshSchedule(next);
+  }
+
+  function goToToday() {
+    const today = startOfWeekMonday(new Date());
+    setViewState((current) => ({
+      ...current,
+      weekStartIso: today.toISOString(),
+      monthAnchorIso: today.toISOString(),
+    }));
+    refreshSchedule(today);
   }
 
   function openProposal(proposalId: string) {
@@ -186,41 +251,60 @@ export function ScheduleClient({
         sx={{ mb: 1 }}
       >
         <Stack direction="row" alignItems="center" spacing={0.5}>
-          <IconButton aria-label="Previous period" onClick={() => shiftWeek(-1)} disabled={pending}>
+          <IconButton aria-label="Previous period" onClick={() => shiftPeriod(-1)} disabled={pending}>
             <ChevronLeftIcon />
           </IconButton>
           <Typography variant="subtitle1" fontWeight={600}>
             {rangeLabel}
           </Typography>
-          <IconButton aria-label="Next period" onClick={() => shiftWeek(1)} disabled={pending}>
+          <IconButton aria-label="Next period" onClick={() => shiftPeriod(1)} disabled={pending}>
             <ChevronRightIcon />
           </IconButton>
         </Stack>
 
-        <ToggleButtonGroup
-          exclusive
-          size="small"
-          value={viewState.compact ? "compact" : "normal"}
-          onChange={(_, value) => {
-            if (!value) return;
-            const compact = value === "compact";
-            setViewState((current) => ({ ...current, compact }));
-            const monday = startOfWeekMonday(weekStart);
-            const end = compact ? addDays(monday, 13) : endOfWeekSunday(monday);
-            if (compact) end.setHours(23, 59, 59, 999);
-            startTransition(async () => {
-              const result = await listScheduleEventsAction({
-                rangeStart: monday.toISOString(),
-                rangeEnd: end.toISOString(),
-              });
-              if (result.ok) setPayload(result.payload);
-            });
-          }}
-          aria-label="View density"
-        >
-          <ToggleButton value="normal">Week</ToggleButton>
-          <ToggleButton value="compact">2 weeks</ToggleButton>
-        </ToggleButtonGroup>
+        <Stack direction="row" spacing={1} alignItems="center">
+          <ToggleButtonGroup
+            exclusive
+            size="small"
+            value={viewState.calendarLayout}
+            onChange={(_, value: "week" | "month" | null) => {
+              if (!value) return;
+              setViewState((current) => ({ ...current, calendarLayout: value }));
+              refreshSchedule(value === "month" ? monthAnchor : weekStart);
+            }}
+            aria-label="Calendar layout"
+          >
+            <ToggleButton value="week">Week</ToggleButton>
+            <ToggleButton value="month">Month</ToggleButton>
+          </ToggleButtonGroup>
+
+          {!isMonthLayout && (
+            <ToggleButtonGroup
+              exclusive
+              size="small"
+              value={viewState.compact ? "compact" : "normal"}
+              onChange={(_, value) => {
+                if (!value) return;
+                const compact = value === "compact";
+                setViewState((current) => ({ ...current, compact }));
+                const monday = startOfWeekMonday(weekStart);
+                const end = compact ? addDays(monday, 13) : endOfWeekSunday(monday);
+                if (compact) end.setHours(23, 59, 59, 999);
+                startTransition(async () => {
+                  const result = await listScheduleEventsAction({
+                    rangeStart: monday.toISOString(),
+                    rangeEnd: end.toISOString(),
+                  });
+                  if (result.ok) setPayload(result.payload);
+                });
+              }}
+              aria-label="View density"
+            >
+              <ToggleButton value="normal">Week</ToggleButton>
+              <ToggleButton value="compact">2 weeks</ToggleButton>
+            </ToggleButtonGroup>
+          )}
+        </Stack>
       </Stack>
 
       <Stack
@@ -313,18 +397,33 @@ export function ScheduleClient({
 
       <ScheduleHeatmap
         events={filteredEvents}
-        weekStartIso={viewState.weekStartIso}
-        dayCount={dayCount}
+        weekStartIso={rangeStart.toISOString()}
+        dayCount={
+          isMonthLayout
+            ? Math.ceil(
+                (rangeEnd.getTime() - rangeStart.getTime()) / (24 * 60 * 60 * 1000),
+              ) + 1
+            : dayCount
+        }
       />
 
-      <ScheduleWeekView
-        weekStart={weekStart}
-        dayCount={dayCount}
-        events={filteredEvents}
-        compact={viewState.compact}
-        timeZone={timeZone}
-        onEventClick={openProposal}
-      />
+      {isMonthLayout ? (
+        <ScheduleMonthView
+          monthAnchor={monthAnchor}
+          events={filteredEvents}
+          timeZone={timeZone}
+          onEventClick={openProposal}
+        />
+      ) : (
+        <ScheduleWeekView
+          weekStart={weekStart}
+          dayCount={dayCount}
+          events={filteredEvents}
+          compact={viewState.compact}
+          timeZone={timeZone}
+          onEventClick={openProposal}
+        />
+      )}
 
       <PlanningModeDrawer
         open={viewState.planningOpen}
@@ -343,7 +442,7 @@ export function ScheduleClient({
           setDetailOpen(false);
           setSelectedProposalId(null);
           router.refresh();
-          refreshSchedule(weekStart);
+          refreshSchedule(isMonthLayout ? monthAnchor : weekStart);
         }}
         onEdit={handleEditFromDetail}
         people={people}
@@ -355,7 +454,7 @@ export function ScheduleClient({
           setDraftOpen(false);
           setEditDetail(null);
           router.refresh();
-          refreshSchedule(weekStart);
+          refreshSchedule(isMonthLayout ? monthAnchor : weekStart);
         }}
         people={people}
         places={places}

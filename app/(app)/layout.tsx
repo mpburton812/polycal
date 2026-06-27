@@ -20,6 +20,10 @@ export default async function AppLayout({
     redirect("/login");
   }
 
+  if (session.user.accountStatus === "paused") {
+    redirect("/paused");
+  }
+
   const hasAdminAccess = await userHasAdminAccess(session.user.role);
   const themeId = isUserThemeId(session.user.theme ?? "")
     ? session.user.theme!
