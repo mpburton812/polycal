@@ -52,15 +52,19 @@ function scheduleWindow(
   offsetDays: number,
   startHour: number,
   durationHours: number,
-  options?: { ensureFuture?: boolean },
+  options?: { ensureFuture?: boolean; minFutureHours?: number },
 ): { startAt: string; endAt: string } {
   const start = startOfWeekMonday(new Date());
   start.setDate(start.getDate() + offsetDays);
   start.setHours(startHour, 0, 0, 0);
   if (options?.ensureFuture) {
     const now = new Date();
+    const minFutureMs = (options.minFutureHours ?? 2) * 60 * 60 * 1000;
     while (start.getTime() <= now.getTime()) {
-      start.setDate(start.getDate() + 7);
+      start.setDate(start.getDate() + 1);
+    }
+    while (start.getTime() < now.getTime() + minFutureMs) {
+      start.setHours(start.getHours() + 1);
     }
   }
   const end = new Date(start);
@@ -98,7 +102,7 @@ const DEMO_PROPOSALS: DemoProposal[] = [
     proposerId: "sw-leia",
     locationId: "loc-cloudcity",
     inviteeIds: ["sw-luke", "sw-han"],
-    timeSlots: [{ startOffsetDays: 30, startHour: 14, durationHours: 2 }],
+    timeSlots: [{ startOffsetDays: 1, startHour: 14, durationHours: 2 }],
   },
   {
     id: "prop-proposed-2",
@@ -109,7 +113,7 @@ const DEMO_PROPOSALS: DemoProposal[] = [
     proposerId: "sw-han",
     locationId: "loc-tatooine",
     inviteeIds: ["sw-leia"],
-    timeSlots: [{ startOffsetDays: 32, startHour: 22, durationHours: 8 }],
+    timeSlots: [{ startOffsetDays: 3, startHour: 22, durationHours: 8 }],
   },
   {
     id: "prop-proposed-3",
@@ -120,7 +124,7 @@ const DEMO_PROPOSALS: DemoProposal[] = [
     proposerId: "sw-vader",
     locationId: "loc-deathstar",
     inviteeIds: ["sw-luke"],
-    timeSlots: [{ startOffsetDays: 35, startHour: 10, durationHours: 1 }],
+    timeSlots: [{ startOffsetDays: 5, startHour: 10, durationHours: 1 }],
   },
   {
     id: "prop-resolved-1",
