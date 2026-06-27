@@ -1,15 +1,25 @@
 "use server";
 
 import { randomUUID } from "node:crypto";
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, inArray, like } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { auth } from "@/lib/auth";
+import { userHasAdminAccess } from "@/lib/admin-access";
 import { logUserActivity } from "@/lib/audit";
 import { getDb } from "@/lib/db/client";
 import { ensureDbReady } from "@/lib/db/ensure-ready";
-import { locationResidents, locations, users } from "@/lib/db/schema";
+import {
+  locationResidents,
+  locations,
+  proposalInvitees,
+  proposals,
+  userActivityLog,
+  users,
+} from "@/lib/db/schema";
+import { notifyUser } from "@/lib/notifications";
+import type { UserRole } from "@/types/user";
 
 const placeSchema = z.object({
   name: z.string().trim().min(1).max(120),
@@ -32,6 +42,7 @@ export interface PlaceSummary {
   bedroomNames: string[];
   residentCount: number;
   residents: ResidentView[];
+  createdById: string | null;
 }
 
 export interface ResidentView {
@@ -40,6 +51,210 @@ export interface ResidentView {
   displayName: string;
   status: string;
   isIncoming: boolean;
+}
+
+/** Summary shown before confirming place deletion (PC-37). */
+export interface PlaceDeleteImpact {
+  placeName: string;
+  activeProposalCount: number;
+  scheduledEventCount: number;
+  pendingResidencyCount: number;
+  affectedProposalCount: number;
+}
+
+const PLACE_DELETED_DRAFT_NOTE =
+  "Place was deleted. Location cleared and proposal moved to your drafts.";
+
+function appendProposalNote(existing: string | null, line: string): string {
+  if (!existing?.trim()) return line;
+  return `${existing.trim()}\n${line}`;
+}
+
+/** True when a resolved proposal should be treated as a future scheduled event. */
+function isFutureScheduledEvent(scheduledStartAt: string | null): boolean {
+  if (!scheduledStartAt) return true;
+  return scheduledStartAt >= new Date().toISOString();
+}
+
+/**
+ * Whether the viewer may edit a place (admin, creator, or accepted resident) (PC-56).
+ */
+async function userCanEditPlace(
+  db: ReturnType<typeof getDb>,
+  userId: string,
+  role: UserRole,
+  placeId: string,
+): Promise<boolean> {
+  if (await userHasAdminAccess(role)) return true;
+
+  const [place] = await db.select().from(locations).where(eq(locations.id, placeId)).limit(1);
+  if (!place) return false;
+  if (place.createdById === userId) return true;
+
+  const [resident] = await db
+    .select({ id: locationResidents.id })
+    .from(locationResidents)
+    .where(
+      and(
+        eq(locationResidents.locationId, placeId),
+        eq(locationResidents.userId, userId),
+        eq(locationResidents.status, "accepted"),
+      ),
+    )
+    .limit(1);
+
+  return Boolean(resident);
+}
+
+/**
+ * Whether the viewer may delete a place (admin, creator, or accepted resident).
+ */
+async function userCanDeletePlace(
+  db: ReturnType<typeof getDb>,
+  userId: string,
+  role: UserRole,
+  placeId: string,
+): Promise<boolean> {
+  if (await userHasAdminAccess(role)) return true;
+
+  const [place] = await db.select().from(locations).where(eq(locations.id, placeId)).limit(1);
+  if (!place) return false;
+  if (place.createdById === userId) return true;
+
+  const [resident] = await db
+    .select({ id: locationResidents.id })
+    .from(locationResidents)
+    .where(
+      and(
+        eq(locationResidents.locationId, placeId),
+        eq(locationResidents.userId, userId),
+        eq(locationResidents.status, "accepted"),
+      ),
+    )
+    .limit(1);
+
+  return Boolean(resident);
+}
+
+/**
+ * Loads linked proposals and residency rows that matter for delete confirmation (PC-37).
+ */
+export async function getPlaceDeleteImpactAction(
+  placeId: string,
+): Promise<{ ok: boolean; message: string; impact?: PlaceDeleteImpact }> {
+  const session = await auth();
+  if (!session?.user) {
+    return { ok: false, message: "Sign in required." };
+  }
+
+  await ensureDbReady();
+  const db = getDb();
+  const [place] = await db.select().from(locations).where(eq(locations.id, placeId)).limit(1);
+  if (!place) {
+    return { ok: false, message: "Place not found." };
+  }
+
+  if (!(await userCanDeletePlace(db, session.user.id, session.user.role, placeId))) {
+    return { ok: false, message: "You cannot delete this place." };
+  }
+
+  const linkedProposals = await db
+    .select({
+      id: proposals.id,
+      state: proposals.state,
+      scheduledStartAt: proposals.scheduledStartAt,
+    })
+    .from(proposals)
+    .where(eq(proposals.locationId, placeId));
+
+  const activeProposalCount = linkedProposals.filter((row) => row.state === "proposed").length;
+  const scheduledEventCount = linkedProposals.filter(
+    (row) => row.state === "resolved" && isFutureScheduledEvent(row.scheduledStartAt),
+  ).length;
+
+  const pendingResidents = await db
+    .select({ id: locationResidents.id })
+    .from(locationResidents)
+    .where(
+      and(eq(locationResidents.locationId, placeId), eq(locationResidents.status, "proposed")),
+    );
+
+  const affectedProposalCount = activeProposalCount + scheduledEventCount;
+
+  return {
+    ok: true,
+    message: "Impact loaded.",
+    impact: {
+      placeName: place.name,
+      activeProposalCount,
+      scheduledEventCount,
+      pendingResidencyCount: pendingResidents.length,
+      affectedProposalCount,
+    },
+  };
+}
+
+/**
+ * Moves active or future scheduled proposals to drafts and notifies stakeholders (PC-37).
+ */
+async function revertProposalsForDeletedPlace(
+  db: ReturnType<typeof getDb>,
+  placeId: string,
+  placeName: string,
+  deletedByUserId: string,
+): Promise<number> {
+  const linked = await db.select().from(proposals).where(eq(proposals.locationId, placeId));
+  const now = new Date().toISOString();
+  let movedCount = 0;
+
+  for (const proposal of linked) {
+    const shouldMoveToDraft =
+      proposal.state === "proposed" ||
+      (proposal.state === "resolved" && isFutureScheduledEvent(proposal.scheduledStartAt));
+
+    if (shouldMoveToDraft) {
+      await db
+        .update(proposals)
+        .set({
+          state: "draft",
+          locationId: null,
+          scheduledStartAt: null,
+          notes: appendProposalNote(proposal.notes, PLACE_DELETED_DRAFT_NOTE),
+          updatedAt: now,
+        })
+        .where(eq(proposals.id, proposal.id));
+
+      const inviteeRows = await db
+        .select({ userId: proposalInvitees.userId })
+        .from(proposalInvitees)
+        .where(eq(proposalInvitees.proposalId, proposal.id));
+
+      const notifyIds = new Set<string>([proposal.proposerId, ...inviteeRows.map((r) => r.userId)]);
+      const notificationMessage = `Place "${placeName}" was deleted. Proposal "${proposal.title}" was moved to drafts.`;
+
+      for (const userId of notifyIds) {
+        await notifyUser(userId, "place_deleted_proposal_reverted", notificationMessage, {
+          placeId,
+          placeName,
+          proposalId: proposal.id,
+          proposalTitle: proposal.title,
+          deletedByUserId,
+        });
+      }
+
+      movedCount += 1;
+      continue;
+    }
+
+    if (proposal.locationId) {
+      await db
+        .update(proposals)
+        .set({ locationId: null, updatedAt: now })
+        .where(eq(proposals.id, proposal.id));
+    }
+  }
+
+  return movedCount;
 }
 
 function parseBedroomNames(raw: string | null): string[] {
@@ -125,6 +340,7 @@ export async function listPlacesAction(): Promise<PlaceSummary[]> {
       residentCount: placeResidents.filter((resident) => resident.status === "accepted")
         .length,
       residents: mapResidentRows(placeResidents, viewerId),
+      createdById: row.createdById ?? null,
     };
   });
 }
@@ -166,6 +382,17 @@ export async function createPlaceAction(
     createdById: session.user.id,
     createdAt: now,
     updatedAt: now,
+  });
+
+  await db.insert(locationResidents).values({
+    id: `lr-${randomUUID()}`,
+    locationId: placeId,
+    userId: session.user.id,
+    status: "accepted",
+    proposedById: session.user.id,
+    createdAt: now,
+    updatedAt: now,
+    respondedAt: now,
   });
 
   await logUserActivity(session.user.id, "places.create", placeId);
@@ -210,8 +437,8 @@ export async function updatePlaceAction(
   input: z.infer<typeof updatePlaceSchema>,
 ): Promise<{ ok: boolean; message: string }> {
   const session = await auth();
-  if (!session?.user || session.user.role !== "admin") {
-    return { ok: false, message: "Admin access required." };
+  if (!session?.user) {
+    return { ok: false, message: "Sign in required." };
   }
 
   const parsed = updatePlaceSchema.safeParse(input);
@@ -228,6 +455,11 @@ export async function updatePlaceAction(
     .limit(1);
   if (!place) {
     return { ok: false, message: "Place not found." };
+  }
+
+  const isAdmin = await userHasAdminAccess(session.user.role);
+  if (!(await userCanEditPlace(db, session.user.id, session.user.role, parsed.data.placeId))) {
+    return { ok: false, message: "You can only edit places you created or where you are a resident." };
   }
 
   if (await isPlaceNameTaken(db, parsed.data.name, parsed.data.placeId)) {
@@ -258,14 +490,14 @@ export async function updatePlaceAction(
 }
 
 /**
- * Deletes a place and its residency rows (admin only, PC-37).
+ * Deletes a place, reverts linked proposals to drafts, and notifies stakeholders (PC-37).
  */
 export async function deletePlaceAction(
   placeId: string,
-): Promise<{ ok: boolean; message: string }> {
+): Promise<{ ok: boolean; message: string; movedProposalCount?: number }> {
   const session = await auth();
-  if (!session?.user || session.user.role !== "admin") {
-    return { ok: false, message: "Admin access required." };
+  if (!session?.user) {
+    return { ok: false, message: "Sign in required." };
   }
 
   await ensureDbReady();
@@ -275,13 +507,38 @@ export async function deletePlaceAction(
     return { ok: false, message: "Place not found." };
   }
 
+  if (!(await userCanDeletePlace(db, session.user.id, session.user.role, placeId))) {
+    return { ok: false, message: "You cannot delete this place." };
+  }
+
+  const movedProposalCount = await revertProposalsForDeletedPlace(
+    db,
+    placeId,
+    place.name,
+    session.user.id,
+  );
+
   await db.delete(locationResidents).where(eq(locationResidents.locationId, placeId));
   await db.delete(locations).where(eq(locations.id, placeId));
 
-  await logUserActivity(session.user.id, "places.delete", placeId);
+  await logUserActivity(
+    session.user.id,
+    "places.delete",
+    JSON.stringify({ placeId, placeName: place.name, movedProposalCount }),
+  );
   revalidatePath("/people-places");
+  revalidatePath("/proposals");
 
-  return { ok: true, message: `Deleted place ${place.name}.` };
+  const movedSuffix =
+    movedProposalCount > 0
+      ? ` ${movedProposalCount} proposal(s) moved to drafts and stakeholders notified.`
+      : "";
+
+  return {
+    ok: true,
+    message: `Deleted place ${place.name}.${movedSuffix}`,
+    movedProposalCount,
+  };
 }
 
 /**
@@ -296,12 +553,21 @@ export async function proposeResidencyAction(
     return { ok: false, message: "Sign in required." };
   }
 
+  if (!(await userHasAdminAccess(session.user.role)) && targetUserId !== session.user.id) {
+    return { ok: false, message: "You can only associate yourself with a place." };
+  }
+
   await ensureDbReady();
   const db = getDb();
   const [place] = await db.select().from(locations).where(eq(locations.id, locationId)).limit(1);
   const [target] = await db.select().from(users).where(eq(users.id, targetUserId)).limit(1);
   if (!place || !target || target.status !== "active") {
     return { ok: false, message: "Place or user not found." };
+  }
+
+  const isAdmin = await userHasAdminAccess(session.user.role);
+  if (!isAdmin && place.createdById !== session.user.id) {
+    return { ok: false, message: "You cannot associate with this place." };
   }
 
   const [existing] = await db
@@ -322,6 +588,7 @@ export async function proposeResidencyAction(
   const now = new Date().toISOString();
   const autoAccept = target.role === "passive";
   const status = autoAccept ? "accepted" : "proposed";
+  const residencyId = existing?.id ?? `lr-${randomUUID()}`;
 
   if (existing) {
     await db
@@ -335,7 +602,7 @@ export async function proposeResidencyAction(
       .where(eq(locationResidents.id, existing.id));
   } else {
     await db.insert(locationResidents).values({
-      id: `lr-${randomUUID()}`,
+      id: residencyId,
       locationId,
       userId: targetUserId,
       status,
@@ -346,12 +613,33 @@ export async function proposeResidencyAction(
     });
   }
 
+  const [proposer] = await db
+    .select({ displayName: users.displayName })
+    .from(users)
+    .where(eq(users.id, session.user.id))
+    .limit(1);
+
+  if (!autoAccept) {
+    await notifyUser(
+      targetUserId,
+      "residency_proposed",
+      `${proposer?.displayName ?? "Someone"} proposed residency at ${place.name} for you.`,
+      {
+        residencyId: existing?.id ?? residencyId,
+        locationId,
+        placeName: place.name,
+        proposerId: session.user.id,
+      },
+    );
+  }
+
   await logUserActivity(
     session.user.id,
     "places.propose_residency",
-    JSON.stringify({ locationId, targetUserId, status }),
+    JSON.stringify({ locationId, targetUserId, status, placeName: place.name }),
   );
   revalidatePath("/people-places");
+  revalidatePath("/proposals");
 
   return {
     ok: true,
@@ -397,15 +685,269 @@ export async function respondResidencyAction(
     .set({ status, updatedAt: now, respondedAt: now })
     .where(eq(locationResidents.id, row.id));
 
+  const [place] = await db
+    .select({ name: locations.name })
+    .from(locations)
+    .where(eq(locations.id, row.locationId))
+    .limit(1);
+  const [responder] = await db
+    .select({ displayName: users.displayName })
+    .from(users)
+    .where(eq(users.id, session.user.id))
+    .limit(1);
+  const placeName = place?.name ?? "a place";
+
+  await notifyUser(
+    row.proposedById,
+    parsed.data.accept ? "residency_accepted" : "residency_declined",
+    `${responder?.displayName ?? "Someone"} ${parsed.data.accept ? "accepted" : "declined"} residency at ${placeName}.`,
+    { residencyId: row.id, locationId: row.locationId, placeName },
+  );
+
   await logUserActivity(
     session.user.id,
     parsed.data.accept ? "places.accept_residency" : "places.decline_residency",
-    row.id,
+    JSON.stringify({
+      residencyId: row.id,
+      placeName,
+      inviteeName: responder?.displayName,
+      accept: parsed.data.accept,
+    }),
   );
   revalidatePath("/people-places");
+  revalidatePath("/proposals");
 
   return {
     ok: true,
     message: parsed.data.accept ? "Residency accepted." : "Residency declined.",
   };
+}
+
+export interface ResidencyCommentView {
+  id: number;
+  authorName: string;
+  body: string;
+  createdAt: string;
+}
+
+export interface ResidencyProposalDetail {
+  residencyId: string;
+  placeName: string;
+  inviteeName: string;
+  proposerName: string;
+  status: string;
+  comments: ResidencyCommentView[];
+  activityLog: { action: string; details: string | null; createdAt: string }[];
+}
+
+const residencyCommentSchema = z.object({
+  residencyId: z.string().min(1),
+  body: z.string().trim().min(1).max(2000),
+});
+
+/**
+ * Loads residency proposal detail for the Proposals Kanban dialog (PC-56).
+ */
+export async function getResidencyProposalDetailAction(
+  residencyId: string,
+): Promise<{ ok: boolean; message: string; detail?: ResidencyProposalDetail }> {
+  const session = await auth();
+  if (!session?.user) {
+    return { ok: false, message: "Sign in required." };
+  }
+
+  await ensureDbReady();
+  const db = getDb();
+  const [row] = await db
+    .select({
+      id: locationResidents.id,
+      status: locationResidents.status,
+      userId: locationResidents.userId,
+      proposedById: locationResidents.proposedById,
+      placeName: locations.name,
+      inviteeName: users.displayName,
+    })
+    .from(locationResidents)
+    .innerJoin(locations, eq(locationResidents.locationId, locations.id))
+    .innerJoin(users, eq(locationResidents.userId, users.id))
+    .where(eq(locationResidents.id, residencyId))
+    .limit(1);
+
+  if (!row) {
+    return { ok: false, message: "Residency proposal not found." };
+  }
+
+  const isAdmin = await userHasAdminAccess(session.user.role);
+  const isParticipant =
+    row.userId === session.user.id || row.proposedById === session.user.id;
+  if (!isParticipant && !isAdmin) {
+    return { ok: false, message: "You cannot view this residency proposal." };
+  }
+
+  const [proposer] = await db
+    .select({ displayName: users.displayName })
+    .from(users)
+    .where(eq(users.id, row.proposedById))
+    .limit(1);
+
+  const logRows = await db
+    .select({
+      action: userActivityLog.action,
+      details: userActivityLog.details,
+      createdAt: userActivityLog.createdAt,
+      userId: userActivityLog.userId,
+    })
+    .from(userActivityLog)
+    .where(like(userActivityLog.details, `%${residencyId}%`))
+    .orderBy(asc(userActivityLog.createdAt));
+
+  const authorIds = [...new Set(logRows.map((entry) => entry.userId).filter(Boolean))] as string[];
+  const authorRows =
+    authorIds.length > 0
+      ? await db
+          .select({ id: users.id, displayName: users.displayName })
+          .from(users)
+          .where(inArray(users.id, authorIds))
+      : [];
+  const authorMap = new Map(authorRows.map((author) => [author.id, author.displayName]));
+
+  const comments: ResidencyCommentView[] = [];
+  const activityLog: ResidencyProposalDetail["activityLog"] = [];
+
+  for (const entry of logRows) {
+    if (entry.action === "residency.comment" && entry.details) {
+      try {
+        const parsed = JSON.parse(entry.details) as { residencyId?: string; body?: string };
+        if (parsed.residencyId === residencyId && parsed.body) {
+          comments.push({
+            id: comments.length + 1,
+            authorName: authorMap.get(entry.userId ?? "") ?? "Someone",
+            body: parsed.body,
+            createdAt: entry.createdAt,
+          });
+        }
+      } catch {
+        // skip malformed
+      }
+    }
+    activityLog.push({
+      action: entry.action,
+      details: entry.details,
+      createdAt: entry.createdAt,
+    });
+  }
+
+  return {
+    ok: true,
+    message: "OK",
+    detail: {
+      residencyId: row.id,
+      placeName: row.placeName,
+      inviteeName: row.inviteeName,
+      proposerName: proposer?.displayName ?? "Someone",
+      status: row.status,
+      comments,
+      activityLog,
+    },
+  };
+}
+
+/**
+ * Adds a comment to a residency proposal thread (PC-56).
+ */
+export async function addResidencyCommentAction(
+  input: z.infer<typeof residencyCommentSchema>,
+): Promise<{ ok: boolean; message: string }> {
+  const session = await auth();
+  if (!session?.user) {
+    return { ok: false, message: "Sign in required." };
+  }
+
+  const parsed = residencyCommentSchema.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, message: "Invalid comment." };
+  }
+
+  await ensureDbReady();
+  const db = getDb();
+  const [row] = await db
+    .select()
+    .from(locationResidents)
+    .where(eq(locationResidents.id, parsed.data.residencyId))
+    .limit(1);
+
+  if (!row || row.status === "accepted") {
+    return { ok: false, message: "Cannot comment on this residency proposal." };
+  }
+
+  const isAdmin = await userHasAdminAccess(session.user.role);
+  const isParticipant =
+    row.userId === session.user.id || row.proposedById === session.user.id;
+  if (!isParticipant && !isAdmin) {
+    return { ok: false, message: "You cannot comment on this residency proposal." };
+  }
+
+  await logUserActivity(
+    session.user.id,
+    "residency.comment",
+    JSON.stringify({ residencyId: parsed.data.residencyId, body: parsed.data.body }),
+  );
+
+  const [author] = await db
+    .select({ displayName: users.displayName })
+    .from(users)
+    .where(eq(users.id, session.user.id))
+    .limit(1);
+
+  const notifyTargetId =
+    session.user.id === row.userId ? row.proposedById : row.userId;
+  await notifyUser(
+    notifyTargetId,
+    "residency_comment",
+    `${author?.displayName ?? "Someone"} commented on residency at your proposal.`,
+    { residencyId: row.id },
+  );
+
+  revalidatePath("/proposals");
+  return { ok: true, message: "Comment posted." };
+}
+
+/**
+ * Removes a declined residency draft so the proposer can re-associate (PC-56).
+ */
+export async function deleteDeclinedResidencyAction(
+  residencyId: string,
+): Promise<{ ok: boolean; message: string }> {
+  const session = await auth();
+  if (!session?.user) {
+    return { ok: false, message: "Sign in required." };
+  }
+
+  await ensureDbReady();
+  const db = getDb();
+  const [row] = await db
+    .select()
+    .from(locationResidents)
+    .where(eq(locationResidents.id, residencyId))
+    .limit(1);
+
+  if (!row || row.status !== "declined") {
+    return { ok: false, message: "Declined residency draft not found." };
+  }
+
+  const isAdmin = await userHasAdminAccess(session.user.role);
+  if (!isAdmin && row.proposedById !== session.user.id) {
+    return { ok: false, message: "Only the proposer can remove this draft." };
+  }
+
+  await db.delete(locationResidents).where(eq(locationResidents.id, residencyId));
+  await logUserActivity(
+    session.user.id,
+    "places.delete_declined_residency",
+    JSON.stringify({ residencyId }),
+  );
+  revalidatePath("/people-places");
+  revalidatePath("/proposals");
+
+  return { ok: true, message: "Declined residency draft removed." };
 }

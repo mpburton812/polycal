@@ -12,5 +12,8 @@ fi
 git fetch origin dev 2>/dev/null || git fetch origin "${TARGET_BRANCH}"
 RANGE="origin/${TARGET_BRANCH}...HEAD"
 
+echo "[ci] Ensuring Jira backlog gap tickets PC-52..PC-56 exist"
+npx tsx scripts/backfill-jira-kanban-gap.ts
+
 echo "[ci] Jira In Review sync for range: ${RANGE}"
 npx tsx scripts/jira-transition-issues.ts --range "${RANGE}" --status "In Review"

@@ -1,18 +1,40 @@
+import { Suspense } from "react";
 import { Typography } from "@mui/material";
+import { redirect } from "next/navigation";
 
-import { ProposalsKanban } from "@/components/proposals/ProposalsKanban";
+import { listProposalBoardAction, listProposalPlaceOptionsAction } from "@/actions/proposals";
+import { listPeopleAction } from "@/actions/users";
+import { ProposalsClient } from "@/components/proposals/ProposalsClient";
+import { auth } from "@/lib/auth";
 
-export default function ProposalsPage() {
+export default async function ProposalsPage() {
+  const session = await auth();
+  if (!session?.user) {
+    redirect("/login");
+  }
+
+  const [board, people, places] = await Promise.all([
+    listProposalBoardAction(),
+    listPeopleAction(),
+    listProposalPlaceOptionsAction(),
+  ]);
+
   return (
     <>
       <Typography variant="h5" component="h1" gutterBottom>
         Proposals
       </Typography>
       <Typography color="text.secondary" sx={{ mb: 3 }}>
-        Demo Kanban seeded across all workflow columns. Voting and creation UI
-        arrive in Phases 4–5.
+        Draft, submit, vote, and resolve proposals. Click any card for details and actions.
       </Typography>
-      <ProposalsKanban />
+      <Suspense fallback={null}>
+        <ProposalsClient
+          board={board}
+          people={people}
+          places={places}
+          currentUserId={session.user.id}
+        />
+      </Suspense>
     </>
   );
 }

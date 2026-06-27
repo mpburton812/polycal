@@ -10,6 +10,19 @@ export const AVATAR_OPTIONS = [
 
 export type AvatarKey = (typeof AVATAR_OPTIONS)[number]["key"];
 
+/** Resolves built-in bird avatars or custom uploads stored in `stored_images` (PC-45). */
 export function avatarSrcForKey(key: string | null | undefined): string | undefined {
-  return AVATAR_OPTIONS.find((option) => option.key === key)?.src;
+  if (!key) return undefined;
+  const builtIn = AVATAR_OPTIONS.find((option) => option.key === key)?.src;
+  if (builtIn) return builtIn;
+  if (key.startsWith("custom:")) {
+    const imageId = key.slice("custom:".length);
+    if (imageId) return `/api/avatars/${encodeURIComponent(imageId)}`;
+  }
+  return undefined;
+}
+
+/** True when the avatar key references a user-uploaded image (PC-45). */
+export function isCustomAvatarKey(key: string | null | undefined): boolean {
+  return Boolean(key?.startsWith("custom:"));
 }

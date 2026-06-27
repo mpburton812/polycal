@@ -8,6 +8,66 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- PC-53: Pending-recovery TTL when resolved proposals lose all required invitees; admin-configurable recovery hours.
+- PC-53: Schedule network busyness heatmap (privacy-masked) and sticky week/filter toolbar.
+- PC-53: Resend email delivery for notifications and profile email verification when `RESEND_API_KEY` is set.
+- PC-53: Admin user table gender column; production admin bootstrap script (`scripts/create-prod-admin.mjs`).
+
+### Fixed
+
+- PC-53: Block submit/auto-resolve when a proposal has zero required invitees and is not marked solo.
+
+### Added
+
+- PC-52: Playwright journey for admin provisioning an active user (copy credentials, logout, first-login onboarding).
+- PC-52: Test environment scripts (`test:env:test`, `validate-test-seed`) and login hint for Burton-Thompson seed; dev/feature keep Star Wars demo data.
+- PC-51: Render Blueprint (`render.yaml`) with hourly dev/test enforcement cron jobs calling Vercel `/api/cron/enforcement`; `scripts/cron-enforcement.sh` runner; production cron template documented in Blueprint comments.
+- PC-50: Sleeping network notifications when partnerships are added or removed (partners of affected users are notified).
+- PC-50: Track admin-initiated partnership proposals (`initiatedByUserId`) with accurate Kanban/detail copy.
+
+- PC-49: Optional poll invitees keep the proposal in Proposed until they vote; banner and tailored notification when required attendees have already approved and scheduled.
+
+- PC-48: Attendee-update one-click notifications (maintain accept / decline) after proposer removes required invitees; at-risk resolved flow with proposer options, tentative calendar styling, and auto-cancel enforcement.
+- PC-48: Recurring series archive when past final child occurrence; cron enforcement API (`/api/cron/enforcement`) protected by `CRON_SECRET`.
+- PC-48: User-selectable timezone in profile; schedule display normalization; admin reschedule from calendar detail.
+- PC-48: Places list collapsible by default (name, bedrooms, residents summary); clone proposal opens draft editor.
+- PC-48: MUI X date/time pickers with analog clock for event draft start/end times; calendar picker for sleeping dates.
+
+- Phase 9 enforcement (PC-46): admin-configurable proposed TTL, at-risk TTL, archive grace, and redraft deadline; proposed expiration, auto-archive after event end, centralized enforcement runner; overlap acknowledge/decline flow for voters.
+
+### Fixed
+
+- PC-52: First-login onboarding wizard now saves avatar/theme via a dedicated server action (timezone defaults to UTC).
+- PC-50: Relationship proposal cards no longer say "with you" when the partnership is between two other named members.
+
+### Fixed
+
+- PC-49: Poll matrix time slots show label and date/time on separate lines; proposal detail dialog scrolls to reach All responses.
+
+- Draft proposal submit now surfaces schedule conflicts in a confirmation dialog and at the top of the draft card (PC-47).
+- People & Places: Add place uses a dialog button matching Add person (PC-47).
+- Admin sections collapse by default with chevron expand/collapse; Logins column removed from user management (PC-47).
+- Phase 7 post-resolution (PC-45): required attendee removal with notifications, redraft T−24h auto-repropose, overlap warnings for voters.
+- Phase 2 profile completion (PC-45): quiet hours, alert-type toggles, custom avatar upload with API route.
+- Phase 8 admin completion (PC-45): pause/delete user proposal workflow, audit log visibility tiers, group name change proposals.
+- Phase 5 notifications (PC-43): Web Push subscription storage and service worker handler; actionable inbox (partnership accept/decline, proposal links); notification email with verification token; email delivery queue stub in activity log.
+- Relationship proposals surface on Proposals Kanban with dedicated dialog; partnership actions send inbox notifications.
+- Solo event toggle on event drafts; Submit button visible immediately after first draft save.
+- Calendar blocks show time and participant names (privacy-masked when required); schedule week anchor always opens on current week.
+- Sleeping drafts use date-only fields; location autocomplete with direct + sleeping-network places and custom text; schedule re-draft opens draft editor.
+
+### Fixed
+
+- Sleeping partnership proposals visible on Proposals tab (not only People & Places).
+- Proposal draft dialog scrolls on small screens.
+- Schedule localStorage no longer restores a stale week anchor.
+- Re-draft from schedule/calendar opens the proposal draft dialog instead of leaving detail view only.
+
+### Added
+
+- Phase 4 close-out (PC-40): resolution collision engine auto-declines overlapping pending proposals into proposer review; notification inbox in app header; per-bedroom picker on sleeping drafts; schema v10 (`notification_dismissals`).
+- Phase 6 schedule (PC-42): weekly/two-week calendar views, color-coded events, network filters, planning mode drawer, proposal detail from calendar blocks.
+
 - Phase 1 foundation: demo proposals Kanban seed (all workflow columns), admin test DB reset, profile password change with first-login enforcement, avatar and accent theme preferences.
 - Phase 2 People & Places: user provisioning with clipboard credentials, sleeping partnership graph, place CRUD with residency proposals.
 - Credentials auth (Auth.js) with persistent JWT sessions in HttpOnly cookies.

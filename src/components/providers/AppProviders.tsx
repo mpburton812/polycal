@@ -4,6 +4,8 @@ import CssBaseline from "@mui/material/CssBaseline";
 import { ThemeProvider } from "@mui/material/styles";
 
 import { AuthSessionProvider } from "@/components/providers/AuthSessionProvider";
+import { DatePickerProvider } from "@/components/providers/DatePickerProvider";
+import { ToastProvider } from "@/components/providers/ToastProvider";
 import { ThemeRegistry } from "@/components/providers/ThemeRegistry";
 import { polycalTheme } from "@/theme/theme";
 
@@ -13,7 +15,11 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
     <ThemeRegistry>
       <ThemeProvider theme={polycalTheme}>
         <CssBaseline />
-        <AuthSessionProvider>{children}</AuthSessionProvider>
+        <DatePickerProvider>
+          <ToastProvider>
+            <AuthSessionProvider>{children}</AuthSessionProvider>
+          </ToastProvider>
+        </DatePickerProvider>
       </ThemeProvider>
     </ThemeRegistry>
   );

@@ -3,6 +3,7 @@ import {
   integer,
   sqliteTable,
   text,
+  unique,
 } from "drizzle-orm/sqlite-core";
 
 import {
@@ -38,6 +39,16 @@ export const users = sqliteTable("users", {
   theme: text("theme").notNull().default("mint"),
   loginCount: integer("login_count").notNull().default(0),
   lastLoginAt: text("last_login_at"),
+  gender: text("gender"),
+  notificationEmail: text("notification_email"),
+  emailVerifiedAt: text("email_verified_at"),
+  emailVerificationToken: text("email_verification_token"),
+  notificationPrefsJson: text("notification_prefs_json"),
+  /** IANA timezone for schedule display normalization (PC-48 / spec §10). */
+  timezone: text("timezone").notNull().default("UTC"),
+  onboardingComplete: integer("onboarding_complete", { mode: "boolean" }).notNull().default(true),
+  sessionVersion: integer("session_version").notNull().default(0),
+  activatedFromPassiveAt: text("activated_from_passive_at"),
   createdAt: text("created_at").notNull(),
   updatedAt: text("updated_at").notNull(),
 });
@@ -49,6 +60,34 @@ export const polyGroup = sqliteTable("poly_group", {
   allowUserProvisioning: integer("allow_user_provisioning", { mode: "boolean" })
     .notNull()
     .default(false),
+  allowGroupNameProposals: integer("allow_group_name_proposals", { mode: "boolean" })
+    .notNull()
+    .default(false),
+  groupNameChangeMode: text("group_name_change_mode").notNull().default("admin_only"),
+  powerManagementMode: text("power_management_mode").notNull().default("admin_user"),
+  roleSnapshotsJson: text("role_snapshots_json"),
+  eventPrivacyOpen: integer("event_privacy_open", { mode: "boolean" }).notNull().default(true),
+  eventPrivacyPrivate: integer("event_privacy_private", { mode: "boolean" }).notNull().default(true),
+  eventPrivacySuperPrivate: integer("event_privacy_super_private", { mode: "boolean" })
+    .notNull()
+    .default(true),
+  adminCanSeePrivate: integer("admin_can_see_private", { mode: "boolean" }).notNull().default(false),
+  adminCanSeeSuperPrivate: integer("admin_can_see_super_private", { mode: "boolean" })
+    .notNull()
+    .default(false),
+  auditLogVisibility: text("audit_log_visibility").notNull().default("admin_only"),
+  hideSleepingArrangements: integer("hide_sleeping_arrangements", { mode: "boolean" })
+    .notNull()
+    .default(false),
+  logTailLength: integer("log_tail_length").notNull().default(100),
+  onboardingWelcomeMessage: text("onboarding_welcome_message"),
+  /** Hours in proposed before auto-expire; 0 = expire only when event start passes (PC-46). */
+  proposedMaxHours: integer("proposed_max_hours").notNull().default(0),
+  atRiskTtlHours: integer("at_risk_ttl_hours").notNull().default(168),
+  archiveGraceHours: integer("archive_grace_hours").notNull().default(24),
+  redraftDeadlineHours: integer("redraft_deadline_hours").notNull().default(24),
+  /** Hours to hold resolved calendar blocks when required invitees drop to zero (PC-53). */
+  recoveryMaxHours: integer("recovery_max_hours").notNull().default(48),
   updatedAt: text("updated_at").notNull(),
 });
 
@@ -74,6 +113,7 @@ export const userActivityLog = sqliteTable("user_activity_log", {
   userId: text("user_id").references(() => users.id),
   action: text("action").notNull(),
   details: text("details"),
+  eventType: text("event_type").notNull().default("user"),
   createdAt: text("created_at").notNull(),
 });
 
@@ -97,8 +137,23 @@ export type ProposalState = (typeof proposalStates)[number];
 export const proposalTypes = ["event", "sleeping"] as const;
 export type ProposalType = (typeof proposalTypes)[number];
 
+export const inviteeRoles = ["required", "optional"] as const;
+export type InviteeRole = (typeof inviteeRoles)[number];
+
+export const inviteeVoteStatuses = [
+  "not_seen",
+  "accept",
+  "abstain",
+  "decline",
+  "accept_suboptimal",
+] as const;
+export type InviteeVoteStatus = (typeof inviteeVoteStatuses)[number];
+
+export const eventPrivacyLevels = ["open", "private", "super_private"] as const;
+export type EventPrivacyLevel = (typeof eventPrivacyLevels)[number];
+
 /**
- * Proposal records for Kanban — full workflow logic arrives in later phases.
+ * Proposal records for Kanban workflow (PC-40).
  */
 export const proposals = sqliteTable("proposals", {
   id: text("id").primaryKey(),
@@ -110,10 +165,146 @@ export const proposals = sqliteTable("proposals", {
     .notNull()
     .references(() => users.id),
   locationId: text("location_id").references(() => locations.id),
+  /** Free-text location when no registered place is selected (PC-43). */
+  locationText: text("location_text"),
+  scheduledStartAt: text("scheduled_start_at"),
+  scheduledEndAt: text("scheduled_end_at"),
+  intentionalSolo: integer("intentional_solo", { mode: "boolean" }).notNull().default(false),
+  eventPrivacy: text("event_privacy", { enum: eventPrivacyLevels }).notNull().default("open"),
+  isPoll: integer("is_poll", { mode: "boolean" }).notNull().default(false),
+  atRisk: integer("at_risk", { mode: "boolean" }).notNull().default(false),
+  atRiskExpiresAt: text("at_risk_expires_at"),
+  /** When set on resolved proposals, calendar hold until invitees/solo are restored (PC-53). */
+  pendingRecoveryUntil: text("pending_recovery_until"),
+  parentProposalId: text("parent_proposal_id"),
+  /** JSON recurrence pattern: daily|weekly|monthly|yearly, interval, count (2–52). */
+  recurrenceRule: text("recurrence_rule"),
+  occurrenceIndex: integer("occurrence_index"),
+  isRecurrenceParent: integer("is_recurrence_parent", { mode: "boolean" })
+    .notNull()
+    .default(false),
+  /** Place bedroom index for sleeping proposals (MVP place-level lock when unset). */
+  bedroomIndex: integer("bedroom_index"),
+  batchGroupId: text("batch_group_id"),
+  winningSlotId: text("winning_slot_id"),
   notes: text("notes"),
   createdAt: text("created_at").notNull(),
   updatedAt: text("updated_at").notNull(),
 });
+
+/** Users invited to a proposal — voting queue and notifications (PC-40). */
+export const proposalInvitees = sqliteTable(
+  "proposal_invitees",
+  {
+    id: text("id").primaryKey(),
+    proposalId: text("proposal_id")
+      .notNull()
+      .references(() => proposals.id),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id),
+    role: text("role", { enum: inviteeRoles }).notNull().default("required"),
+    voteStatus: text("vote_status", { enum: inviteeVoteStatuses })
+      .notNull()
+      .default("not_seen"),
+    respondedAt: text("responded_at"),
+    overlapAcknowledgedAt: text("overlap_acknowledged_at"),
+    createdAt: text("created_at").notNull(),
+  },
+  (table) => [unique().on(table.proposalId, table.userId)],
+);
+
+/** Poll or single-slot scheduling options attached to a draft/proposed item. */
+export const proposalTimeSlots = sqliteTable("proposal_time_slots", {
+  id: text("id").primaryKey(),
+  proposalId: text("proposal_id")
+    .notNull()
+    .references(() => proposals.id),
+  startAt: text("start_at").notNull(),
+  endAt: text("end_at"),
+  label: text("label"),
+  sortOrder: integer("sort_order").notNull().default(0),
+  createdAt: text("created_at").notNull(),
+});
+
+/** Per-slot poll votes — matrix voting for multi-slot polls (PC-40). */
+export const proposalSlotVotes = sqliteTable(
+  "proposal_slot_votes",
+  {
+    id: text("id").primaryKey(),
+    proposalId: text("proposal_id")
+      .notNull()
+      .references(() => proposals.id),
+    timeSlotId: text("time_slot_id")
+      .notNull()
+      .references(() => proposalTimeSlots.id),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id),
+    voteStatus: text("vote_status", { enum: inviteeVoteStatuses })
+      .notNull()
+      .default("not_seen"),
+    respondedAt: text("responded_at"),
+    createdAt: text("created_at").notNull(),
+  },
+  (table) => [unique().on(table.timeSlotId, table.userId)],
+);
+
+/** Immutable proposal state transition audit trail (PC-40). */
+export const proposalStateLog = sqliteTable("proposal_state_log", {
+  id: text("id").primaryKey(),
+  proposalId: text("proposal_id")
+    .notNull()
+    .references(() => proposals.id),
+  actorUserId: text("actor_user_id").references(() => users.id),
+  action: text("action").notNull(),
+  details: text("details"),
+  createdAt: text("created_at").notNull(),
+});
+
+/** Threaded discussion on a proposal (PC-40). */
+export const proposalComments = sqliteTable("proposal_comments", {
+  id: text("id").primaryKey(),
+  proposalId: text("proposal_id")
+    .notNull()
+    .references(() => proposals.id),
+  authorId: text("author_id")
+    .notNull()
+    .references(() => users.id),
+  body: text("body").notNull(),
+  createdAt: text("created_at").notNull(),
+});
+
+/** Tracks per-user dismissal of system notifications in the activity log (PC-40). */
+export const notificationDismissals = sqliteTable(
+  "notification_dismissals",
+  {
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id),
+    logId: integer("log_id")
+      .notNull()
+      .references(() => userActivityLog.id),
+    dismissedAt: text("dismissed_at").notNull(),
+  },
+  (table) => [unique().on(table.userId, table.logId)],
+);
+
+/** Web Push subscription endpoints per user device (PC-43 Phase 5). */
+export const pushSubscriptions = sqliteTable(
+  "push_subscriptions",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id),
+    endpoint: text("endpoint").notNull().unique(),
+    p256dh: text("p256dh").notNull(),
+    auth: text("auth").notNull(),
+    createdAt: text("created_at").notNull(),
+    updatedAt: text("updated_at").notNull(),
+  },
+);
 
 /** Undirected sleeping partnership edge with proposal workflow (PC-36). */
 export const sleepingPartnerships = sqliteTable("sleeping_partnerships", {
@@ -128,9 +319,14 @@ export const sleepingPartnerships = sqliteTable("sleeping_partnerships", {
   proposedById: text("proposed_by_id")
     .notNull()
     .references(() => users.id),
+  /** Admin or proxy user who submitted on behalf of proposedById (PC-50). */
+  initiatedByUserId: text("initiated_by_user_id").references(() => users.id),
   createdAt: text("created_at").notNull(),
   updatedAt: text("updated_at").notNull(),
   respondedAt: text("responded_at"),
+  passiveAutoAccepted: integer("passive_auto_accepted", { mode: "boolean" })
+    .notNull()
+    .default(false),
 });
 
 /** User residency at a place — active users must accept (PC-37). */
@@ -159,6 +355,13 @@ export const schema = {
   storedImages,
   schemaMeta,
   proposals,
+  proposalInvitees,
+  proposalSlotVotes,
+  proposalTimeSlots,
+  proposalStateLog,
+  proposalComments,
+  notificationDismissals,
+  pushSubscriptions,
   sleepingPartnerships,
   locationResidents,
 };

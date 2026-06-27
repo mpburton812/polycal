@@ -2,11 +2,13 @@ import { Typography } from "@mui/material";
 import { eq } from "drizzle-orm";
 import { redirect } from "next/navigation";
 
+import { getNotificationEmailAction, getNotificationPrefsAction } from "@/actions/profile";
 import { ProfileSettings } from "@/components/profile/ProfileSettings";
 import { auth } from "@/lib/auth";
 import { getDb } from "@/lib/db/client";
 import { ensureDbReady } from "@/lib/db/ensure-ready";
 import { users } from "@/lib/db/schema";
+import { resolveTimezone } from "@/lib/schedule/timezone";
 
 export default async function ProfilePage() {
   const session = await auth();
@@ -20,11 +22,16 @@ export default async function ProfilePage() {
     .select({
       avatarKey: users.avatarKey,
       theme: users.theme,
+      timezone: users.timezone,
       mustChangePassword: users.mustChangePassword,
+      displayName: users.displayName,
     })
     .from(users)
     .where(eq(users.id, session.user.id))
     .limit(1);
+
+  const notificationPrefs = await getNotificationPrefsAction();
+  const notificationEmail = await getNotificationEmailAction();
 
   return (
     <>
@@ -35,8 +42,13 @@ export default async function ProfilePage() {
         Signed in as <strong>{session.user.displayName}</strong> ({session.user.role})
       </Typography>
       <ProfileSettings
+        initialDisplayName={row?.displayName ?? session.user.displayName}
         initialAvatarKey={row?.avatarKey ?? null}
         initialTheme={row?.theme ?? "mint"}
+        initialTimezone={resolveTimezone(row?.timezone)}
+        initialNotificationPrefs={notificationPrefs}
+        initialNotificationEmail={notificationEmail.email}
+        initialEmailVerified={notificationEmail.verified}
         mustChangePassword={row?.mustChangePassword ?? false}
       />
     </>

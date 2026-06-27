@@ -24,9 +24,9 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState, useTransition } from "react";
 
 import {
+  checkUsernameAvailableAction,
   createActiveUserAction,
   createPassiveUserAction,
-  checkUsernameAvailableAction,
   updateProvisionedUsernameAction,
   type PersonSummary,
 } from "@/actions/users";
@@ -40,13 +40,16 @@ import {
 import {
   createPlaceAction,
   deletePlaceAction,
+  getPlaceDeleteImpactAction,
   listResidentsForPlaceAction,
   proposeResidencyAction,
   respondResidencyAction,
   updatePlaceAction,
+  type PlaceDeleteImpact,
   type PlaceSummary,
   type ResidentView,
 } from "@/actions/places";
+import { AdminCollapsibleSection } from "@/components/admin/AdminCollapsibleSection";
 import { AVATAR_OPTIONS, avatarSrcForKey } from "@/lib/constants/avatars";
 
 interface PeoplePlacesClientProps {
@@ -64,6 +67,20 @@ function PersonAvatar({ avatarKey, name }: { avatarKey: string | null; name: str
 
 function normalizePlaceName(name: string): string {
   return name.trim().toLowerCase();
+}
+
+/** Keeps bedroom label array aligned with count, preserving user-entered names. */
+function syncBedroomNames(count: number, existing: string[]): string[] {
+  const safeCount = Math.max(0, Math.min(20, count));
+  return Array.from({ length: safeCount }, (_, index) => {
+    const value = existing[index]?.trim();
+    return value || `Bedroom ${index + 1}`;
+  });
+}
+
+function bedroomLabelsForForm(count: number, existing: string[]): string[] {
+  const safeCount = Math.max(0, Math.min(20, count));
+  return Array.from({ length: safeCount }, (_, index) => existing[index] ?? "");
 }
 
 function residentStatusColor(status: string): "success" | "warning" | "default" {
@@ -96,7 +113,11 @@ function CreateUserDialog({
   }>({ checked: false, available: false, message: "" });
   const [createdUserId, setCreatedUserId] = useState<string | null>(null);
   const [temporaryPassword, setTemporaryPassword] = useState<string | null>(null);
+  const [creationComplete, setCreationComplete] = useState(false);
   const [pending, startTransition] = useTransition();
+
+  const showActiveCredentials = mode === "active" && Boolean(instructions);
+  const formLocked = creationComplete || showActiveCredentials;
 
   if (!canProvision) return null;
 
@@ -109,6 +130,7 @@ function CreateUserDialog({
     setUsernameStatus({ checked: false, available: false, message: "" });
     setCreatedUserId(null);
     setTemporaryPassword(null);
+    setCreationComplete(false);
   }
 
   function handleClose() {
@@ -153,6 +175,10 @@ function CreateUserDialog({
   }
 
   function handleSubmit() {
+    if (creationComplete || showActiveCredentials) {
+      return;
+    }
+
     if (mode === "active" && (!usernameStatus.checked || !usernameStatus.available)) {
       setMessage("Check username availability before creating the account.");
       return;
@@ -170,6 +196,7 @@ function CreateUserDialog({
         setTemporaryPassword(result.temporaryPassword ?? null);
       }
       if (result.ok) {
+        setCreationComplete(true);
         router.refresh();
       }
     });
@@ -189,6 +216,7 @@ function CreateUserDialog({
           <Tabs
             value={mode}
             onChange={(_, value) => {
+              if (formLocked) return;
               setMode(value);
               if (value === "passive") {
                 setInstructions(null);
@@ -211,6 +239,7 @@ function CreateUserDialog({
               onBlur={() => checkUsername()}
               required
               fullWidth
+              disabled={formLocked}
               error={usernameStatus.checked && !usernameStatus.available}
               helperText={
                 usernameStatus.checked
@@ -225,9 +254,10 @@ function CreateUserDialog({
             onChange={(event) => setDisplayName(event.target.value)}
             required
             fullWidth
+            disabled={formLocked}
           />
           {mode === "active" && (
-            <FormControl fullWidth>
+            <FormControl fullWidth disabled={formLocked}>
               <InputLabel id="create-user-role">Role</InputLabel>
               <Select
                 labelId="create-user-role"
@@ -240,7 +270,7 @@ function CreateUserDialog({
               </Select>
             </FormControl>
           )}
-          <FormControl fullWidth>
+          <FormControl fullWidth disabled={formLocked}>
             <InputLabel id="create-user-avatar">Avatar</InputLabel>
             <Select
               labelId="create-user-avatar"
@@ -269,13 +299,31 @@ function CreateUserDialog({
         </Stack>
       </DialogContent>
       <DialogActions>
-        {mode === "active" && instructions && (
-          <Button onClick={() => void copyInstructions()}>Copy instructions</Button>
+        {showActiveCredentials ? (
+          <>
+            <Button onClick={() => void copyInstructions()}>Copy instructions</Button>
+            <Button variant="contained" onClick={handleClose}>
+              Close
+            </Button>
+          </>
+        ) : creationComplete ? (
+          <Button variant="contained" onClick={handleClose}>
+            Close
+          </Button>
+        ) : (
+          <>
+            <Button onClick={handleClose}>Cancel</Button>
+            <Button
+              variant="contained"
+              onClick={handleSubmit}
+              disabled={
+                pending || (mode === "active" && (!usernameStatus.checked || !usernameStatus.available))
+              }
+            >
+              Create
+            </Button>
+          </>
         )}
-        <Button onClick={handleClose}>Close</Button>
-        <Button variant="contained" onClick={handleSubmit} disabled={pending || (mode === "active" && (!usernameStatus.checked || !usernameStatus.available))}>
-          Create
-        </Button>
       </DialogActions>
     </Dialog>
   );
@@ -294,10 +342,12 @@ function PersonDetail({
 }) {
   const router = useRouter();
   const [partnerships, setPartnerships] = useState<PartnershipView[]>([]);
-  const [loaded, setLoaded] = useState(false);
+  const [partnershipsLoading, setPartnershipsLoading] = useState(false);
   const [partnerTarget, setPartnerTarget] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+
+  const canViewPartnerships = isAdmin || person.id === currentUserId;
 
   const candidates = useMemo(
     () => people.filter((row) => row.id !== person.id),
@@ -305,125 +355,145 @@ function PersonDetail({
   );
 
   function loadPartnerships() {
+    setPartnershipsLoading(true);
     startTransition(async () => {
       const rows = await listPartnershipsForUserAction(person.id);
       setPartnerships(rows);
-      setLoaded(true);
+      setPartnershipsLoading(false);
     });
   }
 
-  if (!loaded) {
-    return (
-      <Button size="small" onClick={loadPartnerships} sx={{ mt: 1 }}>
-        Load sleeping partners
-      </Button>
-    );
-  }
+  useEffect(() => {
+    if (canViewPartnerships) {
+      loadPartnerships();
+    } else {
+      setPartnerships([]);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reload when selected person changes
+  }, [person.id, canViewPartnerships]);
 
   return (
-    <Stack spacing={1.5} sx={{ mt: 2 }}>
-      <Typography variant="subtitle2">Sleeping partners</Typography>
-      {partnerships.length === 0 && (
-        <Typography variant="body2" color="text.secondary">
-          No partnerships yet.
-        </Typography>
-      )}
-      {partnerships.map((row) => (
-        <Stack key={row.id} direction="row" spacing={1} alignItems="center">
-          <Chip size="small" label={row.status} color={row.status === "accepted" ? "success" : "warning"} />
-          <Typography variant="body2">{row.partnerName}</Typography>
-          {row.isIncoming && (
-            <>
+    <Stack spacing={1.5} sx={{ mt: 2 }} onClick={(event) => event.stopPropagation()}>
+      {canViewPartnerships && (
+        <>
+          <Typography variant="subtitle2">Sleeping partners</Typography>
+          <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1 }}>
+            Pending relationship proposals also appear on the Proposals tab.
+          </Typography>
+          {partnershipsLoading && (
+            <Typography variant="body2" color="text.secondary">
+              Loading…
+            </Typography>
+          )}
+          {!partnershipsLoading && partnerships.length === 0 && (
+            <Typography variant="body2" color="text.secondary">
+              No partnerships yet.
+            </Typography>
+          )}
+          {partnerships.map((row) => (
+            <Stack key={row.id} direction="row" spacing={1} alignItems="center">
+              <Chip
+                size="small"
+                label={row.status}
+                color={row.status === "accepted" ? "success" : "warning"}
+              />
+              <Typography variant="body2">{row.partnerName}</Typography>
+              {row.isIncoming && person.id === currentUserId && (
+                <>
+                  <Button
+                    size="small"
+                    onClick={() =>
+                      startTransition(async () => {
+                        const result = await respondPartnershipAction({
+                          partnershipId: row.id,
+                          accept: true,
+                        });
+                        setMessage(result.message);
+                        loadPartnerships();
+                        router.refresh();
+                      })
+                    }
+                  >
+                    Accept
+                  </Button>
+                  <Button
+                    size="small"
+                    color="inherit"
+                    onClick={() =>
+                      startTransition(async () => {
+                        const result = await respondPartnershipAction({
+                          partnershipId: row.id,
+                          accept: false,
+                        });
+                        setMessage(result.message);
+                        loadPartnerships();
+                        router.refresh();
+                      })
+                    }
+                  >
+                    Decline
+                  </Button>
+                </>
+              )}
+              {row.status === "accepted" && (person.id === currentUserId || isAdmin) && (
+                <Button
+                  size="small"
+                  color="error"
+                  onClick={() =>
+                    startTransition(async () => {
+                      const result = await removePartnershipAction(row.id);
+                      setMessage(result.message);
+                      loadPartnerships();
+                      router.refresh();
+                    })
+                  }
+                >
+                  Remove
+                </Button>
+              )}
+            </Stack>
+          ))}
+          {(person.id === currentUserId || isAdmin) && person.role !== "passive" && (
+            <Stack direction="row" spacing={1} alignItems="center">
+              <FormControl size="small" sx={{ minWidth: 180 }}>
+                <InputLabel id={`partner-${person.id}`}>Propose partner</InputLabel>
+                <Select
+                  labelId={`partner-${person.id}`}
+                  label="Propose partner"
+                  value={partnerTarget}
+                  onChange={(event) => setPartnerTarget(event.target.value)}
+                  onClick={(event) => event.stopPropagation()}
+                  MenuProps={{ disablePortal: false }}
+                >
+                  {candidates.map((row) => (
+                    <MenuItem key={row.id} value={row.id}>
+                      {row.displayName}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
               <Button
                 size="small"
+                variant="outlined"
+                disabled={!partnerTarget || pending}
                 onClick={() =>
                   startTransition(async () => {
-                    const result = await respondPartnershipAction({
-                      partnershipId: row.id,
-                      accept: true,
-                    });
+                    const result = await proposePartnershipAction(
+                      partnerTarget,
+                      person.id !== currentUserId ? person.id : undefined,
+                    );
                     setMessage(result.message);
+                    setPartnerTarget("");
                     loadPartnerships();
                     router.refresh();
                   })
                 }
               >
-                Accept
+                Propose
               </Button>
-              <Button
-                size="small"
-                color="inherit"
-                onClick={() =>
-                  startTransition(async () => {
-                    const result = await respondPartnershipAction({
-                      partnershipId: row.id,
-                      accept: false,
-                    });
-                    setMessage(result.message);
-                    loadPartnerships();
-                    router.refresh();
-                  })
-                }
-              >
-                Decline
-              </Button>
-            </>
+            </Stack>
           )}
-          {(row.status === "accepted" && (person.id === currentUserId || isAdmin)) && (
-            <Button
-              size="small"
-              color="error"
-              onClick={() =>
-                startTransition(async () => {
-                  const result = await removePartnershipAction(row.id);
-                  setMessage(result.message);
-                  loadPartnerships();
-                  router.refresh();
-                })
-              }
-            >
-              Remove
-            </Button>
-          )}
-        </Stack>
-      ))}
-      {(person.id === currentUserId || isAdmin) && person.role !== "passive" && (
-        <Stack direction="row" spacing={1} alignItems="center">
-          <FormControl size="small" sx={{ minWidth: 180 }}>
-            <InputLabel id={`partner-${person.id}`}>Propose partner</InputLabel>
-            <Select
-              labelId={`partner-${person.id}`}
-              label="Propose partner"
-              value={partnerTarget}
-              onChange={(event) => setPartnerTarget(event.target.value)}
-            >
-              {candidates.map((row) => (
-                <MenuItem key={row.id} value={row.id}>
-                  {row.displayName}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-          <Button
-            size="small"
-            variant="outlined"
-            disabled={!partnerTarget || pending}
-            onClick={() =>
-              startTransition(async () => {
-                const result = await proposePartnershipAction(
-                  partnerTarget,
-                  person.id !== currentUserId ? person.id : undefined,
-                );
-                setMessage(result.message);
-                setPartnerTarget("");
-                loadPartnerships();
-                router.refresh();
-              })
-            }
-          >
-            Propose
-          </Button>
-        </Stack>
+        </>
       )}
       {message && <Alert severity="info">{message}</Alert>}
     </Stack>
@@ -453,14 +523,27 @@ function PlaceDetail({
   const [editName, setEditName] = useState(place.name);
   const [editAddress, setEditAddress] = useState(place.address ?? "");
   const [editBedroomCount, setEditBedroomCount] = useState(place.bedroomCount);
+  const [editBedroomLabels, setEditBedroomLabels] = useState<string[]>(
+    bedroomLabelsForForm(place.bedroomCount, place.bedroomNames),
+  );
   const [editNameWarning, setEditNameWarning] = useState<string | null>(null);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteImpact, setDeleteImpact] = useState<PlaceDeleteImpact | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+
+  const isResident = residents.some(
+    (row) => row.userId === currentUserId && row.status === "accepted",
+  );
+  const canEditPlace = isAdmin || place.createdById === currentUserId || isResident;
+  const canDeletePlace = isAdmin || isResident || place.createdById === currentUserId;
 
   useEffect(() => {
     setResidents(place.residents);
     setEditName(place.name);
     setEditAddress(place.address ?? "");
     setEditBedroomCount(place.bedroomCount);
+    setEditBedroomLabels(bedroomLabelsForForm(place.bedroomCount, place.bedroomNames));
   }, [place]);
 
   function refreshResidents() {
@@ -481,9 +564,38 @@ function PlaceDetail({
     return !taken;
   }
 
+  function openDeleteDialog() {
+    setDeleteError(null);
+    startTransition(async () => {
+      const result = await getPlaceDeleteImpactAction(place.id);
+      if (!result.ok || !result.impact) {
+        setDeleteError(result.message);
+        return;
+      }
+      setDeleteImpact(result.impact);
+      setDeleteOpen(true);
+    });
+  }
+
+  function confirmDeletePlace() {
+    setDeleteError(null);
+    startTransition(async () => {
+      const result = await deletePlaceAction(place.id);
+      if (!result.ok) {
+        setDeleteError(result.message);
+        return;
+      }
+      setDeleteOpen(false);
+      setDeleteImpact(null);
+      setMessage(result.message);
+      onPlaceUpdated();
+      router.refresh();
+    });
+  }
+
   return (
     <Stack spacing={1} sx={{ mt: 1 }}>
-      {isAdmin && (
+      {canEditPlace && (
         <Stack direction="row" spacing={1}>
           <Button
             size="small"
@@ -492,32 +604,26 @@ function PlaceDetail({
               setEditName(place.name);
               setEditAddress(place.address ?? "");
               setEditBedroomCount(place.bedroomCount);
+              setEditBedroomLabels(
+                bedroomLabelsForForm(place.bedroomCount, place.bedroomNames),
+              );
               setEditNameWarning(null);
               setEditOpen(true);
             }}
           >
             Edit place
           </Button>
-          <Button
-            size="small"
-            color="error"
-            onClick={() =>
-              startTransition(async () => {
-                if (!window.confirm(`Delete ${place.name}? This cannot be undone.`)) {
-                  return;
-                }
-                const result = await deletePlaceAction(place.id);
-                setMessage(result.message);
-                if (result.ok) {
-                  onPlaceUpdated();
-                  router.refresh();
-                }
-              })
-            }
-          >
-            Delete place
-          </Button>
+          {canDeletePlace && (
+            <Button size="small" color="error" onClick={openDeleteDialog} disabled={pending}>
+              Delete place
+            </Button>
+          )}
         </Stack>
+      )}
+      {!canEditPlace && canDeletePlace && (
+        <Button size="small" color="error" onClick={openDeleteDialog} disabled={pending}>
+          Delete place
+        </Button>
       )}
       {place.bedroomNames.length > 0 && (
         <Typography variant="caption" color="text.secondary">
@@ -572,39 +678,46 @@ function PlaceDetail({
           )}
         </Stack>
       ))}
-      <Stack direction="row" spacing={1} alignItems="center">
-        <FormControl size="small" sx={{ minWidth: 180 }}>
-          <InputLabel id={`resident-${place.id}`}>Add resident</InputLabel>
-          <Select
-            labelId={`resident-${place.id}`}
-            label="Add resident"
-            value={targetUserId}
-            onChange={(event) => setTargetUserId(event.target.value)}
+      {isAdmin && (
+        <Stack direction="row" spacing={1} alignItems="center">
+          <FormControl size="small" sx={{ minWidth: 180 }}>
+            <InputLabel id={`resident-${place.id}`}>Add resident</InputLabel>
+            <Select
+              labelId={`resident-${place.id}`}
+              label="Add resident"
+              value={targetUserId}
+              onChange={(event) => setTargetUserId(event.target.value)}
+            >
+              {people.map((row) => (
+                <MenuItem key={row.id} value={row.id}>
+                  {row.displayName}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+          <Button
+            size="small"
+            variant="outlined"
+            disabled={!targetUserId || pending}
+            onClick={() =>
+              startTransition(async () => {
+                const result = await proposeResidencyAction(place.id, targetUserId);
+                setMessage(result.message);
+                setTargetUserId("");
+                refreshResidents();
+                router.refresh();
+              })
+            }
           >
-            {people.map((row) => (
-              <MenuItem key={row.id} value={row.id}>
-                {row.displayName}
-              </MenuItem>
-            ))}
-          </Select>
-        </FormControl>
-        <Button
-          size="small"
-          variant="outlined"
-          disabled={!targetUserId || pending}
-          onClick={() =>
-            startTransition(async () => {
-              const result = await proposeResidencyAction(place.id, targetUserId);
-              setMessage(result.message);
-              setTargetUserId("");
-              refreshResidents();
-              router.refresh();
-            })
-          }
-        >
-          Associate
-        </Button>
-      </Stack>
+            Associate
+          </Button>
+        </Stack>
+      )}
+      {!isAdmin && isResident && (
+        <Typography variant="caption" color="text.secondary">
+          You are associated with this place.
+        </Typography>
+      )}
       {message && <Alert severity="info">{message}</Alert>}
 
       <Dialog open={editOpen} onClose={() => setEditOpen(false)} fullWidth maxWidth="sm">
@@ -633,10 +746,33 @@ function PlaceDetail({
               label="Bedrooms"
               type="number"
               value={editBedroomCount}
-              onChange={(event) => setEditBedroomCount(Number(event.target.value))}
+              onChange={(event) => {
+                const count = Number(event.target.value);
+                setEditBedroomCount(count);
+                setEditBedroomLabels((current) => syncBedroomNames(count, current));
+              }}
               inputProps={{ min: 0, max: 20 }}
               fullWidth
             />
+            {editBedroomCount > 0 && (
+              <Stack spacing={1}>
+                <Typography variant="subtitle2">Bedroom names (optional)</Typography>
+                {editBedroomLabels.map((label, index) => (
+                  <TextField
+                    key={`edit-bedroom-${index}`}
+                    label={`Bedroom ${index + 1} name`}
+                    value={label}
+                    placeholder={`Bedroom ${index + 1}`}
+                    onChange={(event) => {
+                      const next = [...editBedroomLabels];
+                      next[index] = event.target.value;
+                      setEditBedroomLabels(next);
+                    }}
+                    fullWidth
+                  />
+                ))}
+              </Stack>
+            )}
           </Stack>
         </DialogContent>
         <DialogActions>
@@ -652,6 +788,7 @@ function PlaceDetail({
                   name: editName,
                   address: editAddress || undefined,
                   bedroomCount: editBedroomCount,
+                  bedroomNames: syncBedroomNames(editBedroomCount, editBedroomLabels),
                 });
                 setMessage(result.message);
                 if (result.ok) {
@@ -666,7 +803,183 @@ function PlaceDetail({
           </Button>
         </DialogActions>
       </Dialog>
+
+      <Dialog open={deleteOpen} onClose={() => setDeleteOpen(false)} fullWidth maxWidth="sm">
+        <DialogTitle>Delete {deleteImpact?.placeName ?? place.name}?</DialogTitle>
+        <DialogContent>
+          <Stack spacing={2} sx={{ mt: 1 }}>
+            <Typography>
+              This cannot be undone. The place will be removed from the list.
+            </Typography>
+            {deleteImpact && deleteImpact.affectedProposalCount > 0 && (
+              <Alert severity="warning">
+                {deleteImpact.activeProposalCount > 0 && (
+                  <Typography variant="body2">
+                    {deleteImpact.activeProposalCount} active proposal
+                    {deleteImpact.activeProposalCount === 1 ? "" : "s"} use this place.
+                  </Typography>
+                )}
+                {deleteImpact.scheduledEventCount > 0 && (
+                  <Typography variant="body2">
+                    {deleteImpact.scheduledEventCount} scheduled future event
+                    {deleteImpact.scheduledEventCount === 1 ? "" : "s"} use this place.
+                  </Typography>
+                )}
+                <Typography variant="body2" sx={{ mt: 1 }}>
+                  Affected proposals will move to Drafts. Proposers and invitees will be
+                  notified.
+                </Typography>
+              </Alert>
+            )}
+            {deleteImpact && deleteImpact.pendingResidencyCount > 0 && (
+              <Alert severity="info">
+                {deleteImpact.pendingResidencyCount} pending residency proposal
+                {deleteImpact.pendingResidencyCount === 1 ? "" : "s"} will be cancelled.
+              </Alert>
+            )}
+            {deleteError && <Alert severity="error">{deleteError}</Alert>}
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDeleteOpen(false)}>Cancel</Button>
+          <Button variant="contained" color="error" disabled={pending} onClick={confirmDeletePlace}>
+            Delete place
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Stack>
+  );
+}
+
+function CreatePlaceDialog({
+  open,
+  onClose,
+  existingPlaceNames,
+}: {
+  open: boolean;
+  onClose: () => void;
+  existingPlaceNames: string[];
+}) {
+  const router = useRouter();
+  const [placeName, setPlaceName] = useState("");
+  const [placeAddress, setPlaceAddress] = useState("");
+  const [bedroomCount, setBedroomCount] = useState(1);
+  const [bedroomLabels, setBedroomLabels] = useState<string[]>([""]);
+  const [placeNameWarning, setPlaceNameWarning] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+
+  function reset() {
+    setPlaceName("");
+    setPlaceAddress("");
+    setBedroomCount(1);
+    setBedroomLabels([""]);
+    setPlaceNameWarning(null);
+    setMessage(null);
+  }
+
+  function handleClose() {
+    reset();
+    onClose();
+  }
+
+  function validateNewPlaceName(name: string) {
+    const taken = existingPlaceNames.some(
+      (existing) => normalizePlaceName(existing) === normalizePlaceName(name),
+    );
+    setPlaceNameWarning(taken ? "A place with this name is already in use." : null);
+    return !taken;
+  }
+
+  function handleCreate() {
+    startTransition(async () => {
+      if (!validateNewPlaceName(placeName)) return;
+      const result = await createPlaceAction({
+        name: placeName,
+        address: placeAddress || undefined,
+        bedroomCount,
+        bedroomNames: syncBedroomNames(bedroomCount, bedroomLabels),
+      });
+      setMessage(result.message);
+      if (result.ok) {
+        router.refresh();
+        handleClose();
+      }
+    });
+  }
+
+  return (
+    <Dialog open={open} onClose={handleClose} fullWidth maxWidth="sm">
+      <DialogTitle>Add place</DialogTitle>
+      <DialogContent>
+        <Stack spacing={2} sx={{ mt: 1 }}>
+          <TextField
+            label="Home name"
+            value={placeName}
+            onChange={(event) => {
+              setPlaceName(event.target.value);
+              setPlaceNameWarning(null);
+            }}
+            onBlur={() => {
+              if (placeName.trim()) validateNewPlaceName(placeName);
+            }}
+            error={Boolean(placeNameWarning)}
+            helperText={placeNameWarning ?? undefined}
+            fullWidth
+          />
+          <TextField
+            label="Address (optional)"
+            value={placeAddress}
+            onChange={(event) => setPlaceAddress(event.target.value)}
+            fullWidth
+          />
+          <TextField
+            label="Bedrooms"
+            type="number"
+            value={bedroomCount}
+            onChange={(event) => {
+              const count = Number(event.target.value);
+              setBedroomCount(count);
+              setBedroomLabels((current) => bedroomLabelsForForm(count, current));
+            }}
+            inputProps={{ min: 0, max: 20 }}
+            fullWidth
+          />
+          {bedroomCount > 0 && (
+            <Stack spacing={1}>
+              <Typography variant="subtitle2">Bedroom names (optional)</Typography>
+              {bedroomLabels.map((label, index) => (
+                <TextField
+                  key={`new-bedroom-${index}`}
+                  label={`Bedroom ${index + 1} name`}
+                  value={label}
+                  placeholder={`Bedroom ${index + 1}`}
+                  onChange={(event) => {
+                    const next = [...bedroomLabels];
+                    next[index] = event.target.value;
+                    setBedroomLabels(next);
+                  }}
+                  fullWidth
+                />
+              ))}
+            </Stack>
+          )}
+          {message && <Alert severity={message.includes("Created") ? "success" : "info"}>{message}</Alert>}
+        </Stack>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={handleClose} color="inherit">
+          Cancel
+        </Button>
+        <Button
+          variant="contained"
+          disabled={!placeName.trim() || Boolean(placeNameWarning) || pending}
+          onClick={handleCreate}
+        >
+          Create place
+        </Button>
+      </DialogActions>
+    </Dialog>
   );
 }
 
@@ -683,24 +996,11 @@ export function PeoplePlacesClient({
   const router = useRouter();
   const [tab, setTab] = useState(0);
   const [createOpen, setCreateOpen] = useState(false);
+  const [createPlaceOpen, setCreatePlaceOpen] = useState(false);
   const [selectedPersonId, setSelectedPersonId] = useState<string | null>(null);
-  const [placeName, setPlaceName] = useState("");
-  const [placeAddress, setPlaceAddress] = useState("");
-  const [bedroomCount, setBedroomCount] = useState(1);
-  const [placeNameWarning, setPlaceNameWarning] = useState<string | null>(null);
-  const [placeMessage, setPlaceMessage] = useState<string | null>(null);
-  const [pending, startTransition] = useTransition();
 
   const selectedPerson = people.find((row) => row.id === selectedPersonId) ?? null;
   const existingPlaceNames = useMemo(() => places.map((place) => place.name), [places]);
-
-  function validateNewPlaceName(name: string) {
-    const taken = existingPlaceNames.some(
-      (existing) => normalizePlaceName(existing) === normalizePlaceName(name),
-    );
-    setPlaceNameWarning(taken ? "A place with this name is already in use." : null);
-    return !taken;
-  }
 
   return (
     <Box>
@@ -714,11 +1014,18 @@ export function PeoplePlacesClient({
             Add person
           </Button>
         )}
+        {tab === 1 && (
+          <Button variant="contained" onClick={() => setCreatePlaceOpen(true)}>
+            Add place
+          </Button>
+        )}
       </Stack>
 
       {tab === 0 && (
         <Stack spacing={1}>
-          {people.map((person) => (
+          {people.map((person) => {
+            const canExpand = isAdmin || person.id === currentUserId;
+            return (
             <Box
               key={person.id}
               sx={{
@@ -726,22 +1033,42 @@ export function PeoplePlacesClient({
                 border: 1,
                 borderColor: selectedPersonId === person.id ? "primary.main" : "divider",
                 borderRadius: 1,
-                cursor: "pointer",
               }}
-              onClick={() =>
-                setSelectedPersonId((current) => (current === person.id ? null : person.id))
-              }
             >
-              <Stack direction="row" spacing={2} alignItems="center">
+              <Stack
+                direction="row"
+                spacing={2}
+                alignItems="center"
+                role={canExpand ? "button" : undefined}
+                tabIndex={canExpand ? 0 : undefined}
+                aria-expanded={canExpand ? selectedPersonId === person.id : undefined}
+                aria-label={canExpand ? `View ${person.displayName} details` : undefined}
+                onClick={() => {
+                  if (!canExpand) return;
+                  setSelectedPersonId((current) =>
+                    current === person.id ? null : person.id,
+                  );
+                }}
+                onKeyDown={(event) => {
+                  if (!canExpand) return;
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    setSelectedPersonId((current) =>
+                      current === person.id ? null : person.id,
+                    );
+                  }
+                }}
+                sx={{ cursor: canExpand ? "pointer" : "default" }}
+              >
                 <PersonAvatar avatarKey={person.avatarKey} name={person.displayName} />
                 <Box sx={{ flex: 1 }}>
-                  <Typography fontWeight={600}>{person.displayName}</Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    @{person.username} · {person.role}
-                  </Typography>
+                  <Stack direction="row" spacing={1} alignItems="baseline">
+                    <Typography fontWeight={600}>{person.displayName}</Typography>
+                    <Chip size="small" label={person.role} variant="outlined" />
+                  </Stack>
                 </Box>
               </Stack>
-              {selectedPersonId === person.id && selectedPerson && (
+              {canExpand && selectedPersonId === person.id && selectedPerson && (
                 <PersonDetail
                   person={selectedPerson}
                   people={people}
@@ -750,79 +1077,28 @@ export function PeoplePlacesClient({
                 />
               )}
             </Box>
-          ))}
+          );
+          })}
         </Stack>
       )}
 
       {tab === 1 && (
         <Stack spacing={2}>
-          <Stack spacing={1.5} sx={{ p: 2, border: 1, borderColor: "divider", borderRadius: 1 }}>
-            <Typography variant="subtitle1">Add place</Typography>
-            <TextField
-              label="Home name"
-              value={placeName}
-              onChange={(event) => {
-                setPlaceName(event.target.value);
-                setPlaceNameWarning(null);
-              }}
-              onBlur={() => {
-                if (placeName.trim()) validateNewPlaceName(placeName);
-              }}
-              error={Boolean(placeNameWarning)}
-              helperText={placeNameWarning ?? undefined}
-              fullWidth
-            />
-            <TextField
-              label="Address (optional)"
-              value={placeAddress}
-              onChange={(event) => setPlaceAddress(event.target.value)}
-              fullWidth
-            />
-            <TextField
-              label="Bedrooms"
-              type="number"
-              value={bedroomCount}
-              onChange={(event) => setBedroomCount(Number(event.target.value))}
-              inputProps={{ min: 0, max: 20 }}
-              fullWidth
-            />
-            <Button
-              variant="contained"
-              disabled={!placeName.trim() || Boolean(placeNameWarning) || pending}
-              onClick={() =>
-                startTransition(async () => {
-                  if (!validateNewPlaceName(placeName)) return;
-                  const result = await createPlaceAction({
-                    name: placeName,
-                    address: placeAddress || undefined,
-                    bedroomCount,
-                  });
-                  setPlaceMessage(result.message);
-                  if (result.ok) {
-                    setPlaceName("");
-                    setPlaceAddress("");
-                    setPlaceNameWarning(null);
-                    router.refresh();
-                  }
-                })
+          {places.map((place) => (
+            <AdminCollapsibleSection
+              key={place.id}
+              title={place.name}
+              headerAction={
+                <Typography variant="caption" color="text.secondary" sx={{ mr: 1 }}>
+                  {place.bedroomCount} bedrooms · {place.residentCount} residents
+                </Typography>
               }
             >
-              Create place
-            </Button>
-            {placeMessage && <Alert severity="info">{placeMessage}</Alert>}
-          </Stack>
-
-          {places.map((place) => (
-            <Box key={place.id} sx={{ p: 2, border: 1, borderColor: "divider", borderRadius: 1 }}>
-              <Typography fontWeight={600}>{place.name}</Typography>
               {place.address && (
-                <Typography variant="body2" color="text.secondary">
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
                   {place.address}
                 </Typography>
               )}
-              <Typography variant="caption" color="text.secondary">
-                {place.bedroomCount} bedrooms · {place.residentCount} residents
-              </Typography>
               <PlaceDetail
                 place={place}
                 people={people}
@@ -831,7 +1107,7 @@ export function PeoplePlacesClient({
                 existingPlaceNames={existingPlaceNames}
                 onPlaceUpdated={() => router.refresh()}
               />
-            </Box>
+            </AdminCollapsibleSection>
           ))}
         </Stack>
       )}
@@ -840,6 +1116,11 @@ export function PeoplePlacesClient({
         open={createOpen}
         onClose={() => setCreateOpen(false)}
         canProvision={canProvision}
+      />
+      <CreatePlaceDialog
+        open={createPlaceOpen}
+        onClose={() => setCreatePlaceOpen(false)}
+        existingPlaceNames={existingPlaceNames}
       />
     </Box>
   );

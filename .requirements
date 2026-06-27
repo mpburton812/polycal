@@ -1,4 +1,4 @@
-# .requirements — PolyCal requirement traceability log
+﻿# .requirements â€” PolyCal requirement traceability log
 #
 # Full workflow: docs/REQUIREMENTS-WORKFLOW.md
 #
@@ -30,7 +30,7 @@
 2026-06-18 | f2e64c4 | PC-5 | require GitHub PR for feature to dev promotion | .cursorrules
 2026-06-18 | 335f798 | PC-5 | add merge feature shortcut for dev promotion | README.md
 2026-06-18 | 0ce8a0a | PC-5 | Windows compatibility for merge-feature CLI | scripts/merge-feature.ts
-2026-06-23 | ef2bd2a | PC-20 | Phase 0 scaffold — shell, auth, DB, dev bar, PWA | src/actions/dev.ts
+2026-06-23 | ef2bd2a | PC-20 | Phase 0 scaffold â€” shell, auth, DB, dev bar, PWA | src/actions/dev.ts
 2026-06-23 | ca48194 | PC-20 | resolve npm audit findings via overrides | package.json
 2026-06-23 | 316265c | PC-20 | add workflow config for PC Jira project | .workflow.json
 2026-06-23 | d1b8107 | PC-21 | edge-safe middleware for Vercel deploy | src/lib/auth.config.ts
@@ -45,3 +45,57 @@
 2026-06-23 | 30353d0 | PC-20 | fixed environment banner colors independent of theme | src/components/layout/DevBar.tsx
 2026-06-23 | afc8be2 | PC-35 | People and Places UX and admin force reload | src/actions/admin.ts
 2026-06-23 | 79fc854 | PC-35 | use static z-index in AppShell sticky header | src/components/layout/AppShell.tsx
+2026-06-24 | f83a76c | PC-35 | correct username availability validation and error messages | src/actions/users.ts
+2026-06-24 | d23d1a1 | PC-35 | lock add-person dialog after create and add admin user edit/delete | src/actions/users.ts
+2026-06-24 | 3c6a190 | PC-8 | admin tab, profile gaps, passive activation and onboarding | src/actions/admin.ts
+2026-06-24 | cc9fed8 | PC-8 | admin tab, profile gaps, passive activation and onboarding | src/actions/admin.ts
+2026-06-24 | 9e5e40e | PC-8 | admin tab, profile gaps, passive activation and onboarding | src/actions/admin.ts
+2026-06-24 | f175bec | PC-8 | refine admin user mgmt, people UX, and onboarding welcome | src/actions/admin.ts
+2026-06-24 | 24de1f6 | PC-35 | fix people/places UX and first-login password | src/actions/places.ts
+2026-06-24 | c2462f7 | PC-40 | Phase 4 proposals foundation and place delete workflow | src/actions/places.ts
+2026-06-24 | 004e626 | PC-40 | add proposal voting, draft editing, and time slots | src/actions/proposals.ts
+2026-06-24 | 54579be | PC-40 | add proposal comments, cancel/re-draft, and poll draft UI | src/actions/proposals.ts
+2026-06-24 | cf61fe4 | PC-40 | poll matrix voting, conflict checks, and proposal card UI | src/actions/proposals.ts
+2026-06-24 | 28b026d | PC-40 | shared proposal card theme and draft dialog layout | src/components/proposals/ProposalCard.tsx
+2026-06-24 | 703cdac | PC-40 | poll rules, privacy masking, recurrence, and bedroom locks | src/actions/proposals.ts
+2026-06-24 | f5b49fb | PC-40 | add Playwright E2E suite, CI workflow, and promotion gates | src/lib/seed/reset-test-database.ts
+2026-06-24 | 720db88 | PC-40 | Phase 4 close-out — collision engine, notification inbox, bedroom picker | src/actions/notifications.ts
+2026-06-24 | cda7c09 | PC-42 | Phase 6 schedule tab with weekly calendar, filters, and planning mode | src/actions/schedule.ts
+2026-06-24 | pending | PC-43 | Surface sleeping partnership proposals on Proposals Kanban | src/actions/proposals.ts
+2026-06-24 | pending | PC-43 | Actionable notification inbox with partnership accept/decline | src/components/layout/NotificationInbox.tsx
+2026-06-24 | pending | PC-43 | Web Push subscriptions and service worker push handler | src/lib/push.ts
+2026-06-24 | pending | PC-43 | Notification email verification hook on profile | src/actions/profile.ts
+2026-06-24 | pending | PC-43 | Solo event toggle and post-create Submit in draft dialog | src/components/proposals/ProposalDraftDialog.tsx
+2026-06-24 | pending | PC-43 | Calendar blocks show stakeholders; week anchor resets to today | src/components/schedule/ScheduleEventBlock.tsx
+2026-06-24 | fc0c8aa | PC-43 | Phase 5 notifications and proposal UX fixes | src/actions/partnerships.ts
+2026-06-24 | 5a43490 | PC-43 | fix lifecycle E2E for draft dialog stay-open UX | e2e/proposals-lifecycle.spec.ts
+2026-06-24 | 10deb8f | PC-44 | admin UX, proposal polish, and header improvements | src/actions/partnerships.ts
+2026-06-24 | 386df9d | PC-45 | complete phases 2, 7, and 8 foundations | src/actions/poly-group.ts
+2026-06-24 | 7814576 | PC-46 | phase 9 enforcement and Playwright E2E updates | src/lib/proposals/enforcement.ts
+2026-06-25 | 39601d0 | PC-47 | fix draft conflict UX, places dialog, and admin accordions | src/components/admin/AdminActivityLogPanel.tsx
+2026-06-25 | a2d2d12 | PC-48 | attendee updates, enforcement cron, timezone, and schedule UX | src/actions/profile.ts
+2026-06-25 | 09df410 | PC-48 | attendee updates, enforcement cron, timezone, and schedule UX | src/actions/profile.ts
+2026-06-25 | f2c79bc | PC-48 | update E2E for pickers, clone draft, and collapsible places | e2e/helpers/datePickers.ts
+2026-06-25 | 0155c5a | PC-48 | fix strict mode on voting E2E assertion | e2e/proposals-voting.spec.ts
+2026-06-25 | 77d33ea | PC-48 | fix strict mode on voting E2E assertion | e2e/proposals-voting.spec.ts
+2026-06-25 | 976dc59 | PC-49 | poll optional voting UX and matrix readability | src/actions/proposals.ts
+2026-06-25 | 7261426 | PC-50 | partnership copy, network alerts, cancel close | src/actions/partnerships.ts
+2026-06-25 | 0304a5d | PC-51 | add Render enforcement cron blueprint and script | CHANGELOG.md
+2026-06-25 | 92f97d7 | PC-52 | Burton-Thompson test seed and environment validation scripts | src/components/admin/AdminTestDataPanel.tsx
+2026-06-25 | 346a648 | PC-52 | Burton-Thompson test seed and environment validation scripts | src/components/admin/AdminTestDataPanel.tsx
+2026-06-25 | c0f03cc | PC-52 | admin user provisioning E2E and onboarding wizard fix | src/actions/onboarding.ts
+2026-06-25 | db52d00 | PC-53 | launch ops gaps — recovery TTL, heatmap, email, admin gender | src/actions/poly-group.ts
+2026-06-26 | 7bfd9f4 | PC-53 | proposal UX — perf, sleeping dates, activity log, attendee votes | src/actions/proposals.ts
+2026-06-27 | 87a0c94 | PC-55 | paused users, open resolved comments, and E2E journeys | src/actions/proposals.ts
+2026-06-27 | 616944c | PC-55 | keep demo proposed fixtures voteable all day | src/lib/seed/demo-proposals.ts
+2026-06-27 | 45cb108 | PC-55 | keep demo proposals in week and voteable | src/lib/seed/demo-proposals.ts
+2026-06-27 | 59047a7 | PC-55 | harden paused-user redirects and E2E admin helpers | src/lib/auth-session.ts
+2026-06-27 | 7fc19c4 | PC-55 | use heading click for admin accordion E2E helper | src/actions/proposals.ts
+2026-06-27 | 82bacc1 | PC-56 | residency Kanban workflow, toast UX, and schedule polish | src/actions/partnerships.ts
+2026-06-27 | d58a217 | PC-56 | assert vote feedback via toast in E2E specs | e2e/helpers/toast.ts
+2026-06-27 | e9fa7a0 | PC-56 | add Jira backfill workflow for .. gap | .github/workflows/jira-backfill-gap.yml
+2026-06-27 | 1e7c04c | PC-56 | run Jira gap backfill before CI status sync | scripts/backfill-jira-kanban-gap.ts
+2026-06-27 | ef49fa8 | PC-56 | use Jira search/jql API for gap backfill | scripts/backfill-jira-kanban-gap.ts
+2026-06-27 | 3273364 | PC-56 | probe Jira keys for gap backfill instead of search API | scripts/backfill-jira-kanban-gap.ts
+2026-06-27 | f89acaa | PC-56 | improve Jira backfill diagnostics when project is invisible | scripts/backfill-jira-kanban-gap.ts
+2026-06-27 | 0310ca9 | PC-56 | wire declined residency Kanban cards to correct workflow | src/actions/proposals.ts

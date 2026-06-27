@@ -49,15 +49,27 @@ cp .env.example .env.local
 npm run dev
 ```
 
-**Non-production login (after seed):** `luke` / `ChangeMe123!`
+**Non-production login (after seed):**
+
+| Environment | Login | Password |
+|-------------|-------|----------|
+| Dev / feature / local E2E | `luke` | `ChangeMe123!` |
+| Test (`polycal-test`) | `mpburton` | `password` |
 
 ```bash
-npm run db:seed   # optional manual re-seed on empty database
+npm run db:seed          # optional manual re-seed on empty local/dev database
+npm run test:env:test    # reset + validate polycal-test Turso + Vercel connectivity
 ```
 
 ## Commands
 
 ```bash
+npm run test:promote    # audit + Vitest — same local gate as merge-feature (minus Jira/push)
+npm run test:unit       # Vitest — pure logic in src/**/*.test.ts
+npm run test:unit:watch # Vitest watch mode while developing
+npm run test:e2e        # Playwright browser journeys (e2e/)
+npm run test:env:test
+npm run test:connectivity
 npm run requirements:validate
 npm run requirements:append
 npm run audit:check

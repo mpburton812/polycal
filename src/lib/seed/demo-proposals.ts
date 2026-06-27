@@ -1,12 +1,23 @@
 import { getDb } from "@/lib/db/client";
 import {
   proposals,
+  proposalInvitees,
+  proposalTimeSlots,
   locations,
   users,
   type ProposalState,
   type ProposalType,
 } from "@/lib/db/schema";
 import { isNonProductionEnvironment } from "@/lib/env";
+import { usesTestFamilySeed } from "@/lib/seed/seed-profile";
+import { randomUUID } from "node:crypto";
+
+interface DemoTimeSlot {
+  startOffsetDays: number;
+  startHour: number;
+  durationHours: number;
+  label?: string;
+}
 
 interface DemoProposal {
   id: string;
@@ -17,6 +28,48 @@ interface DemoProposal {
   proposerId: string;
   locationId?: string;
   notes?: string;
+  inviteeIds?: string[];
+  /** Resolved events — schedule relative to seed time (PC-42). */
+  scheduledOffsetDays?: number;
+  scheduledStartHour?: number;
+  scheduledDurationHours?: number;
+  /** Proposed events without resolve — time slot windows for calendar (PC-42). */
+  timeSlots?: DemoTimeSlot[];
+}
+
+/** Monday 00:00 local for the week containing `date`. */
+function startOfWeekMonday(date: Date): Date {
+  const monday = new Date(date);
+  monday.setHours(0, 0, 0, 0);
+  const day = monday.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  monday.setDate(monday.getDate() + diff);
+  return monday;
+}
+
+/** Builds ISO timestamps anchored to the current week for schedule demos. */
+function scheduleWindow(
+  offsetDays: number,
+  startHour: number,
+  durationHours: number,
+  options?: { ensureFuture?: boolean; minFutureHours?: number },
+): { startAt: string; endAt: string } {
+  const start = startOfWeekMonday(new Date());
+  start.setDate(start.getDate() + offsetDays);
+  start.setHours(startHour, 0, 0, 0);
+  if (options?.ensureFuture) {
+    const now = new Date();
+    const minFutureMs = (options.minFutureHours ?? 2) * 60 * 60 * 1000;
+    while (start.getTime() <= now.getTime()) {
+      start.setDate(start.getDate() + 1);
+    }
+    while (start.getTime() < now.getTime() + minFutureMs) {
+      start.setHours(start.getHours() + 1);
+    }
+  }
+  const end = new Date(start);
+  end.setTime(end.getTime() + durationHours * 60 * 60 * 1000);
+  return { startAt: start.toISOString(), endAt: end.toISOString() };
 }
 
 /** Representative fixtures across all Kanban columns for QA and demos. */
@@ -48,15 +101,19 @@ const DEMO_PROPOSALS: DemoProposal[] = [
     state: "proposed",
     proposerId: "sw-leia",
     locationId: "loc-cloudcity",
+    inviteeIds: ["sw-luke", "sw-han"],
+    timeSlots: [{ startOffsetDays: 1, startHour: 14, durationHours: 2 }],
   },
   {
     id: "prop-proposed-2",
     title: "Falcon overnight — Tatooine",
-    description: "Multi-night sleeping proposal in poll state.",
+    description: "Sleeping proposal awaiting votes.",
     proposalType: "sleeping",
     state: "proposed",
     proposerId: "sw-han",
     locationId: "loc-tatooine",
+    inviteeIds: ["sw-leia"],
+    timeSlots: [{ startOffsetDays: 3, startHour: 22, durationHours: 8 }],
   },
   {
     id: "prop-proposed-3",
@@ -66,6 +123,8 @@ const DEMO_PROPOSALS: DemoProposal[] = [
     state: "proposed",
     proposerId: "sw-vader",
     locationId: "loc-deathstar",
+    inviteeIds: ["sw-luke"],
+    timeSlots: [{ startOffsetDays: 5, startHour: 10, durationHours: 1 }],
   },
   {
     id: "prop-resolved-1",
@@ -75,6 +134,10 @@ const DEMO_PROPOSALS: DemoProposal[] = [
     state: "resolved",
     proposerId: "sw-luke",
     locationId: "loc-falcon",
+    scheduledOffsetDays: 2,
+    scheduledStartHour: 18,
+    scheduledDurationHours: 3,
+    inviteeIds: ["sw-leia", "sw-han"],
   },
   {
     id: "prop-resolved-2",
@@ -84,6 +147,10 @@ const DEMO_PROPOSALS: DemoProposal[] = [
     state: "resolved",
     proposerId: "sw-lando",
     locationId: "loc-cloudcity",
+    scheduledOffsetDays: 4,
+    scheduledStartHour: 22,
+    scheduledDurationHours: 8,
+    inviteeIds: ["sw-han"],
   },
   {
     id: "prop-archived-1",
@@ -104,6 +171,9 @@ export async function seedDemoProposals(options?: {
   force?: boolean;
 }): Promise<{ seeded: boolean; count: number }> {
   if (!isNonProductionEnvironment()) {
+    return { seeded: false, count: 0 };
+  }
+  if (usesTestFamilySeed()) {
     return { seeded: false, count: 0 };
   }
 
@@ -134,6 +204,23 @@ export async function seedDemoProposals(options?: {
 
   const now = new Date().toISOString();
   for (const proposal of eligible) {
+    let scheduledStartAt: string | null = null;
+    let scheduledEndAt: string | null = null;
+
+    if (
+      proposal.scheduledOffsetDays !== undefined &&
+      proposal.scheduledStartHour !== undefined &&
+      proposal.scheduledDurationHours !== undefined
+    ) {
+      const window = scheduleWindow(
+        proposal.scheduledOffsetDays,
+        proposal.scheduledStartHour,
+        proposal.scheduledDurationHours,
+      );
+      scheduledStartAt = window.startAt;
+      scheduledEndAt = window.endAt;
+    }
+
     await db.insert(proposals).values({
       id: proposal.id,
       title: proposal.title,
@@ -142,10 +229,43 @@ export async function seedDemoProposals(options?: {
       state: proposal.state,
       proposerId: proposal.proposerId,
       locationId: proposal.locationId,
+      scheduledStartAt,
+      scheduledEndAt,
+      intentionalSolo: false,
       notes: proposal.notes,
       createdAt: now,
       updatedAt: now,
     });
+
+    for (const inviteeId of proposal.inviteeIds ?? []) {
+      if (!userIds.has(inviteeId)) continue;
+      await db.insert(proposalInvitees).values({
+        id: `pi-${randomUUID()}`,
+        proposalId: proposal.id,
+        userId: inviteeId,
+        role: "required",
+        createdAt: now,
+      });
+    }
+
+    for (let index = 0; index < (proposal.timeSlots ?? []).length; index += 1) {
+      const slot = proposal.timeSlots![index];
+      const window = scheduleWindow(
+        slot.startOffsetDays,
+        slot.startHour,
+        slot.durationHours,
+        { ensureFuture: true },
+      );
+      await db.insert(proposalTimeSlots).values({
+        id: `pts-${proposal.id}-${index}`,
+        proposalId: proposal.id,
+        startAt: window.startAt,
+        endAt: window.endAt,
+        label: slot.label ?? null,
+        sortOrder: index,
+        createdAt: now,
+      });
+    }
   }
 
   return { seeded: true, count: eligible.length };

@@ -10,14 +10,8 @@ export function ensureDbReady(): Promise<void> {
       const { runMigrations } = await import("@/lib/db/migrate");
       await runMigrations();
 
-      const { seedStarWarsFoundation } = await import("@/lib/seed/star-wars");
-      await seedStarWarsFoundation();
-
-      const { seedDemoProposals } = await import("@/lib/seed/demo-proposals");
-      await seedDemoProposals();
-
-      const { seedDemoPartnerships } = await import("@/lib/seed/demo-partnerships");
-      await seedDemoPartnerships();
+      const { runFullNonProductionSeed } = await import("@/lib/seed/reset-test-database");
+      await runFullNonProductionSeed();
     })();
   }
 

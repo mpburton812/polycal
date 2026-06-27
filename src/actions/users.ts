@@ -2,7 +2,7 @@
 
 import { hash } from "bcryptjs";
 import { randomUUID } from "node:crypto";
-import { asc, eq } from "drizzle-orm";
+import { and, asc, eq, inArray, or } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
@@ -10,26 +10,52 @@ import { auth } from "@/lib/auth";
 import { logUserActivity } from "@/lib/audit";
 import { getDb } from "@/lib/db/client";
 import { ensureDbReady } from "@/lib/db/ensure-ready";
-import { polyGroup, users, type UserRole } from "@/lib/db/schema";
+import {
+  locationResidents,
+  locations,
+  polyGroup,
+  proposalInvitees,
+  proposalSlotVotes,
+  proposals,
+  sleepingPartnerships,
+  users,
+  type UserRole,
+} from "@/lib/db/schema";
+import { notifyUser } from "@/lib/notifications";
+import { enterPendingRecoveryIfNeeded } from "@/lib/proposals/pending-recovery";
 import {
   buildLoginInstructions,
   generateTemporaryPassword,
 } from "@/lib/users/credentials";
 
+/** Shared username rules for provisioned active accounts. */
+const usernameSchema = z
+  .string()
+  .trim()
+  .min(2, "Username must be at least 2 characters.")
+  .max(32, "Username must be 32 characters or fewer.")
+  .regex(
+    /^[a-z0-9._-]+$/i,
+    "Username may only contain letters, numbers, and these characters: . _ -",
+  );
+
 const activeUserSchema = z.object({
-  username: z
+  username: usernameSchema,
+  displayName: z
     .string()
     .trim()
-    .min(2)
-    .max(32)
-    .regex(/^[a-z0-9._-]+$/i, "Username may only contain letters, numbers, . _ -"),
-  displayName: z.string().trim().min(1).max(80),
+    .min(1, "Display name is required.")
+    .max(80, "Display name must be 80 characters or fewer."),
   role: z.enum(["admin", "user"]),
   avatarKey: z.string().optional(),
 });
 
 const passiveUserSchema = z.object({
-  displayName: z.string().trim().min(1).max(80),
+  displayName: z
+    .string()
+    .trim()
+    .min(1, "Display name is required.")
+    .max(80, "Display name must be 80 characters or fewer."),
   avatarKey: z.string().optional(),
 });
 
@@ -42,12 +68,39 @@ export interface PersonSummary {
   avatarKey: string | null;
 }
 
+export interface AdminUserRow {
+  id: string;
+  displayName: string;
+  username: string;
+  gender: string | null;
+  role: UserRole;
+  status: string;
+  lastLoginAt: string | null;
+  loginCount: number;
+}
+
 export interface CreateUserResult {
   ok: boolean;
   message: string;
   loginInstructions?: string;
   temporaryPassword?: string;
   userId?: string;
+}
+
+export interface UserActionResult {
+  ok: boolean;
+  message: string;
+}
+
+/**
+ * Ensures the caller is an admin; used for user lifecycle management.
+ */
+async function requireAdminSession() {
+  const session = await auth();
+  if (!session?.user || session.user.role !== "admin") {
+    return null;
+  }
+  return session;
 }
 
 /**
@@ -70,6 +123,243 @@ function slugify(value: string): string {
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-|-$/g, "")
     .slice(0, 24);
+}
+
+/** Turns Zod issues into a single user-facing sentence. */
+function formatZodError(error: z.ZodError): string {
+  if (error.issues.length === 0) {
+    return "One or more fields are invalid.";
+  }
+
+  return error.issues
+    .map((issue) => {
+      const field = issue.path.at(-1);
+      const label =
+        field === "username"
+          ? "Username"
+          : field === "displayName"
+            ? "Display name"
+            : field === "role"
+              ? "Role"
+              : field
+                ? String(field)
+                : "Input";
+      return `${label}: ${issue.message}`;
+    })
+    .join(" ");
+}
+
+/**
+ * Archives proposals owned by a departing user and removes them as invitees elsewhere (PC-45).
+ */
+async function archiveProposalsForDeletedUser(
+  db: ReturnType<typeof getDb>,
+  userId: string,
+  actorUserId: string,
+): Promise<void> {
+  const now = new Date().toISOString();
+
+  const owned = await db
+    .select({ id: proposals.id, title: proposals.title })
+    .from(proposals)
+    .where(
+      and(
+        eq(proposals.proposerId, userId),
+        inArray(proposals.state, ["draft", "proposed", "resolved"]),
+      ),
+    );
+
+  for (const proposal of owned) {
+    await db
+      .update(proposals)
+      .set({
+        state: "archived",
+        scheduledStartAt: null,
+        scheduledEndAt: null,
+        atRisk: false,
+        updatedAt: now,
+      })
+      .where(eq(proposals.id, proposal.id));
+
+    const invitees = await db
+      .select({ userId: proposalInvitees.userId })
+      .from(proposalInvitees)
+      .where(eq(proposalInvitees.proposalId, proposal.id));
+
+    for (const invitee of invitees) {
+      if (invitee.userId === userId) continue;
+      await notifyUser(
+        invitee.userId,
+        "proposal_cancelled",
+        `Proposal "${proposal.title}" was archived because the proposer was removed.`,
+        { proposalId: proposal.id },
+      );
+    }
+  }
+
+  await demoteOrRemoveInviteeFromActiveProposals(db, userId, actorUserId, "removed from the network");
+}
+
+/**
+ * Removes places created by a departing user (PC-55).
+ */
+async function deletePlacesOwnedByUser(
+  db: ReturnType<typeof getDb>,
+  userId: string,
+): Promise<void> {
+  const ownedPlaces = await db
+    .select({ id: locations.id })
+    .from(locations)
+    .where(eq(locations.createdById, userId));
+
+  for (const place of ownedPlaces) {
+    await db.delete(locationResidents).where(eq(locationResidents.locationId, place.id));
+    await db
+      .update(proposals)
+      .set({ locationId: null, updatedAt: new Date().toISOString() })
+      .where(eq(proposals.locationId, place.id));
+    await db.delete(locations).where(eq(locations.id, place.id));
+  }
+}
+
+/**
+ * Demotes a paused/deleted user to optional on active proposals; reverts when no required remain (PC-45).
+ */
+async function demoteOrRemoveInviteeFromActiveProposals(
+  db: ReturnType<typeof getDb>,
+  userId: string,
+  actorUserId: string | null,
+  reason: string,
+): Promise<void> {
+  const now = new Date().toISOString();
+
+  const inviteeRows = await db
+    .select({
+      id: proposalInvitees.id,
+      proposalId: proposalInvitees.proposalId,
+      role: proposalInvitees.role,
+    })
+    .from(proposalInvitees)
+    .innerJoin(proposals, eq(proposalInvitees.proposalId, proposals.id))
+    .where(
+      and(
+        eq(proposalInvitees.userId, userId),
+        inArray(proposals.state, ["proposed", "resolved"]),
+      ),
+    );
+
+  for (const row of inviteeRows) {
+    await db.delete(proposalSlotVotes).where(
+      and(eq(proposalSlotVotes.proposalId, row.proposalId), eq(proposalSlotVotes.userId, userId)),
+    );
+    await db.delete(proposalInvitees).where(eq(proposalInvitees.id, row.id));
+
+    const [proposal] = await db
+      .select()
+      .from(proposals)
+      .where(eq(proposals.id, row.proposalId))
+      .limit(1);
+    if (!proposal) continue;
+
+    const remainingRequired = await db
+      .select({ userId: proposalInvitees.userId })
+      .from(proposalInvitees)
+      .where(
+        and(eq(proposalInvitees.proposalId, row.proposalId), eq(proposalInvitees.role, "required")),
+      );
+
+    if (remainingRequired.length === 0) {
+      await enterPendingRecoveryIfNeeded(db, row.proposalId, `participant ${reason}.`);
+    } else if (row.role === "required") {
+      const notifyIds = new Set<string>([
+        proposal.proposerId,
+        ...remainingRequired.map((r) => r.userId),
+      ]);
+      for (const notifyId of notifyIds) {
+        await notifyUser(
+          notifyId,
+          "proposal_attendees_updated",
+          `A required attendee was ${reason} on "${proposal.title}".`,
+          { proposalId: row.proposalId },
+        );
+      }
+    }
+  }
+}
+
+/**
+ * Pauses active proposals involving a user by demoting them to optional (PC-45).
+ */
+async function pauseUserProposalSideEffects(
+  db: ReturnType<typeof getDb>,
+  userId: string,
+): Promise<void> {
+  const now = new Date().toISOString();
+  const affectedProposalIds = new Set<string>();
+
+  const requiredRows = await db
+    .select({ id: proposalInvitees.id, proposalId: proposalInvitees.proposalId })
+    .from(proposalInvitees)
+    .innerJoin(proposals, eq(proposalInvitees.proposalId, proposals.id))
+    .where(
+      and(
+        eq(proposalInvitees.userId, userId),
+        eq(proposalInvitees.role, "required"),
+        inArray(proposals.state, ["proposed", "resolved"]),
+      ),
+    );
+
+  for (const row of requiredRows) {
+    await db
+      .update(proposalInvitees)
+      .set({ role: "optional", voteStatus: "abstain", respondedAt: now })
+      .where(eq(proposalInvitees.id, row.id));
+    affectedProposalIds.add(row.proposalId);
+  }
+
+  for (const proposalId of affectedProposalIds) {
+    const remainingRequired = await db
+      .select({ userId: proposalInvitees.userId })
+      .from(proposalInvitees)
+      .where(
+        and(eq(proposalInvitees.proposalId, proposalId), eq(proposalInvitees.role, "required")),
+      );
+
+    if (remainingRequired.length > 0) continue;
+
+    const [proposal] = await db
+      .select()
+      .from(proposals)
+      .where(eq(proposals.id, proposalId))
+      .limit(1);
+    if (!proposal) continue;
+
+    const noteLine = "Returned to drafts: no required invitees remain after a participant was paused.";
+    await db
+      .update(proposals)
+      .set({
+        state: "draft",
+        atRisk: false,
+        notes: proposal.notes?.trim() ? `${proposal.notes.trim()}\n${noteLine}` : noteLine,
+        updatedAt: now,
+      })
+      .where(eq(proposals.id, proposalId));
+
+    const invitees = await db
+      .select({ userId: proposalInvitees.userId })
+      .from(proposalInvitees)
+      .where(eq(proposalInvitees.proposalId, proposalId));
+
+    const notifyIds = new Set<string>([proposal.proposerId, ...invitees.map((i) => i.userId)]);
+    for (const notifyId of notifyIds) {
+      await notifyUser(
+        notifyId,
+        "proposal_reverted_to_draft",
+        `Proposal "${proposal.title}" was moved back to drafts.`,
+        { proposalId, reason: "participant paused" },
+      );
+    }
+  }
 }
 
 /**
@@ -110,7 +400,7 @@ export async function createActiveUserAction(
   const session = await auth();
   const parsed = activeUserSchema.safeParse(input);
   if (!parsed.success) {
-    return { ok: false, message: parsed.error.issues[0]?.message ?? "Invalid input." };
+    return { ok: false, message: formatZodError(parsed.error) };
   }
 
   await ensureDbReady();
@@ -141,6 +431,7 @@ export async function createActiveUserAction(
     avatarKey: parsed.data.avatarKey ?? "bird_blue",
     theme: "mint",
     loginCount: 0,
+    onboardingComplete: false,
     createdAt: now,
     updatedAt: now,
   });
@@ -164,13 +455,10 @@ export async function createActiveUserAction(
   };
 }
 
-const usernameCheckSchema = z.object({
-  username: z
-    .string()
-    .trim()
-    .min(2)
-    .max(32)
-    .regex(/^[a-z0-9._-]+$/i, "Username may only contain letters, numbers, . _ -"),
+const updateProvisionedUsernameSchema = z.object({
+  userId: z.string().min(1, "User id is required."),
+  username: usernameSchema,
+  temporaryPassword: z.string().min(8, "Temporary password is missing or too short."),
 });
 
 /**
@@ -178,36 +466,31 @@ const usernameCheckSchema = z.object({
  */
 export async function checkUsernameAvailableAction(
   username: string,
+  excludeUserId?: string,
 ): Promise<{ available: boolean; message: string }> {
-  const parsed = usernameCheckSchema.safeParse(username);
+  const parsed = usernameSchema.safeParse(username);
   if (!parsed.success) {
     return {
       available: false,
-      message: parsed.error.issues[0]?.message ?? "Invalid username.",
+      message: formatZodError(parsed.error),
     };
   }
 
   await ensureDbReady();
   const db = getDb();
-  const normalized = parsed.data.username.toLowerCase();
+  const normalized = parsed.data.toLowerCase();
   const [existing] = await db
     .select({ id: users.id })
     .from(users)
     .where(eq(users.username, normalized))
     .limit(1);
 
-  if (existing) {
+  if (existing && existing.id !== excludeUserId) {
     return { available: false, message: "Username is already in use." };
   }
 
   return { available: true, message: "Username is available." };
 }
-
-const updateProvisionedUsernameSchema = z.object({
-  userId: z.string().min(1),
-  username: usernameCheckSchema.shape.username,
-  temporaryPassword: z.string().min(8),
-});
 
 /**
  * Updates username for a freshly provisioned user and returns refreshed credentials (PC-35).
@@ -221,7 +504,7 @@ export async function updateProvisionedUsernameAction(
 
   const parsed = updateProvisionedUsernameSchema.safeParse(input);
   if (!parsed.success) {
-    return { ok: false, message: parsed.error.issues[0]?.message ?? "Invalid input." };
+    return { ok: false, message: formatZodError(parsed.error) };
   }
 
   await ensureDbReady();
@@ -281,7 +564,7 @@ export async function createPassiveUserAction(
   const session = await auth();
   const parsed = passiveUserSchema.safeParse(input);
   if (!parsed.success) {
-    return { ok: false, message: parsed.error.issues[0]?.message ?? "Invalid input." };
+    return { ok: false, message: formatZodError(parsed.error) };
   }
 
   await ensureDbReady();
@@ -319,6 +602,400 @@ export async function createPassiveUserAction(
     ok: true,
     message: `Created passive profile ${parsed.data.displayName}.`,
     userId,
+  };
+}
+
+const adminUpdateUserSchema = z.object({
+  userId: z.string().min(1, "User id is required."),
+  displayName: z
+    .string()
+    .trim()
+    .min(1, "Display name is required.")
+    .max(80, "Display name must be 80 characters or fewer."),
+  avatarKey: z.string().optional(),
+  role: z.enum(["admin", "user"]).optional(),
+  username: usernameSchema.optional(),
+  gender: z.string().trim().max(40).optional().nullable(),
+});
+
+/**
+ * Updates any network member (admin only, PC-35).
+ */
+export async function updateUserAction(
+  input: z.infer<typeof adminUpdateUserSchema>,
+): Promise<UserActionResult> {
+  const session = await requireAdminSession();
+  if (!session) {
+    return { ok: false, message: "Admin access required." };
+  }
+
+  const parsed = adminUpdateUserSchema.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, message: formatZodError(parsed.error) };
+  }
+
+  await ensureDbReady();
+  const db = getDb();
+  const [user] = await db
+    .select()
+    .from(users)
+    .where(eq(users.id, parsed.data.userId))
+    .limit(1);
+
+  if (!user || user.status !== "active") {
+    return { ok: false, message: "User not found." };
+  }
+
+  const now = new Date().toISOString();
+  const updates: {
+    displayName: string;
+    avatarKey?: string;
+    role?: "admin" | "user";
+    username?: string;
+    gender?: string | null;
+    updatedAt: string;
+  } = {
+    displayName: parsed.data.displayName,
+    updatedAt: now,
+  };
+
+  if (parsed.data.avatarKey) {
+    updates.avatarKey = parsed.data.avatarKey;
+  }
+
+  if (parsed.data.gender !== undefined) {
+    updates.gender = parsed.data.gender?.trim() || null;
+  }
+
+  if (user.role !== "passive") {
+    if (parsed.data.role) {
+      updates.role = parsed.data.role;
+    }
+    if (parsed.data.username) {
+      const username = parsed.data.username.toLowerCase();
+      const availability = await checkUsernameAvailableAction(username, user.id);
+      if (!availability.available) {
+        return { ok: false, message: availability.message };
+      }
+      updates.username = username;
+    }
+  }
+
+  await db.update(users).set(updates).where(eq(users.id, user.id));
+
+  await logUserActivity(
+    session.user.id,
+    "users.admin_update",
+    JSON.stringify({ userId: user.id, updates }),
+  );
+
+  revalidatePath("/people-places");
+  revalidatePath("/admin");
+  revalidatePath("/api/dev/users");
+  revalidatePath("/profile");
+
+  return { ok: true, message: `Updated ${parsed.data.displayName}.` };
+}
+
+/**
+ * Soft-deletes a user and removes their graph edges (admin only, PC-35).
+ */
+export async function deleteUserAction(userId: string): Promise<UserActionResult> {
+  const session = await requireAdminSession();
+  if (!session) {
+    return { ok: false, message: "Admin access required." };
+  }
+
+  if (userId === session.user.id) {
+    return { ok: false, message: "You cannot delete your own account." };
+  }
+
+  await ensureDbReady();
+  const db = getDb();
+  const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+  if (!user || (user.status !== "active" && user.status !== "paused")) {
+    return { ok: false, message: "User not found." };
+  }
+
+  await db
+    .delete(sleepingPartnerships)
+    .where(
+      or(
+        eq(sleepingPartnerships.userLowId, userId),
+        eq(sleepingPartnerships.userHighId, userId),
+        eq(sleepingPartnerships.proposedById, userId),
+      ),
+    );
+
+  await db
+    .delete(locationResidents)
+    .where(
+      or(
+        eq(locationResidents.userId, userId),
+        eq(locationResidents.proposedById, userId),
+      ),
+    );
+
+  await deletePlacesOwnedByUser(db, userId);
+
+  await archiveProposalsForDeletedUser(db, userId, session.user.id);
+  await demoteOrRemoveInviteeFromActiveProposals(db, userId, session.user.id, "removed");
+
+  const now = new Date().toISOString();
+  await db
+    .update(users)
+    .set({
+      status: "deleted",
+      displayName: "Former User",
+      username: `deleted-${userId.slice(-8)}`,
+      passwordHash: await hash(randomUUID(), 12),
+      notificationEmail: null,
+      emailVerifiedAt: null,
+      sessionVersion: user.sessionVersion + 1,
+      updatedAt: now,
+    })
+    .where(eq(users.id, userId));
+
+  await logUserActivity(
+    session.user.id,
+    "users.admin_delete",
+    JSON.stringify({ userId, username: user.username }),
+  );
+
+  revalidatePath("/people-places");
+  revalidatePath("/admin");
+  revalidatePath("/api/dev/users");
+  revalidatePath("/proposals");
+  revalidatePath("/schedule");
+
+  return { ok: true, message: `Deleted ${user.displayName}.` };
+}
+
+/**
+ * Lists users for the admin management table (PC-31).
+ */
+export async function listAdminUsersAction(): Promise<AdminUserRow[]> {
+  const session = await requireAdminSession();
+  if (!session) return [];
+
+  await ensureDbReady();
+  const db = getDb();
+  const rows = await db
+    .select({
+      id: users.id,
+      displayName: users.displayName,
+      username: users.username,
+      gender: users.gender,
+      role: users.role,
+      status: users.status,
+      lastLoginAt: users.lastLoginAt,
+      loginCount: users.loginCount,
+    })
+    .from(users)
+    .orderBy(asc(users.displayName));
+
+  return rows;
+}
+
+/**
+ * Pauses a user account and invalidates active sessions (PC-31).
+ */
+export async function pauseUserAction(userId: string): Promise<UserActionResult> {
+  const session = await requireAdminSession();
+  if (!session) return { ok: false, message: "Admin access required." };
+  if (userId === session.user.id) {
+    return { ok: false, message: "You cannot pause your own account." };
+  }
+
+  await ensureDbReady();
+  const db = getDb();
+  const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+  if (!user || user.status !== "active") {
+    return { ok: false, message: "User not found or not active." };
+  }
+
+  await pauseUserProposalSideEffects(db, userId);
+
+  const now = new Date().toISOString();
+  await db
+    .update(users)
+    .set({
+      status: "paused",
+      sessionVersion: user.sessionVersion + 1,
+      updatedAt: now,
+    })
+    .where(eq(users.id, userId));
+
+  await logUserActivity(session.user.id, "users.admin_pause", JSON.stringify({ userId }));
+  revalidatePath("/admin");
+  revalidatePath("/people-places");
+  revalidatePath("/proposals");
+  revalidatePath("/schedule");
+  return { ok: true, message: `Paused ${user.displayName}.` };
+}
+
+/**
+ * Resumes a paused user account (PC-31).
+ */
+export async function resumeUserAction(userId: string): Promise<UserActionResult> {
+  const session = await requireAdminSession();
+  if (!session) return { ok: false, message: "Admin access required." };
+
+  await ensureDbReady();
+  const db = getDb();
+  const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+  if (!user || user.status !== "paused") {
+    return { ok: false, message: "User is not paused." };
+  }
+
+  const now = new Date().toISOString();
+  await db
+    .update(users)
+    .set({ status: "active", updatedAt: now })
+    .where(eq(users.id, userId));
+
+  await logUserActivity(session.user.id, "users.admin_resume", JSON.stringify({ userId }));
+  revalidatePath("/admin");
+  revalidatePath("/people-places");
+  return { ok: true, message: `Resumed ${user.displayName}.` };
+}
+
+const adminResetPasswordSchema = z.object({
+  userId: z.string().min(1),
+});
+
+/**
+ * Resets an active user's password and returns clipboard instructions (PC-10).
+ */
+export async function adminResetPasswordAction(
+  input: z.infer<typeof adminResetPasswordSchema>,
+): Promise<CreateUserResult> {
+  const session = await requireAdminSession();
+  if (!session) return { ok: false, message: "Admin access required." };
+
+  const parsed = adminResetPasswordSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, message: "Invalid input." };
+
+  await ensureDbReady();
+  const db = getDb();
+  const [user] = await db
+    .select()
+    .from(users)
+    .where(eq(users.id, parsed.data.userId))
+    .limit(1);
+
+  if (!user || user.role === "passive" || user.status !== "active") {
+    return { ok: false, message: "Active user not found." };
+  }
+
+  const tempPassword = generateTemporaryPassword();
+  const passwordHash = await hash(tempPassword, 12);
+  const now = new Date().toISOString();
+
+  await db
+    .update(users)
+    .set({
+      passwordHash,
+      mustChangePassword: true,
+      sessionVersion: user.sessionVersion + 1,
+      updatedAt: now,
+    })
+    .where(eq(users.id, user.id));
+
+  await logUserActivity(
+    session.user.id,
+    "users.admin_reset_password",
+    JSON.stringify({ userId: user.id }),
+  );
+
+  revalidatePath("/admin");
+  revalidatePath("/people-places");
+
+  return {
+    ok: true,
+    message: `Password reset for ${user.displayName}. Copy instructions to share securely.`,
+    userId: user.id,
+    temporaryPassword: tempPassword,
+    loginInstructions: buildLoginInstructions({
+      username: user.username,
+      password: tempPassword,
+    }),
+  };
+}
+
+const activatePassiveSchema = z.object({
+  userId: z.string().min(1),
+  username: usernameSchema,
+  role: z.enum(["admin", "user"]).default("user"),
+});
+
+/**
+ * Converts a passive profile into an active user with login credentials (PC-10).
+ */
+export async function activatePassiveUserAction(
+  input: z.infer<typeof activatePassiveSchema>,
+): Promise<CreateUserResult> {
+  if (!(await canProvisionUsers())) {
+    return { ok: false, message: "You do not have permission to activate users." };
+  }
+
+  const session = await auth();
+  const parsed = activatePassiveSchema.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, message: formatZodError(parsed.error) };
+  }
+
+  await ensureDbReady();
+  const db = getDb();
+  const [user] = await db
+    .select()
+    .from(users)
+    .where(eq(users.id, parsed.data.userId))
+    .limit(1);
+
+  if (!user || user.role !== "passive" || user.status !== "active") {
+    return { ok: false, message: "Passive profile not found." };
+  }
+
+  const username = parsed.data.username.toLowerCase();
+  const availability = await checkUsernameAvailableAction(username);
+  if (!availability.available) {
+    return { ok: false, message: availability.message };
+  }
+
+  const tempPassword = generateTemporaryPassword();
+  const passwordHash = await hash(tempPassword, 12);
+  const now = new Date().toISOString();
+
+  await db
+    .update(users)
+    .set({
+      username,
+      passwordHash,
+      role: parsed.data.role,
+      mustChangePassword: true,
+      onboardingComplete: false,
+      activatedFromPassiveAt: now,
+      updatedAt: now,
+    })
+    .where(eq(users.id, user.id));
+
+  await logUserActivity(
+    session?.user?.id ?? null,
+    "users.activate_passive",
+    JSON.stringify({ userId: user.id, username }),
+  );
+
+  revalidatePath("/people-places");
+  revalidatePath("/admin");
+  revalidatePath("/api/dev/users");
+
+  return {
+    ok: true,
+    message: `Activated ${user.displayName} as an active user.`,
+    userId: user.id,
+    temporaryPassword: tempPassword,
+    loginInstructions: buildLoginInstructions({ username, password: tempPassword }),
   };
 }
 

@@ -28,11 +28,23 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         username: { label: "Username", type: "text" },
         password: { label: "Password", type: "password" },
         impersonateUserId: { label: "Impersonate", type: "text" },
+        impersonateSecret: { label: "Impersonate secret", type: "password" },
       },
       async authorize(raw) {
         await ensureDbReady();
 
-        if (raw?.impersonateUserId && isNonProductionEnvironment()) {
+        if (raw?.impersonateUserId) {
+          const impersonationSecret =
+            process.env.AUTH_IMPERSONATION_SECRET ?? process.env.AUTH_SECRET;
+          const secretOk =
+            impersonationSecret &&
+            typeof raw.impersonateSecret === "string" &&
+            raw.impersonateSecret === impersonationSecret;
+
+          if (!isNonProductionEnvironment() && !secretOk) {
+            return null;
+          }
+
           const db = getDb();
           const [row] = await db
             .select()
@@ -48,7 +60,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             name: row.displayName,
             email: row.username,
             role: row.role as UserRole,
+            accountStatus: row.status,
             mustChangePassword: row.mustChangePassword,
+            onboardingComplete: row.onboardingComplete,
+            sessionVersion: row.sessionVersion,
             displayName: row.displayName,
             avatarKey: row.avatarKey ?? undefined,
             theme: row.theme,
@@ -65,7 +80,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           .where(eq(users.username, parsed.data.username.toLowerCase()))
           .limit(1);
 
-        if (!row || row.status !== "active" || row.role === "passive") {
+        if (!row || row.status === "deleted" || row.role === "passive") {
           return null;
         }
 
@@ -79,7 +94,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           name: row.displayName,
           email: row.username,
           role: row.role,
+          accountStatus: row.status,
           mustChangePassword: row.mustChangePassword,
+          onboardingComplete: row.onboardingComplete,
+          sessionVersion: row.sessionVersion,
           displayName: row.displayName,
           avatarKey: row.avatarKey ?? undefined,
           theme: row.theme,

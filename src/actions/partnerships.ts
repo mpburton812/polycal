@@ -11,6 +11,8 @@ import { getDb } from "@/lib/db/client";
 import { ensureDbReady } from "@/lib/db/ensure-ready";
 import { sleepingPartnerships, users } from "@/lib/db/schema";
 import { canonicalUserPair } from "@/lib/users/pair";
+import { notifyUser } from "@/lib/notifications";
+import { notifySleepingNetworkOfPartnershipChange } from "@/lib/partnerships/network-notify";
 
 export interface PartnershipView {
   id: string;
@@ -25,6 +27,7 @@ export interface PartnershipView {
 const respondSchema = z.object({
   partnershipId: z.string().min(1),
   accept: z.boolean(),
+  comment: z.string().trim().max(2000).optional(),
 });
 
 /**
@@ -133,10 +136,19 @@ export async function proposePartnershipAction(
   if (existing?.status === "proposed") {
     return { ok: false, message: "A partnership proposal is already pending." };
   }
+  if (existing?.status === "declined") {
+    return {
+      ok: false,
+      message: "This sleeping partnership was declined and cannot be resubmitted.",
+    };
+  }
 
   const now = new Date().toISOString();
   const autoAccept = target.role === "passive";
   const status = autoAccept ? "accepted" : "proposed";
+  const partnershipId = existing?.id ?? `sp-${randomUUID()}`;
+  const initiatedByUserId =
+    subjectUserId && session.user.id !== proposerId ? session.user.id : null;
 
   if (existing) {
     await db
@@ -144,22 +156,32 @@ export async function proposePartnershipAction(
       .set({
         status,
         proposedById: proposerId,
+        initiatedByUserId,
         updatedAt: now,
         respondedAt: autoAccept ? now : null,
+        passiveAutoAccepted: autoAccept,
       })
       .where(eq(sleepingPartnerships.id, existing.id));
   } else {
     await db.insert(sleepingPartnerships).values({
-      id: `sp-${randomUUID()}`,
+      id: partnershipId,
       userLowId,
       userHighId,
       status,
       proposedById: proposerId,
+      initiatedByUserId,
       createdAt: now,
       updatedAt: now,
       respondedAt: autoAccept ? now : null,
+      passiveAutoAccepted: autoAccept,
     });
   }
+
+  const [proposer] = await db
+    .select({ displayName: users.displayName })
+    .from(users)
+    .where(eq(users.id, proposerId))
+    .limit(1);
 
   await logUserActivity(
     session.user.id,
@@ -167,7 +189,25 @@ export async function proposePartnershipAction(
     JSON.stringify({ targetUserId, status }),
   );
 
+  if (!autoAccept) {
+    await notifyUser(
+      targetUserId,
+      "partnership_proposed",
+      `${proposer?.displayName ?? "Someone"} proposed a sleeping partnership with you.`,
+      { partnershipId, proposerId, partnerId: targetUserId },
+    );
+  } else {
+    await notifySleepingNetworkOfPartnershipChange(
+      db,
+      userLowId,
+      userHighId,
+      `${proposer?.displayName ?? "Someone"} established a sleeping partnership with ${target.displayName}.`,
+      { partnershipId, userLowId, userHighId },
+    );
+  }
+
   revalidatePath("/people-places");
+  revalidatePath("/proposals");
 
   return {
     ok: true,
@@ -175,6 +215,61 @@ export async function proposePartnershipAction(
       ? `Sleeping partnership with ${target.displayName} established.`
       : `Partnership proposal sent to ${target.displayName}.`,
   };
+}
+
+/**
+ * Withdraws a pending partnership proposal (proposer only).
+ */
+export async function withdrawPartnershipProposalAction(
+  partnershipId: string,
+): Promise<{ ok: boolean; message: string }> {
+  const session = await auth();
+  if (!session?.user) {
+    return { ok: false, message: "Sign in required." };
+  }
+
+  await ensureDbReady();
+  const db = getDb();
+  const [row] = await db
+    .select()
+    .from(sleepingPartnerships)
+    .where(eq(sleepingPartnerships.id, partnershipId))
+    .limit(1);
+
+  if (!row || row.status !== "proposed") {
+    return { ok: false, message: "Proposal not found." };
+  }
+
+  if (row.proposedById !== session.user.id) {
+    return { ok: false, message: "Only the proposer can withdraw this proposal." };
+  }
+
+  const now = new Date().toISOString();
+  await db
+    .update(sleepingPartnerships)
+    .set({ status: "declined", updatedAt: now, respondedAt: now })
+    .where(eq(sleepingPartnerships.id, row.id));
+
+  const partnerId =
+    row.userLowId === session.user.id ? row.userHighId : row.userLowId;
+  const [proposer] = await db
+    .select({ displayName: users.displayName })
+    .from(users)
+    .where(eq(users.id, session.user.id))
+    .limit(1);
+
+  await notifyUser(
+    partnerId,
+    "partnership_withdrawn",
+    `${proposer?.displayName ?? "Someone"} withdrew their sleeping partnership proposal.`,
+    { partnershipId: row.id },
+  );
+
+  await logUserActivity(session.user.id, "partnership.withdraw", row.id);
+  revalidatePath("/people-places");
+  revalidatePath("/proposals");
+
+  return { ok: true, message: "Partnership proposal withdrawn." };
 }
 
 /**
@@ -219,13 +314,65 @@ export async function respondPartnershipAction(
     .set({ status, updatedAt: now, respondedAt: now })
     .where(eq(sleepingPartnerships.id, row.id));
 
+  const partnerId =
+    row.userLowId === session.user.id ? row.userHighId : row.userLowId;
+  const [responder] = await db
+    .select({ displayName: users.displayName })
+    .from(users)
+    .where(eq(users.id, session.user.id))
+    .limit(1);
+  const [lowUser] = await db
+    .select({ displayName: users.displayName })
+    .from(users)
+    .where(eq(users.id, row.userLowId))
+    .limit(1);
+  const [highUser] = await db
+    .select({ displayName: users.displayName })
+    .from(users)
+    .where(eq(users.id, row.userHighId))
+    .limit(1);
+  const lowName = lowUser?.displayName ?? "a member";
+  const highName = highUser?.displayName ?? "a member";
+
+  await notifyUser(
+    row.proposedById,
+    parsed.data.accept ? "partnership_accepted" : "partnership_declined",
+    `${responder?.displayName ?? "Someone"} ${parsed.data.accept ? "accepted" : "declined"} your sleeping partnership proposal.`,
+    { partnershipId: row.id, partnerId },
+  );
+
+  if (parsed.data.accept) {
+    await notifySleepingNetworkOfPartnershipChange(
+      db,
+      row.userLowId,
+      row.userHighId,
+      `${responder?.displayName ?? "Someone"} accepted the sleeping partnership between ${lowName} and ${highName}.`,
+      { partnershipId: row.id, userLowId: row.userLowId, userHighId: row.userHighId },
+    );
+  }
+
   await logUserActivity(
     session.user.id,
     parsed.data.accept ? "partnership.accept" : "partnership.decline",
-    row.id,
+    JSON.stringify({
+      partnershipId: row.id,
+      lowName,
+      highName,
+      responderName: responder?.displayName,
+      comment: parsed.data.comment ?? null,
+    }),
   );
 
+  if (parsed.data.comment?.trim()) {
+    await logUserActivity(
+      session.user.id,
+      "partnership.comment",
+      JSON.stringify({ partnershipId: row.id, body: parsed.data.comment.trim() }),
+    );
+  }
+
   revalidatePath("/people-places");
+  revalidatePath("/proposals");
 
   return {
     ok: true,
@@ -263,7 +410,34 @@ export async function removePartnershipAction(
     return { ok: false, message: "Not allowed." };
   }
 
+  const [lowUser] = await db
+    .select({ displayName: users.displayName })
+    .from(users)
+    .where(eq(users.id, row.userLowId))
+    .limit(1);
+  const [highUser] = await db
+    .select({ displayName: users.displayName })
+    .from(users)
+    .where(eq(users.id, row.userHighId))
+    .limit(1);
+  const [actor] = await db
+    .select({ displayName: users.displayName })
+    .from(users)
+    .where(eq(users.id, session.user.id))
+    .limit(1);
+
   await db.delete(sleepingPartnerships).where(eq(sleepingPartnerships.id, partnershipId));
+
+  if (row.status === "accepted") {
+    await notifySleepingNetworkOfPartnershipChange(
+      db,
+      row.userLowId,
+      row.userHighId,
+      `${actor?.displayName ?? "Someone"} removed the sleeping partnership between ${lowUser?.displayName ?? "a member"} and ${highUser?.displayName ?? "a member"}.`,
+      { partnershipId, userLowId: row.userLowId, userHighId: row.userHighId },
+    );
+  }
+
   await logUserActivity(session.user.id, "partnership.remove", partnershipId);
   revalidatePath("/people-places");
 

@@ -7,6 +7,14 @@ You are an AI programming assistant. You must adhere strictly to the following a
 ## 1. Environment & Branching Strategy
 - **Branch Structure:** Enforce a strict Git flow utilizing `feature`, `dev`, `test`, and `production` branches. Code generation should assume execution within a `feature` branch until promotion.
 - **Dev Promotion (feature → dev):** **Always** promote via a **GitHub Pull Request** — never direct `git push origin dev` or local merge-and-push to `dev`. Workflow: push `feature/*` → `gh pr create --base dev` → CI passes → merge PR on GitHub (`gh pr merge`). See `docs/DEV-PROMOTION.md`. This triggers Jira In Review (PR open) and Done (merge) automation.
+- **Test Promotion (dev → test):** **Always** promote via a **GitHub Pull Request** — never direct push to `test`. Workflow: `gh pr create --base test --head dev` → CI passes → merge PR on GitHub.
+- **Production Promotion (test → production):** **Always** promote via a **GitHub Pull Request** — never direct push to `production`. Workflow: `gh pr create --base production --head test` → CI passes → merge PR on GitHub.
+- **Playwright E2E gate (all promotions):** Before opening or merging any PR that promotes code to `dev`, `test`, or `production`, run the full Playwright suite locally and **resolve all failures** before proceeding:
+  - Local (feature branch): `npm run test:e2e` (prepares `e2e.db`, starts app on port `3099`, runs `e2e/` specs).
+  - CI parity check before `dev`/`test`/`production` merge: `npm run test:e2e:ci` (`npm run build` + prepare + Playwright).
+  - Do not promote with failing, skipped (unless documented in PR), or unrun E2E tests. Fix regressions or update tests to match intentional behavior changes; document any test updates in the PR test plan.
+  - CI workflow `.github/workflows/e2e.yml` runs on PRs to `dev`/`test` and on `feature/**` pushes — PR checks must be green before merge.
+  - On failure: inspect `playwright-report/` (`npm run test:e2e:report`) and `test-results/`; re-run after fixes until the full suite passes.
 - **Data Isolation:** Maintain strict logical and physical separation between non-production (`dev`/`test`) and `production` databases.
 - **Database Seeding:** Generate and maintain dedicated seeding scripts that populate `dev` and `test` environments with predictable, reset-friendly, realistic test scenarios derived from current and previous builds. Ensure production deployments strictly exclude all seeding logic and dummy data.
 
@@ -31,20 +39,31 @@ You are an AI programming assistant. You must adhere strictly to the following a
 - **Formatting:** Output code that strictly conforms to the project's established linter and formatter configurations.
 - **Dependency Auditing:** Continuously monitor and recommend updates for third-party dependencies to patch security vulnerabilities and optimize performance.
 - **`npm audit` Gate (feature → dev):** Before any push or merge request from `feature/*` to `dev`, run `npm audit` and **resolve all reported issues** (critical, high, moderate, and low). Apply fixes via `npm audit fix`, targeted dependency upgrades, or documented compensating controls when no fix exists. Do not promote to `dev` with unresolved audit findings unless the user explicitly approves an exception documented in the MR/PR description.
+- **`npm run test:e2e` Gate (feature → dev, dev → test, test → production):** Same policy as `npm audit` — run the full Playwright suite and resolve all failures before promotion at each tier. Pair with `npm run build` (included in `test:e2e:ci`) to catch type/lint errors. Promotion PR descriptions must note E2E pass status.
 
 ## 6. Testing & CI/CD Workflow Generation
 When generating or modifying `.github/workflows/` files, adhere to these explicit pipeline definitions:
 
+- **Playwright E2E (`e2e.yml`):**
+  - **Trigger:** Pull Request to `dev` or `test`; push to `feature/**`.
+  - **Actions Required:** `npm ci` → `npx playwright install chromium --with-deps` → `npm run test:e2e:ci`.
+  - **Validation:** Full `e2e/` suite against isolated `e2e.db` (Star Wars seed). Fail the pipeline on any test failure.
+  - **Artifacts:** Upload `playwright-report/` on failure.
+
 - **Dev Environment Workflow (`dev.yml`):**
   - **Trigger:** Pull Request or merge from `feature` to `dev`.
   - **Actions Required:** Instruct the generation of missing unit, integration, and Playwright tests for the promoted code.
-  - **Validation:** Execute automated checks against OWASP Top Ten compliance and accessibility standards. Run `npm audit` and fail the pipeline on unresolved vulnerabilities (or enforce the same policy via `.gitlab-ci.yml` when using GitLab).
+  - **Validation:** Execute automated checks against OWASP Top Ten compliance and accessibility standards. Run `npm audit` and fail the pipeline on unresolved vulnerabilities (or enforce the same policy via `.gitlab-ci.yml` when using GitLab). Run Playwright E2E via `e2e.yml` (or inline equivalent).
   - **Execution:** Run the full test suite and report pass/fail status directly to the GitHub PR.
 
 - **Test Environment Workflow (`test.yml`):**
   - **Trigger:** Promotion from `dev` to `test`.
   - **Actions Required:** Assess the codebase for required updates to automated user journeys.
-  - **Execution:** Run comprehensive End-to-End (E2E) testing and script-driven Automated Use
+  - **Execution:** Run comprehensive End-to-End (E2E) testing via Playwright (`npm run test:e2e:ci`) and script-driven automated user journeys. Fail promotion on E2E regressions.
+
+- **Production Environment Workflow (`production.yml`):**
+  - **Trigger:** Promotion from `test` to `production`.
+  - **Actions Required:** Confirm Playwright E2E and `npm audit` passed on the promoting PR chain; no new code may reach `production` without green CI on the `test` → `production` PR.
 
 ## 7. User Management & Identity Architecture
 - **Authentication & Persistence:** Implement stateless, persistent authentication using industry-standard protocols (e.g., JWTs stored in HttpOnly secure cookies, or OAuth 2.0). Explicitly prohibit storing sensitive session tokens in LocalStorage or SessionStorage.
