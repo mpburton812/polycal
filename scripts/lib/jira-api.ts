@@ -1,6 +1,7 @@
 /**
  * Shared Jira REST API helpers for CI status sync scripts.
  */
+import { loadEnvLocal } from "./load-env-local";
 
 export interface JiraTransition {
   id: string;
@@ -20,6 +21,8 @@ export interface JiraIssueStatus {
 
 /** Load Jira credentials from environment or return null when not configured. */
 export function loadJiraCredentials(): JiraCredentials | null {
+  loadEnvLocal();
+
   const baseUrl = process.env.JIRA_BASE_URL;
   const email = process.env.JIRA_EMAIL;
   const token = process.env.JIRA_API_TOKEN;

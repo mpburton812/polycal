@@ -7,7 +7,9 @@
  *
  * Requires JIRA_BASE_URL, JIRA_EMAIL, and JIRA_API_TOKEN.
  */
-import { jiraFetch, loadJiraCredentials } from "./lib/jira-api";
+import { jiraFetch, loadJiraCredentials, tryGetIssueStatus } from "./lib/jira-api";
+
+const LAUNCH_EPIC_KEY = "PC-57";
 
 const PROJECT_KEY = "PC";
 
@@ -91,8 +93,23 @@ async function main(): Promise<void> {
   const credentials = loadJiraCredentials();
   if (!credentials) {
     throw new Error(
-      "Set JIRA_BASE_URL, JIRA_EMAIL, and JIRA_API_TOKEN before creating launch tickets.",
+      [
+        "Set JIRA_BASE_URL, JIRA_EMAIL, and JIRA_API_TOKEN before creating launch tickets.",
+        "Add them to .env.local in the project root, or export them in your shell.",
+        "Example .env.local:",
+        "  JIRA_BASE_URL=https://mpburton.atlassian.net",
+        "  JIRA_EMAIL=you@example.com",
+        "  JIRA_API_TOKEN=<atlassian-api-token>",
+      ].join("\n"),
     );
+  }
+
+  const existingEpic = await tryGetIssueStatus(credentials, LAUNCH_EPIC_KEY);
+  if (existingEpic) {
+    console.log(
+      `[jira-launch] ${LAUNCH_EPIC_KEY} already exists (${existingEpic.name}); skipping create.`,
+    );
+    return;
   }
 
   console.log(`[jira-launch] Creating ${LAUNCH_TICKETS.length} issue(s) in ${PROJECT_KEY}…`);
