@@ -30,8 +30,9 @@ import {
   typeChipSx,
 } from "./proposalCardTheme";
 
-function stateBadgeLabel(state: string): string {
-  return state.toUpperCase();
+function stateBadgeLabel(proposal: ProposalCardData): string {
+  if (proposal.workflowStatus === "declined") return "DECLINED";
+  return proposal.state.toUpperCase();
 }
 
 function responseLabel(proposal: ProposalCardData): string {
@@ -74,6 +75,17 @@ export function ProposalCard({
       onClick={() => onOpen(proposal.id)}
     >
       <CardContent sx={{ pb: 1 }}>
+        {proposal.cardKind === "partnership" && (
+          <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 0.5 }}>
+            Visible only to proposer, invitee, and admins.
+          </Typography>
+        )}
+        {proposal.cardKind === "residency" && (
+          <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 0.5 }}>
+            Place residency — no date or time required.
+          </Typography>
+        )}
+
         <Stack direction="row" justifyContent="space-between" alignItems="flex-start" sx={{ mb: 1 }}>
           <Chip
             label={typeBadgeLabel(proposal.proposalType, proposal.cardKind)}
@@ -90,7 +102,7 @@ export function ProposalCard({
             {proposal.title}
           </Typography>
           <Chip
-            label={stateBadgeLabel(proposal.state)}
+            label={stateBadgeLabel(proposal)}
             size="small"
             variant="outlined"
             sx={{ fontWeight: 600, fontSize: "0.65rem" }}

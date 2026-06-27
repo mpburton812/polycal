@@ -37,7 +37,7 @@ import {
   loadEnforcementSettings,
   runProposalEnforcement,
 } from "@/lib/proposals/enforcement";
-import { PARTNERSHIP_CARD_PREFIX } from "@/lib/proposals/constants";
+import { PARTNERSHIP_CARD_PREFIX, RESIDENCY_CARD_PREFIX } from "@/lib/proposals/constants";
 import { sleepingScheduleFromSlotRows } from "@/lib/proposals/sleeping-schedule";
 import { buildPartnershipProposalCopy } from "@/lib/partnerships/copy";
 import type { UserRole } from "@/types/user";
@@ -123,7 +123,7 @@ const rescheduleProposalSchema = z.object({
   scheduledEndAt: z.string().optional(),
 });
 
-export type ProposalCardKind = "proposal" | "partnership";
+export type ProposalCardKind = "proposal" | "partnership" | "residency";
 
 export interface ProposalCard {
   id: string;
@@ -148,6 +148,11 @@ export interface ProposalCard {
   cardKind?: ProposalCardKind;
   partnershipId?: string;
   partnerName?: string;
+  residencyId?: string;
+  residencyPlaceName?: string;
+  residencyInviteeName?: string;
+  /** Residency/partnership workflow status when Kanban state is mapped for display. */
+  workflowStatus?: "proposed" | "declined";
 }
 
 export type RecurrencePattern = "daily" | "weekly" | "monthly" | "yearly";
@@ -829,6 +834,76 @@ export async function listProposalBoardAction(): Promise<ProposalBoard> {
         partnershipId: row.id,
         partnerName,
       });
+    }
+  }
+
+  const residencyRows = await db
+    .select({
+      id: locationResidents.id,
+      locationId: locationResidents.locationId,
+      userId: locationResidents.userId,
+      proposedById: locationResidents.proposedById,
+      status: locationResidents.status,
+      placeName: locations.name,
+      inviteeName: users.displayName,
+    })
+    .from(locationResidents)
+    .innerJoin(locations, eq(locationResidents.locationId, locations.id))
+    .innerJoin(users, eq(locationResidents.userId, users.id))
+    .where(inArray(locationResidents.status, ["proposed", "declined"]));
+
+  if (residencyRows.length > 0) {
+    const proposerIds = [...new Set(residencyRows.map((row) => row.proposedById))];
+    const proposerRows = await db
+      .select({ id: users.id, displayName: users.displayName })
+      .from(users)
+      .where(inArray(users.id, proposerIds));
+    const proposerMap = new Map(proposerRows.map((row) => [row.id, row.displayName]));
+
+    for (const row of residencyRows) {
+      const isInvitee = row.userId === viewerId;
+      const isProposer = row.proposedById === viewerId;
+      if (!isInvitee && !isProposer && !isAdmin) continue;
+
+      const proposerName =
+        row.proposedById === viewerId
+          ? "You"
+          : (proposerMap.get(row.proposedById) ?? "Someone");
+      const needsViewerAction = row.status === "proposed" && isInvitee;
+
+      const card: ProposalCard = {
+        id: `${RESIDENCY_CARD_PREFIX}${row.id}`,
+        title: `Residency at ${row.placeName}`,
+        description: isInvitee
+          ? `${proposerName} invited you to be a resident at ${row.placeName}.`
+          : `Residency proposal for ${row.inviteeName} at ${row.placeName}.`,
+        proposalType: "event",
+        state: row.status === "declined" ? "draft" : "proposed",
+        proposerId: row.proposedById,
+        proposerName,
+        locationName: row.placeName,
+        scheduledStartAt: null,
+        scheduledEndAt: null,
+        atRisk: false,
+        isPoll: false,
+        eventPrivacy: "open",
+        isContentMasked: false,
+        needsViewerAction,
+        inviteeCount: 1,
+        respondedCount: row.status === "proposed" ? 0 : 1,
+        isPastSchedule: false,
+        cardKind: "residency",
+        residencyId: row.id,
+        residencyPlaceName: row.placeName,
+        residencyInviteeName: row.inviteeName,
+        workflowStatus: row.status === "declined" ? "declined" : "proposed",
+      };
+
+      if (row.status === "declined") {
+        if (isProposer) empty.draft.push(card);
+      } else {
+        empty.proposed.push(card);
+      }
     }
   }
 

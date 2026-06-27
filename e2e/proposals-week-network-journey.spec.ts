@@ -9,6 +9,7 @@ import {
   createAndSubmitSoloSleepingWeek,
   proposalCardsWithPrefix,
 } from "./helpers/proposals";
+import { expectToast } from "./helpers/toast";
 
 test.describe("Week schedule poly-family journey", () => {
   test("proposer schedules solo week + social events, cancels a night, required accepts and optional declines with notes, notifications match actions", async ({
@@ -93,7 +94,7 @@ test.describe("Week schedule poly-family journey", () => {
 
     const leiaDialog = page.getByRole("dialog");
     await leiaDialog.getByRole("button", { name: "Accept" }).click();
-    await expect(leiaDialog.getByText(/Vote recorded/i)).toBeVisible({ timeout: 15_000 });
+    await expectToast(page, /Vote recorded/i);
     await expect(leiaDialog.getByText("RESOLVED", { exact: true }).first()).toBeVisible({
       timeout: 15_000,
     });
@@ -111,7 +112,7 @@ test.describe("Week schedule poly-family journey", () => {
     await hanDialog.getByRole("button", { name: "Post" }).click();
     await expect(hanDialog.getByText(declineNote)).toBeVisible({ timeout: 15_000 });
     await hanDialog.getByRole("button", { name: "Decline" }).click();
-    await expect(hanDialog.getByText(/Vote recorded/i)).toBeVisible({ timeout: 15_000 });
+    await expectToast(page, /Vote recorded/i);
     await expect(hanDialog.getByText("Declined", { exact: true })).toBeVisible();
     await expect(hanDialog.getByText("RESOLVED", { exact: true }).first()).toBeVisible();
     await expect(hanDialog.getByText("Accepted", { exact: true })).toBeVisible();

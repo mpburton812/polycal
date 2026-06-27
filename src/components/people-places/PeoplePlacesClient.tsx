@@ -535,7 +535,7 @@ function PlaceDetail({
   const isResident = residents.some(
     (row) => row.userId === currentUserId && row.status === "accepted",
   );
-  const canEditPlace = isAdmin || place.createdById === currentUserId;
+  const canEditPlace = isAdmin || place.createdById === currentUserId || isResident;
   const canDeletePlace = isAdmin || isResident || place.createdById === currentUserId;
 
   useEffect(() => {
@@ -1039,11 +1039,24 @@ export function PeoplePlacesClient({
                 direction="row"
                 spacing={2}
                 alignItems="center"
+                role={canExpand ? "button" : undefined}
+                tabIndex={canExpand ? 0 : undefined}
+                aria-expanded={canExpand ? selectedPersonId === person.id : undefined}
+                aria-label={canExpand ? `View ${person.displayName} details` : undefined}
                 onClick={() => {
                   if (!canExpand) return;
                   setSelectedPersonId((current) =>
                     current === person.id ? null : person.id,
                   );
+                }}
+                onKeyDown={(event) => {
+                  if (!canExpand) return;
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    setSelectedPersonId((current) =>
+                      current === person.id ? null : person.id,
+                    );
+                  }
                 }}
                 sx={{ cursor: canExpand ? "pointer" : "default" }}
               >
