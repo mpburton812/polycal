@@ -21,7 +21,7 @@ else
 fi
 
 echo "[ci] Ensuring Jira backlog gap tickets PC-52..PC-56 exist"
-npx tsx scripts/backfill-jira-kanban-gap.ts
+npx tsx scripts/backfill-jira-kanban-gap.ts || echo "[ci] Jira gap backfill skipped or failed; continuing to status sync."
 
 echo "[ci] Jira In Progress sync for range: ${RANGE}"
 npx tsx scripts/jira-transition-issues.ts --range "${RANGE}" --status "In Progress"
