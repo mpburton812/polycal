@@ -62,30 +62,16 @@ function parseIssueNumber(issueKey: string): number | null {
   return match ? Number.parseInt(match[1] ?? "", 10) : null;
 }
 
-/** Highest numeric PC issue key in the project, or 0 when none exist. */
+/** Probe sequential keys — more reliable than JQL search with restricted tokens. */
 async function getLatestIssueNumber(
   credentials: NonNullable<ReturnType<typeof loadJiraCredentials>>,
 ): Promise<number> {
-  const response = await jiraFetch(credentials, "/search/jql", {
-    method: "POST",
-    body: JSON.stringify({
-      jql: `project = ${PROJECT_KEY} ORDER BY key DESC`,
-      maxResults: 1,
-      fields: ["key"],
-    }),
-  });
-
-  if (!response.ok) {
-    const body = await response.text();
-    throw new Error(`Failed to search Jira project ${PROJECT_KEY}: ${response.status} ${body}`);
+  for (let number = TARGET_MAX; number >= 1; number -= 1) {
+    if (await issueExists(credentials, `${PROJECT_KEY}-${number}`)) {
+      return number;
+    }
   }
-
-  const data = (await response.json()) as {
-    issues?: Array<{ key?: string }>;
-  };
-
-  const key = data.issues?.[0]?.key;
-  return key ? (parseIssueNumber(key) ?? 0) : 0;
+  return 0;
 }
 
 /** Create the next sequential Story in project PC. */
@@ -145,6 +131,18 @@ async function main(): Promise<void> {
 
   let latest = await getLatestIssueNumber(credentials);
   console.log(`[jira-backfill] Latest ${PROJECT_KEY} issue: ${latest > 0 ? `${PROJECT_KEY}-${latest}` : "none"}`);
+
+  if (latest === 0) {
+    throw new Error(
+      `No ${PROJECT_KEY} issues found via key probe; create the project backlog before gap backfill.`,
+    );
+  }
+
+  if (latest < 51) {
+    throw new Error(
+      `Latest ${PROJECT_KEY} issue is ${PROJECT_KEY}-${latest}; expected PC-51 or higher before backfilling PC-52..PC-56.`,
+    );
+  }
 
   while (latest < TARGET_MAX) {
     const nextNumber = latest + 1;
