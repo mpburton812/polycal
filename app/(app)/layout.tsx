@@ -7,6 +7,7 @@ import { AppShell } from "@/components/layout/AppShell";
 import { FirstLoginWizard } from "@/components/onboarding/FirstLoginWizard";
 import { UserThemeProvider } from "@/components/providers/UserThemeProvider";
 import { auth } from "@/lib/auth";
+import { getLiveUserStatus } from "@/lib/auth-session";
 import { userHasAdminAccess } from "@/lib/admin-access";
 import { isUserThemeId } from "@/lib/constants/themes";
 
@@ -20,7 +21,11 @@ export default async function AppLayout({
     redirect("/login");
   }
 
-  if (session.user.accountStatus === "paused") {
+  const liveStatus = await getLiveUserStatus(session.user.id);
+  if (liveStatus === "deleted") {
+    redirect("/login");
+  }
+  if (liveStatus === "paused") {
     redirect("/paused");
   }
 

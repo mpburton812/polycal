@@ -1,7 +1,12 @@
 import { Box, Button, Paper, TextField, Typography } from "@mui/material";
+import { eq } from "drizzle-orm";
 import { redirect } from "next/navigation";
 
 import { auth, signIn } from "@/lib/auth";
+import { getLiveUserStatus } from "@/lib/auth-session";
+import { getDb } from "@/lib/db/client";
+import { ensureDbReady } from "@/lib/db/ensure-ready";
+import { users } from "@/lib/db/schema";
 import { getNonProductionLoginHint } from "@/lib/seed/login-hint";
 
 interface LoginPageProps {
@@ -13,8 +18,9 @@ interface LoginPageProps {
  */
 export default async function LoginPage({ searchParams }: LoginPageProps) {
   const session = await auth();
-  if (session?.user) {
-    if (session.user.accountStatus === "paused") {
+  if (session?.user?.id) {
+    const liveStatus = await getLiveUserStatus(session.user.id);
+    if (liveStatus === "paused") {
       redirect("/paused");
     }
     redirect("/schedule");
@@ -25,14 +31,26 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
 
   async function loginAction(formData: FormData) {
     "use server";
-    const username = String(formData.get("username") ?? "");
+    const username = String(formData.get("username") ?? "").trim().toLowerCase();
     const password = String(formData.get("password") ?? "");
-    const callbackUrl = String(formData.get("callbackUrl") ?? "/schedule");
+    let redirectTo = String(formData.get("callbackUrl") ?? "/schedule");
+
+    await ensureDbReady();
+    const db = getDb();
+    const [row] = await db
+      .select({ status: users.status })
+      .from(users)
+      .where(eq(users.username, username))
+      .limit(1);
+    if (row?.status === "paused") {
+      redirectTo = "/paused";
+    }
+
     try {
       await signIn("credentials", {
         username,
         password,
-        redirectTo: callbackUrl,
+        redirectTo,
       });
     } catch {
       redirect("/login?error=CredentialsSignin");

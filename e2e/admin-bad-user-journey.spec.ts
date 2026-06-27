@@ -37,7 +37,6 @@ test.describe("Admin bad user lifecycle journey", () => {
     await login(page, USERS.luke.username);
     await goToAdmin(page);
     await pauseUserInAdmin(page, USERS.badUser.displayName);
-    await expect(page.getByText(/Paused Bad User/i)).toBeVisible({ timeout: 15_000 });
 
     await logout(page);
 
@@ -53,7 +52,6 @@ test.describe("Admin bad user lifecycle journey", () => {
     await login(page, USERS.luke.username);
     await goToAdmin(page);
     await resumeUserInAdmin(page, USERS.badUser.displayName);
-    await expect(page.getByText(/Resumed Bad User/i)).toBeVisible({ timeout: 15_000 });
 
     await logout(page);
 

@@ -20,6 +20,15 @@ export async function login(
       await page.waitForURL(/\/(schedule|profile|people-places|proposals|admin|paused)/, {
         timeout: 60_000,
       });
+      if (page.url().includes("/paused")) {
+        return;
+      }
+      if (page.url().includes("/schedule")) {
+        await page
+          .waitForURL(/\/paused/, { timeout: 5_000 })
+          .then(() => true)
+          .catch(() => false);
+      }
       if (!page.url().includes("/login")) {
         return;
       }

@@ -2,6 +2,7 @@ import { Box, Button, Paper, Typography } from "@mui/material";
 import { redirect } from "next/navigation";
 
 import { auth, signOut } from "@/lib/auth";
+import { getLiveUserStatus } from "@/lib/auth-session";
 
 /**
  * Minimal shell for paused accounts — no app navigation (PC-55).
@@ -11,7 +12,12 @@ export default async function PausedPage() {
   if (!session?.user?.id) {
     redirect("/login");
   }
-  if (session.user.accountStatus !== "paused") {
+
+  const liveStatus = await getLiveUserStatus(session.user.id);
+  if (liveStatus === "deleted") {
+    redirect("/login");
+  }
+  if (liveStatus !== "paused") {
     redirect("/schedule");
   }
 

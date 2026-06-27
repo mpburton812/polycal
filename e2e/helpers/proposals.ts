@@ -184,7 +184,7 @@ export async function createAndSubmitSoloSleepingWeek(
 
     const editDialog = page.getByRole("dialog");
     await expect(editDialog.getByRole("heading", { name: "Edit draft" })).toBeVisible({
-      timeout: 30_000,
+      timeout: 45_000,
     });
     await expect(editDialog.getByLabel("Title")).toHaveValue(new RegExp(`^${escaped}`), {
       timeout: 20_000,

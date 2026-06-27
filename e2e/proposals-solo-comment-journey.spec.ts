@@ -3,7 +3,7 @@ import { expect, test } from "./helpers/test";
 import { login, logout } from "./helpers/auth";
 import { USERS } from "./helpers/constants";
 import { currentWeekDateTime } from "./helpers/datePickers";
-import { goToProposals, goToSchedule, selectProposalTab } from "./helpers/navigation";
+import { goToProposals, openProposalCard, selectProposalTab } from "./helpers/navigation";
 import { createAndSubmitSoloEvent, proposalCard } from "./helpers/proposals";
 
 test.describe("Solo open event network comment journey", () => {
@@ -30,8 +30,9 @@ test.describe("Solo open event network comment journey", () => {
 
     await logout(page);
     await login(page, USERS.han.username);
-    await goToSchedule(page);
-    await page.getByRole("button", { name: new RegExp(title, "i") }).click();
+    await goToProposals(page);
+    await selectProposalTab(page, "Resolved");
+    await openProposalCard(page, title);
 
     const dialog = page.getByRole("dialog");
     await expect(dialog.getByRole("heading", { name: title })).toBeVisible();
