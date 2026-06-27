@@ -52,10 +52,17 @@ function scheduleWindow(
   offsetDays: number,
   startHour: number,
   durationHours: number,
+  options?: { ensureFuture?: boolean },
 ): { startAt: string; endAt: string } {
   const start = startOfWeekMonday(new Date());
   start.setDate(start.getDate() + offsetDays);
   start.setHours(startHour, 0, 0, 0);
+  if (options?.ensureFuture) {
+    const now = new Date();
+    while (start.getTime() <= now.getTime()) {
+      start.setDate(start.getDate() + 7);
+    }
+  }
   const end = new Date(start);
   end.setTime(end.getTime() + durationHours * 60 * 60 * 1000);
   return { startAt: start.toISOString(), endAt: end.toISOString() };
@@ -91,7 +98,7 @@ const DEMO_PROPOSALS: DemoProposal[] = [
     proposerId: "sw-leia",
     locationId: "loc-cloudcity",
     inviteeIds: ["sw-luke", "sw-han"],
-    timeSlots: [{ startOffsetDays: 1, startHour: 14, durationHours: 2 }],
+    timeSlots: [{ startOffsetDays: 30, startHour: 14, durationHours: 2 }],
   },
   {
     id: "prop-proposed-2",
@@ -102,7 +109,7 @@ const DEMO_PROPOSALS: DemoProposal[] = [
     proposerId: "sw-han",
     locationId: "loc-tatooine",
     inviteeIds: ["sw-leia"],
-    timeSlots: [{ startOffsetDays: 3, startHour: 22, durationHours: 8 }],
+    timeSlots: [{ startOffsetDays: 32, startHour: 22, durationHours: 8 }],
   },
   {
     id: "prop-proposed-3",
@@ -113,7 +120,7 @@ const DEMO_PROPOSALS: DemoProposal[] = [
     proposerId: "sw-vader",
     locationId: "loc-deathstar",
     inviteeIds: ["sw-luke"],
-    timeSlots: [{ startOffsetDays: 5, startHour: 10, durationHours: 1 }],
+    timeSlots: [{ startOffsetDays: 35, startHour: 10, durationHours: 1 }],
   },
   {
     id: "prop-resolved-1",
@@ -243,6 +250,7 @@ export async function seedDemoProposals(options?: {
         slot.startOffsetDays,
         slot.startHour,
         slot.durationHours,
+        { ensureFuture: true },
       );
       await db.insert(proposalTimeSlots).values({
         id: `pts-${proposal.id}-${index}`,
