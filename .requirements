@@ -89,3 +89,4 @@
 2026-06-27 | 87a0c94 | PC-55 | paused users, open resolved comments, and E2E journeys | src/actions/proposals.ts
 2026-06-27 | 616944c | PC-55 | keep demo proposed fixtures voteable all day | src/lib/seed/demo-proposals.ts
 2026-06-27 | 45cb108 | PC-55 | keep demo proposals in week and voteable | src/lib/seed/demo-proposals.ts
+2026-06-27 | 59047a7 | PC-55 | harden paused-user redirects and E2E admin helpers | src/lib/auth-session.ts
