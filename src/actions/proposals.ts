@@ -151,6 +151,8 @@ export interface ProposalCard {
   residencyId?: string;
   residencyPlaceName?: string;
   residencyInviteeName?: string;
+  /** Residency/partnership workflow status when Kanban state is mapped for display. */
+  workflowStatus?: "proposed" | "declined";
 }
 
 export type RecurrencePattern = "daily" | "weekly" | "monthly" | "yearly";
@@ -894,6 +896,7 @@ export async function listProposalBoardAction(): Promise<ProposalBoard> {
         residencyId: row.id,
         residencyPlaceName: row.placeName,
         residencyInviteeName: row.inviteeName,
+        workflowStatus: row.status === "declined" ? "declined" : "proposed",
       };
 
       if (row.status === "declined") {

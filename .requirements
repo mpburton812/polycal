@@ -93,3 +93,8 @@
 2026-06-27 | 7fc19c4 | PC-55 | use heading click for admin accordion E2E helper | src/actions/proposals.ts
 2026-06-27 | 82bacc1 | PC-56 | residency Kanban workflow, toast UX, and schedule polish | src/actions/partnerships.ts
 2026-06-27 | d58a217 | PC-56 | assert vote feedback via toast in E2E specs | e2e/helpers/toast.ts
+2026-06-27 | e9fa7a0 | PC-56 | add Jira backfill workflow for .. gap | .github/workflows/jira-backfill-gap.yml
+2026-06-27 | 1e7c04c | PC-56 | run Jira gap backfill before CI status sync | scripts/backfill-jira-kanban-gap.ts
+2026-06-27 | ef49fa8 | PC-56 | use Jira search/jql API for gap backfill | scripts/backfill-jira-kanban-gap.ts
+2026-06-27 | 3273364 | PC-56 | probe Jira keys for gap backfill instead of search API | scripts/backfill-jira-kanban-gap.ts
+2026-06-27 | f89acaa | PC-56 | improve Jira backfill diagnostics when project is invisible | scripts/backfill-jira-kanban-gap.ts

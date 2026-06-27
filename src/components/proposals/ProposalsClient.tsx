@@ -41,6 +41,13 @@ const TAB_LABELS: Record<TabKey, string> = {
 
 const POLY_GREEN = "#004d40";
 
+/** Standard event/date proposals only — not residency or partnership workflow cards. */
+function isStandardDraftProposal(proposal: ProposalCardData): boolean {
+  if (proposal.state !== "draft") return false;
+  const kind = proposal.cardKind ?? "proposal";
+  return kind === "proposal";
+}
+
 interface ProposalsClientProps {
   board: ProposalBoard;
   people: PersonSummary[];
@@ -200,8 +207,12 @@ export function ProposalsClient({
               key={proposal.id}
               proposal={proposal}
               onOpen={openDetail}
-              onContinueEdit={proposal.state === "draft" ? handleContinueEdit : undefined}
-              onDeleteDraft={proposal.state === "draft" ? handleDeleteDraft : undefined}
+              onContinueEdit={
+                isStandardDraftProposal(proposal) ? handleContinueEdit : undefined
+              }
+              onDeleteDraft={
+                isStandardDraftProposal(proposal) ? handleDeleteDraft : undefined
+              }
             />
           ))}
         </Box>

@@ -30,8 +30,9 @@ import {
   typeChipSx,
 } from "./proposalCardTheme";
 
-function stateBadgeLabel(state: string): string {
-  return state.toUpperCase();
+function stateBadgeLabel(proposal: ProposalCardData): string {
+  if (proposal.workflowStatus === "declined") return "DECLINED";
+  return proposal.state.toUpperCase();
 }
 
 function responseLabel(proposal: ProposalCardData): string {
@@ -101,7 +102,7 @@ export function ProposalCard({
             {proposal.title}
           </Typography>
           <Chip
-            label={stateBadgeLabel(proposal.state)}
+            label={stateBadgeLabel(proposal)}
             size="small"
             variant="outlined"
             sx={{ fontWeight: 600, fontSize: "0.65rem" }}
