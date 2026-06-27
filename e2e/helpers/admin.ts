@@ -2,11 +2,7 @@ import { type Page, expect } from "@playwright/test";
 
 /** Expands a collapsed admin accordion section by title. */
 export async function expandAdminSection(page: Page, title: string): Promise<void> {
-  const toggle = page.getByRole("button", { name: new RegExp(title, "i") });
-  if ((await toggle.getAttribute("aria-expanded")) !== "true") {
-    await toggle.click();
-    await expect(toggle).toHaveAttribute("aria-expanded", "true", { timeout: 10_000 });
-  }
+  await page.getByRole("heading", { name: title, level: 2 }).click();
 }
 
 function userRow(page: Page, displayName: string) {

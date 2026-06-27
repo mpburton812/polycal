@@ -688,11 +688,17 @@ export async function listProposalBoardAction(): Promise<ProposalBoard> {
 
     if (row.state === "draft") {
       if (row.proposerId !== viewerId) continue;
-    } else if (row.state === "proposed") {
+    } else if (
+      row.state === "proposed" ||
+      row.state === "resolved" ||
+      row.state === "archived"
+    ) {
       if (!viewerCanSeeProposal(viewerId, isAdmin, row.proposerId, inviteeUserIds, {
         state: row.state,
         eventPrivacy: row.eventPrivacy,
-      })) continue;
+      })) {
+        continue;
+      }
     }
 
     const masked = shouldMaskProposalContent(
@@ -2201,7 +2207,7 @@ export async function getProposalDetailAction(
     return { ok: false, message: "Proposal not found." };
   }
   if (
-    row.state === "proposed" &&
+    (row.state === "proposed" || row.state === "resolved" || row.state === "archived") &&
     !viewerCanSeeProposal(session.user.id, isAdmin, row.proposerId, inviteeUserIds, {
       state: row.state,
       eventPrivacy: row.eventPrivacy,

@@ -2,7 +2,6 @@ import { expect, test } from "./helpers/test";
 
 import { login, logout } from "./helpers/auth";
 import { USERS } from "./helpers/constants";
-import { currentWeekDateTime } from "./helpers/datePickers";
 import { goToProposals, openProposalCard, selectProposalTab } from "./helpers/navigation";
 import { createAndSubmitSoloEvent, proposalCard } from "./helpers/proposals";
 
@@ -13,8 +12,8 @@ test.describe("Solo open event network comment journey", () => {
     const tag = Date.now();
     const title = `E2E Alone Time ${tag}`;
     const comment = "I hope you have a nice time!";
-    const start = currentWeekDateTime(3, 14, 0);
-    const end = currentWeekDateTime(3, 16, 30);
+    const start = "2099-09-10T14:00";
+    const end = "2099-09-10T16:30";
 
     await login(page, USERS.luke.username);
     await page.getByRole("link", { name: "Proposals" }).click();
