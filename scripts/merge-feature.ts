@@ -2,9 +2,10 @@
 /**
  * Promote the current feature/* branch toward dev:
  *   1. npm audit gate
- *   2. Jira key validation (commits vs origin/dev)
- *   3. git push -u origin HEAD
- *   4. gh pr create --base dev --fill (or report existing open PR)
+ *   2. Vitest unit tests
+ *   3. Jira key validation (commits vs origin/dev)
+ *   4. git push -u origin HEAD
+ *   5. gh pr create --base dev --fill (or report existing open PR)
  *
  * Usage:
  *   npm run merge-feature
@@ -96,6 +97,9 @@ function main(): void {
 
   console.log("[merge-feature] Running npm audit...");
   runInherit("npm", ["audit", "--audit-level=low"]);
+
+  console.log("[merge-feature] Running Vitest unit tests...");
+  runInherit("npm", ["run", "test:unit"]);
 
   console.log("[merge-feature] Validating Jira keys in commits...");
   runInherit("npx", ["tsx", "scripts/validate-jira-commits.ts", "--range", `origin/dev...HEAD`, "--branch", branch]);

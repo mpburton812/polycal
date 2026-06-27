@@ -580,10 +580,14 @@ function viewerCanSeeProposal(
   isAdmin: boolean,
   proposerId: string,
   inviteeUserIds: string[],
+  context?: { state?: ProposalState; eventPrivacy?: EventPrivacyLevel },
 ): boolean {
   if (isAdmin) return true;
   if (proposerId === viewerId) return true;
-  return inviteeUserIds.includes(viewerId);
+  if (inviteeUserIds.includes(viewerId)) return true;
+  if (context?.state === "resolved" && context.eventPrivacy === "open") return true;
+  if (context?.state === "archived" && context.eventPrivacy === "open") return true;
+  return false;
 }
 
 /** Notifies proposer and all invitees on a proposal (PC-40). */
@@ -684,8 +688,17 @@ export async function listProposalBoardAction(): Promise<ProposalBoard> {
 
     if (row.state === "draft") {
       if (row.proposerId !== viewerId) continue;
-    } else if (row.state === "proposed") {
-      if (!viewerCanSeeProposal(viewerId, isAdmin, row.proposerId, inviteeUserIds)) continue;
+    } else if (
+      row.state === "proposed" ||
+      row.state === "resolved" ||
+      row.state === "archived"
+    ) {
+      if (!viewerCanSeeProposal(viewerId, isAdmin, row.proposerId, inviteeUserIds, {
+        state: row.state,
+        eventPrivacy: row.eventPrivacy,
+      })) {
+        continue;
+      }
     }
 
     const masked = shouldMaskProposalContent(
@@ -2194,8 +2207,11 @@ export async function getProposalDetailAction(
     return { ok: false, message: "Proposal not found." };
   }
   if (
-    row.state === "proposed" &&
-    !viewerCanSeeProposal(session.user.id, isAdmin, row.proposerId, inviteeUserIds)
+    (row.state === "proposed" || row.state === "resolved" || row.state === "archived") &&
+    !viewerCanSeeProposal(session.user.id, isAdmin, row.proposerId, inviteeUserIds, {
+      state: row.state,
+      eventPrivacy: row.eventPrivacy,
+    })
   ) {
     return { ok: false, message: "Proposal not found." };
   }
@@ -2301,7 +2317,14 @@ export async function getProposalDetailAction(
       id: row.id,
       title: display.title,
       description: display.description,
-      notes: masked ? null : row.notes,
+      notes: masked
+        ? null
+        : isProposer ||
+            isInvitee ||
+            isAdmin ||
+            (row.state === "resolved" && row.eventPrivacy === "open")
+          ? row.notes
+          : null,
       proposalType: row.proposalType,
       state: row.state,
       proposerId: row.proposerId,
@@ -2388,7 +2411,10 @@ export async function getProposalDetailAction(
         canViewSensitive &&
         row.state !== "draft" &&
         row.state !== "archived" &&
-        viewerCanSeeProposal(session.user.id, isAdmin, row.proposerId, inviteeUserIds),
+        viewerCanSeeProposal(session.user.id, isAdmin, row.proposerId, inviteeUserIds, {
+          state: row.state,
+          eventPrivacy: row.eventPrivacy,
+        }),
       canCancel: canManage && (row.state === "proposed" || row.state === "resolved"),
       canRedraft: isProposer && row.state === "resolved",
       canClone:

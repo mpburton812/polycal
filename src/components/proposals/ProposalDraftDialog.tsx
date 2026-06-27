@@ -268,6 +268,8 @@ export function ProposalDraftDialog({
   useEffect(() => {
     if (!open) return;
     if (initialDetail) {
+      setSavedDraftId(initialDetail.id);
+      setBatchMode(false);
       setProposalType(initialDetail.proposalType);
       setTitle(initialDetail.title);
       setDescription(initialDetail.description ?? "");

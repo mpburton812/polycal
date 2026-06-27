@@ -173,7 +173,15 @@ export function AdminUserManagementPanel({
                   <Chip
                     size="small"
                     label={user.status}
-                    color={user.status === "active" ? "success" : "warning"}
+                    color={
+                      user.status === "active"
+                        ? "success"
+                        : user.status === "paused"
+                          ? "warning"
+                          : user.status === "deleted"
+                            ? "error"
+                            : "default"
+                    }
                   />
                 </TableCell>
                 <TableCell>

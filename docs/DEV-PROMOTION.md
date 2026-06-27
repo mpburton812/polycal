@@ -5,7 +5,7 @@ All promotion from `feature/*` to `dev` **must use a GitHub Pull Request**. Dire
 ## Why PRs are required
 
 - Triggers **In Review** Jira sync (`jira-sync-on-pr`)
-- Runs CI gates (`validate-jira-commits`, `npm-audit`) before merge
+- Runs CI gates (`validate-jira-commits`, `npm-audit`, `vitest`, `playwright`) before merge
 - Triggers **Done** Jira sync on merge (`jira-sync-on-merge`)
 - Provides an audit trail in GitHub
 
@@ -29,9 +29,10 @@ merge feature -Merge   # push + open PR + wait for CI + merge to dev
 The shortcut runs:
 
 1. `npm audit --audit-level=low`
-2. Jira key validation (`origin/dev...HEAD`)
-3. `git push -u origin HEAD`
-4. `gh pr create --base dev --fill` (skips if PR already open)
+2. `npm run test:unit` (Vitest)
+3. Jira key validation (`origin/dev...HEAD`)
+4. `git push -u origin HEAD`
+5. `gh pr create --base dev --fill` (skips if PR already open)
 
 ### Manual steps
 
@@ -69,7 +70,7 @@ Enable on the `dev` branch in GitHub repository settings:
 1. **Settings → Branches → Add branch protection rule**
 2. Branch name pattern: `dev`
 3. Enable **Require a pull request before merging**
-4. Enable **Require status checks to pass** (select `validate-jira-commits`, `npm-audit`)
+4. Enable **Require status checks to pass** (select `validate-jira-commits`, `npm-audit`, `vitest`, `playwright`)
 5. Optionally require PR reviews
 
 This enforces PR-only promotion at the platform level.

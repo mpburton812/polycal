@@ -60,6 +60,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             name: row.displayName,
             email: row.username,
             role: row.role as UserRole,
+            accountStatus: row.status,
             mustChangePassword: row.mustChangePassword,
             onboardingComplete: row.onboardingComplete,
             sessionVersion: row.sessionVersion,
@@ -79,7 +80,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           .where(eq(users.username, parsed.data.username.toLowerCase()))
           .limit(1);
 
-        if (!row || row.status !== "active" || row.role === "passive") {
+        if (!row || row.status === "deleted" || row.role === "passive") {
           return null;
         }
 
@@ -93,6 +94,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           name: row.displayName,
           email: row.username,
           role: row.role,
+          accountStatus: row.status,
           mustChangePassword: row.mustChangePassword,
           onboardingComplete: row.onboardingComplete,
           sessionVersion: row.sessionVersion,

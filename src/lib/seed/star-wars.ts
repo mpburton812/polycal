@@ -3,7 +3,7 @@ import { hash } from "bcryptjs";
 
 import { getDb } from "@/lib/db/client";
 import { isNonProductionEnvironment } from "@/lib/env";
-import { locations, polyGroup, users, type UserRole } from "@/lib/db/schema";
+import { locationResidents, locations, polyGroup, users, type UserRole } from "@/lib/db/schema";
 
 const DEFAULT_PASSWORD = "ChangeMe123!";
 
@@ -98,6 +98,14 @@ const SEED_USERS: SeedUser[] = [
     avatarKey: "bird_yellow",
     mustChangePassword: true,
   },
+  {
+    id: "sw-bad-user",
+    username: "bad_user",
+    displayName: "Bad User",
+    role: "user",
+    avatarKey: "bird_red",
+    mustChangePassword: false,
+  },
 ];
 
 const SEED_LOCATIONS = [
@@ -163,6 +171,28 @@ export async function seedStarWarsFoundation(options?: {
       updatedAt: now,
     });
   }
+
+  await db.insert(locations).values({
+    id: "loc-bad-user",
+    name: "Bad User Hideout",
+    description: "E2E troublemaker lair",
+    bedroomCount: 1,
+    bedroomNames: JSON.stringify(["Main"]),
+    createdById: "sw-bad-user",
+    createdAt: now,
+    updatedAt: now,
+  });
+
+  await db.insert(locationResidents).values({
+    id: "res-bad-user",
+    locationId: "loc-bad-user",
+    userId: "sw-bad-user",
+    status: "accepted",
+    proposedById: "sw-bad-user",
+    createdAt: now,
+    updatedAt: now,
+    respondedAt: now,
+  });
 
   return { seeded: true };
 }

@@ -2,7 +2,7 @@
 
 import { hash } from "bcryptjs";
 import { randomUUID } from "node:crypto";
-import { and, asc, eq, inArray, ne, or } from "drizzle-orm";
+import { and, asc, eq, inArray, or } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
@@ -12,6 +12,7 @@ import { getDb } from "@/lib/db/client";
 import { ensureDbReady } from "@/lib/db/ensure-ready";
 import {
   locationResidents,
+  locations,
   polyGroup,
   proposalInvitees,
   proposalSlotVotes,
@@ -197,6 +198,28 @@ async function archiveProposalsForDeletedUser(
   }
 
   await demoteOrRemoveInviteeFromActiveProposals(db, userId, actorUserId, "removed from the network");
+}
+
+/**
+ * Removes places created by a departing user (PC-55).
+ */
+async function deletePlacesOwnedByUser(
+  db: ReturnType<typeof getDb>,
+  userId: string,
+): Promise<void> {
+  const ownedPlaces = await db
+    .select({ id: locations.id })
+    .from(locations)
+    .where(eq(locations.createdById, userId));
+
+  for (const place of ownedPlaces) {
+    await db.delete(locationResidents).where(eq(locationResidents.locationId, place.id));
+    await db
+      .update(proposals)
+      .set({ locationId: null, updatedAt: new Date().toISOString() })
+      .where(eq(proposals.locationId, place.id));
+    await db.delete(locations).where(eq(locations.id, place.id));
+  }
 }
 
 /**
@@ -690,7 +713,7 @@ export async function deleteUserAction(userId: string): Promise<UserActionResult
   await ensureDbReady();
   const db = getDb();
   const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
-  if (!user || user.status !== "active") {
+  if (!user || (user.status !== "active" && user.status !== "paused")) {
     return { ok: false, message: "User not found." };
   }
 
@@ -712,6 +735,8 @@ export async function deleteUserAction(userId: string): Promise<UserActionResult
         eq(locationResidents.proposedById, userId),
       ),
     );
+
+  await deletePlacesOwnedByUser(db, userId);
 
   await archiveProposalsForDeletedUser(db, userId, session.user.id);
   await demoteOrRemoveInviteeFromActiveProposals(db, userId, session.user.id, "removed");
@@ -767,7 +792,6 @@ export async function listAdminUsersAction(): Promise<AdminUserRow[]> {
       loginCount: users.loginCount,
     })
     .from(users)
-    .where(ne(users.status, "deleted"))
     .orderBy(asc(users.displayName));
 
   return rows;
