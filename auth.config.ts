@@ -23,6 +23,7 @@ export const authConfig = {
       if (user) {
         token.id = user.id!;
         token.role = user.role;
+        token.accountStatus = user.accountStatus ?? "active";
         token.mustChangePassword = user.mustChangePassword;
         token.onboardingComplete = user.onboardingComplete;
         token.sessionVersion = user.sessionVersion;
@@ -56,7 +57,7 @@ export const authConfig = {
           .where(eq(users.id, token.id as string))
           .limit(1);
 
-        if (!row || row.status !== "active") {
+        if (!row || row.status === "deleted") {
           token.error = "SessionInvalid";
           return token;
         }
@@ -66,6 +67,7 @@ export const authConfig = {
           return token;
         }
 
+        token.accountStatus = row.status;
         token.role = row.role;
         token.mustChangePassword = row.mustChangePassword;
         token.onboardingComplete = row.onboardingComplete;
@@ -84,6 +86,7 @@ export const authConfig = {
       if (session.user && token.id) {
         session.user.id = token.id as string;
         session.user.role = token.role as "admin" | "user" | "passive";
+        session.user.accountStatus = (token.accountStatus as "active" | "paused") ?? "active";
         session.user.mustChangePassword = token.mustChangePassword as boolean;
         session.user.onboardingComplete = token.onboardingComplete as boolean;
         session.user.displayName = token.displayName as string;

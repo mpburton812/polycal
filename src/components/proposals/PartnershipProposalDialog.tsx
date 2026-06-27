@@ -8,6 +8,7 @@ import {
   DialogContent,
   DialogTitle,
   Stack,
+  TextField,
   Typography,
 } from "@mui/material";
 import { useRouter } from "next/navigation";
@@ -18,6 +19,7 @@ import {
   withdrawPartnershipProposalAction,
 } from "@/actions/partnerships";
 import type { ProposalCard } from "@/actions/proposals";
+import { useToast } from "@/components/providers/ToastProvider";
 
 import { primaryButtonSx } from "./proposalCardTheme";
 
@@ -38,8 +40,9 @@ export function PartnershipProposalDialog({
   onClose,
 }: PartnershipProposalDialogProps) {
   const router = useRouter();
-  const [message, setMessage] = useState<string | null>(null);
+  const { showToast } = useToast();
   const [pending, startTransition] = useTransition();
+  const [commentText, setCommentText] = useState("");
 
   if (!card || card.cardKind !== "partnership" || !card.partnershipId) {
     return null;
@@ -55,8 +58,9 @@ export function PartnershipProposalDialog({
       const result = await respondPartnershipAction({
         partnershipId,
         accept,
+        comment: commentText.trim() || undefined,
       });
-      setMessage(result.message);
+      showToast(result.message, result.ok ? "success" : "error");
       if (!result.ok) return;
       onClose();
       router.refresh();
@@ -66,7 +70,7 @@ export function PartnershipProposalDialog({
   function withdraw() {
     startTransition(async () => {
       const result = await withdrawPartnershipProposalAction(partnershipId);
-      setMessage(result.message);
+      showToast(result.message, result.ok ? "success" : "error");
       if (!result.ok) return;
       onClose();
       router.refresh();
@@ -78,6 +82,9 @@ export function PartnershipProposalDialog({
       <DialogTitle>Relationship proposal</DialogTitle>
       <DialogContent>
         <Stack spacing={2} sx={{ pt: 1 }}>
+          <Alert severity="info" sx={{ py: 0.5 }}>
+            Visible only to the proposer, invitee, and admins.
+          </Alert>
           <Typography variant="body1">{card.title}</Typography>
           {card.description && (
             <Typography variant="body2" color="text.secondary">
@@ -87,8 +94,17 @@ export function PartnershipProposalDialog({
           <Typography variant="caption" color="text.secondary">
             {card.proposerName === "You" ? "Proposed by you" : `Proposed by ${card.proposerName}`}
           </Typography>
-          {message && (
-            <Alert severity={message.includes("cannot") ? "warning" : "info"}>{message}</Alert>
+          {canRespond && (
+            <TextField
+              size="small"
+              fullWidth
+              multiline
+              minRows={1}
+              maxRows={3}
+              placeholder="Add a comment (optional)…"
+              value={commentText}
+              onChange={(event) => setCommentText(event.target.value)}
+            />
           )}
         </Stack>
       </DialogContent>

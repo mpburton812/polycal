@@ -51,8 +51,10 @@ import {
   type ProposalConflictWarning,
   type ProposalDetail,
 } from "@/actions/proposals";
+import { useToast } from "@/components/providers/ToastProvider";
 import type { InviteeVoteStatus } from "@/lib/db/schema";
 import type { PersonSummary } from "@/actions/users";
+import { handleCommentEnterKey } from "@/lib/ui/comment-keydown";
 
 import {
   formatTimeRange,
@@ -62,6 +64,7 @@ import {
   typeBadgeLabel,
   typeChipSx,
 } from "./proposalCardTheme";
+import { formatProposalLogLine } from "@/lib/proposals/state-log-format";
 
 const VOTE_STATUS_LABELS: Record<InviteeVoteStatus, string> = {
   not_seen: "Not yet viewed",
@@ -76,10 +79,6 @@ function voteLabel(status: InviteeVoteStatus | string): string {
     return VOTE_STATUS_LABELS[status as InviteeVoteStatus];
   }
   return status.replaceAll("_", " ");
-}
-
-function formatLogAction(action: string): string {
-  return action.replaceAll(".", " · ").replaceAll("_", " ");
 }
 
 /** Readable poll slot label + time on separate lines (PC-49). */
@@ -135,9 +134,8 @@ export function ProposalDetailDialog({
   people = [],
 }: ProposalDetailDialogProps) {
   const router = useRouter();
+  const { showToast } = useToast();
   const [detail, setDetail] = useState<ProposalDetail | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
   const [commentText, setCommentText] = useState("");
   const [conflictWarnings, setConflictWarnings] = useState<ProposalConflictWarning[]>([]);
   const [showConflictConfirm, setShowConflictConfirm] = useState(false);
@@ -149,24 +147,25 @@ export function ProposalDetailDialog({
   const [rescheduleEnd, setRescheduleEnd] = useState("");
   const [pending, startTransition] = useTransition();
 
+  function notifyResult(result: { ok: boolean; message: string }) {
+    showToast(result.message, result.ok ? "success" : "error");
+  }
+
   function reloadDetail(id: string) {
     startTransition(async () => {
       const result = await getProposalDetailAction(id);
       if (!result.ok || !result.detail) {
-        setError(result.message);
+        notifyResult(result);
         setDetail(null);
         return;
       }
       setDetail(result.detail);
-      setError(null);
     });
   }
 
   useEffect(() => {
     if (!open || !proposalId) {
       setDetail(null);
-      setError(null);
-      setMessage(null);
       setCommentText("");
       setConflictWarnings([]);
       setShowConflictConfirm(false);
@@ -178,10 +177,9 @@ export function ProposalDetailDialog({
 
   function handleOverlapResponse(response: "acknowledge" | "decline") {
     if (!proposalId) return;
-    setMessage(null);
     startTransition(async () => {
       const result = await acknowledgeProposalOverlapAction({ proposalId, response });
-      setMessage(result.message);
+      notifyResult(result);
       if (!result.ok) return;
       reloadDetail(proposalId);
       router.refresh();
@@ -190,10 +188,9 @@ export function ProposalDetailDialog({
 
   function handleVote(vote: "accept" | "abstain" | "decline" | "accept_suboptimal") {
     if (!proposalId) return;
-    setMessage(null);
     startTransition(async () => {
       const result = await castProposalVoteAction({ proposalId, vote });
-      setMessage(result.message);
+      notifyResult(result);
       if (!result.ok) return;
       reloadDetail(proposalId);
       router.refresh();
@@ -205,10 +202,9 @@ export function ProposalDetailDialog({
     vote: "accept" | "abstain" | "decline" | "accept_suboptimal",
   ) {
     if (!proposalId) return;
-    setMessage(null);
     startTransition(async () => {
       const result = await castSlotVoteAction({ proposalId, timeSlotId, vote });
-      setMessage(result.message);
+      notifyResult(result);
       if (!result.ok) return;
       reloadDetail(proposalId);
       router.refresh();
@@ -222,10 +218,10 @@ export function ProposalDetailDialog({
       if (!result.ok && result.warnings && result.warnings.length > 0) {
         setConflictWarnings(result.warnings);
         setShowConflictConfirm(true);
-        setMessage(result.message);
+        notifyResult(result);
         return;
       }
-      setMessage(result.message);
+      notifyResult(result);
       if (!result.ok) return;
       onClose();
       router.refresh();
@@ -236,7 +232,7 @@ export function ProposalDetailDialog({
     if (!proposalId || !window.confirm("Delete this draft?")) return;
     startTransition(async () => {
       const result = await deleteDraftProposalAction(proposalId);
-      setMessage(result.message);
+      notifyResult(result);
       if (!result.ok) return;
       onClose();
       router.refresh();
@@ -247,7 +243,7 @@ export function ProposalDetailDialog({
     if (!proposalId) return;
     startTransition(async () => {
       const result = await cancelProposalAction(proposalId, scope);
-      setMessage(result.message);
+      notifyResult(result);
       setCancelScopeOpen(false);
       if (!result.ok) return;
       onClose();
@@ -269,7 +265,7 @@ export function ProposalDetailDialog({
     if (!proposalId) return;
     startTransition(async () => {
       const result = await cloneProposalAction(proposalId);
-      setMessage(result.message);
+      notifyResult(result);
       if (!result.ok || !result.newProposalId) return;
       const detailResult = await getProposalDetailAction(result.newProposalId);
       if (detailResult.ok && detailResult.detail) {
@@ -288,7 +284,7 @@ export function ProposalDetailDialog({
     }
     startTransition(async () => {
       const result = await revokeResolvedAcceptanceAction(proposalId);
-      setMessage(result.message);
+      notifyResult(result);
       if (!result.ok) return;
       reloadDetail(proposalId);
       router.refresh();
@@ -317,7 +313,7 @@ export function ProposalDetailDialog({
         scheduledStartAt: new Date(rescheduleStart).toISOString(),
         scheduledEndAt: rescheduleEnd ? new Date(rescheduleEnd).toISOString() : undefined,
       });
-      setMessage(result.message);
+      notifyResult(result);
       if (!result.ok) return;
       setRescheduleOpen(false);
       reloadDetail(proposalId);
@@ -331,7 +327,7 @@ export function ProposalDetailDialog({
     }
     startTransition(async () => {
       const result = await redraftProposalAction(proposalId);
-      setMessage(result.message);
+      notifyResult(result);
       if (!result.ok) return;
       const detailResult = await getProposalDetailAction(proposalId);
       if (detailResult.ok && detailResult.detail) {
@@ -345,13 +341,12 @@ export function ProposalDetailDialog({
 
   function handleAddComment() {
     if (!proposalId || !commentText.trim()) return;
-    setMessage(null);
     startTransition(async () => {
       const result = await addProposalCommentAction({
         proposalId,
         body: commentText.trim(),
       });
-      setMessage(result.message);
+      notifyResult(result);
       if (!result.ok) return;
       setCommentText("");
       reloadDetail(proposalId);
@@ -367,7 +362,7 @@ export function ProposalDetailDialog({
           ? { addRequired: [addAttendeeId.trim()] }
           : { addOptional: [addAttendeeId.trim()] }),
       });
-      setMessage(result.message);
+      notifyResult(result);
       if (!result.ok) return;
       setAddAttendeeId("");
       reloadDetail(proposalId);
@@ -382,7 +377,7 @@ export function ProposalDetailDialog({
         proposalId,
         removeUserIds: [userId],
       });
-      setMessage(result.message);
+      notifyResult(result);
       if (!result.ok) return;
       reloadDetail(proposalId);
       router.refresh();
@@ -390,9 +385,17 @@ export function ProposalDetailDialog({
   }
 
   const whenLabel = detail
-    ? formatTimeRange(detail.scheduledStartAt, detail.scheduledEndAt) ??
+    ? formatTimeRange(
+        detail.scheduledStartAt,
+        detail.scheduledEndAt,
+        detail.proposalType,
+      ) ??
       (detail.timeSlots[0]
-        ? formatTimeRange(detail.timeSlots[0].startAt, detail.timeSlots[0].endAt)
+        ? formatTimeRange(
+            detail.timeSlots[0].startAt,
+            detail.timeSlots[0].endAt,
+            detail.proposalType,
+          )
         : null)
     : null;
 
@@ -418,8 +421,6 @@ export function ProposalDetailDialog({
         }}
       >
         <CardContent sx={{ pb: 1, overflowY: "auto", flex: 1 }}>
-          {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
-          {message && <Alert severity="info" sx={{ mb: 2 }}>{message}</Alert>}
           {detail?.optionalPollPending && (
             <Alert severity="success" sx={{ mb: 2 }}>
               This proposal was approved by all required attendees and scheduled. Please complete
@@ -529,7 +530,7 @@ export function ProposalDetailDialog({
                 )}
                 {detail.atRisk && <Chip size="small" label="At risk" color="warning" />}
                 {detail.isRecurring && <Chip size="small" label="Recurring" variant="outlined" />}
-                {detail.winningSlotId && (
+                {detail.isPoll && detail.winningSlotId && (
                   <Chip size="small" label="Winning slot" sx={{ bgcolor: POLY_GREEN, color: "#fff" }} />
                 )}
               </Stack>
@@ -837,9 +838,19 @@ export function ProposalDetailDialog({
                     <TextField
                       size="small"
                       fullWidth
+                      multiline
+                      minRows={1}
+                      maxRows={4}
                       placeholder="Add a comment…"
                       value={commentText}
                       onChange={(event) => setCommentText(event.target.value)}
+                      onKeyDown={(event) =>
+                        handleCommentEnterKey(
+                          event,
+                          handleAddComment,
+                          Boolean(commentText.trim()) && !pending,
+                        )
+                      }
                     />
                     <Button
                       variant="outlined"
@@ -858,8 +869,7 @@ export function ProposalDetailDialog({
                   <Stack spacing={0.5}>
                     {detail.stateLog.map((entry, index) => (
                       <Typography key={`${entry.createdAt}-${index}`} variant="caption" color="text.secondary">
-                        {new Date(entry.createdAt).toLocaleString()} · {formatLogAction(entry.action)}
-                        {entry.actorName ? ` · ${entry.actorName}` : ""}
+                        {formatProposalLogLine(entry)}
                       </Typography>
                     ))}
                   </Stack>

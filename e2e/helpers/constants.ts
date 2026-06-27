@@ -5,9 +5,12 @@ export const USERS = {
   luke: { username: "luke", displayName: "Luke Skywalker", id: "sw-luke" },
   leia: { username: "leia", displayName: "Leia Organa", id: "sw-leia" },
   han: { username: "han", displayName: "Han Solo", id: "sw-han" },
+  chewie: { username: "chewie", displayName: "Chewbacca", id: "sw-chewie" },
+  anakin: { username: "anakin", displayName: "Anakin Skywalker", id: "sw-anakin" },
   yoda: { username: "yoda", displayName: "Yoda", id: "sw-yoda" },
   vader: { username: "vader", displayName: "Darth Vader", id: "sw-vader" },
   lando: { username: "lando", displayName: "Lando Calrissian", id: "sw-lando" },
+  badUser: { username: "bad_user", displayName: "Bad User", id: "sw-bad-user" },
 } as const;
 
 /** Demo proposal fixtures from `demo-proposals.ts`. */

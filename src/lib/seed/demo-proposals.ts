@@ -37,16 +37,36 @@ interface DemoProposal {
   timeSlots?: DemoTimeSlot[];
 }
 
+/** Monday 00:00 local for the week containing `date`. */
+function startOfWeekMonday(date: Date): Date {
+  const monday = new Date(date);
+  monday.setHours(0, 0, 0, 0);
+  const day = monday.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  monday.setDate(monday.getDate() + diff);
+  return monday;
+}
+
 /** Builds ISO timestamps anchored to the current week for schedule demos. */
 function scheduleWindow(
   offsetDays: number,
   startHour: number,
   durationHours: number,
+  options?: { ensureFuture?: boolean; minFutureHours?: number },
 ): { startAt: string; endAt: string } {
-  const start = new Date();
-  start.setHours(0, 0, 0, 0);
+  const start = startOfWeekMonday(new Date());
   start.setDate(start.getDate() + offsetDays);
   start.setHours(startHour, 0, 0, 0);
+  if (options?.ensureFuture) {
+    const now = new Date();
+    const minFutureMs = (options.minFutureHours ?? 2) * 60 * 60 * 1000;
+    while (start.getTime() <= now.getTime()) {
+      start.setDate(start.getDate() + 1);
+    }
+    while (start.getTime() < now.getTime() + minFutureMs) {
+      start.setHours(start.getHours() + 1);
+    }
+  }
   const end = new Date(start);
   end.setTime(end.getTime() + durationHours * 60 * 60 * 1000);
   return { startAt: start.toISOString(), endAt: end.toISOString() };
@@ -234,6 +254,7 @@ export async function seedDemoProposals(options?: {
         slot.startOffsetDays,
         slot.startHour,
         slot.durationHours,
+        { ensureFuture: true },
       );
       await db.insert(proposalTimeSlots).values({
         id: `pts-${proposal.id}-${index}`,

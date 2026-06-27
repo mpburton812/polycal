@@ -4,8 +4,12 @@ import type { ScheduleFilterMode } from "@/actions/schedule";
 
 const STORAGE_KEY = "polycal.schedule.view";
 
+export type ScheduleCalendarLayout = "week" | "month";
+
 export interface ScheduleViewState {
   weekStartIso: string;
+  monthAnchorIso: string;
+  calendarLayout: ScheduleCalendarLayout;
   compact: boolean;
   filterMode: ScheduleFilterMode;
   filterPersonId: string;
@@ -14,6 +18,8 @@ export interface ScheduleViewState {
 
 const DEFAULT_STATE = (): ScheduleViewState => ({
   weekStartIso: new Date().toISOString(),
+  monthAnchorIso: new Date().toISOString(),
+  calendarLayout: "week",
   compact: false,
   filterMode: "whole",
   filterPersonId: "",
@@ -33,11 +39,12 @@ export function loadScheduleViewState(): ScheduleViewState {
     return {
       ...defaults,
       compact: parsed.compact ?? defaults.compact,
+      calendarLayout: parsed.calendarLayout ?? defaults.calendarLayout,
       filterMode: parsed.filterMode ?? defaults.filterMode,
       filterPersonId: parsed.filterPersonId ?? defaults.filterPersonId,
       planningOpen: parsed.planningOpen ?? defaults.planningOpen,
-      // Week anchor always resets to the current week; only other prefs persist (PC-43).
       weekStartIso: defaults.weekStartIso,
+      monthAnchorIso: defaults.monthAnchorIso,
     };
   } catch {
     return defaults;
@@ -50,6 +57,6 @@ export function loadScheduleViewState(): ScheduleViewState {
  */
 export function saveScheduleViewState(state: ScheduleViewState): void {
   if (typeof window === "undefined") return;
-  const { weekStartIso: _week, ...persisted } = state;
+  const { weekStartIso: _week, monthAnchorIso: _month, ...persisted } = state;
   window.localStorage.setItem(STORAGE_KEY, JSON.stringify(persisted));
 }

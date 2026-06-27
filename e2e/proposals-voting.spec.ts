@@ -3,6 +3,7 @@ import { expect, test } from "./helpers/test";
 import { login } from "./helpers/auth";
 import { DEMO, USERS } from "./helpers/constants";
 import { goToProposals, openProposalCard, selectProposalTab } from "./helpers/navigation";
+import { expectToast } from "./helpers/toast";
 
 test.describe("Proposal voting", () => {
   test.beforeEach(async ({ page }) => {
@@ -15,9 +16,7 @@ test.describe("Proposal voting", () => {
     const dialog = page.getByRole("dialog");
     await openProposalCard(page, DEMO.proposedDeathStar);
     await dialog.getByRole("button", { name: "Accept" }).click();
-    await expect(dialog.getByText(/Vote recorded/i)).toBeVisible({
-      timeout: 15_000,
-    });
+    await expectToast(page, /Vote recorded/i);
     await expect(dialog.getByText(USERS.luke.displayName, { exact: true }).first()).toBeVisible();
     await expect(dialog.getByText("Accepted", { exact: true })).toBeVisible();
     await expect(dialog.getByText("RESOLVED", { exact: true }).first()).toBeVisible({
@@ -29,9 +28,7 @@ test.describe("Proposal voting", () => {
     const dialog = page.getByRole("dialog");
     await openProposalCard(page, DEMO.proposedRescueHan);
     await dialog.getByRole("button", { name: "Abstain" }).click();
-    await expect(dialog.getByText(/Vote recorded/i)).toBeVisible({
-      timeout: 15_000,
-    });
+    await expectToast(page, /Vote recorded/i);
     await expect(dialog.getByText("Abstained", { exact: true })).toBeVisible();
     await expect(dialog.getByRole("button", { name: "Abstain" })).toHaveCount(0);
   });
