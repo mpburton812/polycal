@@ -4,6 +4,7 @@ import { login, logout } from "./helpers/auth";
 import { fillProposalDateTimeField } from "./helpers/datePickers";
 import { USERS } from "./helpers/constants";
 import { goToProposals, openProposalCard, selectProposalTab } from "./helpers/navigation";
+import { expectToast } from "./helpers/toast";
 
 function proposalCard(page: import("@playwright/test").Page, title: string) {
   return page.locator(".MuiCard-root").filter({
@@ -38,7 +39,7 @@ test.describe("Proposal invitee journey", () => {
 
     const leiaDialog = page.getByRole("dialog");
     await leiaDialog.getByRole("button", { name: "Accept" }).click();
-    await expect(leiaDialog.getByText(/Vote recorded/i)).toBeVisible({ timeout: 15_000 });
+    await expectToast(page, /Vote recorded/i);
     await expect(leiaDialog.getByText("RESOLVED", { exact: true }).first()).toBeVisible({
       timeout: 15_000,
     });
@@ -59,7 +60,7 @@ test.describe("Proposal invitee journey", () => {
 
     const hanDialog = page.getByRole("dialog");
     await hanDialog.getByRole("button", { name: "Abstain" }).click();
-    await expect(hanDialog.getByText(/Vote recorded/i)).toBeVisible({ timeout: 15_000 });
+    await expectToast(page, /Vote recorded/i);
     await expect(hanDialog.getByText("RESOLVED", { exact: true }).first()).toBeVisible();
     await expect(hanDialog.getByText("Abstained", { exact: true })).toBeVisible();
     await expect(hanDialog.getByText("Accepted", { exact: true })).toBeVisible();
