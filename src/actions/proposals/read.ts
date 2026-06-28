@@ -1,11 +1,10 @@
-"use server";
-
 /**
- * Re-exports proposal board/listing actions split from the main proposals module (PC-59).
+ * Proposal board and listing reads (PC-62).
  */
 export {
-  listProposalBoardAction,
+  getProposalDetailAction,
   listAcceptedSleepingPartnerIdsAction,
-  listSleepingLocationOptionsAction,
+  listProposalBoardAction,
   listProposalPlaceOptionsAction,
-} from "../proposals";
+  listSleepingLocationOptionsAction,
+} from "./_core";

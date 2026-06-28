@@ -47,14 +47,23 @@ function startOfWeekMonday(date: Date): Date {
   return monday;
 }
 
-/** Builds ISO timestamps anchored to the current week for schedule demos. */
+/**
+ * Calendar anchor for demo proposal seeds. Uses the current date so resolved
+ * events align with the schedule view; E2E_ANCHOR_DATE documents the Monday
+ * ISO for the active Playwright run (PC-64).
+ */
+function getSeedAnchorDate(): Date {
+  return new Date();
+}
+
+/** Builds ISO timestamps anchored to the seed week for schedule demos. */
 function scheduleWindow(
   offsetDays: number,
   startHour: number,
   durationHours: number,
   options?: { ensureFuture?: boolean; minFutureHours?: number },
 ): { startAt: string; endAt: string } {
-  const start = startOfWeekMonday(new Date());
+  const start = startOfWeekMonday(getSeedAnchorDate());
   start.setDate(start.getDate() + offsetDays);
   start.setHours(startHour, 0, 0, 0);
   if (options?.ensureFuture) {
