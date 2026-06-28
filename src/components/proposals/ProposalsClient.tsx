@@ -25,11 +25,11 @@ import type { PersonSummary } from "@/actions/users";
 
 import { ProposalCard } from "./ProposalCard";
 import { PartnershipProposalDialog } from "./PartnershipProposalDialog";
-import { ResidencyProposalDialog } from "./ResidencyProposalDialog";
 import { ProposalDetailDialog } from "./ProposalDetailDialog";
 import { ProposalDraftDialog } from "./ProposalDraftDialog";
+import { ResidencyCreateDialog } from "./ResidencyCreateDialog";
 import { SleepingPartnerCreateDialog } from "./SleepingPartnerCreateDialog";
-import { PARTNERSHIP_CARD_PREFIX, RESIDENCY_CARD_PREFIX } from "@/lib/proposals/constants";
+import { PARTNERSHIP_CARD_PREFIX } from "@/lib/proposals/constants";
 import { useToast } from "@/components/providers/ToastProvider";
 
 const TAB_KEYS = ["draft", "proposed", "resolved", "archived"] as const;
@@ -44,9 +44,12 @@ const TAB_LABELS: Record<TabKey, string> = {
 
 const POLY_GREEN = "#004d40";
 
-/** Standard event/date proposals only — not residency or partnership workflow cards. */
+/** Event/sleeping drafts edited via ProposalDraftDialog — not residency or group rename. */
 function isStandardDraftProposal(proposal: ProposalCardData): boolean {
   if (proposal.state !== "draft") return false;
+  if (proposal.specialKind === "residency" || proposal.specialKind === "group_name") {
+    return false;
+  }
   const kind = proposal.cardKind ?? "proposal";
   return kind === "proposal";
 }
@@ -72,14 +75,13 @@ export function ProposalsClient({
   const [activeTab, setActiveTab] = useState<TabKey>("draft");
   const [createOpen, setCreateOpen] = useState(false);
   const [partnerCreateOpen, setPartnerCreateOpen] = useState(false);
+  const [residencyCreateOpen, setResidencyCreateOpen] = useState(false);
   const [fabMenuAnchor, setFabMenuAnchor] = useState<null | HTMLElement>(null);
   const [editDetail, setEditDetail] = useState<ProposalDetail | null>(null);
   const [selectedProposalId, setSelectedProposalId] = useState<string | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
   const [partnershipCard, setPartnershipCard] = useState<ProposalCardData | null>(null);
   const [partnershipOpen, setPartnershipOpen] = useState(false);
-  const [residencyCard, setResidencyCard] = useState<ProposalCardData | null>(null);
-  const [residencyOpen, setResidencyOpen] = useState(false);
   const { showToast } = useToast();
   const [, startTransition] = useTransition();
 
@@ -95,12 +97,6 @@ export function ProposalsClient({
       const card = allBoardCards.find((row) => row.id === proposalId) ?? null;
       setPartnershipCard(card);
       setPartnershipOpen(true);
-      return;
-    }
-    if (proposalId.startsWith(RESIDENCY_CARD_PREFIX)) {
-      const card = allBoardCards.find((row) => row.id === proposalId) ?? null;
-      setResidencyCard(card);
-      setResidencyOpen(true);
       return;
     }
     setSelectedProposalId(proposalId);
@@ -152,17 +148,6 @@ export function ProposalsClient({
       const card = allBoardCards.find((row) => row.id === openId) ?? null;
       setPartnershipCard(card);
       setPartnershipOpen(true);
-      return;
-    }
-
-    if (openId.startsWith(RESIDENCY_CARD_PREFIX)) {
-      const tabForResidency = board.draft.some((row) => row.id === openId)
-        ? "draft"
-        : "proposed";
-      setActiveTab(tabForResidency);
-      const card = allBoardCards.find((row) => row.id === openId) ?? null;
-      setResidencyCard(card);
-      setResidencyOpen(true);
       return;
     }
 
@@ -262,6 +247,14 @@ export function ProposalsClient({
         >
           Sleeping partner proposal
         </MenuItem>
+        <MenuItem
+          onClick={() => {
+            setFabMenuAnchor(null);
+            setResidencyCreateOpen(true);
+          }}
+        >
+          Place residency proposal
+        </MenuItem>
       </Menu>
 
       <ProposalDraftDialog
@@ -276,6 +269,13 @@ export function ProposalsClient({
         open={partnerCreateOpen}
         onClose={() => setPartnerCreateOpen(false)}
         people={people}
+        currentUserId={currentUserId}
+      />
+      <ResidencyCreateDialog
+        open={residencyCreateOpen}
+        onClose={() => setResidencyCreateOpen(false)}
+        people={people}
+        places={places}
         currentUserId={currentUserId}
       />
       <ProposalDetailDialog
@@ -295,15 +295,6 @@ export function ProposalsClient({
         onClose={() => {
           setPartnershipOpen(false);
           setPartnershipCard(null);
-        }}
-      />
-      <ResidencyProposalDialog
-        card={residencyCard}
-        open={residencyOpen}
-        currentUserId={currentUserId}
-        onClose={() => {
-          setResidencyOpen(false);
-          setResidencyCard(null);
         }}
       />
     </Box>

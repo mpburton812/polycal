@@ -22,6 +22,7 @@ export async function applyAdminMigrations(sql: Client): Promise<void> {
   await ensureColumn(sql, "users", "notification_email", "TEXT");
   await ensureColumn(sql, "users", "email_verified_at", "TEXT");
   await ensureColumn(sql, "users", "email_verification_token", "TEXT");
+  await ensureColumn(sql, "users", "email_verification_token_expires_at", "TEXT");
   await ensureColumn(sql, "users", "notification_prefs_json", "TEXT");
   await ensureColumn(sql, "users", "onboarding_complete", "INTEGER NOT NULL DEFAULT 1");
   await ensureColumn(sql, "users", "session_version", "INTEGER NOT NULL DEFAULT 0");
@@ -31,6 +32,7 @@ export async function applyAdminMigrations(sql: Client): Promise<void> {
   await ensureColumn(sql, "user_activity_log", "event_type", "TEXT NOT NULL DEFAULT 'user'");
   await ensureColumn(sql, "sleeping_partnerships", "passive_auto_accepted", "INTEGER NOT NULL DEFAULT 0");
   await ensureColumn(sql, "sleeping_partnerships", "initiated_by_user_id", "TEXT");
+  await ensureColumn(sql, "location_residents", "proposal_id", "TEXT");
 }
 
 async function ensureColumn(

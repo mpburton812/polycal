@@ -9,8 +9,8 @@ import { auth } from "@/lib/auth";
 import { logUserActivity } from "@/lib/audit";
 import { getDb } from "@/lib/db/client";
 import { ensureDbReady } from "@/lib/db/ensure-ready";
-import { notifyUser } from "@/lib/notifications";
 import { polyGroup, proposalInvitees, proposalStateLog, proposals, users } from "@/lib/db/schema";
+import { serializeGroupNameProposalMeta } from "@/lib/proposals/special-proposals";
 import {
   DEFAULT_ONBOARDING_WELCOME_MESSAGE,
   auditLogVisibilityLevels,
@@ -220,11 +220,11 @@ const groupNameProposalSchema = z.object({
 });
 
 /**
- * Creates a proposed-state group name change proposal when enabled (PC-45).
+ * Creates a draft group name change proposal when enabled (PC-45/PC-60).
  */
 export async function proposeGroupNameChangeAction(
   input: z.infer<typeof groupNameProposalSchema>,
-): Promise<PolyGroupActionResult> {
+): Promise<PolyGroupActionResult & { proposalId?: string }> {
   const session = await requireAdmin();
   if (!session) {
     return { ok: false, message: "Admin access required." };
@@ -242,14 +242,24 @@ export async function proposeGroupNameChangeAction(
     return { ok: false, message: "Group name proposals are disabled." };
   }
 
+  if (group.groupNameChangeMode === "admin_only" && session.user.role !== "admin") {
+    return { ok: false, message: "Only admins may propose group name changes in admin-only mode." };
+  }
+
   if (parsed.data.proposedName === group.name) {
     return { ok: false, message: "Proposed name matches the current name." };
   }
 
+  const inviteeFilter =
+    group.groupNameChangeMode === "mandatory_consensus" ||
+    group.groupNameChangeMode === "plurality"
+      ? and(eq(users.status, "active"), ne(users.role, "passive"))
+      : and(eq(users.status, "active"), ne(users.role, "passive"));
+
   const activeUsers = await db
     .select({ id: users.id })
     .from(users)
-    .where(and(eq(users.status, "active"), ne(users.role, "passive")));
+    .where(inviteeFilter);
 
   const now = new Date().toISOString();
   const proposalId = `prop-${randomUUID()}`;
@@ -258,13 +268,13 @@ export async function proposeGroupNameChangeAction(
   await db.insert(proposals).values({
     id: proposalId,
     title,
-    description: JSON.stringify({
+    description: serializeGroupNameProposalMeta({
       groupNameProposal: true,
       proposedName: parsed.data.proposedName,
       previousName: group.name,
     }),
     proposalType: "event",
-    state: "proposed",
+    state: "draft",
     proposerId: session.user.id,
     eventPrivacy: "open",
     createdAt: now,
@@ -287,27 +297,23 @@ export async function proposeGroupNameChangeAction(
     id: `psl-${randomUUID()}`,
     proposalId,
     actorUserId: session.user.id,
-    action: "proposal.group_name_created",
-    details: parsed.data.proposedName,
+    action: "draft.created",
+    details: JSON.stringify({ kind: "group_name", proposedName: parsed.data.proposedName }),
     createdAt: now,
   });
-
-  for (const user of activeUsers) {
-    if (user.id === session.user.id) continue;
-    await notifyUser(user.id, "proposal_submitted", `${title} needs your review.`, {
-      proposalId,
-      proposalType: "group_name",
-    });
-  }
 
   await logUserActivity(
     session.user.id,
     "admin.group_name_proposal",
-    JSON.stringify({ proposalId, proposedName: parsed.data.proposedName }),
+    JSON.stringify({ proposalId, proposedName: parsed.data.proposedName, state: "draft" }),
     "system",
   );
 
   revalidatePath("/admin");
   revalidatePath("/proposals");
-  return { ok: true, message: "Group name change proposed to the network." };
+  return {
+    ok: true,
+    message: "Group name change saved as draft. Submit from Proposals when ready.",
+    proposalId,
+  };
 }

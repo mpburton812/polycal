@@ -40,7 +40,7 @@ test.describe("Residency proposal journey", () => {
     await expect(proposalCard(page, RESIDENCY_TITLE)).toBeVisible({ timeout: 20_000 });
     await proposalCard(page, RESIDENCY_TITLE).click();
     const lukeDraftDialog = page.getByRole("dialog");
-    await lukeDraftDialog.getByRole("button", { name: "Delete draft" }).click();
+    await lukeDraftDialog.getByRole("button", { name: "Delete" }).click();
     await expect(proposalCard(page, RESIDENCY_TITLE)).toHaveCount(0, { timeout: 15_000 });
     await logout(page);
 
