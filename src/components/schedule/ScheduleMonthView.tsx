@@ -9,6 +9,7 @@ import type { ScheduleEvent } from "@/actions/schedule";
 import {
   LEVEL_COLORS,
   busynessLevelForDay,
+  formatHeatmapDate,
 } from "@/components/schedule/ScheduleHeatmap";
 import {
   buildMonthGrid,
@@ -178,9 +179,18 @@ export function ScheduleMonthView({
                       bgcolor: LEVEL_COLORS[busynessLevel],
                       border: "1px solid",
                       borderColor: "divider",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontSize: "0.45rem",
+                      fontWeight: 600,
+                      color: "text.secondary",
+                      lineHeight: 1,
                     }}
                     aria-label={`Network busyness: ${busynessLabel}`}
-                  />
+                  >
+                    {formatHeatmapDate(day)}
+                  </Box>
                   <Typography variant="caption" fontWeight={600} display="block">
                     {day.getDate()}
                   </Typography>

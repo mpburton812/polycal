@@ -103,3 +103,5 @@
 2026-06-27 | 62aca5c | PC-57 | load Jira creds from .env.local and auto-create in CI | scripts/ci-jira-sync-on-feature-push.sh
 2026-06-27 | 041bf44 | PC-58 | push opt-in, schedule calendar UX, and sleeping block styling | src/components/layout/AppShell.tsx
 2026-06-27 | ea8848e | PC-58 | VAPID validation tooling and web-push ESM import | src/lib/push.ts
+2026-06-28 | 784cf1f | PC-59 | batch sleeping proposals, partner UX, and promotion rules | src/actions/proposals.ts
+2026-06-28 | 1f0576c | PC-59 | align Playwright with sleeping proposal UX | e2e/helpers/proposals.ts
