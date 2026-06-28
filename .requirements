@@ -110,3 +110,4 @@
 2026-06-28 | 95c3d62 | PC-60 | migrate residency and group name proposals to standard draft workflow | src/actions/places.ts
 2026-06-28 | a279ef8 | PC-60 | include proposals access module required by CI build | src/lib/proposals/access.test.ts
 2026-06-28 | 8eacedf | PC-59 | security hardening, notifications UX, and CI promotion gates | src/actions/dev.ts
+2026-06-28 | c0d0cf0 | PC-59 | wait for residency dialog close before people-places nav | e2e/residency-proposal-journey.spec.ts
