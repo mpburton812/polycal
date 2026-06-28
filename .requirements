@@ -101,3 +101,4 @@
 2026-06-27 | 0310ca9 | PC-56 | wire declined residency Kanban cards to correct workflow | src/actions/proposals.ts
 2026-06-27 | 52ef03a | PC-57 | launch readiness Jira tickets and resilient Jira CI sync | .github/workflows/jira-create-launch-tickets.yml
 2026-06-27 | 62aca5c | PC-57 | load Jira creds from .env.local and auto-create in CI | scripts/ci-jira-sync-on-feature-push.sh
+2026-06-27 | 041bf44 | PC-58 | push opt-in, schedule calendar UX, and sleeping block styling | src/components/layout/AppShell.tsx
