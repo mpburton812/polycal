@@ -80,14 +80,20 @@ function upsertBranchVar(name, value, branch) {
 }
 
 const env = loadEnv();
+const localEnv = parseEnv(".env.local");
 let authSecret = env.AUTH_SECRET?.trim();
 if (!authSecret) {
-  const local = parseEnv(".env.local");
-  authSecret = local.AUTH_SECRET?.trim();
+  authSecret = localEnv.AUTH_SECRET?.trim();
   if (!authSecret) {
     throw new Error("AUTH_SECRET missing in .env.vercel-setup or .env.local");
   }
 }
+
+const vapidEnv = {
+  VAPID_PUBLIC_KEY: env.VAPID_PUBLIC_KEY?.trim() || localEnv.VAPID_PUBLIC_KEY?.trim(),
+  VAPID_PRIVATE_KEY: env.VAPID_PRIVATE_KEY?.trim() || localEnv.VAPID_PRIVATE_KEY?.trim(),
+  VAPID_SUBJECT: env.VAPID_SUBJECT?.trim() || localEnv.VAPID_SUBJECT?.trim(),
+};
 
 const branches = [
   {
@@ -121,6 +127,20 @@ for (const { gitBranch, appEnv, database, authUrl, tokenKeys } of branches) {
   upsertBranchVar("NEXT_PUBLIC_APP_ENV", appEnv, gitBranch);
   upsertBranchVar("AUTH_SECRET", authSecret, gitBranch);
   upsertBranchVar("AUTH_URL", authUrl, gitBranch);
+
+  const vapidPublic = vapidEnv.VAPID_PUBLIC_KEY;
+  const vapidPrivate = vapidEnv.VAPID_PRIVATE_KEY;
+  const vapidSubject = vapidEnv.VAPID_SUBJECT;
+  if (vapidPublic && vapidPrivate && vapidSubject) {
+    upsertBranchVar("VAPID_PUBLIC_KEY", vapidPublic, gitBranch);
+    upsertBranchVar("VAPID_PRIVATE_KEY", vapidPrivate, gitBranch);
+    upsertBranchVar("VAPID_SUBJECT", vapidSubject, gitBranch);
+    upsertBranchVar("NEXT_PUBLIC_VAPID_PUBLIC_KEY", vapidPublic, gitBranch);
+  } else {
+    console.warn(
+      `skip VAPID for preview/${gitBranch} — set VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_SUBJECT in source env file`,
+    );
+  }
 }
 
 console.log("Done. Redeploy preview branches to pick up env changes.");

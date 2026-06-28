@@ -102,3 +102,4 @@
 2026-06-27 | 52ef03a | PC-57 | launch readiness Jira tickets and resilient Jira CI sync | .github/workflows/jira-create-launch-tickets.yml
 2026-06-27 | 62aca5c | PC-57 | load Jira creds from .env.local and auto-create in CI | scripts/ci-jira-sync-on-feature-push.sh
 2026-06-27 | 041bf44 | PC-58 | push opt-in, schedule calendar UX, and sleeping block styling | src/components/layout/AppShell.tsx
+2026-06-27 | ea8848e | PC-58 | VAPID validation tooling and web-push ESM import | src/lib/push.ts
