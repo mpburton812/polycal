@@ -221,3 +221,85 @@ export async function createAndSubmitSoloSleepingWeek(
 
   return nightDates.length;
 }
+
+/** Opens a draft card in the edit dialog via Continue Editing. */
+export async function openDraftForEdit(page: Page, title: string): Promise<Locator> {
+  const card = proposalCard(page, title);
+  await card.getByRole("button", { name: "Continue Editing" }).click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog.getByRole("heading", { name: /Edit draft/i })).toBeVisible({
+    timeout: 15_000,
+  });
+  return dialog;
+}
+export async function castPollSlotVote(
+  dialog: Locator,
+  slotRowIndex: number,
+  voteLabel: "Accept" | "Sub-opt" | "Decline",
+): Promise<void> {
+  const row = dialog.locator("table").first().locator("tbody tr").nth(slotRowIndex);
+  await row.getByRole("button", { name: new RegExp(`${voteLabel} for`, "i") }).click();
+}
+
+/** Creates and submits a time poll with the given slot start times and required invitees. */
+export async function createAndSubmitPoll(
+  page: Page,
+  options: {
+    title: string;
+    description?: string;
+    requiredNames: string[];
+    slotStarts: string[];
+    slotLabels?: string[];
+  },
+): Promise<void> {
+  const dialog = await openEventOrSleepingProposalDraft(page);
+  await dialog.getByLabel("Title").fill(options.title);
+  if (options.description) {
+    await dialog.getByLabel(/Description/i).fill(options.description);
+  }
+  await dialog.getByRole("checkbox", { name: /Time poll/i }).check();
+  for (const name of options.requiredNames) {
+    await setInviteeRequired(dialog, name);
+  }
+  for (let index = 0; index < options.slotStarts.length; index += 1) {
+    if (index > 0) {
+      await dialog.getByRole("button", { name: "Add poll option" }).click();
+    }
+    if (options.slotLabels?.[index]) {
+      await dialog.getByLabel(`Option ${index + 1} label`).fill(options.slotLabels[index]!);
+    }
+    await fillProposalDateTimeField(
+      dialog.getByLabel("Start").nth(index),
+      options.slotStarts[index]!,
+    );
+  }
+  await submitProposalDraft(page, dialog);
+}
+
+/** Creates and submits a batch sleeping night with a required partner invitee. */
+export async function createAndSubmitBatchSleepingWithInvitee(
+  page: Page,
+  options: {
+    title: string;
+    nightDate: string;
+    requiredPartnerName: string;
+    locationName?: string;
+    comment?: string;
+  },
+): Promise<void> {
+  const dialog = await openEventOrSleepingProposalDraft(page);
+  await selectProposalType(page, dialog, "Sleeping");
+  await dialog.getByRole("checkbox", { name: /Batch/i }).check();
+  await dialog.getByLabel("Title").fill(options.title);
+  await fillProposalDateField(dialog.getByLabel("Night of").first(), options.nightDate);
+  await dialog.getByRole("button", { name: "With invitees" }).first().click();
+  await setInviteeRequired(dialog, options.requiredPartnerName);
+  if (options.locationName) {
+    await dialog.getByLabel("Location (optional)").first().click();
+    await page.getByRole("option", { name: options.locationName }).click();
+  }
+  if (options.comment) {
+    await dialog.getByLabel("Comment (optional)").first().fill(options.comment);
+  }
+  await submitProposalDraft(page, dialog);
+}

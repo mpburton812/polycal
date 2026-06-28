@@ -16,7 +16,7 @@ import {
   eventSpanInGrid,
   startOfMonth,
 } from "@/lib/schedule/month-grid";
-import { localDateKey } from "@/lib/schedule/dates";
+import { localDateKey, scheduleDayCellSx, isTodayDate } from "@/lib/schedule/dates";
 
 interface ScheduleMonthViewProps {
   monthAnchor: Date;
@@ -147,6 +147,8 @@ export function ScheduleMonthView({
               const busynessLevel = busynessLevelForDay(events, day);
               const busynessLabel =
                 busynessLevel === 0 ? "open" : busynessLevel === 3 ? "very busy" : "busy";
+              const daySx = scheduleDayCellSx(day, timeZone);
+              const isToday = isTodayDate(day, timeZone);
 
               return (
                 <Box
@@ -156,11 +158,11 @@ export function ScheduleMonthView({
                   onClick={onDayClick ? () => onDayClick(day) : undefined}
                   sx={{
                     border: 1,
-                    borderColor: "divider",
+                    borderColor: daySx.borderColor,
                     borderRadius: 1,
                     p: 0.5,
-                    bgcolor: inMonth ? "background.paper" : "action.hover",
-                    opacity: inMonth ? 1 : 0.65,
+                    bgcolor: inMonth ? daySx.bgcolor : "action.hover",
+                    opacity: inMonth ? daySx.opacity : 0.45,
                     minHeight: 72,
                     position: "relative",
                     textAlign: "left",
@@ -191,7 +193,12 @@ export function ScheduleMonthView({
                   >
                     {formatHeatmapDate(day)}
                   </Box>
-                  <Typography variant="caption" fontWeight={600} display="block">
+                  <Typography
+                    variant="caption"
+                    fontWeight={isToday ? 800 : 600}
+                    color={isToday ? "primary.main" : "text.primary"}
+                    display="block"
+                  >
                     {day.getDate()}
                   </Typography>
                   <Box sx={{ display: "flex", gap: 0.25, mt: 0.25 }}>

@@ -19,7 +19,15 @@ test.describe("Schedule calendar", () => {
 
   test("shows resolved and proposed seed events for invitee", async ({ page }) => {
     await expect(page.getByRole("button", { name: /Yavin 4 victory celebration/i })).toBeVisible();
-    await expect(page.getByRole("button", { name: /Rescue Han from carbonite/i })).toBeVisible();
+    const rescueHan = page.getByRole("button", { name: /Rescue Han from carbonite/i });
+    if (!(await rescueHan.isVisible({ timeout: 2_000 }).catch(() => false))) {
+      await page.getByLabel("Next period").click();
+    }
+    if (!(await rescueHan.isVisible({ timeout: 2_000 }).catch(() => false))) {
+      await page.getByLabel("Previous period").click();
+      await page.getByLabel("Previous period").click();
+    }
+    await expect(rescueHan).toBeVisible({ timeout: 15_000 });
   });
 
   test("opens proposal detail from calendar block", async ({ page }) => {

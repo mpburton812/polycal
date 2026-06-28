@@ -413,6 +413,7 @@ export function ScheduleClient({
         events={filteredEvents}
         weekStartIso={rangeStart.toISOString()}
         dayCount={dayCount}
+        timeZone={timeZone}
         layout={
           isMonthLayout ? "month" : viewState.compact ? "twoWeek" : "week"
         }

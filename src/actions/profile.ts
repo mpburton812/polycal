@@ -43,6 +43,51 @@ const AVATAR_KEYS = AVATAR_OPTIONS.map((option) => option.key);
 const MAX_AVATAR_BYTES = 2 * 1024 * 1024;
 const ALLOWED_AVATAR_MIMES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
 
+/**
+ * Normalizes FormData avatar payload — some runtimes pass Blob instead of File (PC-59).
+ */
+async function readAvatarUpload(
+  formData: FormData,
+): Promise<{ ok: true; file: File } | { ok: false; error: string }> {
+  const entry = formData.get("avatar");
+  if (!entry) {
+    return { ok: false, error: "Choose an image file." };
+  }
+
+  let file: File;
+  if (entry instanceof File) {
+    file = entry;
+  } else if (typeof entry === "object" && "arrayBuffer" in entry) {
+    const blob = entry as Blob;
+    file = new File([blob], "avatar", { type: blob.type || "application/octet-stream" });
+  } else {
+    return { ok: false, error: "Choose an image file." };
+  }
+
+  if (file.size === 0) {
+    return { ok: false, error: "Choose an image file." };
+  }
+  if (file.size > MAX_AVATAR_BYTES) {
+    return { ok: false, error: "Image must be 2 MB or smaller." };
+  }
+
+  const mimeType = file.type || guessImageMime(file.name);
+  if (!ALLOWED_AVATAR_MIMES.has(mimeType)) {
+    return { ok: false, error: "Use JPEG, PNG, WebP, or GIF." };
+  }
+
+  return { ok: true, file: mimeType === file.type ? file : new File([file], file.name, { type: mimeType }) };
+}
+
+/** Infers image MIME from extension when the browser omits `file.type`. */
+function guessImageMime(filename: string): string {
+  const lower = filename.toLowerCase();
+  if (lower.endsWith(".png")) return "image/png";
+  if (lower.endsWith(".webp")) return "image/webp";
+  if (lower.endsWith(".gif")) return "image/gif";
+  return "image/jpeg";
+}
+
 function isValidAvatarKey(value: string): value is AvatarKey | `custom:${string}` {
   if (AVATAR_KEYS.includes(value as AvatarKey)) return true;
   return isCustomAvatarKey(value);
@@ -165,39 +210,39 @@ export async function uploadCustomAvatarAction(
     return { ok: false, error: "Not signed in." };
   }
 
-  const file = formData.get("avatar");
-  if (!(file instanceof File) || file.size === 0) {
-    return { ok: false, error: "Choose an image file." };
+  const upload = await readAvatarUpload(formData);
+  if (!upload.ok) {
+    return upload;
   }
-  if (file.size > MAX_AVATAR_BYTES) {
-    return { ok: false, error: "Image must be 2 MB or smaller." };
-  }
-  if (!ALLOWED_AVATAR_MIMES.has(file.type)) {
-    return { ok: false, error: "Use JPEG, PNG, WebP, or GIF." };
-  }
+  const file = upload.file;
 
-  const buffer = Buffer.from(await file.arrayBuffer());
   const imageId = randomUUID();
   const avatarKey = `custom:${imageId}`;
   const now = new Date().toISOString();
 
-  await ensureDbReady();
-  const db = getDb();
-  await db.insert(storedImages).values({
-    id: imageId,
-    mimeType: file.type,
-    data: buffer,
-    createdAt: now,
-  });
+  try {
+    await ensureDbReady();
+    const db = getDb();
+    const buffer = Buffer.from(await file.arrayBuffer());
+    await db.insert(storedImages).values({
+      id: imageId,
+      mimeType: file.type,
+      data: buffer,
+      createdAt: now,
+    });
 
-  await db
-    .update(users)
-    .set({ avatarKey, updatedAt: now })
-    .where(eq(users.id, session.user.id));
+    await db
+      .update(users)
+      .set({ avatarKey, updatedAt: now })
+      .where(eq(users.id, session.user.id));
 
-  await logUserActivity(session.user.id, "profile.custom_avatar_upload", imageId);
-  revalidatePath("/profile");
-  return { ok: true, avatarKey };
+    await logUserActivity(session.user.id, "profile.custom_avatar_upload", imageId);
+    revalidatePath("/profile");
+    return { ok: true, avatarKey };
+  } catch (error) {
+    console.error("uploadCustomAvatarAction failed:", error);
+    return { ok: false, error: "Could not save avatar. Try a smaller image or another format." };
+  }
 }
 
 const displayNameSchema = z
