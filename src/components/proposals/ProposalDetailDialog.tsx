@@ -108,12 +108,13 @@ function PollSlotTimeCell({
   );
 }
 
-const SLOT_VOTE_LABELS: Record<"accept" | "accept_suboptimal" | "abstain" | "decline", string> = {
+const SLOT_VOTE_LABELS: Record<"accept" | "accept_suboptimal" | "decline", string> = {
   accept: "Accept",
-  accept_suboptimal: "Sub-optimal",
-  abstain: "Abstain",
+  accept_suboptimal: "Sub-opt",
   decline: "Decline",
 };
+
+const SLOT_VOTE_OPTIONS = ["accept", "accept_suboptimal", "decline"] as const;
 
 interface ProposalDetailDialogProps {
   proposalId: string | null;
@@ -581,13 +582,10 @@ export function ProposalDetailDialog({
                           <TableCell align="center" sx={{ minWidth: 52, px: 0.5 }}>
                             Accept
                           </TableCell>
-                          <TableCell align="center" sx={{ minWidth: 52, px: 0.5 }}>
+                          <TableCell align="center" sx={{ minWidth: 64, px: 0.5 }}>
                             Sub-opt.
                           </TableCell>
-                          <TableCell align="center" sx={{ minWidth: 52, px: 0.5 }}>
-                            Abstain
-                          </TableCell>
-                          <TableCell align="center" sx={{ minWidth: 52, px: 0.5 }}>
+                          <TableCell align="center" sx={{ minWidth: 64, px: 0.5 }}>
                             Decline
                           </TableCell>
                           <TableCell sx={{ minWidth: 100 }}>Your vote</TableCell>
@@ -613,8 +611,7 @@ export function ProposalDetailDialog({
                                   endAt={slot.endAt}
                                 />
                               </TableCell>
-                              {(["accept", "accept_suboptimal", "abstain", "decline"] as const).map(
-                                (vote) => (
+                              {SLOT_VOTE_OPTIONS.map((vote) => (
                                   <TableCell key={vote} align="center" sx={{ px: 0.5 }}>
                                     {canVoteRow && (
                                       <Button
@@ -631,19 +628,19 @@ export function ProposalDetailDialog({
                                         aria-label={`${SLOT_VOTE_LABELS[vote]} for ${slot.label ?? formatTimeRange(slot.startAt, slot.endAt)}`}
                                         onClick={() => handleSlotVote(slot.id, vote)}
                                         sx={{
-                                          minWidth: 40,
+                                          minWidth: 52,
                                           px: 0.75,
+                                          fontSize: "0.7rem",
                                           ...(viewerVote === vote && vote === "accept"
                                             ? { bgcolor: POLY_GREEN }
                                             : undefined),
                                         }}
                                       >
-                                        {viewerVote === vote ? "✓" : "·"}
+                                        {SLOT_VOTE_LABELS[vote]}
                                       </Button>
                                     )}
                                   </TableCell>
-                                ),
-                              )}
+                                ))}
                               <TableCell sx={{ verticalAlign: "top" }}>
                                 <Chip
                                   size="small"

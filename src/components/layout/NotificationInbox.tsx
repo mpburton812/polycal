@@ -32,6 +32,16 @@ function formatNotificationType(type: string): string {
   return type.replaceAll("_", " ");
 }
 
+function isProposalOpenAction(
+  type: string,
+  proposalId: string | null,
+  residencyId: string | null,
+): boolean {
+  if (residencyId) return true;
+  if (!proposalId) return false;
+  return type.startsWith("proposal") || type.includes("proposal") || type.startsWith("residency");
+}
+
 /**
  * Header notification bell with dismissible inbox popover (PC-40, PC-43).
  */
@@ -58,12 +68,16 @@ export function NotificationInbox({
     setAnchorEl(null);
   }
 
+  function removeFromList(logId: number) {
+    setItems((current) => current.filter((item) => item.id !== logId));
+    setCount((current) => Math.max(0, current - 1));
+  }
+
   function dismissOne(logId: number) {
     startTransition(async () => {
       const result = await dismissNotificationAction(logId);
       if (!result.ok) return;
-      setItems((current) => current.filter((item) => item.id !== logId));
-      setCount((current) => Math.max(0, current - 1));
+      removeFromList(logId);
       router.refresh();
     });
   }
@@ -78,12 +92,25 @@ export function NotificationInbox({
     });
   }
 
+  function openProposalTarget(
+    logId: number,
+    openTarget: string,
+  ) {
+    startTransition(async () => {
+      const result = await dismissNotificationAction(logId);
+      if (!result.ok) return;
+      removeFromList(logId);
+      handleClose();
+      router.push(`/proposals?open=${encodeURIComponent(openTarget)}`);
+      router.refresh();
+    });
+  }
+
   function respondToResidency(logId: number, residencyId: string, accept: boolean) {
     startTransition(async () => {
       const result = await respondResidencyAction({ residencyId, accept });
       if (!result.ok) return;
-      setItems((current) => current.filter((item) => item.id !== logId));
-      setCount((current) => Math.max(0, current - 1));
+      removeFromList(logId);
       router.refresh();
     });
   }
@@ -92,8 +119,7 @@ export function NotificationInbox({
     startTransition(async () => {
       const result = await respondPartnershipAction({ partnershipId, accept });
       if (!result.ok) return;
-      setItems((current) => current.filter((item) => item.id !== logId));
-      setCount((current) => Math.max(0, current - 1));
+      removeFromList(logId);
       router.refresh();
     });
   }
@@ -105,8 +131,7 @@ export function NotificationInbox({
         response: maintain ? "maintain" : "decline",
       });
       if (!result.ok) return;
-      setItems((current) => current.filter((item) => item.id !== logId));
-      setCount((current) => Math.max(0, current - 1));
+      removeFromList(logId);
       router.refresh();
     });
   }
@@ -165,6 +190,12 @@ export function NotificationInbox({
                 typeof item.metadata.proposalId === "string"
                   ? item.metadata.proposalId
                   : null;
+              const showOpenProposal =
+                isProposalOpenAction(item.type, proposalId, residencyId) &&
+                item.type !== "proposal_attendee_update";
+              const openTarget = residencyId
+                ? `${RESIDENCY_CARD_PREFIX}${residencyId}`
+                : proposalId;
 
               return (
                 <ListItem
@@ -185,16 +216,14 @@ export function NotificationInbox({
                   <ListItemText
                     primary={item.message}
                     secondary={
-                      <>
-                        <Typography component="span" variant="caption" display="block">
-                          {formatNotificationType(item.type)} ·{" "}
-                          {new Date(item.createdAt).toLocaleString()}
-                        </Typography>
-                      </>
+                      <Typography component="span" variant="caption" display="block">
+                        {formatNotificationType(item.type)} ·{" "}
+                        {new Date(item.createdAt).toLocaleString()}
+                      </Typography>
                     }
                     primaryTypographyProps={{ variant: "body2" }}
                   />
-                  <Stack direction="row" spacing={1} sx={{ mt: 1, pr: 4 }}>
+                  <Stack direction="row" spacing={1} sx={{ mt: 1, pr: 4 }} flexWrap="wrap" useFlexGap>
                     {item.type === "residency_proposed" && residencyId && (
                       <>
                         <Button
@@ -256,19 +285,14 @@ export function NotificationInbox({
                         </Button>
                       </>
                     )}
-                    {(proposalId || residencyId) && item.type !== "proposal_attendee_update" && (
+                    {showOpenProposal && openTarget && (
                       <Button
                         size="small"
+                        variant="outlined"
                         disabled={pending}
-                        onClick={() => {
-                          handleClose();
-                          const openTarget = residencyId
-                            ? `${RESIDENCY_CARD_PREFIX}${residencyId}`
-                            : proposalId!;
-                          router.push(`/proposals?open=${encodeURIComponent(openTarget)}`);
-                        }}
+                        onClick={() => openProposalTarget(item.id, openTarget)}
                       >
-                        View proposal
+                        Open Proposal
                       </Button>
                     )}
                   </Stack>

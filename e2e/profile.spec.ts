@@ -38,4 +38,18 @@ test.describe("Profile settings", () => {
     await expect(page.getByText("Custom avatar")).toBeVisible();
     await expect(page.getByRole("button", { name: "Upload image" })).toBeVisible();
   });
+
+  test("uploads a custom avatar image", async ({ page }) => {
+    const input = page.locator('input[type="file"][accept*="image"]');
+    await input.setInputFiles({
+      name: "avatar.png",
+      mimeType: "image/png",
+      buffer: Buffer.from(
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
+        "base64",
+      ),
+    });
+    await expect(page.getByText(/Could not save avatar/i)).not.toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText("Custom avatar selected")).toBeVisible({ timeout: 15_000 });
+  });
 });

@@ -1,7 +1,7 @@
 "use server";
 
 import { randomUUID } from "node:crypto";
-import { and, asc, eq, inArray, or } from "drizzle-orm";
+import { and, asc, eq, inArray, ne, or } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
@@ -37,7 +37,18 @@ import {
   loadEnforcementSettings,
   runProposalEnforcement,
 } from "@/lib/proposals/enforcement";
-import { PARTNERSHIP_CARD_PREFIX, RESIDENCY_CARD_PREFIX } from "@/lib/proposals/constants";
+import { PARTNERSHIP_CARD_PREFIX } from "@/lib/proposals/constants";
+import {
+  getProposalSpecialKind,
+  isNonScheduleProposal,
+  parseGroupNameProposalMeta,
+  parseResidencyProposalMeta,
+} from "@/lib/proposals/special-proposals";
+import {
+  applyResidencyProposalResolution,
+  cleanupResidencyProposalLinkage,
+  syncResidencyRowOnSubmit,
+} from "@/actions/residency-proposals";
 import {
   sleepingDateToStartIso,
   isoToSleepingDateInput,
@@ -48,9 +59,16 @@ import {
   encodeBatchSlotMeta,
   parseBatchEntriesJson,
   unionBatchInvitees,
-  newBatchEntryId,
   type BatchSleepingEntry,
 } from "@/lib/proposals/batch-sleeping";
+import {
+  applyProposalMask,
+  getPrivacyAdminFlags,
+  MASKED_DESCRIPTION,
+  MASKED_TITLE,
+  shouldMaskProposalContent,
+  viewerCanSeeProposal,
+} from "@/lib/proposals/access";
 import { buildPartnershipProposalCopy } from "@/lib/partnerships/copy";
 import type { UserRole } from "@/types/user";
 
@@ -106,19 +124,6 @@ const slotVoteSchema = z.object({
   vote: z.enum(["accept", "abstain", "decline", "accept_suboptimal"]),
 });
 
-const batchSleepingSchema = z.object({
-  title: z.string().trim().min(1).max(200),
-  description: z.string().trim().max(2000).optional(),
-  locationId: z.string().optional(),
-  locationText: z.string().trim().max(200).optional(),
-  notes: z.string().trim().max(500).optional(),
-  intentionalSolo: z.boolean().optional(),
-  invitees: z.array(inviteeInputSchema).optional(),
-  rangeStart: z.string().min(1),
-  rangeEnd: z.string().min(1),
-  nightsPattern: z.enum(["every", "weekdays", "weekends"]),
-});
-
 const attendeeUpdateSchema = z.object({
   proposalId: z.string().min(1),
   addRequired: z.array(z.string().min(1)).optional(),
@@ -167,6 +172,8 @@ export interface ProposalCard {
   residencyInviteeName?: string;
   /** Residency/partnership workflow status when Kanban state is mapped for display. */
   workflowStatus?: "proposed" | "declined";
+  /** Residency or group name proposals using standard draft workflow (PC-60). */
+  specialKind?: "residency" | "group_name";
 }
 
 export type RecurrencePattern = "daily" | "weekly" | "monthly" | "yearly";
@@ -294,9 +301,6 @@ export interface ProposalStateLogView {
 const APPROVING_VOTES: InviteeVoteStatus[] = ["accept", "abstain", "accept_suboptimal"];
 const APPROVING_SLOT_VOTES: InviteeVoteStatus[] = ["accept", "abstain", "accept_suboptimal"];
 
-const MASKED_TITLE = "Private event";
-const MASKED_DESCRIPTION = "Details are hidden for your privacy level.";
-
 function parseRecurrenceRule(raw: string | null): RecurrenceRule | null {
   if (!raw) return null;
   try {
@@ -311,17 +315,6 @@ function parseRecurrenceRule(raw: string | null): RecurrenceRule | null {
 function serializeRecurrenceRule(rule: RecurrenceRule | undefined): string | null {
   if (!rule) return null;
   return JSON.stringify(rule);
-}
-
-/** Poly-group admin visibility toggles for private proposals (PC-40). */
-async function getPrivacyAdminFlags(
-  db: ReturnType<typeof getDb>,
-): Promise<{ adminCanSeePrivate: boolean; adminCanSeeSuperPrivate: boolean }> {
-  const [group] = await db.select().from(polyGroup).where(eq(polyGroup.id, 1)).limit(1);
-  return {
-    adminCanSeePrivate: group?.adminCanSeePrivate ?? false,
-    adminCanSeeSuperPrivate: group?.adminCanSeeSuperPrivate ?? false,
-  };
 }
 
 /** Loads proposal audit-log visibility policy from poly group settings (PC-45). */
@@ -356,60 +349,6 @@ function filterStateLogForViewer(
     return isAdmin || isProposer || isInvitee ? logRows : [];
   }
   return isAdmin ? logRows : [];
-}
-
-/** Parses proposed group name from a group_name proposal description (PC-45). */
-function parseGroupNameProposalMeta(description: string | null): string | null {
-  if (!description) return null;
-  try {
-    const parsed = JSON.parse(description) as { proposedName?: string };
-    return typeof parsed.proposedName === "string" ? parsed.proposedName.trim() : null;
-  } catch {
-    return null;
-  }
-}
-
-/**
- * Whether resolved/archived card content should be masked for the viewer (PC-40).
- */
-function shouldMaskProposalContent(
-  viewerId: string,
-  isAdmin: boolean,
-  proposerId: string,
-  inviteeUserIds: string[],
-  eventPrivacy: EventPrivacyLevel,
-  adminCanSeePrivate: boolean,
-  adminCanSeeSuperPrivate: boolean,
-  state: ProposalState,
-): boolean {
-  if (state !== "resolved" && state !== "archived") return false;
-  if (eventPrivacy === "open") return false;
-  if (proposerId === viewerId || inviteeUserIds.includes(viewerId)) return false;
-  if (eventPrivacy === "private" && isAdmin && adminCanSeePrivate) return false;
-  if (eventPrivacy === "super_private" && isAdmin && adminCanSeeSuperPrivate) return false;
-  return true;
-}
-
-function applyProposalMask<T extends {
-  title: string;
-  description: string | null;
-  locationName: string | null;
-  locationText?: string | null;
-  scheduledStartAt: string | null;
-  scheduledEndAt: string | null;
-  notes?: string | null;
-}>(row: T, masked: boolean): T {
-  if (!masked) return row;
-  return {
-    ...row,
-    title: MASKED_TITLE,
-    description: MASKED_DESCRIPTION,
-    locationName: null,
-    locationText: row.locationText !== undefined ? null : undefined,
-    scheduledStartAt: null,
-    scheduledEndAt: null,
-    notes: row.notes !== undefined ? null : undefined,
-  };
 }
 
 /** Counts slots where every required invitee voted accept/abstain/sub-optimal (PC-40). */
@@ -595,22 +534,6 @@ async function logProposalTransition(
   });
 }
 
-/** Whether the viewer may see a proposal in a non-draft column. */
-function viewerCanSeeProposal(
-  viewerId: string,
-  isAdmin: boolean,
-  proposerId: string,
-  inviteeUserIds: string[],
-  context?: { state?: ProposalState; eventPrivacy?: EventPrivacyLevel },
-): boolean {
-  if (isAdmin) return true;
-  if (proposerId === viewerId) return true;
-  if (inviteeUserIds.includes(viewerId)) return true;
-  if (context?.state === "resolved" && context.eventPrivacy === "open") return true;
-  if (context?.state === "archived" && context.eventPrivacy === "open") return true;
-  return false;
-}
-
 /** Notifies proposer and all invitees on a proposal (PC-40). */
 async function notifyProposalStakeholders(
   db: ReturnType<typeof getDb>,
@@ -645,10 +568,39 @@ export async function listProposalBoardAction(): Promise<ProposalBoard> {
   }
 
   const db = getDb();
+  const { bridgeLegacyResidencyProposals } = await import("@/actions/residency-proposals");
+  await bridgeLegacyResidencyProposals(db);
   const viewerId = session.user.id;
   const isAdmin = await userHasAdminAccess(session.user.role);
   const privacyFlags = await getPrivacyAdminFlags(db);
   const nowIso = new Date().toISOString();
+
+  const viewerInviteeProposalRows = isAdmin
+    ? []
+    : await db
+        .select({ proposalId: proposalInvitees.proposalId })
+        .from(proposalInvitees)
+        .where(eq(proposalInvitees.userId, viewerId));
+  const viewerInviteeProposalIds = viewerInviteeProposalRows.map((row) => row.proposalId);
+
+  const boardVisibilityFilter = isAdmin
+    ? undefined
+    : or(
+        and(eq(proposals.state, "draft"), eq(proposals.proposerId, viewerId)),
+        and(
+          ne(proposals.state, "draft"),
+          or(
+            eq(proposals.proposerId, viewerId),
+            viewerInviteeProposalIds.length > 0
+              ? inArray(proposals.id, viewerInviteeProposalIds)
+              : eq(proposals.id, "__none__"),
+            and(
+              inArray(proposals.state, ["resolved", "archived"]),
+              eq(proposals.eventPrivacy, "open"),
+            ),
+          ),
+        ),
+      );
 
   const rows = await db
     .select({
@@ -670,16 +622,22 @@ export async function listProposalBoardAction(): Promise<ProposalBoard> {
     .from(proposals)
     .innerJoin(users, eq(proposals.proposerId, users.id))
     .leftJoin(locations, eq(proposals.locationId, locations.id))
+    .where(boardVisibilityFilter)
     .orderBy(asc(proposals.updatedAt));
 
-  const inviteeRows = await db
-    .select({
-      proposalId: proposalInvitees.proposalId,
-      userId: proposalInvitees.userId,
-      role: proposalInvitees.role,
-      voteStatus: proposalInvitees.voteStatus,
-    })
-    .from(proposalInvitees);
+  const visibleProposalIds = rows.map((row) => row.id);
+  const inviteeRows =
+    visibleProposalIds.length > 0
+      ? await db
+          .select({
+            proposalId: proposalInvitees.proposalId,
+            userId: proposalInvitees.userId,
+            role: proposalInvitees.role,
+            voteStatus: proposalInvitees.voteStatus,
+          })
+          .from(proposalInvitees)
+          .where(inArray(proposalInvitees.proposalId, visibleProposalIds))
+      : [];
 
   const inviteesByProposal = new Map<string, typeof inviteeRows>();
   for (const row of inviteeRows) {
@@ -688,13 +646,18 @@ export async function listProposalBoardAction(): Promise<ProposalBoard> {
     inviteesByProposal.set(row.proposalId, list);
   }
 
-  const pollSlotCountRows = await db
-    .select({
-      proposalId: proposalTimeSlots.proposalId,
-    })
-    .from(proposalTimeSlots)
-    .innerJoin(proposals, eq(proposalTimeSlots.proposalId, proposals.id))
-    .where(eq(proposals.isPoll, true));
+  const pollSlotCountRows =
+    visibleProposalIds.length > 0
+      ? await db
+          .select({
+            proposalId: proposalTimeSlots.proposalId,
+          })
+          .from(proposalTimeSlots)
+          .innerJoin(proposals, eq(proposalTimeSlots.proposalId, proposals.id))
+          .where(
+            and(eq(proposals.isPoll, true), inArray(proposals.id, visibleProposalIds)),
+          )
+      : [];
 
   const pollSlotCounts = new Map<string, number>();
   for (const slotRow of pollSlotCountRows) {
@@ -707,9 +670,7 @@ export async function listProposalBoardAction(): Promise<ProposalBoard> {
     const invitees = inviteesByProposal.get(row.id) ?? [];
     const inviteeUserIds = invitees.map((invitee) => invitee.userId);
 
-    if (row.state === "draft") {
-      if (row.proposerId !== viewerId) continue;
-    } else if (
+    if (
       row.state === "proposed" ||
       row.state === "resolved" ||
       row.state === "archived"
@@ -768,6 +729,7 @@ export async function listProposalBoardAction(): Promise<ProposalBoard> {
       inviteeCount: invitees.length,
       respondedCount,
       isPastSchedule,
+      specialKind: getProposalSpecialKind(row.description) ?? undefined,
     };
 
     const column: keyof ProposalBoard = optionalPollPending
@@ -850,76 +812,6 @@ export async function listProposalBoardAction(): Promise<ProposalBoard> {
         partnershipId: row.id,
         partnerName,
       });
-    }
-  }
-
-  const residencyRows = await db
-    .select({
-      id: locationResidents.id,
-      locationId: locationResidents.locationId,
-      userId: locationResidents.userId,
-      proposedById: locationResidents.proposedById,
-      status: locationResidents.status,
-      placeName: locations.name,
-      inviteeName: users.displayName,
-    })
-    .from(locationResidents)
-    .innerJoin(locations, eq(locationResidents.locationId, locations.id))
-    .innerJoin(users, eq(locationResidents.userId, users.id))
-    .where(inArray(locationResidents.status, ["proposed", "declined"]));
-
-  if (residencyRows.length > 0) {
-    const proposerIds = [...new Set(residencyRows.map((row) => row.proposedById))];
-    const proposerRows = await db
-      .select({ id: users.id, displayName: users.displayName })
-      .from(users)
-      .where(inArray(users.id, proposerIds));
-    const proposerMap = new Map(proposerRows.map((row) => [row.id, row.displayName]));
-
-    for (const row of residencyRows) {
-      const isInvitee = row.userId === viewerId;
-      const isProposer = row.proposedById === viewerId;
-      if (!isInvitee && !isProposer && !isAdmin) continue;
-
-      const proposerName =
-        row.proposedById === viewerId
-          ? "You"
-          : (proposerMap.get(row.proposedById) ?? "Someone");
-      const needsViewerAction = row.status === "proposed" && isInvitee;
-
-      const card: ProposalCard = {
-        id: `${RESIDENCY_CARD_PREFIX}${row.id}`,
-        title: `Residency at ${row.placeName}`,
-        description: isInvitee
-          ? `${proposerName} invited you to be a resident at ${row.placeName}.`
-          : `Residency proposal for ${row.inviteeName} at ${row.placeName}.`,
-        proposalType: "event",
-        state: row.status === "declined" ? "draft" : "proposed",
-        proposerId: row.proposedById,
-        proposerName,
-        locationName: row.placeName,
-        scheduledStartAt: null,
-        scheduledEndAt: null,
-        atRisk: false,
-        isPoll: false,
-        eventPrivacy: "open",
-        isContentMasked: false,
-        needsViewerAction,
-        inviteeCount: 1,
-        respondedCount: row.status === "proposed" ? 0 : 1,
-        isPastSchedule: false,
-        cardKind: "residency",
-        residencyId: row.id,
-        residencyPlaceName: row.placeName,
-        residencyInviteeName: row.inviteeName,
-        workflowStatus: row.status === "declined" ? "declined" : "proposed",
-      };
-
-      if (row.status === "declined") {
-        if (isProposer) empty.draft.push(card);
-      } else {
-        empty.proposed.push(card);
-      }
     }
   }
 
@@ -1373,6 +1265,16 @@ async function revertProposalToDraft(
   await resetInviteeVotes(db, proposal.id);
   await logProposalTransition(db, proposal.id, actorUserId, "proposal.reverted_to_draft", reason);
 
+  if (parseResidencyProposalMeta(proposal.description)) {
+    await cleanupResidencyProposalLinkage(db, proposal, true);
+    await logUserActivity(
+      actorUserId,
+      "places.decline_residency",
+      JSON.stringify({ proposalId: proposal.id, reason }),
+    );
+    revalidatePath("/people-places");
+  }
+
   const invitees = await db
     .select({ userId: proposalInvitees.userId })
     .from(proposalInvitees)
@@ -1592,12 +1494,17 @@ async function resolveProposal(
 
   await logProposalTransition(db, proposal.id, actorUserId, "proposal.resolved");
 
-  const proposedName = parseGroupNameProposalMeta(proposal.description);
-  if (proposedName) {
+  const groupMeta = parseGroupNameProposalMeta(proposal.description);
+  if (groupMeta) {
     await db
       .update(polyGroup)
-      .set({ name: proposedName, updatedAt: now })
+      .set({ name: groupMeta.proposedName, updatedAt: now })
       .where(eq(polyGroup.id, 1));
+  }
+
+  const residencyMeta = parseResidencyProposalMeta(proposal.description);
+  if (residencyMeta) {
+    await applyResidencyProposalResolution(db, proposal, actorUserId);
   }
 
   const invitees = await db
@@ -1610,6 +1517,7 @@ async function resolveProposal(
     .where(eq(proposalInvitees.proposalId, proposal.id));
 
   const pollMatrix = proposal.isPoll && slots.length > 1;
+  const specialKind = getProposalSpecialKind(proposal.description);
   const notifyIds = new Set<string>([proposal.proposerId, ...invitees.map((row) => row.userId)]);
   for (const userId of notifyIds) {
     const invitee = invitees.find((row) => row.userId === userId);
@@ -1617,13 +1525,22 @@ async function resolveProposal(
       pollMatrix &&
       invitee?.role === "optional" &&
       invitee.voteStatus === "not_seen";
-    const message = optionalStillVoting
-      ? `Proposal "${proposal.title}" was approved by all required attendees and scheduled. Please complete your poll votes.`
-      : `Proposal "${proposal.title}" was approved and scheduled.`;
+    let message: string;
+    if (specialKind === "residency") {
+      message = `Residency proposal "${proposal.title}" was accepted.`;
+    } else if (specialKind === "group_name") {
+      message = `Group rename proposal "${proposal.title}" was approved.`;
+    } else if (optionalStillVoting) {
+      message = `Proposal "${proposal.title}" was approved by all required attendees and scheduled. Please complete your poll votes.`;
+    } else {
+      message = `Proposal "${proposal.title}" was approved and scheduled.`;
+    }
     await notifyUser(userId, "proposal_resolved", message, { proposalId: proposal.id });
   }
 
-  await autoDeclineCollidingProposals(db, proposal, scheduleStart, scheduleEnd, actorUserId);
+  if (!isNonScheduleProposal(proposal.description)) {
+    await autoDeclineCollidingProposals(db, proposal, scheduleStart, scheduleEnd, actorUserId);
+  }
 }
 
 /**
@@ -1729,6 +1646,27 @@ async function evaluateProposalAfterVote(
 
   const pendingRequired = required.filter((row) => row.voteStatus === "not_seen");
   if (pendingRequired.length > 0) return;
+
+  const groupMeta = parseGroupNameProposalMeta(proposal.description);
+  if (groupMeta) {
+    const [group] = await db.select().from(polyGroup).where(eq(polyGroup.id, 1)).limit(1);
+    if (group?.groupNameChangeMode === "plurality") {
+      const acceptCount = required.filter((row) =>
+        APPROVING_VOTES.includes(row.voteStatus),
+      ).length;
+      if (acceptCount > required.length / 2) {
+        await resolveProposal(db, proposal, actorUserId);
+      } else {
+        await revertProposalToDraft(
+          db,
+          proposal,
+          actorUserId,
+          "Plurality did not approve the group rename.",
+        );
+      }
+      return;
+    }
+  }
 
   if (required.length === 0 || required.every((row) => APPROVING_VOTES.includes(row.voteStatus))) {
     await resolveProposal(db, proposal, actorUserId);
@@ -1966,6 +1904,7 @@ export async function checkProposalConflictsAction(
       title: proposals.title,
       state: proposals.state,
       proposerId: proposals.proposerId,
+      proposalType: proposals.proposalType,
       scheduledStartAt: proposals.scheduledStartAt,
       scheduledEndAt: proposals.scheduledEndAt,
     })
@@ -1992,6 +1931,8 @@ export async function checkProposalConflictsAction(
   for (const other of activeProposals) {
     if (other.id === proposalId) continue;
     if (!other.scheduledStartAt) continue;
+    // Sleeping arrangements do not schedule-conflict with events (PC-59).
+    if (proposal.proposalType !== other.proposalType) continue;
 
     const otherStakeholders = new Set([
       other.proposerId,
@@ -2149,6 +2090,8 @@ export async function createDraftProposalAction(
 
   if (batchInvitees.length) {
     await replaceInvitees(db, proposalId, session.user.id, batchInvitees);
+  } else if (isBatchSleeping) {
+    await replaceInvitees(db, proposalId, session.user.id, []);
   }
 
   if (isBatchSleeping) {
@@ -2378,7 +2321,11 @@ export async function submitProposalAction(
     return { ok: false, message: "Title is required before submitting." };
   }
 
-  if (!confirm) {
+  const residencyMeta = parseResidencyProposalMeta(proposal.description);
+  const groupMeta = parseGroupNameProposalMeta(proposal.description);
+  const isSpecial = isNonScheduleProposal(proposal.description);
+
+  if (!confirm && !isSpecial) {
     const conflictCheck = await checkProposalConflictsAction(proposalId);
     if (conflictCheck.warnings.length > 0) {
       return {
@@ -2394,19 +2341,58 @@ export async function submitProposalAction(
     .from(proposalInvitees)
     .where(eq(proposalInvitees.proposalId, proposalId));
 
-  const requiredCount = invitees.filter((row) => row.role === "required").length;
-  if (requiredCount === 0 && !proposal.intentionalSolo) {
+  let requiredCount = invitees.filter((row) => row.role === "required").length;
+  let intentionalSolo = proposal.intentionalSolo;
+
+  if (proposal.isBatchSleeping) {
+    const batchEntries = parseBatchEntriesJson(proposal.batchEntriesJson);
+    if (batchEntries.length === 0) {
+      return { ok: false, message: "Add at least one night to the batch." };
+    }
+    const union = unionBatchInvitees(batchEntries);
+    requiredCount = union.filter((row) => row.role === "required").length;
+    intentionalSolo = batchEntries.every((entry) => entry.intentionalSolo);
+    for (const entry of batchEntries) {
+      if (entry.intentionalSolo) continue;
+      if (!entry.invitees.some((invitee) => invitee.role === "required")) {
+        return {
+          ok: false,
+          message: "Each batch night with invitees needs at least one required invitee.",
+        };
+      }
+    }
+  }
+
+  if (requiredCount === 0 && !intentionalSolo) {
     return {
       ok: false,
       message: "Add at least one required invitee or enable solo before submitting.",
     };
   }
 
-  const autoResolve = shouldAutoResolveOnSubmit(
+  let autoResolve = shouldAutoResolveOnSubmit(
     proposal.proposalType,
-    proposal.intentionalSolo,
+    intentionalSolo,
     requiredCount,
   );
+
+  if (groupMeta) {
+    const [group] = await db.select().from(polyGroup).where(eq(polyGroup.id, 1)).limit(1);
+    if (group?.groupNameChangeMode === "auto") {
+      autoResolve = true;
+    }
+  }
+
+  if (residencyMeta) {
+    const [target] = await db
+      .select({ role: users.role })
+      .from(users)
+      .where(eq(users.id, residencyMeta.targetUserId))
+      .limit(1);
+    if (target?.role === "passive") {
+      autoResolve = true;
+    }
+  }
 
   const slots = await db
     .select({ startAt: proposalTimeSlots.startAt, endAt: proposalTimeSlots.endAt })
@@ -2466,22 +2452,39 @@ export async function submitProposalAction(
     JSON.stringify({ nextState, requiredInviteeCount: requiredCount }),
   );
 
+  const [updatedProposal] = await db
+    .select()
+    .from(proposals)
+    .where(eq(proposals.id, proposalId))
+    .limit(1);
+
+  if (updatedProposal) {
+    if (autoResolve && isSpecial) {
+      await resolveProposal(db, updatedProposal, session.user.id);
+    } else if (residencyMeta && !autoResolve) {
+      await syncResidencyRowOnSubmit(db, updatedProposal);
+    }
+  }
+
   const notificationMessage = autoResolve
     ? `Proposal "${proposal.title}" was auto-approved.`
     : `Proposal "${proposal.title}" needs your review.`;
 
-  const notifyIds = new Set<string>(invitees.map((row) => row.userId));
-  for (const userId of notifyIds) {
-    await notifyUser(userId, "proposal_submitted", notificationMessage, {
-      proposalId,
-      proposalTitle: proposal.title,
-      proposerId: session.user.id,
-      state: nextState,
-    });
+  if (!(autoResolve && isSpecial)) {
+    const notifyIds = new Set<string>(invitees.map((row) => row.userId));
+    for (const userId of notifyIds) {
+      await notifyUser(userId, "proposal_submitted", notificationMessage, {
+        proposalId,
+        proposalTitle: proposal.title,
+        proposerId: session.user.id,
+        state: nextState,
+      });
+    }
   }
 
   revalidatePath("/proposals");
   revalidatePath("/schedule");
+  revalidatePath("/people-places");
 
   return {
     ok: true,
@@ -3158,79 +3161,6 @@ export async function castSlotVoteAction(
 }
 
 /**
- * @deprecated Use createDraftProposalAction with isBatchSleeping + batchEntries.
- * Kept for legacy callers — creates one batch sleeping draft.
- */
-export async function createBatchSleepingProposalsAction(
-  input: z.infer<typeof batchSleepingSchema>,
-): Promise<{ ok: boolean; message: string; proposalIds?: string[] }> {
-  const parsed = batchSleepingSchema.safeParse(input);
-  if (!parsed.success) {
-    return { ok: false, message: parsed.error.issues[0]?.message ?? "Invalid input." };
-  }
-
-  const rangeStart = new Date(parsed.data.rangeStart);
-  const rangeEnd = new Date(parsed.data.rangeEnd);
-  if (Number.isNaN(rangeStart.getTime()) || Number.isNaN(rangeEnd.getTime())) {
-    return { ok: false, message: "Invalid date range." };
-  }
-
-  const nights: Date[] = [];
-  const cursor = new Date(rangeStart);
-  cursor.setHours(0, 0, 0, 0);
-  const endCursor = new Date(rangeEnd);
-  endCursor.setHours(0, 0, 0, 0);
-
-  while (cursor <= endCursor) {
-    const day = cursor.getDay();
-    const isWeekend = day === 0 || day === 6;
-    const include =
-      parsed.data.nightsPattern === "every" ||
-      (parsed.data.nightsPattern === "weekends" && isWeekend) ||
-      (parsed.data.nightsPattern === "weekdays" && !isWeekend);
-
-    if (include) nights.push(new Date(cursor));
-    cursor.setDate(cursor.getDate() + 1);
-  }
-
-  if (nights.length === 0) {
-    return { ok: false, message: "No nights matched the selected pattern." };
-  }
-  if (nights.length > 14) {
-    return { ok: false, message: "Batch limited to 14 nights at a time." };
-  }
-
-  const batchEntries: BatchSleepingEntry[] = nights.map((night) => ({
-    id: newBatchEntryId(),
-    nightDate: isoToSleepingDateInput(night.toISOString()),
-    locationId: parsed.data.locationId,
-    intentionalSolo: parsed.data.intentionalSolo,
-    invitees: parsed.data.invitees ?? [],
-  }));
-
-  const result = await createDraftProposalAction({
-    title: parsed.data.title,
-    description: parsed.data.description,
-    proposalType: "sleeping",
-    notes: parsed.data.notes,
-    intentionalSolo: parsed.data.intentionalSolo,
-    invitees: parsed.data.invitees,
-    isBatchSleeping: true,
-    batchEntries,
-  });
-
-  if (!result.ok || !result.proposalId) {
-    return { ok: false, message: result.message };
-  }
-
-  return {
-    ok: true,
-    message: `Created batch sleeping draft with ${batchEntries.length} nights.`,
-    proposalIds: [result.proposalId],
-  };
-}
-
-/**
  * Adds or removes attendees on a resolved proposal (PC-40, PC-45).
  */
 export async function updateResolvedAttendeesAction(
@@ -3640,6 +3570,8 @@ export async function deleteDraftProposalAction(
     return { ok: false, message: "Draft not found." };
   }
 
+  await cleanupResidencyProposalLinkage(db, proposal, true);
+
   await db.delete(proposalSlotVotes).where(eq(proposalSlotVotes.proposalId, proposalId));
   await db.delete(proposalTimeSlots).where(eq(proposalTimeSlots.proposalId, proposalId));
   await db.delete(proposalInvitees).where(eq(proposalInvitees.proposalId, proposalId));
@@ -3649,6 +3581,7 @@ export async function deleteDraftProposalAction(
 
   await logUserActivity(session.user.id, "proposals.draft_delete", proposalId);
   revalidatePath("/proposals");
+  revalidatePath("/people-places");
 
   return { ok: true, message: "Draft deleted." };
 }

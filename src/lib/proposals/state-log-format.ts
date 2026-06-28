@@ -5,14 +5,40 @@ export interface ProposalLogEntry {
   createdAt: string;
 }
 
+const VOTE_LABELS: Record<string, string> = {
+  accept: "Accepted",
+  accept_suboptimal: "Accepted sub-optimal",
+  abstain: "Abstained",
+  decline: "Declined",
+  not_seen: "Not seen",
+};
+
 /**
- * Human-readable activity log line for proposal detail (PC-53).
+ * Human-readable activity log line for proposal detail (PC-53, PC-59).
  */
 export function formatProposalLogLine(entry: ProposalLogEntry): string {
-  const action = entry.action.replaceAll(".", " · ").replaceAll("_", " ");
+  const action = formatActionLabel(entry.action);
   const actor = entry.actorName ? ` · ${entry.actorName}` : "";
   const detailSuffix = formatProposalLogDetails(entry);
   return `${new Date(entry.createdAt).toLocaleString()} · ${action}${actor}${detailSuffix}`;
+}
+
+/** Maps machine action keys to readable phrases. */
+function formatActionLabel(action: string): string {
+  const labels: Record<string, string> = {
+    "proposal.slot_vote_cast": "Poll slot vote",
+    "proposal.vote_cast": "Vote cast",
+    "proposal.submitted": "Submitted to network",
+    "proposal.resolved": "Resolved",
+    "proposal.redrafted": "Returned to draft",
+    "proposal.attendees_updated": "Attendees updated",
+    "proposal.comment_added": "Comment added",
+  };
+  return labels[action] ?? action.replaceAll(".", " · ").replaceAll("_", " ");
+}
+
+function formatVoteLabel(vote: string): string {
+  return VOTE_LABELS[vote] ?? vote.replaceAll("_", " ");
 }
 
 function formatProposalLogDetails(entry: ProposalLogEntry): string {
@@ -32,8 +58,19 @@ function formatProposalLogDetails(entry: ProposalLogEntry): string {
       return parts.length ? ` · ${parts.join("; ")}` : "";
     }
 
-    if (entry.action === "proposal.vote_cast" && typeof parsed.vote === "string") {
-      return ` · ${parsed.vote.replaceAll("_", " ")}`;
+    if (
+      (entry.action === "proposal.vote_cast" || entry.action === "proposal.slot_vote_cast") &&
+      typeof parsed.vote === "string"
+    ) {
+      const voteText = formatVoteLabel(parsed.vote);
+      if (entry.action === "proposal.slot_vote_cast" && typeof parsed.timeSlotId === "string") {
+        return ` · ${voteText} (slot ${parsed.timeSlotId.slice(0, 8)}…)`;
+      }
+      return ` · ${voteText}`;
+    }
+
+    if (entry.action === "proposal.submitted" && typeof parsed.nextState === "string") {
+      return ` · moved to ${parsed.nextState}`;
     }
   } catch {
     return ` · ${entry.details}`;
@@ -41,3 +78,5 @@ function formatProposalLogDetails(entry: ProposalLogEntry): string {
 
   return ` · ${entry.details}`;
 }
+
+export { formatVoteLabel };

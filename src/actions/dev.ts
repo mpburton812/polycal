@@ -1,17 +1,30 @@
 "use server";
 
-import { signIn } from "@/lib/auth";
+import { userHasAdminAccess } from "@/lib/admin-access";
+import { signIn, auth } from "@/lib/auth";
 import { isNonProductionEnvironment } from "@/lib/env";
 
 /**
- * Switches the active session to another seeded user — non-production only.
+ * Switches the active session to another seeded user — non-production admins only (PC-59).
  */
 export async function impersonateUser(userId: string): Promise<void> {
   if (!isNonProductionEnvironment()) {
     throw new Error("Impersonation is disabled in production.");
   }
+
+  const session = await auth();
+  if (!session?.user || !(await userHasAdminAccess(session.user.role))) {
+    throw new Error("Admin access required for impersonation.");
+  }
+
+  const secret = process.env.AUTH_IMPERSONATION_SECRET ?? process.env.AUTH_SECRET;
+  if (!secret) {
+    throw new Error("Impersonation is not configured on this server.");
+  }
+
   await signIn("credentials", {
     impersonateUserId: userId,
+    impersonateSecret: secret,
     redirectTo: "/schedule",
   });
 }

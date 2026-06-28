@@ -449,7 +449,7 @@ export function ProposalDraftDialog({
     });
   }
 
-  function handleSave() {
+  function buildDraftPayload() {
     const invitees = isSoloProposal
       ? []
       : Object.entries(inviteeMode)
@@ -483,7 +483,7 @@ export function ProposalDraftDialog({
           })
           .filter((slot) => slot !== null);
 
-    const payload = {
+    return {
       title,
       description,
       proposalType,
@@ -508,49 +508,57 @@ export function ProposalDraftDialog({
           ? batchEntries.filter((entry) => entry.nightDate.trim())
           : undefined,
     };
+  }
 
+  /** Persists the current form to the server; returns proposal id or null on failure (PC-59). */
+  async function persistDraft(): Promise<string | null> {
+    const payload = buildDraftPayload();
+
+    if (batchMode && proposalType === "sleeping" && (payload.batchEntries?.length ?? 0) === 0) {
+      showToast("Add at least one night to the batch.", "error");
+      return null;
+    }
+
+    const editId = initialDetail?.id ?? savedDraftId;
+    let proposalId = editId;
+    if (isEdit && editId) {
+      const result = await updateDraftProposalAction({ ...payload, proposalId: editId });
+      if (!result.ok) {
+        showToast(result.message, "error");
+        return null;
+      }
+    } else {
+      const result = await createDraftProposalAction(payload);
+      if (!result.ok) {
+        showToast(result.message, "error");
+        return null;
+      }
+      proposalId = result.proposalId ?? null;
+    }
+
+    if (!proposalId) return null;
+
+    setSavedDraftId(proposalId);
+    const detailResult = await getProposalDetailAction(proposalId);
+    if (detailResult.ok && detailResult.detail) {
+      applyDetailToForm(detailResult.detail);
+    }
+    return proposalId;
+  }
+
+  function handleSave() {
     startTransition(async () => {
-      if (batchMode && proposalType === "sleeping" && payload.batchEntries?.length === 0) {
-        showToast("Add at least one night to the batch.", "error");
-        return;
-      }
-
-      const editId = initialDetail?.id ?? savedDraftId;
-      let proposalId = editId;
-      if (isEdit && editId) {
-        const result = await updateDraftProposalAction({ ...payload, proposalId: editId });
-        if (!result.ok) {
-          showToast(result.message, "error");
-          return;
-        }
-      } else {
-        const result = await createDraftProposalAction(payload);
-        if (!result.ok) {
-          showToast(result.message, "error");
-          return;
-        }
-        proposalId = result.proposalId ?? null;
-      }
-
-      if (!proposalId) {
-        handleClose();
-        router.refresh();
-        return;
-      }
-
-      setSavedDraftId(proposalId);
-      const detailResult = await getProposalDetailAction(proposalId);
-      if (detailResult.ok && detailResult.detail) {
-        applyDetailToForm(detailResult.detail);
-      }
+      const proposalId = await persistDraft();
+      if (!proposalId) return;
       router.refresh();
     });
   }
 
   function handleSubmit(confirm = false) {
-    const proposalId = initialDetail?.id ?? savedDraftId;
-    if (!proposalId) return;
     startTransition(async () => {
+      const proposalId = await persistDraft();
+      if (!proposalId) return;
+
       const result = await submitProposalAction(proposalId, confirm);
       if (!result.ok && result.warnings && result.warnings.length > 0) {
         setConflictWarnings(result.warnings);
@@ -945,11 +953,45 @@ export function ProposalDraftDialog({
               />
             )}
             {batchMode && proposalType === "sleeping" && (
-              <BatchSleepingEntriesEditor
-                entries={batchEntries}
-                onChange={setBatchEntries}
-                partnerPeople={sleepingCandidates}
-              />
+              <>
+                <BatchSleepingEntriesEditor
+                  entries={batchEntries}
+                  onChange={setBatchEntries}
+                  partnerPeople={sleepingCandidates}
+                />
+                {batchEntries.some((entry) => entry.nightDate.trim()) && (
+                  <Box sx={{ mt: 2, p: 1.5, bgcolor: POLY_GREEN_LIGHT, borderRadius: 1 }}>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
+                      Proposed nights summary
+                    </Typography>
+                    <Stack spacing={0.75}>
+                      {batchEntries
+                        .filter((entry) => entry.nightDate.trim())
+                        .map((entry, index) => {
+                          const place =
+                            locationOptions.find((p) => p.id === entry.locationId)?.name ??
+                            entry.locationText ??
+                            "No location";
+                          const inviteeLabels = entry.intentionalSolo
+                            ? ["Solo"]
+                            : entry.invitees.map((invitee) => {
+                                const person = people.find((p) => p.id === invitee.userId);
+                                return person
+                                  ? `${person.displayName} (${invitee.role})`
+                                  : invitee.role;
+                              });
+                          return (
+                            <Typography key={entry.id} variant="body2" sx={{ color: POLY_GREEN }}>
+                              Night {index + 1}: {entry.nightDate.slice(0, 10)} · {place}
+                              {inviteeLabels.length > 0 ? ` · ${inviteeLabels.join(", ")}` : ""}
+                              {entry.comment ? ` · "${entry.comment}"` : ""}
+                            </Typography>
+                          );
+                        })}
+                    </Stack>
+                  </Box>
+                )}
+              </>
             )}
             {!batchMode && !isPoll && (
               <>
@@ -1102,16 +1144,14 @@ export function ProposalDraftDialog({
           >
             {isEdit ? "Save draft" : "Create draft"}
           </Button>
-          {isEdit && activeProposalId && (
-            <Button
-              variant="contained"
-              disabled={!title.trim() || pending}
-              onClick={() => handleSubmit()}
-              sx={primaryButtonSx}
-            >
-              Submit
-            </Button>
-          )}
+          <Button
+            variant="contained"
+            disabled={!title.trim() || pending}
+            onClick={() => handleSubmit()}
+            sx={primaryButtonSx}
+          >
+            Submit
+          </Button>
         </CardActions>
       </Card>
     </Dialog>

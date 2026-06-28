@@ -60,7 +60,7 @@ test.describe("Sleeping partnership journey", () => {
 
     // —— Phase 4: Han sees acceptance notification ——
     await loginWithOnboardingIfNeeded(page, USERS.han.username);
-    await expectInAppNotification(page, /accepted/i);
+    await expectInAppNotification(page, /accepted your sleeping partnership/i);
 
     // —— Phase 5: Han proposes sleeping event with Anakin at Millennium Falcon ——
     await goToProposals(page);
