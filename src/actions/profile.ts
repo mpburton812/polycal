@@ -76,6 +76,11 @@ async function readAvatarUpload(
     return { ok: false, error: "Use JPEG, PNG, WebP, or GIF." };
   }
 
+  const magicOk = await validateAvatarMagicBytes(file, mimeType);
+  if (!magicOk) {
+    return { ok: false, error: "File content does not match a supported image format." };
+  }
+
   return { ok: true, file: mimeType === file.type ? file : new File([file], file.name, { type: mimeType }) };
 }
 
@@ -86,6 +91,38 @@ function guessImageMime(filename: string): string {
   if (lower.endsWith(".webp")) return "image/webp";
   if (lower.endsWith(".gif")) return "image/gif";
   return "image/jpeg";
+}
+
+/** Validates file magic bytes match the declared image MIME (PC-59). */
+async function validateAvatarMagicBytes(file: File, mimeType: string): Promise<boolean> {
+  const header = new Uint8Array(await file.slice(0, 12).arrayBuffer());
+  if (mimeType === "image/jpeg") {
+    return header[0] === 0xff && header[1] === 0xd8 && header[2] === 0xff;
+  }
+  if (mimeType === "image/png") {
+    return (
+      header[0] === 0x89 &&
+      header[1] === 0x50 &&
+      header[2] === 0x4e &&
+      header[3] === 0x47
+    );
+  }
+  if (mimeType === "image/gif") {
+    return header[0] === 0x47 && header[1] === 0x49 && header[2] === 0x46;
+  }
+  if (mimeType === "image/webp") {
+    return (
+      header[0] === 0x52 &&
+      header[1] === 0x49 &&
+      header[2] === 0x46 &&
+      header[3] === 0x46 &&
+      header[8] === 0x57 &&
+      header[9] === 0x45 &&
+      header[10] === 0x42 &&
+      header[11] === 0x50
+    );
+  }
+  return false;
 }
 
 function isValidAvatarKey(value: string): value is AvatarKey | `custom:${string}` {
@@ -223,6 +260,13 @@ export async function uploadCustomAvatarAction(
   try {
     await ensureDbReady();
     const db = getDb();
+
+    const [existing] = await db
+      .select({ avatarKey: users.avatarKey })
+      .from(users)
+      .where(eq(users.id, session.user.id))
+      .limit(1);
+
     const buffer = Buffer.from(await file.arrayBuffer());
     await db.insert(storedImages).values({
       id: imageId,
@@ -235,6 +279,11 @@ export async function uploadCustomAvatarAction(
       .update(users)
       .set({ avatarKey, updatedAt: now })
       .where(eq(users.id, session.user.id));
+
+    if (existing?.avatarKey && isCustomAvatarKey(existing.avatarKey)) {
+      const orphanId = existing.avatarKey.slice("custom:".length);
+      await db.delete(storedImages).where(eq(storedImages.id, orphanId));
+    }
 
     await logUserActivity(session.user.id, "profile.custom_avatar_upload", imageId);
     revalidatePath("/profile");
@@ -345,6 +394,7 @@ export async function updateNotificationEmailAction(
   const db = getDb();
   const token = `ev-${randomUUID()}`;
   const now = new Date().toISOString();
+  const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
 
   await db
     .update(users)
@@ -352,6 +402,7 @@ export async function updateNotificationEmailAction(
       notificationEmail: parsed.data,
       emailVerifiedAt: null,
       emailVerificationToken: token,
+      emailVerificationTokenExpiresAt: expiresAt,
       updatedAt: now,
     })
     .where(eq(users.id, session.user.id));

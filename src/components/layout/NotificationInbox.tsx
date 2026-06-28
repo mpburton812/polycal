@@ -19,7 +19,9 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition, type MouseEvent } from "react";
 
 import { respondPartnershipAction } from "@/actions/partnerships";
+import { respondResidencyAction } from "@/actions/places";
 import { respondAttendeeUpdateAction } from "@/actions/proposals";
+import { RESIDENCY_CARD_PREFIX } from "@/lib/proposals/constants";
 import {
   clearAllNotificationsAction,
   dismissNotificationAction,
@@ -30,9 +32,14 @@ function formatNotificationType(type: string): string {
   return type.replaceAll("_", " ");
 }
 
-function isProposalOpenAction(type: string, proposalId: string | null): boolean {
+function isProposalOpenAction(
+  type: string,
+  proposalId: string | null,
+  residencyId: string | null,
+): boolean {
+  if (residencyId) return true;
   if (!proposalId) return false;
-  return type.startsWith("proposal") || type.includes("proposal");
+  return type.startsWith("proposal") || type.includes("proposal") || type.startsWith("residency");
 }
 
 /**
@@ -95,6 +102,15 @@ export function NotificationInbox({
       removeFromList(logId);
       handleClose();
       router.push(`/proposals?open=${encodeURIComponent(openTarget)}`);
+      router.refresh();
+    });
+  }
+
+  function respondToResidency(logId: number, residencyId: string, accept: boolean) {
+    startTransition(async () => {
+      const result = await respondResidencyAction({ residencyId, accept });
+      if (!result.ok) return;
+      removeFromList(logId);
       router.refresh();
     });
   }
@@ -166,14 +182,20 @@ export function NotificationInbox({
                 typeof item.metadata.partnershipId === "string"
                   ? item.metadata.partnershipId
                   : null;
+              const residencyId =
+                typeof item.metadata.residencyId === "string"
+                  ? item.metadata.residencyId
+                  : null;
               const proposalId =
                 typeof item.metadata.proposalId === "string"
                   ? item.metadata.proposalId
                   : null;
               const showOpenProposal =
-                isProposalOpenAction(item.type, proposalId) &&
+                isProposalOpenAction(item.type, proposalId, residencyId) &&
                 item.type !== "proposal_attendee_update";
-              const openTarget = proposalId;
+              const openTarget = residencyId
+                ? `${RESIDENCY_CARD_PREFIX}${residencyId}`
+                : proposalId;
 
               return (
                 <ListItem
@@ -202,6 +224,26 @@ export function NotificationInbox({
                     primaryTypographyProps={{ variant: "body2" }}
                   />
                   <Stack direction="row" spacing={1} sx={{ mt: 1, pr: 4 }} flexWrap="wrap" useFlexGap>
+                    {item.type === "residency_proposed" && residencyId && (
+                      <>
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          disabled={pending}
+                          onClick={() => respondToResidency(item.id, residencyId, false)}
+                        >
+                          Decline
+                        </Button>
+                        <Button
+                          size="small"
+                          variant="contained"
+                          disabled={pending}
+                          onClick={() => respondToResidency(item.id, residencyId, true)}
+                        >
+                          Accept
+                        </Button>
+                      </>
+                    )}
                     {item.type === "partnership_proposed" && partnershipId && (
                       <>
                         <Button

@@ -8,6 +8,16 @@ import { getDb } from "@/lib/db/client";
 import { ensureDbReady } from "@/lib/db/ensure-ready";
 import { notificationDismissals, userActivityLog } from "@/lib/db/schema";
 
+/** Internal delivery telemetry — not shown in the user-facing inbox (PC-58). */
+const INBOX_EXCLUDED_NOTIFICATION_TYPES = new Set([
+  "push_sent",
+  "push_failed",
+  "push_skipped",
+  "email_queued",
+  "email_sent",
+  "email_failed",
+]);
+
 export interface NotificationItem {
   id: number;
   type: string;
@@ -85,16 +95,18 @@ export async function getNotificationInboxAction(): Promise<{
           .orderBy(desc(userActivityLog.createdAt))
           .limit(50);
 
-  const items: NotificationItem[] = rows.map((row) => {
-    const parsed = parseNotificationDetails(row.action, row.details);
-    return {
-      id: row.id,
-      type: parsed.type,
-      message: parsed.message,
-      createdAt: row.createdAt,
-      metadata: parsed.metadata,
-    };
-  });
+  const items: NotificationItem[] = rows
+    .map((row) => {
+      const parsed = parseNotificationDetails(row.action, row.details);
+      return {
+        id: row.id,
+        type: parsed.type,
+        message: parsed.message,
+        createdAt: row.createdAt,
+        metadata: parsed.metadata,
+      };
+    })
+    .filter((item) => !INBOX_EXCLUDED_NOTIFICATION_TYPES.has(item.type));
 
   return { ok: true, count: items.length, items };
 }

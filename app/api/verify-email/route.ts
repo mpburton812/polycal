@@ -8,6 +8,7 @@ import { users } from "@/lib/db/schema";
 
 /**
  * Verifies a notification email address from the link sent on profile update (PC-43).
+ * Tokens expire after 24 hours.
  */
 export async function GET(request: Request) {
   const token = new URL(request.url).searchParams.get("token");
@@ -18,7 +19,11 @@ export async function GET(request: Request) {
   await ensureDbReady();
   const db = getDb();
   const [row] = await db
-    .select({ id: users.id, emailVerificationToken: users.emailVerificationToken })
+    .select({
+      id: users.id,
+      emailVerificationToken: users.emailVerificationToken,
+      emailVerificationTokenExpiresAt: users.emailVerificationTokenExpiresAt,
+    })
     .from(users)
     .where(eq(users.emailVerificationToken, token))
     .limit(1);
@@ -27,12 +32,20 @@ export async function GET(request: Request) {
     return NextResponse.json({ ok: false, message: "Invalid or expired token." }, { status: 404 });
   }
 
+  if (row.emailVerificationTokenExpiresAt) {
+    const expiresAt = new Date(row.emailVerificationTokenExpiresAt).getTime();
+    if (Number.isNaN(expiresAt) || Date.now() > expiresAt) {
+      return NextResponse.json({ ok: false, message: "Invalid or expired token." }, { status: 404 });
+    }
+  }
+
   const now = new Date().toISOString();
   await db
     .update(users)
     .set({
       emailVerifiedAt: now,
       emailVerificationToken: null,
+      emailVerificationTokenExpiresAt: null,
       updatedAt: now,
     })
     .where(eq(users.id, row.id));

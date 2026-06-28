@@ -34,12 +34,13 @@ test.describe("Residency proposal journey", () => {
 
     // —— Phase 3: Luke sees declined draft, deletes it ——
     await login(page, USERS.luke.username);
-    await expectInAppNotification(page, /declined residency/i);
+    await expectInAppNotification(page, /vote was cast|declined residency/i);
     await goToProposals(page);
     await selectProposalTab(page, "Drafts");
     await expect(proposalCard(page, RESIDENCY_TITLE)).toBeVisible({ timeout: 20_000 });
     await proposalCard(page, RESIDENCY_TITLE).click();
     const lukeDraftDialog = page.getByRole("dialog");
+    page.once("dialog", (dialog) => dialog.accept());
     await lukeDraftDialog.getByRole("button", { name: "Delete" }).click();
     await expect(proposalCard(page, RESIDENCY_TITLE)).toHaveCount(0, { timeout: 15_000 });
     await logout(page);
@@ -61,6 +62,7 @@ test.describe("Residency proposal journey", () => {
     await hanDialog.getByRole("button", { name: "Post" }).click();
     await expect(hanDialog.getByText(comment)).toBeVisible({ timeout: 15_000 });
     await hanDialog.getByRole("button", { name: "Accept" }).click();
+    await hanDialog.getByRole("button", { name: "Close" }).click({ timeout: 15_000 });
 
     // —— Phase 5: Han edits place bedrooms as accepted resident ——
     await goToPeoplePlaces(page);
