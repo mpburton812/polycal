@@ -32,12 +32,12 @@ test.describe("Week schedule poly-family journey", () => {
     const nightCount = await createAndSubmitSoloSleepingWeek(page, {
       titlePrefix: weekPrefix,
       rangeStart: "2099-07-07",
-      rangeEnd: "2099-07-14",
+      rangeEnd: "2099-07-13",
     });
     expect(nightCount).toBe(7);
 
     await selectProposalTab(page, "Resolved");
-    await expect(proposalCardsWithPrefix(page, weekPrefix)).toHaveCount(7);
+    await expect(proposalCardsWithPrefix(page, weekPrefix)).toHaveCount(1);
 
     // —— Phase 2: Luke schedules social events through the week with poly family ——
     await createAndSubmitEvent(page, {
@@ -60,21 +60,21 @@ test.describe("Week schedule poly-family journey", () => {
     await expect(page.getByRole("heading", { name: brunchTitle, level: 2 })).toBeVisible();
     await expect(page.getByRole("heading", { name: gameTitle, level: 2 })).toBeVisible();
 
-    // —— Phase 3: Luke cancels one solo night ——
+    // —— Phase 3: Luke cancels the batch week proposal ——
     await selectProposalTab(page, "Resolved");
-    const nightToCancel = proposalCardsWithPrefix(page, weekPrefix).first();
-    const cancelledNightTitle = await nightToCancel.getByRole("heading", { level: 2 }).innerText();
+    const batchCard = proposalCardsWithPrefix(page, weekPrefix).first();
+    const cancelledBatchTitle = await batchCard.getByRole("heading", { level: 2 }).innerText();
 
     page.once("dialog", (dialog) => dialog.accept());
-    await nightToCancel.getByRole("heading", { level: 2 }).click();
+    await batchCard.getByRole("heading", { level: 2 }).click();
     const cancelDialog = page.getByRole("dialog");
     await cancelDialog.getByRole("button", { name: "Cancel", exact: true }).click();
     await expect(cancelDialog).toBeHidden({ timeout: 15_000 });
 
     await selectProposalTab(page, "Archived");
-    await expect(page.getByRole("heading", { name: cancelledNightTitle, level: 2 })).toBeVisible();
+    await expect(page.getByRole("heading", { name: cancelledBatchTitle, level: 2 })).toBeVisible();
     await selectProposalTab(page, "Resolved");
-    await expect(proposalCardsWithPrefix(page, weekPrefix)).toHaveCount(6);
+    await expect(proposalCardsWithPrefix(page, weekPrefix)).toHaveCount(0);
 
     // —— Phase 4: Luke proposes dinner with required + optional invitees ——
     await createAndSubmitEvent(page, {
@@ -133,7 +133,7 @@ test.describe("Week schedule poly-family journey", () => {
     await logout(page);
     await login(page, USERS.luke.username);
     await expectInAppNotification(page, /A vote was cast on/i);
-    await expectInAppNotification(page, new RegExp(escape(cancelledNightTitle)));
+    await expectInAppNotification(page, new RegExp(escape(cancelledBatchTitle)));
     await expectInAppNotification(page, /was cancelled/i);
     await expectInAppNotification(page, /approved and scheduled/i);
   });

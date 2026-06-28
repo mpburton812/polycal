@@ -18,6 +18,48 @@ export function proposalCardsWithPrefix(page: Page, titlePrefix: string) {
   });
 }
 
+/** Opens the FAB menu for creating proposals. */
+export async function openNewProposalFabMenu(page: Page): Promise<void> {
+  await page.getByRole("button", { name: "New proposal" }).click();
+}
+
+/** Opens the event/sleeping draft dialog from the FAB menu. */
+export async function openEventOrSleepingProposalDraft(page: Page): Promise<Locator> {
+  await openNewProposalFabMenu(page);
+  await page.getByRole("menuitem", { name: "Event or sleeping proposal" }).click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog.getByRole("heading", { name: "New proposal" })).toBeVisible({
+    timeout: 15_000,
+  });
+  return dialog;
+}
+
+/** Opens the sleeping partner proposal dialog from the FAB menu. */
+export async function openSleepingPartnerProposal(page: Page): Promise<Locator> {
+  await openNewProposalFabMenu(page);
+  await page.getByRole("menuitem", { name: /Sleeping partner proposal/i }).click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog.getByRole("heading", { name: "Sleeping Partner Proposal" })).toBeVisible({
+    timeout: 15_000,
+  });
+  return dialog;
+}
+
+/** Builds inclusive YYYY-MM-DD dates from start through end. */
+function inclusiveNightDates(rangeStart: string, rangeEnd: string): string[] {
+  const dates: string[] = [];
+  const cursor = new Date(`${rangeStart}T00:00:00`);
+  const end = new Date(`${rangeEnd}T00:00:00`);
+  while (cursor <= end) {
+    const pad = (value: number) => String(value).padStart(2, "0");
+    dates.push(
+      `${cursor.getFullYear()}-${pad(cursor.getMonth() + 1)}-${pad(cursor.getDate())}`,
+    );
+    cursor.setDate(cursor.getDate() + 1);
+  }
+  return dates;
+}
+
 /** Cycles an invitee chip to required (none → required). */
 export async function setInviteeRequired(dialog: Locator, displayName: string) {
   const chip = dialog.getByRole("button", { name: new RegExp(displayName, "i") });
@@ -40,7 +82,7 @@ export async function setAllInviteesRequired(dialog: Locator): Promise<void> {
   for (let index = 0; index < count; index += 1) {
     const chip = toggleButtons.nth(index);
     const text = (await chip.innerText()).trim();
-    if (!text || /solo event|with invitees|intentional solo/i.test(text)) {
+    if (!text || /solo event|with invitees|solo/i.test(text)) {
       continue;
     }
     let attempts = 0;
@@ -90,8 +132,7 @@ export async function createAndSubmitEvent(
     start: string;
   },
 ): Promise<void> {
-  await page.getByRole("button", { name: "New proposal" }).click();
-  const dialog = page.getByRole("dialog");
+  const dialog = await openEventOrSleepingProposalDraft(page);
   await dialog.getByLabel("Title").fill(options.title);
   if (options.description) {
     await dialog.getByLabel(/Description/i).fill(options.description);
@@ -113,8 +154,7 @@ export async function createAndSubmitSoloEvent(
     end: string;
   },
 ): Promise<void> {
-  await page.getByRole("button", { name: "New proposal" }).click();
-  const dialog = page.getByRole("dialog");
+  const dialog = await openEventOrSleepingProposalDraft(page);
   await dialog.getByLabel("Title").fill(options.title);
   await dialog.getByRole("button", { name: "Solo event (just me)" }).click();
   if (options.notes) {
@@ -136,8 +176,7 @@ export async function createAndSubmitRecurringEventForEveryone(
     occurrenceCount?: number;
   },
 ): Promise<void> {
-  await page.getByRole("button", { name: "New proposal" }).click();
-  const dialog = page.getByRole("dialog");
+  const dialog = await openEventOrSleepingProposalDraft(page);
   await dialog.getByLabel("Title").fill(options.title);
   await dialog.getByRole("checkbox", { name: /Recurring series/i }).check();
   await dialog.getByLabel("Occurrences").fill(String(options.occurrenceCount ?? 4));
@@ -149,7 +188,8 @@ export async function createAndSubmitRecurringEventForEveryone(
 }
 
 /**
- * Creates a batch week of intentional-solo sleeping drafts and submits each to resolved.
+ * Creates a batch week of solo sleeping nights in one proposal and submits it to resolved.
+ * Returns the number of nights added to the batch.
  */
 export async function createAndSubmitSoloSleepingWeek(
   page: Page,
@@ -159,38 +199,25 @@ export async function createAndSubmitSoloSleepingWeek(
     rangeEnd: string;
   },
 ): Promise<number> {
-  await page.getByRole("button", { name: "New proposal" }).click();
-  const dialog = page.getByRole("dialog");
+  const nightDates = inclusiveNightDates(options.rangeStart, options.rangeEnd);
+  const dialog = await openEventOrSleepingProposalDraft(page);
   await selectProposalType(page, dialog, "Sleeping");
-  await dialog.getByRole("button", { name: "Intentional solo" }).click();
-  await dialog.getByRole("checkbox", { name: /Batch \/ recurring nights/i }).check();
+  await dialog
+    .getByRole("checkbox", { name: "Batch (multiple nights in one proposal)" })
+    .check();
+
   await dialog.getByLabel("Title").fill(options.titlePrefix);
-  await fillProposalDateField(dialog.getByLabel("Range start"), options.rangeStart);
-  await fillProposalDateField(dialog.getByLabel("Range end"), options.rangeEnd);
-  await dialog.getByRole("button", { name: "Create draft" }).click();
-  await expect(dialog).toBeHidden({ timeout: 15_000 });
 
-  await selectProposalTab(page, "Drafts");
-  const total = await proposalCardsWithPrefix(page, options.titlePrefix).count();
-  const escaped = options.titlePrefix.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-
-  for (let i = 0; i < total; i += 1) {
-    await selectProposalTab(page, "Drafts");
-    const continueBtn = proposalCardsWithPrefix(page, options.titlePrefix)
-      .first()
-      .getByRole("button", { name: "Continue Editing" });
-    await expect(continueBtn).toBeVisible({ timeout: 15_000 });
-    await continueBtn.click();
-
-    const editDialog = page.getByRole("dialog");
-    await expect(editDialog.getByRole("heading", { name: "Edit draft" })).toBeVisible({
-      timeout: 45_000,
-    });
-    await expect(editDialog.getByLabel("Title")).toHaveValue(new RegExp(`^${escaped}`), {
-      timeout: 20_000,
-    });
-    await submitProposalDraft(page, editDialog);
+  for (let index = 0; index < nightDates.length; index += 1) {
+    if (index > 0) {
+      await dialog.getByRole("button", { name: "Add night" }).click();
+    }
+    await fillProposalDateField(dialog.getByLabel("Night of").nth(index), nightDates[index]!);
+    await dialog.getByRole("button", { name: "Solo", exact: true }).nth(index).click();
   }
 
-  return total;
+  await dialog.getByRole("button", { name: "Create draft" }).click();
+  await submitProposalDraft(page, dialog);
+
+  return nightDates.length;
 }
