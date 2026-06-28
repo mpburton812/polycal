@@ -72,7 +72,7 @@ export function ScheduleClient({
 }: ScheduleClientProps) {
   const router = useRouter();
   const pathname = usePathname();
-  const previousPathRef = useRef(pathname);
+  const previousPathRef = useRef<string | null>(null);
   const [viewState, setViewState] = useState<ScheduleViewState>(() => ({
     ...loadScheduleViewState(),
     weekStartIso: initialWeekStartIso,
@@ -151,18 +151,20 @@ export function ScheduleClient({
   }, [viewState]);
 
   useEffect(() => {
-    const monday = startOfWeekMonday(new Date(initialWeekStartIso));
-    setViewState((current) => ({
-      ...current,
-      weekStartIso: monday.toISOString(),
-      monthAnchorIso: monday.toISOString(),
-    }));
     setPayload(initialPayload);
-  }, [initialWeekStartIso, initialPayload]);
+  }, [initialPayload]);
 
-  /** Returning to Schedule always opens the current week (PC-55). */
+  /**
+   * Opening Schedule (mount or navigation) always anchors on the current week (PC-55).
+   * Uses client "today" so cached server props cannot leave the calendar on an old week.
+   */
   useEffect(() => {
-    if (pathname === "/schedule" && previousPathRef.current !== "/schedule") {
+    const onSchedule = pathname === "/schedule";
+    const enteringSchedule =
+      onSchedule &&
+      (previousPathRef.current === null || previousPathRef.current !== "/schedule");
+
+    if (enteringSchedule) {
       const monday = startOfWeekMonday(new Date());
       setViewState((current) => ({
         ...current,
@@ -171,6 +173,7 @@ export function ScheduleClient({
       }));
       refreshSchedule(monday);
     }
+
     previousPathRef.current = pathname;
   }, [pathname, refreshSchedule]);
 

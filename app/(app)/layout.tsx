@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { listPeopleAction } from "@/actions/users";
 import { getPolyGroupDisplayNameAction } from "@/actions/poly-group";
 import { getNotificationInboxAction } from "@/actions/notifications";
+import { getNotificationPrefsAction } from "@/actions/profile";
 import { AppShell } from "@/components/layout/AppShell";
 import { FirstLoginWizard } from "@/components/onboarding/FirstLoginWizard";
 import { UserThemeProvider } from "@/components/providers/UserThemeProvider";
@@ -35,6 +36,7 @@ export default async function AppLayout({
     : "mint";
 
   const notificationInbox = await getNotificationInboxAction();
+  const notificationPrefs = await getNotificationPrefsAction();
   const groupName = await getPolyGroupDisplayNameAction();
 
   const showOnboarding = !session.user.onboardingComplete;
@@ -56,6 +58,7 @@ export default async function AppLayout({
         avatarKey={session.user.avatarKey}
         notificationCount={notificationInbox.count}
         notificationItems={notificationInbox.items}
+        notificationPrefs={notificationPrefs}
       >
         {showOnboarding ? (
           <FirstLoginWizard

@@ -4,6 +4,7 @@ import {
   addDays,
   endOfWeekSunday,
   eventInRange,
+  formatEventTime,
   intervalsOverlap,
   localDateKey,
   startOfWeekMonday,
@@ -95,5 +96,19 @@ describe("eventInRange", () => {
 describe("localDateKey", () => {
   it("returns yyyy-mm-dd in UTC", () => {
     expect(localDateKey("2026-06-25T15:30:00.000Z", "UTC")).toBe("2026-06-25");
+  });
+});
+
+describe("formatEventTime", () => {
+  it("shows a single night date for sleeping arrangements", () => {
+    const label = formatEventTime(
+      "2026-06-26T04:00:00.000Z",
+      "2026-06-27T04:00:00.000Z",
+      "sleeping",
+      "UTC",
+    );
+    expect(label).not.toContain("–");
+    expect(label).toMatch(/Jun/i);
+    expect(label).toMatch(/26/);
   });
 });

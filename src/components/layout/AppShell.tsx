@@ -7,6 +7,7 @@ import { PushSubscriptionManager } from "@/components/notifications/PushSubscrip
 import { avatarSrcForKey } from "@/lib/constants/avatars";
 import { getVapidPublicKey } from "@/lib/push";
 import type { NotificationItem } from "@/actions/notifications";
+import type { NotificationPrefs } from "@/types/notification-prefs";
 
 /**
  * Authenticated shell wrapping all primary tabs with dev tooling and bottom nav.
@@ -19,6 +20,7 @@ export function AppShell({
   avatarKey,
   notificationCount = 0,
   notificationItems = [],
+  notificationPrefs,
 }: {
   children: React.ReactNode;
   displayName: string;
@@ -27,13 +29,17 @@ export function AppShell({
   avatarKey?: string;
   notificationCount?: number;
   notificationItems?: NotificationItem[];
+  notificationPrefs: NotificationPrefs;
 }) {
   const avatarSrc = avatarSrcForKey(avatarKey);
   const vapidPublicKey = getVapidPublicKey();
 
   return (
     <>
-      <PushSubscriptionManager vapidPublicKey={vapidPublicKey} />
+      <PushSubscriptionManager
+        vapidPublicKey={vapidPublicKey}
+        pushEnabled={notificationPrefs.channels.push}
+      />
       <Box
         sx={{
           position: "sticky",
