@@ -69,22 +69,37 @@ export function ScheduleWeekView({
                 py: 0.5,
                 borderBottom: 1,
                 borderColor: "divider",
+                width: "100%",
+                minWidth: 0,
               }}
             >
               <Typography
                 variant="caption"
-                sx={{ minWidth: 72, fontWeight: 600, color: "text.secondary" }}
+                sx={{
+                  flexShrink: 0,
+                  minWidth: 72,
+                  fontWeight: 600,
+                  color: "text.secondary",
+                }}
               >
                 {formatDayHeader(day, timeZone)}
               </Typography>
-              <Box sx={{ flex: 1, display: "flex", flexWrap: "wrap", gap: 0.5 }}>
+              <Box
+                sx={{
+                  flex: 1,
+                  minWidth: 0,
+                  display: "flex",
+                  gap: 0.5,
+                  overflow: "hidden",
+                }}
+              >
                 {dayEvents.length === 0 ? (
                   <Typography variant="caption" color="text.disabled">
                     —
                   </Typography>
                 ) : (
                   dayEvents.map((event) => (
-                    <Box key={event.id} sx={{ minWidth: 120, maxWidth: 220, flex: "1 1 120px" }}>
+                    <Box key={event.id} sx={{ flex: 1, minWidth: 0 }}>
                       <ScheduleEventBlock
                         event={event}
                         compact
@@ -115,7 +130,7 @@ export function ScheduleWeekView({
       }}
     >
       {days.map((day) => {
-        const key = localDateKey(day.toISOString());
+        const key = localDateKey(day.toISOString(), timeZone);
         const dayEvents = eventsByDay.get(key) ?? [];
         const isToday = localDateKey(new Date().toISOString(), timeZone) === key;
         return (
@@ -123,11 +138,13 @@ export function ScheduleWeekView({
             key={key}
             sx={{
               minHeight: 120,
+              minWidth: 0,
               border: 1,
               borderColor: isToday ? "primary.main" : "divider",
               borderRadius: 1,
               p: 1,
               bgcolor: isToday ? "action.hover" : "background.paper",
+              overflow: "hidden",
             }}
           >
             <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1 }}>

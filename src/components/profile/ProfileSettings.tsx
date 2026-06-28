@@ -42,6 +42,7 @@ import {
   resolveTimezone,
 } from "@/lib/schedule/timezone";
 import type { NotificationPrefs } from "@/types/notification-prefs";
+import { subscribeToWebPush } from "@/lib/push-client";
 
 export function ProfileSettings({
   initialDisplayName,
@@ -52,6 +53,7 @@ export function ProfileSettings({
   initialNotificationEmail,
   initialEmailVerified,
   mustChangePassword,
+  vapidPublicKey,
 }: {
   initialDisplayName: string;
   initialAvatarKey: string | null;
@@ -61,6 +63,7 @@ export function ProfileSettings({
   initialNotificationEmail: string | null;
   initialEmailVerified: boolean;
   mustChangePassword: boolean;
+  vapidPublicKey: string | null;
 }) {
   const router = useRouter();
   const { update } = useSession();
@@ -90,6 +93,9 @@ export function ProfileSettings({
   const [notifPending, startNotifTransition] = useTransition();
   const [avatarUploadPending, startAvatarUploadTransition] = useTransition();
   const [avatarUploadError, setAvatarUploadError] = useState<string | null>(null);
+  const [pushMessage, setPushMessage] = useState<string | null>(null);
+  const [pushError, setPushError] = useState<string | null>(null);
+  const [pushPending, startPushTransition] = useTransition();
 
   const customAvatarSrc = isCustomAvatarKey(avatarKey) ? avatarSrcForKey(avatarKey) : undefined;
 
@@ -197,6 +203,54 @@ export function ProfileSettings({
           ? `Verification link generated (dev): ${result.verificationUrl}`
           : "Verification email queued.",
       );
+    });
+  }
+
+  function handleEnablePushNotifications() {
+    setPushError(null);
+    setPushMessage(null);
+    if (!vapidPublicKey) {
+      setPushError("Push notifications are not configured on this server.");
+      return;
+    }
+
+    startPushTransition(async () => {
+      const subscribed = await subscribeToWebPush(vapidPublicKey);
+      if (!subscribed) {
+        setPushError("Browser permission denied or push is unavailable on this device.");
+        return;
+      }
+
+      const updatedPrefs: NotificationPrefs = {
+        ...notificationPrefs,
+        channels: { ...notificationPrefs.channels, push: true },
+      };
+      const result = await updateNotificationPrefsAction(updatedPrefs);
+      if (!result.ok) {
+        setPushError(result.error);
+        return;
+      }
+
+      setNotificationPrefs(updatedPrefs);
+      setPushMessage("Push notifications enabled for this device.");
+    });
+  }
+
+  function handleDisablePushNotifications() {
+    setPushError(null);
+    setPushMessage(null);
+    const updatedPrefs: NotificationPrefs = {
+      ...notificationPrefs,
+      channels: { ...notificationPrefs.channels, push: false },
+    };
+    setNotificationPrefs(updatedPrefs);
+    startNotifTransition(async () => {
+      const result = await updateNotificationPrefsAction(updatedPrefs);
+      if (!result.ok) {
+        setPushError(result.error);
+        return;
+      }
+      setPushMessage("Push notifications disabled.");
     });
   }
 
@@ -382,7 +436,8 @@ export function ProfileSettings({
           Notifications
         </Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-          In-app notifications are live. Email delivery queues when your address is verified.
+          In-app inbox alerts and optional browser push are configured separately. Email delivery
+          queues when your address is verified.
         </Typography>
         <Stack direction="row" spacing={2} alignItems="flex-start" sx={{ mb: 2 }}>
           <TextField
@@ -421,16 +476,16 @@ export function ProfileSettings({
           <FormControlLabel
             control={
               <Checkbox
-                checked={notificationPrefs.channels.device}
+                checked={notificationPrefs.channels.inApp}
                 onChange={(e) =>
                   setNotificationPrefs({
                     ...notificationPrefs,
-                    channels: { ...notificationPrefs.channels, device: e.target.checked },
+                    channels: { ...notificationPrefs.channels, inApp: e.target.checked },
                   })
                 }
               />
             }
-            label="In-app / device"
+            label="In-app inbox"
           />
           <FormControlLabel
             control={
@@ -447,6 +502,32 @@ export function ProfileSettings({
             label="Email"
           />
         </FormGroup>
+        <Typography variant="subtitle2">Browser push</Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+          Push requires explicit opt-in. Enable below to receive alerts on this device even when
+          PolyCal is closed.
+        </Typography>
+        {pushError && <Alert severity="error" sx={{ mb: 1 }}>{pushError}</Alert>}
+        {pushMessage && <Alert severity="success" sx={{ mb: 1 }}>{pushMessage}</Alert>}
+        <Stack direction="row" spacing={1} sx={{ mb: 2 }}>
+          <Button
+            variant="contained"
+            onClick={handleEnablePushNotifications}
+            disabled={pushPending || !vapidPublicKey || notificationPrefs.channels.push}
+          >
+            {pushPending ? "Enabling…" : "Enable push notifications"}
+          </Button>
+          {notificationPrefs.channels.push && (
+            <Button
+              variant="outlined"
+              color="inherit"
+              onClick={handleDisablePushNotifications}
+              disabled={notifPending}
+            >
+              Disable push
+            </Button>
+          )}
+        </Stack>
         <Typography variant="subtitle2" sx={{ mt: 1 }}>
           Quiet hours
         </Typography>

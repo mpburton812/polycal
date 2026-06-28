@@ -76,15 +76,7 @@ export function formatEventTime(
       day: "numeric",
       timeZone,
     };
-    const start = new Date(startAt);
-    const startLabel = start.toLocaleDateString(undefined, dateOpts);
-    if (!endAt) return startLabel;
-    const end = new Date(endAt);
-    const sameDay =
-      start.toLocaleDateString(undefined, { timeZone }) ===
-      end.toLocaleDateString(undefined, { timeZone });
-    if (sameDay) return startLabel;
-    return `${startLabel} – ${end.toLocaleDateString(undefined, dateOpts)}`;
+    return new Date(startAt).toLocaleDateString(undefined, dateOpts);
   }
 
   const start = new Date(startAt);

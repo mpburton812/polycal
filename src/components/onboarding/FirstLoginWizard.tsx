@@ -304,16 +304,16 @@ export function FirstLoginWizard({
             <FormControlLabel
               control={
                 <Checkbox
-                  checked={prefs.channels.device}
+                  checked={prefs.channels.inApp}
                   onChange={(e) =>
                     setPrefs({
                       ...prefs,
-                      channels: { ...prefs.channels, device: e.target.checked },
+                      channels: { ...prefs.channels, inApp: e.target.checked },
                     })
                   }
                 />
               }
-              label="In-app / device"
+              label="In-app inbox"
             />
             <FormControlLabel
               control={
