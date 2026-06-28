@@ -9,7 +9,6 @@ import PollOutlinedIcon from "@mui/icons-material/PollOutlined";
 import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 import {
   Alert,
-  Autocomplete,
   Box,
   Button,
   Card,
@@ -37,9 +36,10 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, useTransition, type ReactNode } from "react";
 
 import {
-  createBatchSleepingProposalsAction,
   createDraftProposalAction,
   getProposalDetailAction,
+  listAcceptedSleepingPartnerIdsAction,
+  listSleepingLocationOptionsAction,
   submitProposalAction,
   updateDraftProposalAction,
   type ProposalConflictWarning,
@@ -48,7 +48,12 @@ import {
 } from "@/actions/proposals";
 import type { PersonSummary } from "@/actions/users";
 import { useToast } from "@/components/providers/ToastProvider";
+import {
+  newBatchEntryId,
+  type BatchSleepingEntry,
+} from "@/lib/proposals/batch-sleeping-client";
 
+import { BatchSleepingEntriesEditor } from "./BatchSleepingEntriesEditor";
 import {
   POLY_GREEN,
   POLY_GREEN_HOVER,
@@ -194,9 +199,11 @@ export function ProposalDraftDialog({
   const [soloEvent, setSoloEvent] = useState(false);
   const [isPoll, setIsPoll] = useState(false);
   const [batchMode, setBatchMode] = useState(false);
-  const [rangeStart, setRangeStart] = useState("");
-  const [rangeEnd, setRangeEnd] = useState("");
-  const [nightsPattern, setNightsPattern] = useState<"every" | "weekdays" | "weekends">("every");
+  const [batchEntries, setBatchEntries] = useState<BatchSleepingEntry[]>([]);
+  const [acceptedPartnerIds, setAcceptedPartnerIds] = useState<string[]>([]);
+  const [sleepingLocationOptions, setSleepingLocationOptions] = useState<ProposalPlaceOption[]>(
+    [],
+  );
   const [eventPrivacy, setEventPrivacy] = useState<"open" | "private" | "super_private">("open");
   const [isRecurring, setIsRecurring] = useState(false);
   const [recurrencePattern, setRecurrencePattern] = useState<
@@ -212,16 +219,33 @@ export function ProposalDraftDialog({
   const [pending, startTransition] = useTransition();
   const contentRef = useRef<HTMLDivElement>(null);
 
-  const candidates = people.filter(
-    (person) => person.id !== currentUserId && person.status === "active",
+  const sleepingCandidates = useMemo(
+    () =>
+      people.filter(
+        (person) =>
+          person.id !== currentUserId &&
+          person.status === "active" &&
+          acceptedPartnerIds.includes(person.id),
+      ),
+    [people, currentUserId, acceptedPartnerIds],
   );
+
+  const eventCandidates = useMemo(
+    () => people.filter((person) => person.id !== currentUserId && person.status === "active"),
+    [people, currentUserId],
+  );
+
+  const candidates = proposalType === "sleeping" ? sleepingCandidates : eventCandidates;
 
   const isSoloProposal =
     proposalType === "sleeping" ? intentionalSolo : soloEvent;
 
+  const locationOptions =
+    proposalType === "sleeping" && !batchMode ? sleepingLocationOptions : places;
+
   const locationName =
-    places.find((p) => p.id === locationId)?.name ?? (locationCustom.trim() || null);
-  const selectedPlace = places.find((p) => p.id === locationId);
+    locationOptions.find((p) => p.id === locationId)?.name ?? (locationCustom.trim() || null);
+  const selectedPlace = locationOptions.find((p) => p.id === locationId);
   const bedroomOptions =
     selectedPlace && selectedPlace.bedroomCount > 0
       ? Array.from({ length: selectedPlace.bedroomCount }, (_, index) => ({
@@ -231,23 +255,27 @@ export function ProposalDraftDialog({
       : [];
 
   const previewStartIso = useMemo(() => {
-    if (batchMode) {
-      return proposalType === "sleeping"
-        ? localDateToStartIso(rangeStart)
-        : localInputToIso(rangeStart);
+    if (batchMode && batchEntries.length > 0) {
+      const sorted = [...batchEntries]
+        .map((entry) => localDateToStartIso(entry.nightDate.slice(0, 10)))
+        .filter((iso): iso is string => Boolean(iso))
+        .sort((a, b) => a.localeCompare(b));
+      return sorted[0];
     }
     const first = slots.find((s) => s.startAt);
     if (!first) return undefined;
     return proposalType === "sleeping"
       ? localDateToStartIso(first.startAt)
       : localInputToIso(first.startAt);
-  }, [batchMode, rangeStart, slots, proposalType]);
+  }, [batchMode, batchEntries, slots, proposalType]);
 
   const previewEndIso = useMemo(() => {
-    if (batchMode) {
-      return proposalType === "sleeping"
-        ? localDateToEndIso(rangeEnd)
-        : localInputToIso(rangeEnd);
+    if (batchMode && batchEntries.length > 0) {
+      const sorted = [...batchEntries]
+        .map((entry) => localDateToEndIso(entry.nightDate.slice(0, 10)))
+        .filter((iso): iso is string => Boolean(iso))
+        .sort((a, b) => a.localeCompare(b));
+      return sorted[sorted.length - 1];
     }
     const first = slots.find((s) => s.startAt);
     if (!first) return undefined;
@@ -257,7 +285,30 @@ export function ProposalDraftDialog({
         : localDateToEndIso(first.startAt);
     }
     return first.endAt ? localInputToIso(first.endAt) : undefined;
-  }, [batchMode, rangeEnd, slots, proposalType]);
+  }, [batchMode, batchEntries, slots, proposalType]);
+
+  useEffect(() => {
+    if (!open) return;
+    void listAcceptedSleepingPartnerIdsAction().then(setAcceptedPartnerIds);
+  }, [open]);
+
+  useEffect(() => {
+    if (!open || proposalType !== "sleeping" || batchMode) {
+      setSleepingLocationOptions([]);
+      return;
+    }
+    const inviteeIds = isSoloProposal
+      ? []
+      : Object.entries(inviteeMode)
+          .filter(([, role]) => role === "required" || role === "optional")
+          .map(([userId]) => userId);
+    void listSleepingLocationOptionsAction(inviteeIds).then(setSleepingLocationOptions);
+  }, [open, proposalType, batchMode, isSoloProposal, inviteeMode]);
+
+  useEffect(() => {
+    if (!batchMode || batchEntries.length > 0) return;
+    setBatchEntries([{ id: newBatchEntryId(), nightDate: "", invitees: [], intentionalSolo: false }]);
+  }, [batchMode, batchEntries.length]);
 
   const timePreview = formatTimeRange(
     previewStartIso ?? null,
@@ -270,7 +321,12 @@ export function ProposalDraftDialog({
     if (!open) return;
     if (initialDetail) {
       setSavedDraftId(initialDetail.id);
-      setBatchMode(false);
+      setBatchMode(initialDetail.isBatchSleeping);
+      setBatchEntries(
+        initialDetail.isBatchSleeping && initialDetail.batchEntries.length > 0
+          ? initialDetail.batchEntries
+          : [{ id: newBatchEntryId(), nightDate: "", invitees: [], intentionalSolo: false }],
+      );
       setProposalType(initialDetail.proposalType);
       setTitle(initialDetail.title);
       setDescription(initialDetail.description ?? "");
@@ -324,9 +380,7 @@ export function ProposalDraftDialog({
       setSavedDraftId(null);
       setIsPoll(false);
       setBatchMode(false);
-      setRangeStart("");
-      setRangeEnd("");
-      setNightsPattern("every");
+      setBatchEntries([]);
       setEventPrivacy("open");
       setIsRecurring(false);
       setRecurrencePattern("weekly");
@@ -342,6 +396,12 @@ export function ProposalDraftDialog({
   }
 
   function applyDetailToForm(detail: ProposalDetail) {
+    setBatchMode(detail.isBatchSleeping);
+    setBatchEntries(
+      detail.isBatchSleeping && detail.batchEntries.length > 0
+        ? detail.batchEntries
+        : [{ id: newBatchEntryId(), nightDate: "", invitees: [], intentionalSolo: false }],
+    );
     setProposalType(detail.proposalType);
     setTitle(detail.title);
     setDescription(detail.description ?? "");
@@ -389,48 +449,50 @@ export function ProposalDraftDialog({
     });
   }
 
-  function handleSave() {
+  function buildDraftPayload() {
     const invitees = isSoloProposal
       ? []
       : Object.entries(inviteeMode)
           .filter(([, role]) => role === "required" || role === "optional")
           .map(([userId, role]) => ({ userId, role: role as "required" | "optional" }));
 
-    const timeSlots = slots
-      .map((slot) => {
-        if (proposalType === "sleeping") {
-          const startIso = sleepingDateToStartIso(slot.startAt);
-          if (!startIso) return null;
-          const endIso =
-            slot.endAt && slot.endAt !== slot.startAt
-              ? sleepingDateToStartIso(slot.endAt)
-              : null;
-          return {
-            startAt: startIso,
-            endAt: endIso ?? undefined,
-            label: slot.label.trim() || undefined,
-          };
-        }
-        const startIso = localInputToIso(slot.startAt);
-        if (!startIso) return null;
-        return {
-          startAt: startIso,
-          endAt: localInputToIso(slot.endAt),
-          label: slot.label.trim() || undefined,
-        };
-      })
-      .filter((slot) => slot !== null);
+    const timeSlots = batchMode
+      ? []
+      : slots
+          .map((slot) => {
+            if (proposalType === "sleeping") {
+              const startIso = sleepingDateToStartIso(slot.startAt);
+              if (!startIso) return null;
+              const endIso =
+                slot.endAt && slot.endAt !== slot.startAt
+                  ? sleepingDateToStartIso(slot.endAt)
+                  : null;
+              return {
+                startAt: startIso,
+                endAt: endIso ?? undefined,
+                label: slot.label.trim() || undefined,
+              };
+            }
+            const startIso = localInputToIso(slot.startAt);
+            if (!startIso) return null;
+            return {
+              startAt: startIso,
+              endAt: localInputToIso(slot.endAt),
+              label: slot.label.trim() || undefined,
+            };
+          })
+          .filter((slot) => slot !== null);
 
-    const payload = {
+    return {
       title,
       description,
       proposalType,
-      locationId: locationId || undefined,
-      locationText: locationCustom.trim() || undefined,
+      locationId: batchMode ? undefined : locationId || undefined,
+      locationText: batchMode ? undefined : locationCustom.trim() || undefined,
       bedroomIndex:
-        proposalType === "sleeping" && bedroomIndex !== "" ? bedroomIndex : undefined,
+        proposalType === "sleeping" && !batchMode && bedroomIndex !== "" ? bedroomIndex : undefined,
       notes: notes || undefined,
-      intentionalSolo: isSoloProposal,
+      intentionalSolo: batchMode ? false : isSoloProposal,
       isPoll: proposalType === "event" ? isPoll : false,
       eventPrivacy,
       isRecurring: !batchMode && isRecurring,
@@ -438,80 +500,65 @@ export function ProposalDraftDialog({
         !batchMode && isRecurring
           ? { pattern: recurrencePattern, interval: 1, count: recurrenceCount }
           : undefined,
-      invitees,
+      invitees: batchMode ? [] : invitees,
       timeSlots,
+      isBatchSleeping: batchMode && proposalType === "sleeping",
+      batchEntries:
+        batchMode && proposalType === "sleeping"
+          ? batchEntries.filter((entry) => entry.nightDate.trim())
+          : undefined,
     };
+  }
 
+  /** Persists the current form to the server; returns proposal id or null on failure (PC-59). */
+  async function persistDraft(): Promise<string | null> {
+    const payload = buildDraftPayload();
+
+    if (batchMode && proposalType === "sleeping" && (payload.batchEntries?.length ?? 0) === 0) {
+      showToast("Add at least one night to the batch.", "error");
+      return null;
+    }
+
+    const editId = initialDetail?.id ?? savedDraftId;
+    let proposalId = editId;
+    if (isEdit && editId) {
+      const result = await updateDraftProposalAction({ ...payload, proposalId: editId });
+      if (!result.ok) {
+        showToast(result.message, "error");
+        return null;
+      }
+    } else {
+      const result = await createDraftProposalAction(payload);
+      if (!result.ok) {
+        showToast(result.message, "error");
+        return null;
+      }
+      proposalId = result.proposalId ?? null;
+    }
+
+    if (!proposalId) return null;
+
+    setSavedDraftId(proposalId);
+    const detailResult = await getProposalDetailAction(proposalId);
+    if (detailResult.ok && detailResult.detail) {
+      applyDetailToForm(detailResult.detail);
+    }
+    return proposalId;
+  }
+
+  function handleSave() {
     startTransition(async () => {
-      if (batchMode && proposalType === "sleeping" && !isEdit) {
-        const rangeStartIso =
-          proposalType === "sleeping"
-            ? sleepingDateToStartIso(rangeStart)
-            : localInputToIso(rangeStart);
-        const rangeEndIso =
-          proposalType === "sleeping"
-            ? sleepingDateToStartIso(rangeEnd)
-            : localInputToIso(rangeEnd);
-        if (!rangeStartIso || !rangeEndIso) {
-          showToast("Batch mode requires a valid date range.", "error");
-          return;
-        }
-        const result = await createBatchSleepingProposalsAction({
-          title,
-          description,
-          locationId: locationId || undefined,
-          notes: notes || undefined,
-          intentionalSolo: intentionalSolo,
-          invitees,
-          rangeStart: rangeStartIso,
-          rangeEnd: rangeEndIso,
-          nightsPattern,
-        });
-        if (!result.ok) {
-          showToast(result.message, "error");
-          return;
-        }
-        handleClose();
-        router.refresh();
-        return;
-      }
-
-      const editId = initialDetail?.id ?? savedDraftId;
-      let proposalId = editId;
-      if (isEdit && editId) {
-        const result = await updateDraftProposalAction({ ...payload, proposalId: editId });
-        if (!result.ok) {
-          showToast(result.message, "error");
-          return;
-        }
-      } else {
-        const result = await createDraftProposalAction(payload);
-        if (!result.ok) {
-          showToast(result.message, "error");
-          return;
-        }
-        proposalId = result.proposalId ?? null;
-      }
-
-      if (!proposalId) {
-        handleClose();
-        router.refresh();
-        return;
-      }
-
-      setSavedDraftId(proposalId);
-      const detailResult = await getProposalDetailAction(proposalId);
-      if (detailResult.ok && detailResult.detail) {
-        applyDetailToForm(detailResult.detail);
-      }
+      const proposalId = await persistDraft();
+      if (!proposalId) return;
       router.refresh();
     });
   }
 
   function handleSubmit(confirm = false) {
-    const proposalId = initialDetail?.id ?? savedDraftId;
-    if (!proposalId) return;
     startTransition(async () => {
+      const proposalId = await persistDraft();
+      if (!proposalId) return;
+
       const result = await submitProposalAction(proposalId, confirm);
       if (!result.ok && result.warnings && result.warnings.length > 0) {
         setConflictWarnings(result.warnings);
@@ -694,11 +741,106 @@ export function ProposalDraftDialog({
 
           <Divider sx={{ my: 2 }} />
 
+          {!batchMode && (
+            <>
+              <SectionHeader
+                icon={<GroupsOutlinedIcon fontSize="small" />}
+                title="Invitees"
+                subtitle={
+                  isSoloProposal
+                    ? "Solo proposals do not include invitees"
+                    : "Tap to cycle: none → required → optional → none"
+                }
+              />
+              {proposalType === "event" && (
+                <ToggleButtonGroup
+                  exclusive
+                  value={soloEvent ? "solo" : "group"}
+                  onChange={(_, value) => {
+                    if (!value) return;
+                    const nextSolo = value === "solo";
+                    setSoloEvent(nextSolo);
+                    setIntentionalSolo(false);
+                    if (nextSolo) setInviteeMode({});
+                  }}
+                  size="small"
+                  sx={{
+                    mb: 1.5,
+                    "& .MuiToggleButton-root.Mui-selected": {
+                      bgcolor: POLY_GREEN,
+                      color: "#fff",
+                      "&:hover": { bgcolor: POLY_GREEN_HOVER },
+                    },
+                  }}
+                >
+                  <ToggleButton value="group">With invitees</ToggleButton>
+                  <ToggleButton value="solo">Solo event (just me)</ToggleButton>
+                </ToggleButtonGroup>
+              )}
+              {proposalType === "sleeping" && (
+                <ToggleButtonGroup
+                  exclusive
+                  value={intentionalSolo ? "solo" : "network"}
+                  onChange={(_, value) => {
+                    if (!value) return;
+                    setIntentionalSolo(value === "solo");
+                    if (value === "solo") setInviteeMode({});
+                  }}
+                  size="small"
+                  sx={{
+                    mb: 1.5,
+                    "& .MuiToggleButton-root.Mui-selected": {
+                      bgcolor: POLY_GREEN,
+                      color: "#fff",
+                      "&:hover": { bgcolor: POLY_GREEN_HOVER },
+                    },
+                  }}
+                >
+                  <ToggleButton value="solo">Solo</ToggleButton>
+                  <ToggleButton value="network">With invitees</ToggleButton>
+                </ToggleButtonGroup>
+              )}
+              {!isSoloProposal && (
+                <Stack direction="row" flexWrap="wrap" gap={1} sx={{ mb: 2 }}>
+                  {candidates.map((person) => {
+                    const mode = inviteeMode[person.id] ?? "none";
+                    return (
+                      <ToggleButton
+                        key={person.id}
+                        value={person.id}
+                        selected={mode !== "none"}
+                        onClick={() => cycleInvitee(person.id)}
+                        size="small"
+                        sx={{
+                          textTransform: "none",
+                          ...(mode === "required" && {
+                            bgcolor: POLY_GREEN,
+                            color: "#fff",
+                            "&:hover": { bgcolor: POLY_GREEN_HOVER },
+                            "&.Mui-selected": { bgcolor: POLY_GREEN, color: "#fff" },
+                          }),
+                          ...(mode === "optional" && {
+                            borderColor: POLY_GREEN,
+                            color: POLY_GREEN,
+                          }),
+                        }}
+                      >
+                        {person.displayName}
+                        {mode !== "none" ? ` (${mode})` : ""}
+                      </ToggleButton>
+                    );
+                  })}
+                </Stack>
+              )}
+              <Divider sx={{ my: 2 }} />
+            </>
+          )}
+
           <SectionHeader
             icon={<AccessTimeIcon fontSize="small" />}
             title={
               batchMode
-                ? "Batch date range"
+                ? "Batch nights"
                 : isPoll
                   ? "Poll time slots"
                   : proposalType === "sleeping"
@@ -707,7 +849,7 @@ export function ProposalDraftDialog({
             }
             subtitle={
               batchMode
-                ? "Creates multiple sleeping drafts across the range"
+                ? "Up to 14 nights in one batch sleeping proposal"
                 : isPoll
                   ? "Add up to 5 options for invitees to choose from"
                   : proposalType === "sleeping"
@@ -716,62 +858,20 @@ export function ProposalDraftDialog({
             }
           />
           <Stack spacing={1.5} sx={{ mb: 2 }}>
-            {proposalType === "sleeping" && !isEdit && (
-              <FormControlLabel
-                control={
-                  <Checkbox
-                    checked={batchMode}
-                    onChange={(event) => setBatchMode(event.target.checked)}
-                    sx={{ color: POLY_GREEN, "&.Mui-checked": { color: POLY_GREEN } }}
-                  />
-                }
-                label="Batch / recurring nights (create multiple drafts)"
-              />
-            )}
-            {proposalType === "event" && (
-              <FormControlLabel
-                control={
-                  <Checkbox
-                    checked={isPoll}
-                    onChange={(event) => setIsPoll(event.target.checked)}
-                    sx={{ color: POLY_GREEN, "&.Mui-checked": { color: POLY_GREEN } }}
-                  />
-                }
-                label="Time poll (multiple slot options)"
-              />
-            )}
-            {batchMode ? (
+            {!batchMode && (
               <>
-                <ProposalScheduleField
-                  label="Range start"
-                  mode={proposalType === "sleeping" ? "date" : "datetime"}
-                  value={rangeStart}
-                  onChange={setRangeStart}
-                />
-                <ProposalScheduleField
-                  label="Range end"
-                  mode={proposalType === "sleeping" ? "date" : "datetime"}
-                  value={rangeEnd}
-                  onChange={setRangeEnd}
-                />
-                <FormControl fullWidth size="small">
-                  <InputLabel id="nights-pattern-label">Nights pattern</InputLabel>
-                  <Select
-                    labelId="nights-pattern-label"
-                    label="Nights pattern"
-                    value={nightsPattern}
-                    onChange={(event) =>
-                      setNightsPattern(event.target.value as "every" | "weekdays" | "weekends")
+                {proposalType === "event" && (
+                  <FormControlLabel
+                    control={
+                      <Checkbox
+                        checked={isPoll}
+                        onChange={(event) => setIsPoll(event.target.checked)}
+                        sx={{ color: POLY_GREEN, "&.Mui-checked": { color: POLY_GREEN } }}
+                      />
                     }
-                  >
-                    <MenuItem value="every">Every night</MenuItem>
-                    <MenuItem value="weekdays">Weekdays only</MenuItem>
-                    <MenuItem value="weekends">Weekends only</MenuItem>
-                  </Select>
-                </FormControl>
-              </>
-            ) : (
-              <>
+                    label="Time poll (multiple slot options)"
+                  />
+                )}
                 {slots.map((slot, index) => (
                   <Box
                     key={`slot-${index}`}
@@ -804,7 +904,11 @@ export function ProposalDraftDialog({
                         value={slot.startAt}
                         onChange={(next) => {
                           const updated = [...slots];
-                          updated[index] = { ...updated[index], startAt: next };
+                          updated[index] = {
+                            ...updated[index],
+                            startAt: next,
+                            endAt: updated[index].endAt || next,
+                          };
                           setSlots(updated);
                         }}
                       />
@@ -814,6 +918,7 @@ export function ProposalDraftDialog({
                         }
                         mode={proposalType === "sleeping" ? "date" : "datetime"}
                         value={slot.endAt}
+                        disabled={!slot.startAt}
                         onChange={(next) => {
                           const updated = [...slots];
                           updated[index] = { ...updated[index], endAt: next };
@@ -832,6 +937,59 @@ export function ProposalDraftDialog({
                   >
                     Add poll option
                   </Button>
+                )}
+              </>
+            )}
+            {proposalType === "sleeping" && (
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={batchMode}
+                    onChange={(event) => setBatchMode(event.target.checked)}
+                    sx={{ color: POLY_GREEN, "&.Mui-checked": { color: POLY_GREEN } }}
+                  />
+                }
+                label="Batch (multiple nights in one proposal)"
+              />
+            )}
+            {batchMode && proposalType === "sleeping" && (
+              <>
+                <BatchSleepingEntriesEditor
+                  entries={batchEntries}
+                  onChange={setBatchEntries}
+                  partnerPeople={sleepingCandidates}
+                />
+                {batchEntries.some((entry) => entry.nightDate.trim()) && (
+                  <Box sx={{ mt: 2, p: 1.5, bgcolor: POLY_GREEN_LIGHT, borderRadius: 1 }}>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
+                      Proposed nights summary
+                    </Typography>
+                    <Stack spacing={0.75}>
+                      {batchEntries
+                        .filter((entry) => entry.nightDate.trim())
+                        .map((entry, index) => {
+                          const place =
+                            locationOptions.find((p) => p.id === entry.locationId)?.name ??
+                            entry.locationText ??
+                            "No location";
+                          const inviteeLabels = entry.intentionalSolo
+                            ? ["Solo"]
+                            : entry.invitees.map((invitee) => {
+                                const person = people.find((p) => p.id === invitee.userId);
+                                return person
+                                  ? `${person.displayName} (${invitee.role})`
+                                  : invitee.role;
+                              });
+                          return (
+                            <Typography key={entry.id} variant="body2" sx={{ color: POLY_GREEN }}>
+                              Night {index + 1}: {entry.nightDate.slice(0, 10)} · {place}
+                              {inviteeLabels.length > 0 ? ` · ${inviteeLabels.join(", ")}` : ""}
+                              {entry.comment ? ` · "${entry.comment}"` : ""}
+                            </Typography>
+                          );
+                        })}
+                    </Stack>
+                  </Box>
                 )}
               </>
             )}
@@ -886,73 +1044,74 @@ export function ProposalDraftDialog({
             )}
           </Stack>
 
-          <Divider sx={{ my: 2 }} />
+          {!batchMode && (
+            <>
+              <Divider sx={{ my: 2 }} />
 
-          <SectionHeader
-            icon={<LocationOnOutlinedIcon fontSize="small" />}
-            title="Location"
-            subtitle="Your places, sleeping partners' places, custom text, or leave blank"
-          />
-          <Autocomplete
-            freeSolo
-            options={places}
-            getOptionLabel={(option) => (typeof option === "string" ? option : option.name)}
-            value={
-              locationId
-                ? (places.find((place) => place.id === locationId) ?? null)
-                : locationCustom || null
-            }
-            onChange={(_, newValue) => {
-              if (!newValue) {
-                setLocationId("");
-                setLocationCustom("");
-                setBedroomIndex("");
-              } else if (typeof newValue === "string") {
-                setLocationId("");
-                setLocationCustom(newValue);
-                setBedroomIndex("");
-              } else {
-                setLocationId(newValue.id);
-                setLocationCustom("");
-                setBedroomIndex("");
-              }
-            }}
-            onInputChange={(_, value, reason) => {
-              if (reason === "input" && !locationId) {
-                setLocationCustom(value);
-              }
-            }}
-            renderInput={(params) => (
-              <TextField
-                {...params}
-                label="Location"
-                size="small"
-                placeholder="Select a place, type custom text, or leave blank"
+              <SectionHeader
+                icon={<LocationOnOutlinedIcon fontSize="small" />}
+                title="Location"
+                subtitle="Your places, sleeping partners' places, custom text, or leave blank"
               />
-            )}
-            sx={{ mb: 2 }}
-          />
-
-          {proposalType === "sleeping" && bedroomOptions.length > 0 && (
-            <FormControl fullWidth size="small" sx={{ mb: 2 }}>
-              <InputLabel id="proposal-bedroom-label">Bedroom</InputLabel>
-              <Select
-                labelId="proposal-bedroom-label"
-                label="Bedroom"
-                value={bedroomIndex === "" ? "" : String(bedroomIndex)}
+              <FormControl fullWidth size="small" sx={{ mb: 1 }}>
+                <InputLabel id="proposal-location-label">Location (optional)</InputLabel>
+                <Select
+                  labelId="proposal-location-label"
+                  label="Location (optional)"
+                  value={locationId}
+                  onChange={(event) => {
+                    const value = event.target.value;
+                    setLocationId(value);
+                    if (value) setLocationCustom("");
+                    if (!value) setBedroomIndex("");
+                  }}
+                >
+                  <MenuItem value="">None</MenuItem>
+                  {locationOptions.map((place) => (
+                    <MenuItem key={place.id} value={place.id}>
+                      {place.name}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+              <TextField
+                label="Custom location (optional)"
+                value={locationCustom}
                 onChange={(event) => {
-                  const value = event.target.value;
-                  setBedroomIndex(value === "" ? "" : Number(value));
+                  setLocationCustom(event.target.value);
+                  if (event.target.value) {
+                    setLocationId("");
+                    setBedroomIndex("");
+                  }
                 }}
-              >
-                <MenuItem value="">Any / whole place</MenuItem>
-                {bedroomOptions.map((bedroom) => (
-                  <MenuItem key={bedroom.index} value={String(bedroom.index)}>
-                    {bedroom.label}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
+                fullWidth
+                size="small"
+                placeholder="Type a location not in the list"
+                sx={{ mb: 2 }}
+              />
+
+              {proposalType === "sleeping" && bedroomOptions.length > 0 && (
+                <FormControl fullWidth size="small" sx={{ mb: 2 }}>
+                  <InputLabel id="proposal-bedroom-label">Bedroom</InputLabel>
+                  <Select
+                    labelId="proposal-bedroom-label"
+                    label="Bedroom"
+                    value={bedroomIndex === "" ? "" : String(bedroomIndex)}
+                    onChange={(event) => {
+                      const value = event.target.value;
+                      setBedroomIndex(value === "" ? "" : Number(value));
+                    }}
+                  >
+                    <MenuItem value="">Any / whole place</MenuItem>
+                    {bedroomOptions.map((bedroom) => (
+                      <MenuItem key={bedroom.index} value={String(bedroom.index)}>
+                        {bedroom.label}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              )}
+            </>
           )}
 
           <SectionHeader
@@ -971,98 +1130,6 @@ export function ProposalDraftDialog({
             sx={{ mb: 2 }}
           />
 
-          <Divider sx={{ my: 2 }} />
-
-          <SectionHeader
-            icon={<GroupsOutlinedIcon fontSize="small" />}
-            title="Invitees"
-            subtitle={
-              isSoloProposal
-                ? "Solo proposals do not include invitees"
-                : "Tap to cycle: none → required → optional → none"
-            }
-          />
-          {proposalType === "event" && (
-            <ToggleButtonGroup
-              exclusive
-              value={soloEvent ? "solo" : "group"}
-              onChange={(_, value) => {
-                if (!value) return;
-                const nextSolo = value === "solo";
-                setSoloEvent(nextSolo);
-                setIntentionalSolo(false);
-                if (nextSolo) setInviteeMode({});
-              }}
-              size="small"
-              sx={{
-                mb: 1.5,
-                "& .MuiToggleButton-root.Mui-selected": {
-                  bgcolor: POLY_GREEN,
-                  color: "#fff",
-                  "&:hover": { bgcolor: POLY_GREEN_HOVER },
-                },
-              }}
-            >
-              <ToggleButton value="group">With invitees</ToggleButton>
-              <ToggleButton value="solo">Solo event (just me)</ToggleButton>
-            </ToggleButtonGroup>
-          )}
-          {proposalType === "sleeping" && (
-            <ToggleButtonGroup
-              exclusive
-              value={intentionalSolo ? "solo" : "network"}
-              onChange={(_, value) => {
-                if (!value) return;
-                setIntentionalSolo(value === "solo");
-                if (value === "solo") setInviteeMode({});
-              }}
-              size="small"
-              sx={{
-                mb: 1.5,
-                "& .MuiToggleButton-root.Mui-selected": {
-                  bgcolor: POLY_GREEN,
-                  color: "#fff",
-                  "&:hover": { bgcolor: POLY_GREEN_HOVER },
-                },
-              }}
-            >
-              <ToggleButton value="network">With invitees</ToggleButton>
-              <ToggleButton value="solo">Intentional solo</ToggleButton>
-            </ToggleButtonGroup>
-          )}
-          {!isSoloProposal && (
-          <Stack direction="row" flexWrap="wrap" gap={1}>
-            {candidates.map((person) => {
-              const mode = inviteeMode[person.id] ?? "none";
-              return (
-                <ToggleButton
-                  key={person.id}
-                  value={person.id}
-                  selected={mode !== "none"}
-                  onClick={() => cycleInvitee(person.id)}
-                  size="small"
-                  sx={{
-                    textTransform: "none",
-                    ...(mode === "required" && {
-                      bgcolor: POLY_GREEN,
-                      color: "#fff",
-                      "&:hover": { bgcolor: POLY_GREEN_HOVER },
-                      "&.Mui-selected": { bgcolor: POLY_GREEN, color: "#fff" },
-                    }),
-                    ...(mode === "optional" && {
-                      borderColor: POLY_GREEN,
-                      color: POLY_GREEN,
-                    }),
-                  }}
-                >
-                  {person.displayName}
-                  {mode !== "none" ? ` (${mode})` : ""}
-                </ToggleButton>
-              );
-            })}
-          </Stack>
-          )}
-
         </CardContent>
 
         <CardActions sx={{ px: 2, pb: 2, pt: 0, justifyContent: "flex-end", gap: 1, flexShrink: 0 }}>
@@ -1077,16 +1144,14 @@ export function ProposalDraftDialog({
           >
             {isEdit ? "Save draft" : "Create draft"}
           </Button>
-          {isEdit && activeProposalId && (
-            <Button
-              variant="contained"
-              disabled={!title.trim() || pending}
-              onClick={() => handleSubmit()}
-              sx={primaryButtonSx}
-            >
-              Submit
-            </Button>
-          )}
+          <Button
+            variant="contained"
+            disabled={!title.trim() || pending}
+            onClick={() => handleSubmit()}
+            sx={primaryButtonSx}
+          >
+            Submit
+          </Button>
         </CardActions>
       </Card>
     </Dialog>

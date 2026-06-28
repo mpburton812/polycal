@@ -16,7 +16,7 @@ import {
   eventSpanInGrid,
   startOfMonth,
 } from "@/lib/schedule/month-grid";
-import { localDateKey } from "@/lib/schedule/dates";
+import { localDateKey, scheduleDayCellSx, isTodayDate } from "@/lib/schedule/dates";
 
 interface ScheduleMonthViewProps {
   monthAnchor: Date;
@@ -144,6 +144,11 @@ export function ScheduleMonthView({
               const key = localDateKey(day.toISOString(), timeZone);
               const markers = eventsByDay.get(key);
               const inMonth = day.getMonth() === monthStart.getMonth();
+              const busynessLevel = busynessLevelForDay(events, day);
+              const busynessLabel =
+                busynessLevel === 0 ? "open" : busynessLevel === 3 ? "very busy" : "busy";
+              const daySx = scheduleDayCellSx(day, timeZone);
+              const isToday = isTodayDate(day, timeZone);
 
               return (
                 <Box
@@ -153,11 +158,11 @@ export function ScheduleMonthView({
                   onClick={onDayClick ? () => onDayClick(day) : undefined}
                   sx={{
                     border: 1,
-                    borderColor: "divider",
+                    borderColor: daySx.borderColor,
                     borderRadius: 1,
                     p: 0.5,
-                    bgcolor: inMonth ? "background.paper" : "action.hover",
-                    opacity: inMonth ? 1 : 0.65,
+                    bgcolor: inMonth ? daySx.bgcolor : "action.hover",
+                    opacity: inMonth ? daySx.opacity : 0.45,
                     minHeight: 72,
                     position: "relative",
                     textAlign: "left",
@@ -170,22 +175,30 @@ export function ScheduleMonthView({
                       position: "absolute",
                       top: 4,
                       right: 4,
-                      px: 0.5,
-                      py: 0.15,
+                      width: 14,
+                      height: 14,
                       borderRadius: 0.5,
-                      bgcolor: LEVEL_COLORS[busynessLevelForDay(events, day)],
+                      bgcolor: LEVEL_COLORS[busynessLevel],
                       border: "1px solid",
                       borderColor: "divider",
-                      fontSize: "0.6rem",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontSize: "0.45rem",
                       fontWeight: 600,
                       color: "text.secondary",
-                      lineHeight: 1.2,
+                      lineHeight: 1,
                     }}
-                    aria-hidden
+                    aria-label={`Network busyness: ${busynessLabel}`}
                   >
                     {formatHeatmapDate(day)}
                   </Box>
-                  <Typography variant="caption" fontWeight={600} display="block">
+                  <Typography
+                    variant="caption"
+                    fontWeight={isToday ? 800 : 600}
+                    color={isToday ? "primary.main" : "text.primary"}
+                    display="block"
+                  >
                     {day.getDate()}
                   </Typography>
                   <Box sx={{ display: "flex", gap: 0.25, mt: 0.25 }}>

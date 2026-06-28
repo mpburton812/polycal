@@ -28,6 +28,12 @@ e2e.db-*
 Thumbs.db
 *.log
 .cursor/
+.idea/
+
+# Generated service worker (built by Serwist via `npm run build`)
+public/sw.js
+public/sw.js.map
+public/sw.js.errors
 
 # Vercel
 .vercel

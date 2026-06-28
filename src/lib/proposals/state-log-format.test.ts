@@ -14,7 +14,7 @@ describe("formatProposalLogLine", () => {
       action: "proposal.submitted",
       details: null,
     });
-    expect(line).toContain("proposal · submitted");
+    expect(line).toContain("Submitted to network");
     expect(line).toContain("Leia Organa");
   });
 
@@ -35,9 +35,19 @@ describe("formatProposalLogLine", () => {
     const line = formatProposalLogLine({
       ...baseEntry,
       action: "proposal.vote_cast",
-      details: JSON.stringify({ vote: "accepted" }),
+      details: JSON.stringify({ vote: "accept" }),
     });
-    expect(line).toContain("accepted");
+    expect(line).toContain("Accepted");
+  });
+
+  it("formats slot vote cast details in plain language", () => {
+    const line = formatProposalLogLine({
+      ...baseEntry,
+      action: "proposal.slot_vote_cast",
+      details: JSON.stringify({ vote: "accept_suboptimal", timeSlotId: "pts-abc123" }),
+    });
+    expect(line).toContain("Accepted sub-optimal");
+    expect(line).not.toContain("accept_suboptimal");
   });
 
   it("falls back to raw details when JSON is invalid", () => {

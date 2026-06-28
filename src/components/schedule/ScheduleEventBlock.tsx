@@ -1,5 +1,6 @@
 "use client";
 
+import BedIcon from "@mui/icons-material/Bed";
 import { Box, Typography } from "@mui/material";
 
 import type { ScheduleEvent } from "@/actions/schedule";
@@ -16,7 +17,9 @@ interface ScheduleEventBlockProps {
 /** Formats stakeholder names for calendar blocks, respecting privacy masking (PC-43). */
 function formatStakeholders(event: ScheduleEvent): string | null {
   if (event.isContentMasked) return "Private";
-  if (event.intentionalSolo) return "Solo";
+  if (event.intentionalSolo) {
+    return event.proposalType === "sleeping" ? event.proposerName : "Solo";
+  }
   if (event.participantNames.length === 0) return null;
   return event.participantNames.join(", ");
 }
@@ -62,6 +65,7 @@ export function ScheduleEventBlock({
   if (timeLabel) lineTwoParts.push(timeLabel);
   if (stakeholders) lineTwoParts.push(stakeholders);
   const lineTwo = lineTwoParts.join(", ");
+  const isSleeping = event.proposalType === "sleeping";
 
   return (
     <Box
@@ -69,9 +73,14 @@ export function ScheduleEventBlock({
       type="button"
       onClick={onClick}
       aria-label={`${lineOne}. ${lineTwo}`}
+      title={`${lineOne}\n${lineTwo}`}
       sx={{
+        position: "relative",
         display: "block",
         width: "100%",
+        maxWidth: "100%",
+        minWidth: 0,
+        overflow: "hidden",
         textAlign: "left",
         cursor: "pointer",
         borderRadius: 1,
@@ -85,17 +94,38 @@ export function ScheduleEventBlock({
         "&:hover": { filter: "brightness(0.97)" },
       }}
     >
-      <Typography variant={compact ? "caption" : "body2"} fontWeight={600} noWrap>
-        {lineOne}
-      </Typography>
-      <Typography variant="caption" display="block" noWrap>
-        {lineTwo}
-      </Typography>
-      {!compact && event.proposalType === "sleeping" && (
-        <Typography variant="caption" display="block" color="inherit" sx={{ opacity: 0.85 }}>
-          Overnight arrangement
-        </Typography>
+      {isSleeping && (
+        <BedIcon
+          aria-hidden
+          sx={{
+            position: "absolute",
+            right: compact ? 2 : 4,
+            bottom: compact ? 0 : 2,
+            fontSize: compact ? 40 : 52,
+            opacity: 0.18,
+            color: "currentColor",
+            pointerEvents: "none",
+          }}
+        />
       )}
+      <Box sx={{ position: "relative", zIndex: 1, minWidth: 0 }}>
+        <Typography
+          variant={compact ? "caption" : "body2"}
+          fontWeight={600}
+          noWrap
+          sx={{ overflow: "hidden", textOverflow: "ellipsis" }}
+        >
+          {lineOne}
+        </Typography>
+        <Typography
+          variant="caption"
+          display="block"
+          noWrap
+          sx={{ overflow: "hidden", textOverflow: "ellipsis" }}
+        >
+          {lineTwo}
+        </Typography>
+      </Box>
     </Box>
   );
 }

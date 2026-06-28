@@ -10,6 +10,7 @@ import { auth } from "@/lib/auth";
 import { logUserActivity } from "@/lib/audit";
 import { getDb } from "@/lib/db/client";
 import { ensureDbReady } from "@/lib/db/ensure-ready";
+import { checkRateLimit } from "@/lib/rate-limit";
 import {
   locationResidents,
   locations,
@@ -476,9 +477,13 @@ export async function checkUsernameAvailableAction(
     };
   }
 
+  const normalized = parsed.data.toLowerCase();
+  if (!checkRateLimit(`username-check:${normalized}`, 30, 60_000)) {
+    return { available: false, message: "Too many checks. Try again shortly." };
+  }
+
   await ensureDbReady();
   const db = getDb();
-  const normalized = parsed.data.toLowerCase();
   const [existing] = await db
     .select({ id: users.id })
     .from(users)

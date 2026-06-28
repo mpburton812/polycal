@@ -9,7 +9,7 @@ import { authConfig } from "../../auth.config";
 import { getDb } from "@/lib/db/client";
 import { ensureDbReady } from "@/lib/db/ensure-ready";
 import { users, type UserRole } from "@/lib/db/schema";
-import { isNonProductionEnvironment } from "@/lib/env";
+import { checkRateLimit } from "@/lib/rate-limit";
 
 const credentialsSchema = z.object({
   username: z.string().min(1).max(64),
@@ -41,7 +41,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             typeof raw.impersonateSecret === "string" &&
             raw.impersonateSecret === impersonationSecret;
 
-          if (!isNonProductionEnvironment() && !secretOk) {
+          if (!secretOk) {
             return null;
           }
 
@@ -72,6 +72,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
         const parsed = credentialsSchema.safeParse(raw);
         if (!parsed.success) return null;
+
+        const loginKey = `login:${parsed.data.username.toLowerCase()}`;
+        if (!checkRateLimit(loginKey, 10, 60_000)) {
+          return null;
+        }
 
         const db = getDb();
         const [row] = await db

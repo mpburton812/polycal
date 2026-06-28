@@ -8,7 +8,9 @@ import { ScheduleEventBlock } from "@/components/schedule/ScheduleEventBlock";
 import {
   addDays,
   formatDayHeader,
+  isTodayDate,
   localDateKey,
+  scheduleDayCellSx,
   startOfWeekMonday,
 } from "@/lib/schedule/dates";
 
@@ -59,6 +61,8 @@ export function ScheduleWeekView({
         {days.map((day) => {
           const key = localDateKey(day.toISOString(), timeZone);
           const dayEvents = eventsByDay.get(key) ?? [];
+          const daySx = scheduleDayCellSx(day, timeZone);
+          const isToday = isTodayDate(day, timeZone);
           return (
             <Box
               key={key}
@@ -68,23 +72,42 @@ export function ScheduleWeekView({
                 gap: 1,
                 py: 0.5,
                 borderBottom: 1,
-                borderColor: "divider",
+                borderColor: isToday ? "primary.main" : "divider",
+                width: "100%",
+                minWidth: 0,
+                opacity: daySx.opacity,
+                bgcolor: daySx.bgcolor,
+                borderRadius: 0.5,
+                px: 0.5,
               }}
             >
               <Typography
                 variant="caption"
-                sx={{ minWidth: 72, fontWeight: 600, color: "text.secondary" }}
+                sx={{
+                  flexShrink: 0,
+                  minWidth: 72,
+                  fontWeight: isToday ? 700 : 600,
+                  color: isToday ? "primary.main" : "text.secondary",
+                }}
               >
                 {formatDayHeader(day, timeZone)}
               </Typography>
-              <Box sx={{ flex: 1, display: "flex", flexWrap: "wrap", gap: 0.5 }}>
+              <Box
+                sx={{
+                  flex: 1,
+                  minWidth: 0,
+                  display: "flex",
+                  gap: 0.5,
+                  overflow: "hidden",
+                }}
+              >
                 {dayEvents.length === 0 ? (
                   <Typography variant="caption" color="text.disabled">
                     —
                   </Typography>
                 ) : (
                   dayEvents.map((event) => (
-                    <Box key={event.id} sx={{ minWidth: 120, maxWidth: 220, flex: "1 1 120px" }}>
+                    <Box key={event.id} sx={{ flex: 1, minWidth: 0 }}>
                       <ScheduleEventBlock
                         event={event}
                         compact
@@ -115,22 +138,31 @@ export function ScheduleWeekView({
       }}
     >
       {days.map((day) => {
-        const key = localDateKey(day.toISOString());
+        const key = localDateKey(day.toISOString(), timeZone);
         const dayEvents = eventsByDay.get(key) ?? [];
-        const isToday = localDateKey(new Date().toISOString(), timeZone) === key;
+        const daySx = scheduleDayCellSx(day, timeZone);
+        const isToday = isTodayDate(day, timeZone);
         return (
           <Box
             key={key}
             sx={{
               minHeight: 120,
+              minWidth: 0,
               border: 1,
-              borderColor: isToday ? "primary.main" : "divider",
+              borderColor: daySx.borderColor,
               borderRadius: 1,
               p: 1,
-              bgcolor: isToday ? "action.hover" : "background.paper",
+              bgcolor: daySx.bgcolor,
+              opacity: daySx.opacity,
+              overflow: "hidden",
             }}
           >
-            <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1 }}>
+            <Typography
+              variant="subtitle2"
+              fontWeight={isToday ? 800 : 700}
+              color={isToday ? "primary.main" : "text.primary"}
+              sx={{ mb: 1 }}
+            >
               {formatDayHeader(day, timeZone)}
             </Typography>
             {dayEvents.length === 0 ? (

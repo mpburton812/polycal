@@ -43,6 +43,7 @@ export const users = sqliteTable("users", {
   notificationEmail: text("notification_email"),
   emailVerifiedAt: text("email_verified_at"),
   emailVerificationToken: text("email_verification_token"),
+  emailVerificationTokenExpiresAt: text("email_verification_token_expires_at"),
   notificationPrefsJson: text("notification_prefs_json"),
   /** IANA timezone for schedule display normalization (PC-48 / spec §10). */
   timezone: text("timezone").notNull().default("UTC"),
@@ -186,6 +187,11 @@ export const proposals = sqliteTable("proposals", {
   /** Place bedroom index for sleeping proposals (MVP place-level lock when unset). */
   bedroomIndex: integer("bedroom_index"),
   batchGroupId: text("batch_group_id"),
+  /** Single batch sleeping proposal with embedded mini-proposals (JSON array). */
+  isBatchSleeping: integer("is_batch_sleeping", { mode: "boolean" })
+    .notNull()
+    .default(false),
+  batchEntriesJson: text("batch_entries_json"),
   winningSlotId: text("winning_slot_id"),
   notes: text("notes"),
   createdAt: text("created_at").notNull(),
@@ -342,6 +348,8 @@ export const locationResidents = sqliteTable("location_residents", {
   proposedById: text("proposed_by_id")
     .notNull()
     .references(() => users.id),
+  /** Backing proposal when residency uses standard draft workflow (PC-60). */
+  proposalId: text("proposal_id").references(() => proposals.id),
   createdAt: text("created_at").notNull(),
   updatedAt: text("updated_at").notNull(),
   respondedAt: text("responded_at"),

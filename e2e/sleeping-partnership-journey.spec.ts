@@ -3,25 +3,23 @@ import { expect, test } from "./helpers/test";
 import { login, loginWithOnboardingIfNeeded, logout } from "./helpers/auth";
 import { USERS } from "./helpers/constants";
 import { fillProposalDateField } from "./helpers/datePickers";
-import { goToPeoplePlaces, goToProposals, openProposalCard, selectProposalTab } from "./helpers/navigation";
+import { goToProposals, openProposalCard, selectProposalTab } from "./helpers/navigation";
 import { expectInAppNotification } from "./helpers/notifications";
-import { proposalCard, submitProposalDraft } from "./helpers/proposals";
+import {
+  openEventOrSleepingProposalDraft,
+  openSleepingPartnerProposal,
+  proposalCard,
+  submitProposalDraft,
+} from "./helpers/proposals";
 
-async function adminProposePartnerForHan(
+async function hanProposeSleepingPartner(
   page: import("@playwright/test").Page,
   partnerDisplayName: string,
 ): Promise<void> {
-  await page.getByRole("tab", { name: "People" }).click();
-  const hanToggle = page.getByRole("button", { name: `View ${USERS.han.displayName} details` });
-  if ((await hanToggle.getAttribute("aria-expanded")) !== "true") {
-    await hanToggle.click();
-  }
-  await expect(page.getByRole("heading", { name: "Sleeping partners" })).toBeVisible({
-    timeout: 15_000,
-  });
-  await page.getByRole("combobox", { name: "Propose partner" }).click();
-  await page.getByRole("option", { name: partnerDisplayName }).click();
-  await page.getByRole("button", { name: "Propose" }).click();
+  const dialog = await openSleepingPartnerProposal(page);
+  await dialog.getByRole("button", { name: partnerDisplayName }).click();
+  await dialog.getByRole("button", { name: "Propose" }).click();
+  await expect(dialog).toBeHidden({ timeout: 15_000 });
 }
 
 test.describe("Sleeping partnership journey", () => {
@@ -30,11 +28,11 @@ test.describe("Sleeping partnership journey", () => {
 
     const sleepingTitle = `Falcon night ${Date.now()}`;
 
-    // —— Phase 1: Luke (admin) submits Han's partnership proposals ——
-    await login(page, USERS.luke.username);
-    await goToPeoplePlaces(page);
-    await adminProposePartnerForHan(page, USERS.chewie.displayName);
-    await adminProposePartnerForHan(page, USERS.anakin.displayName);
+    // —— Phase 1: Han proposes sleeping partnerships via Proposals FAB ——
+    await loginWithOnboardingIfNeeded(page, USERS.han.username);
+    await goToProposals(page);
+    await hanProposeSleepingPartner(page, USERS.chewie.displayName);
+    await hanProposeSleepingPartner(page, USERS.anakin.displayName);
     await logout(page);
 
     // —— Phase 2: Chewbacca declines via notification with comment ——
@@ -62,19 +60,16 @@ test.describe("Sleeping partnership journey", () => {
 
     // —— Phase 4: Han sees acceptance notification ——
     await loginWithOnboardingIfNeeded(page, USERS.han.username);
-    await expectInAppNotification(page, /accepted/i);
+    await expectInAppNotification(page, /accepted your sleeping partnership/i);
 
     // —— Phase 5: Han proposes sleeping event with Anakin at Millennium Falcon ——
     await goToProposals(page);
-    await page.getByRole("button", { name: "New proposal" }).click();
-    const draft = page.getByRole("dialog");
+    const draft = await openEventOrSleepingProposalDraft(page);
     await draft.getByLabel("Type").click();
     await page.getByRole("option", { name: "Sleeping" }).click();
     await draft.getByLabel("Title").fill(sleepingTitle);
     await setInviteeRequiredIfNeeded(draft, USERS.anakin.displayName);
-    await draft.getByLabel("Location").click();
-    await draft.getByLabel("Location").fill("Millennium Falcon");
-    await draft.getByLabel("Location").press("Tab");
+    await draft.getByLabel("Custom location (optional)").fill("Millennium Falcon");
     await fillProposalDateField(draft.getByLabel("Night of").first(), "2099-07-06");
     await draft.getByRole("button", { name: "Create draft" }).click();
     await submitProposalDraft(page, draft);

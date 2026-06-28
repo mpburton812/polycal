@@ -1,16 +1,23 @@
 import { and, asc, eq, ne } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
+import { auth } from "@/lib/auth";
+import { userHasAdminAccess } from "@/lib/admin-access";
 import { getDb } from "@/lib/db/client";
 import { ensureDbReady } from "@/lib/db/ensure-ready";
 import { users } from "@/lib/db/schema";
 import { isNonProductionEnvironment } from "@/lib/env";
 
 /**
- * Lists active login-capable users for the non-production impersonation dropdown.
+ * Lists active login-capable users for the non-production admin impersonation dropdown.
  */
 export async function GET(): Promise<NextResponse> {
   if (!isNonProductionEnvironment()) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  const session = await auth();
+  if (!session?.user || !(await userHasAdminAccess(session.user.role))) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 

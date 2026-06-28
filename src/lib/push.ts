@@ -1,5 +1,6 @@
 import { eq } from "drizzle-orm";
 
+import { logUserActivity } from "@/lib/audit";
 import { getDb } from "@/lib/db/client";
 import { ensureDbReady } from "@/lib/db/ensure-ready";
 import { pushSubscriptions, users } from "@/lib/db/schema";
@@ -9,6 +10,7 @@ export interface PushPayload {
   title: string;
   body: string;
   url?: string;
+  notificationType?: string;
   metadata?: Record<string, unknown>;
 }
 
@@ -24,13 +26,31 @@ export function isPushConfigured(): boolean {
 }
 
 /**
+ * Logs push delivery outcomes to the user activity log (PC-58).
+ */
+async function logPushDelivery(
+  userId: string,
+  action: "notification.push_sent" | "notification.push_failed" | "notification.push_skipped",
+  details: Record<string, unknown>,
+  eventType: "system" | "error" = "system",
+): Promise<void> {
+  await logUserActivity(userId, action, JSON.stringify(details), eventType);
+}
+
+/**
  * Sends a Web Push notification to all registered devices for a user when configured.
  */
 export async function sendPushToUser(
   userId: string,
   payload: PushPayload,
 ): Promise<void> {
-  if (!isPushConfigured()) return;
+  if (!isPushConfigured()) {
+    await logPushDelivery(userId, "notification.push_skipped", {
+      reason: "not_configured",
+      notificationType: payload.notificationType,
+    });
+    return;
+  }
 
   await ensureDbReady();
   const db = getDb();
@@ -40,15 +60,28 @@ export async function sendPushToUser(
     .where(eq(users.id, userId))
     .limit(1);
   const prefs = parseNotificationPrefs(userRow?.notificationPrefsJson);
-  if (!prefs.globalEnabled || !prefs.channels.device) return;
+  if (!prefs.globalEnabled || !prefs.channels.push) {
+    await logPushDelivery(userId, "notification.push_skipped", {
+      reason: "push_disabled",
+      notificationType: payload.notificationType,
+    });
+    return;
+  }
 
   const subs = await db
     .select()
     .from(pushSubscriptions)
     .where(eq(pushSubscriptions.userId, userId));
-  if (subs.length === 0) return;
+  if (subs.length === 0) {
+    await logPushDelivery(userId, "notification.push_skipped", {
+      reason: "no_subscription",
+      notificationType: payload.notificationType,
+    });
+    return;
+  }
 
-  const webpush = await import("web-push");
+  const imported = await import("web-push");
+  const webpush = imported.default ?? imported;
   webpush.setVapidDetails(
     process.env.VAPID_SUBJECT!,
     process.env.VAPID_PUBLIC_KEY!,
@@ -56,6 +89,9 @@ export async function sendPushToUser(
   );
 
   const body = JSON.stringify(payload);
+  let sentCount = 0;
+  let failedCount = 0;
+
   for (const sub of subs) {
     try {
       await webpush.sendNotification(
@@ -65,9 +101,35 @@ export async function sendPushToUser(
         },
         body,
       );
-    } catch {
+      sentCount += 1;
+    } catch (error) {
+      failedCount += 1;
       await db.delete(pushSubscriptions).where(eq(pushSubscriptions.id, sub.id));
+      await logPushDelivery(
+        userId,
+        "notification.push_failed",
+        {
+          notificationType: payload.notificationType,
+          subscriptionId: sub.id,
+          error: error instanceof Error ? error.message : "send failed",
+        },
+        "error",
+      );
     }
+  }
+
+  if (sentCount > 0) {
+    await logPushDelivery(userId, "notification.push_sent", {
+      notificationType: payload.notificationType,
+      deviceCount: sentCount,
+      title: payload.title,
+    });
+  } else if (failedCount > 0 && sentCount === 0) {
+    await logPushDelivery(userId, "notification.push_skipped", {
+      reason: "all_deliveries_failed",
+      notificationType: payload.notificationType,
+      failedCount,
+    });
   }
 }
 

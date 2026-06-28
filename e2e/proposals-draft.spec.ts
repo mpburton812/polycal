@@ -3,6 +3,7 @@ import { expect, test } from "./helpers/test";
 import { login } from "./helpers/auth";
 import { DEMO, USERS } from "./helpers/constants";
 import { goToProposals, selectProposalTab } from "./helpers/navigation";
+import { openEventOrSleepingProposalDraft } from "./helpers/proposals";
 
 function proposalCard(page: import("@playwright/test").Page, title: string) {
   return page.locator(".MuiCard-root").filter({
@@ -19,12 +20,11 @@ test.describe("Proposal draft workflows", () => {
   test("creates a new event draft and lists it on the board", async ({ page }) => {
     const title = `E2E Test Event ${Date.now()}`;
 
-    await page.getByRole("button", { name: "New proposal" }).click();
-    await page.getByLabel("Title").fill(title);
-    await page.getByLabel(/Description/i).fill("Automated E2E draft creation.");
-    await page.getByRole("button", { name: "Create draft" }).click();
+    const dialog = await openEventOrSleepingProposalDraft(page);
+    await dialog.getByLabel("Title").fill(title);
+    await dialog.getByLabel(/Description/i).fill("Automated E2E draft creation.");
+    await dialog.getByRole("button", { name: "Create draft" }).click();
 
-    const dialog = page.getByRole("dialog");
     await expect(dialog.getByRole("button", { name: "Submit" })).toBeVisible();
     await dialog.getByRole("button", { name: "Cancel" }).click();
     await expect(dialog).toBeHidden();
@@ -59,11 +59,10 @@ test.describe("Proposal draft workflows", () => {
   test("creates a draft without optional description", async ({ page }) => {
     const title = `E2E No Description ${Date.now()}`;
 
-    await page.getByRole("button", { name: "New proposal" }).click();
-    await page.getByLabel("Title").fill(title);
-    await page.getByRole("button", { name: "Create draft" }).click();
+    const dialog = await openEventOrSleepingProposalDraft(page);
+    await dialog.getByLabel("Title").fill(title);
+    await dialog.getByRole("button", { name: "Create draft" }).click();
 
-    const dialog = page.getByRole("dialog");
     await expect(dialog.getByRole("button", { name: "Submit" })).toBeVisible();
     await dialog.getByRole("button", { name: "Cancel" }).click();
     await expect(proposalCard(page, title)).toBeVisible();
@@ -78,13 +77,12 @@ test.describe("Proposal submit and conflict warnings", () => {
 
   test("submits a draft to proposed state", async ({ page }) => {
     const title = `E2E Submit ${Date.now()}`;
-    await page.getByRole("button", { name: "New proposal" }).click();
-    await page.getByLabel("Title").fill(title);
-    await page.getByLabel(/Description/i).fill("Needs invitee vote.");
-    await page.getByRole("button", { name: /Leia Organa/i }).click();
-    await page.getByRole("button", { name: "Create draft" }).click();
+    const dialog = await openEventOrSleepingProposalDraft(page);
+    await dialog.getByLabel("Title").fill(title);
+    await dialog.getByLabel(/Description/i).fill("Needs invitee vote.");
+    await dialog.getByRole("button", { name: /Leia Organa/i }).click();
+    await dialog.getByRole("button", { name: "Create draft" }).click();
 
-    const dialog = page.getByRole("dialog");
     await expect(dialog.getByRole("button", { name: "Submit" })).toBeVisible();
     await dialog.getByRole("button", { name: "Submit" }).click();
     await expect(dialog).toBeHidden({ timeout: 15_000 });

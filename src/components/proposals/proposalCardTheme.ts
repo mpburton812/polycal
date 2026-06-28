@@ -50,9 +50,14 @@ export function formatDateRange(start: string | null, end: string | null): strin
   return `${startLabel} – ${endDate.toLocaleDateString(undefined, dateOpts)}`;
 }
 
-export function typeBadgeLabel(type: string, cardKind?: string): string {
+export function typeBadgeLabel(
+  type: string,
+  cardKind?: string,
+  specialKind?: "residency" | "group_name",
+): string {
+  if (specialKind === "residency" || cardKind === "residency") return "RESIDENCY PROPOSAL";
+  if (specialKind === "group_name") return "GROUP RENAME";
   if (cardKind === "partnership") return "RELATIONSHIP PROPOSAL";
-  if (cardKind === "residency") return "RESIDENCY PROPOSAL";
   return type === "sleeping" ? "SLEEPING PROPOSAL" : "EVENT PROPOSAL";
 }
 

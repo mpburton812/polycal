@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { auth } from "@/lib/auth";
+import { userHasAdminAccess } from "@/lib/admin-access";
 import { logUserActivity } from "@/lib/audit";
 import { getDb } from "@/lib/db/client";
 import { ensureDbReady } from "@/lib/db/ensure-ready";
@@ -36,6 +37,16 @@ const respondSchema = z.object({
 export async function listPartnershipsForUserAction(
   userId: string,
 ): Promise<PartnershipView[]> {
+  const session = await auth();
+  if (!session?.user) {
+    return [];
+  }
+
+  const isAdmin = await userHasAdminAccess(session.user.role);
+  if (session.user.id !== userId && !isAdmin) {
+    throw new Error("Forbidden");
+  }
+
   await ensureDbReady();
   const db = getDb();
 
