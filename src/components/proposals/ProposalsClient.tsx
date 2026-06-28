@@ -4,6 +4,8 @@ import AddIcon from "@mui/icons-material/Add";
 import {
   Box,
   Fab,
+  Menu,
+  MenuItem,
   Tab,
   Tabs,
   Typography,
@@ -26,6 +28,7 @@ import { PartnershipProposalDialog } from "./PartnershipProposalDialog";
 import { ResidencyProposalDialog } from "./ResidencyProposalDialog";
 import { ProposalDetailDialog } from "./ProposalDetailDialog";
 import { ProposalDraftDialog } from "./ProposalDraftDialog";
+import { SleepingPartnerCreateDialog } from "./SleepingPartnerCreateDialog";
 import { PARTNERSHIP_CARD_PREFIX, RESIDENCY_CARD_PREFIX } from "@/lib/proposals/constants";
 import { useToast } from "@/components/providers/ToastProvider";
 
@@ -68,6 +71,8 @@ export function ProposalsClient({
   const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState<TabKey>("draft");
   const [createOpen, setCreateOpen] = useState(false);
+  const [partnerCreateOpen, setPartnerCreateOpen] = useState(false);
+  const [fabMenuAnchor, setFabMenuAnchor] = useState<null | HTMLElement>(null);
   const [editDetail, setEditDetail] = useState<ProposalDetail | null>(null);
   const [selectedProposalId, setSelectedProposalId] = useState<string | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
@@ -221,10 +226,7 @@ export function ProposalsClient({
       <Fab
         color="primary"
         aria-label="New proposal"
-        onClick={() => {
-          setEditDetail(null);
-          setCreateOpen(true);
-        }}
+        onClick={(event) => setFabMenuAnchor(event.currentTarget)}
         sx={{
           position: "fixed",
           bottom: 88,
@@ -236,6 +238,32 @@ export function ProposalsClient({
         <AddIcon />
       </Fab>
 
+      <Menu
+        anchorEl={fabMenuAnchor}
+        open={Boolean(fabMenuAnchor)}
+        onClose={() => setFabMenuAnchor(null)}
+        anchorOrigin={{ vertical: "top", horizontal: "center" }}
+        transformOrigin={{ vertical: "bottom", horizontal: "center" }}
+      >
+        <MenuItem
+          onClick={() => {
+            setFabMenuAnchor(null);
+            setEditDetail(null);
+            setCreateOpen(true);
+          }}
+        >
+          Event or sleeping proposal
+        </MenuItem>
+        <MenuItem
+          onClick={() => {
+            setFabMenuAnchor(null);
+            setPartnerCreateOpen(true);
+          }}
+        >
+          Sleeping partner proposal
+        </MenuItem>
+      </Menu>
+
       <ProposalDraftDialog
         open={createOpen}
         onClose={handleDraftDialogClose}
@@ -243,6 +271,12 @@ export function ProposalsClient({
         places={places}
         currentUserId={currentUserId}
         initialDetail={editDetail}
+      />
+      <SleepingPartnerCreateDialog
+        open={partnerCreateOpen}
+        onClose={() => setPartnerCreateOpen(false)}
+        people={people}
+        currentUserId={currentUserId}
       />
       <ProposalDetailDialog
         proposalId={selectedProposalId}

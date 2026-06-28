@@ -216,6 +216,7 @@ export async function listScheduleEventsAction(
       atRisk: proposals.atRisk,
       isPoll: proposals.isPoll,
       eventPrivacy: proposals.eventPrivacy,
+      isBatchSleeping: proposals.isBatchSleeping,
     })
     .from(proposals)
     .innerJoin(users, eq(proposals.proposerId, users.id))
@@ -322,13 +323,25 @@ export async function listScheduleEventsAction(
     const windows: { startAt: string; endAt: string | null; slotLabel: string | null; key: string }[] =
       [];
 
-    if (row.state === "resolved" && row.scheduledStartAt) {
-      windows.push({
-        startAt: row.scheduledStartAt,
-        endAt: row.scheduledEndAt,
-        slotLabel: null,
-        key: row.id,
-      });
+    if (row.state === "resolved") {
+      const slots = slotsByProposal.get(row.id) ?? [];
+      if (row.isBatchSleeping && slots.length > 0) {
+        for (const slot of slots) {
+          windows.push({
+            startAt: slot.startAt,
+            endAt: slot.endAt,
+            slotLabel: slot.label,
+            key: `${row.id}:${slot.id}`,
+          });
+        }
+      } else if (row.scheduledStartAt) {
+        windows.push({
+          startAt: row.scheduledStartAt,
+          endAt: row.scheduledEndAt,
+          slotLabel: null,
+          key: row.id,
+        });
+      }
     } else if (row.state === "proposed") {
       const slots = slotsByProposal.get(row.id) ?? [];
       if (slots.length > 0) {

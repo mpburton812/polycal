@@ -75,6 +75,33 @@ Enable on the `dev` branch in GitHub repository settings:
 
 This enforces PR-only promotion at the platform level.
 
+## User journey testing policy
+
+**User journeys** are multi-step Playwright specs (`e2e/*journey*.spec.ts`) and manual browser verification of realistic end-user paths. They are **not** the same as Vitest unit tests.
+
+| Promotion | Default agent gates | User journey tests |
+|-----------|---------------------|-------------------|
+| `feature` → `dev` | `npm audit`, Vitest, green CI | **Optional** — only when the request includes **`user test`** |
+| `dev` → `test` | Green CI on promotion PR | **Optional** — only when the request includes **`user test`** |
+| `test` → `production` | Full CI chain | **Mandatory** — run before opening or merging the production PR |
+
+Examples:
+
+```text
+commit and push to dev          → no user journey run required
+user test: promote to test      → run user journey specs before merge
+promote test to production      → user journeys mandatory
+```
+
+Run user journeys locally:
+
+```bash
+npm run test:e2e                              # full e2e/ suite (CI parity)
+npx playwright test e2e/*journey*.spec.ts   # journey specs only (after e2e prepare)
+```
+
+CI still runs the full Playwright job (`.github/workflows/e2e.yml`) on PRs to `dev` and `test` as an automated safety net.
+
 ## Install the `merge feature` PowerShell shortcut
 
 Run once in PowerShell (updates your profile):

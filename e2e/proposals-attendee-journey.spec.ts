@@ -4,6 +4,7 @@ import { login, logout } from "./helpers/auth";
 import { fillProposalDateTimeField } from "./helpers/datePickers";
 import { USERS } from "./helpers/constants";
 import { goToProposals, openProposalCard, selectProposalTab } from "./helpers/navigation";
+import { openEventOrSleepingProposalDraft } from "./helpers/proposals";
 import { expectToast } from "./helpers/toast";
 
 function proposalCard(page: import("@playwright/test").Page, title: string) {
@@ -20,14 +21,13 @@ test.describe("Proposal invitee journey", () => {
 
     await login(page, USERS.luke.username);
     await goToProposals(page);
-    await page.getByRole("button", { name: "New proposal" }).click();
-    await page.getByLabel("Title").fill(title);
-    await page.getByLabel(/Description/i).fill("Single invitee then attendee add.");
-    await page.getByRole("button", { name: /Leia Organa/i }).click();
-    await fillProposalDateTimeField(page.getByLabel("Start").first(), "2099-07-10T18:00");
-    await page.getByRole("button", { name: "Create draft" }).click();
+    const draftDialog = await openEventOrSleepingProposalDraft(page);
+    await draftDialog.getByLabel("Title").fill(title);
+    await draftDialog.getByLabel(/Description/i).fill("Single invitee then attendee add.");
+    await draftDialog.getByRole("button", { name: /Leia Organa/i }).click();
+    await fillProposalDateTimeField(draftDialog.getByLabel("Start").first(), "2099-07-10T18:00");
+    await draftDialog.getByRole("button", { name: "Create draft" }).click();
 
-    const draftDialog = page.getByRole("dialog");
     await draftDialog.getByRole("button", { name: "Submit" }).click();
     await expect(draftDialog).toBeHidden({ timeout: 15_000 });
 
