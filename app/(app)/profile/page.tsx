@@ -8,6 +8,7 @@ import { auth } from "@/lib/auth";
 import { getDb } from "@/lib/db/client";
 import { ensureDbReady } from "@/lib/db/ensure-ready";
 import { users } from "@/lib/db/schema";
+import { getVapidPublicKey } from "@/lib/push";
 import { resolveTimezone } from "@/lib/schedule/timezone";
 
 export default async function ProfilePage() {
@@ -50,6 +51,7 @@ export default async function ProfilePage() {
         initialNotificationEmail={notificationEmail.email}
         initialEmailVerified={notificationEmail.verified}
         mustChangePassword={row?.mustChangePassword ?? false}
+        vapidPublicKey={getVapidPublicKey()}
       />
     </>
   );

@@ -1,6 +1,7 @@
 /**
  * Shared Jira REST API helpers for CI status sync scripts.
  */
+import { loadEnvLocal } from "./load-env-local";
 
 export interface JiraTransition {
   id: string;
@@ -20,6 +21,8 @@ export interface JiraIssueStatus {
 
 /** Load Jira credentials from environment or return null when not configured. */
 export function loadJiraCredentials(): JiraCredentials | null {
+  loadEnvLocal();
+
   const baseUrl = process.env.JIRA_BASE_URL;
   const email = process.env.JIRA_EMAIL;
   const token = process.env.JIRA_API_TOKEN;
@@ -61,6 +64,40 @@ export async function getIssueStatus(
     credentials,
     `/issue/${issueKey}?fields=status`,
   );
+
+  if (!response.ok) {
+    const body = await response.text();
+    throw new Error(`Failed to load status for ${issueKey}: ${response.status} ${body}`);
+  }
+
+  const data = (await response.json()) as {
+    fields?: {
+      status?: {
+        name?: string;
+        statusCategory?: { key?: string };
+      };
+    };
+  };
+
+  return {
+    name: data.fields?.status?.name ?? "Unknown",
+    statusCategoryKey: data.fields?.status?.statusCategory?.key ?? "new",
+  };
+}
+
+/** Returns null when the issue does not exist or is not visible to the API token. */
+export async function tryGetIssueStatus(
+  credentials: JiraCredentials,
+  issueKey: string,
+): Promise<JiraIssueStatus | null> {
+  const response = await jiraFetch(
+    credentials,
+    `/issue/${issueKey}?fields=status`,
+  );
+
+  if (response.status === 404) {
+    return null;
+  }
 
   if (!response.ok) {
     const body = await response.text();
@@ -171,7 +208,12 @@ export async function transitionIssueToStatus(
   issueKey: string,
   targetStatusName: string,
 ): Promise<"transitioned" | "skipped" | "unavailable"> {
-  const current = await getIssueStatus(credentials, issueKey);
+  const current = await tryGetIssueStatus(credentials, issueKey);
+  if (!current) {
+    console.warn(`[jira-sync] ${issueKey} not found; skipping.`);
+    return "unavailable";
+  }
+
   if (shouldSkipTransition(current, targetStatusName)) {
     console.log(`[jira-sync] ${issueKey} already "${current.name}"; skipping.`);
     return "skipped";
