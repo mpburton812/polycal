@@ -67,7 +67,7 @@ npm run test:env:test    # reset + validate polycal-test Turso + Vercel connecti
 npm run test:promote    # audit + Vitest — same local gate as merge-feature (minus Jira/push)
 npm run test:unit       # Vitest — pure logic in src/**/*.test.ts
 npm run test:unit:watch # Vitest watch mode while developing
-npm run test:e2e        # Playwright browser journeys (e2e/)
+npm run test:e2e        # Playwright E2E (full e2e/ suite; CI parity)
 npm run test:env:test
 npm run test:connectivity
 npm run requirements:validate

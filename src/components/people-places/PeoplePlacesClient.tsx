@@ -32,7 +32,6 @@ import {
 } from "@/actions/users";
 import {
   listPartnershipsForUserAction,
-  proposePartnershipAction,
   removePartnershipAction,
   respondPartnershipAction,
   type PartnershipView,
@@ -343,16 +342,10 @@ function PersonDetail({
   const router = useRouter();
   const [partnerships, setPartnerships] = useState<PartnershipView[]>([]);
   const [partnershipsLoading, setPartnershipsLoading] = useState(false);
-  const [partnerTarget, setPartnerTarget] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
   const canViewPartnerships = isAdmin || person.id === currentUserId;
-
-  const candidates = useMemo(
-    () => people.filter((row) => row.id !== person.id),
-    [people, person.id],
-  );
 
   function loadPartnerships() {
     setPartnershipsLoading(true);
@@ -453,46 +446,6 @@ function PersonDetail({
               )}
             </Stack>
           ))}
-          {(person.id === currentUserId || isAdmin) && person.role !== "passive" && (
-            <Stack direction="row" spacing={1} alignItems="center">
-              <FormControl size="small" sx={{ minWidth: 180 }}>
-                <InputLabel id={`partner-${person.id}`}>Propose partner</InputLabel>
-                <Select
-                  labelId={`partner-${person.id}`}
-                  label="Propose partner"
-                  value={partnerTarget}
-                  onChange={(event) => setPartnerTarget(event.target.value)}
-                  onClick={(event) => event.stopPropagation()}
-                  MenuProps={{ disablePortal: false }}
-                >
-                  {candidates.map((row) => (
-                    <MenuItem key={row.id} value={row.id}>
-                      {row.displayName}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-              <Button
-                size="small"
-                variant="outlined"
-                disabled={!partnerTarget || pending}
-                onClick={() =>
-                  startTransition(async () => {
-                    const result = await proposePartnershipAction(
-                      partnerTarget,
-                      person.id !== currentUserId ? person.id : undefined,
-                    );
-                    setMessage(result.message);
-                    setPartnerTarget("");
-                    loadPartnerships();
-                    router.refresh();
-                  })
-                }
-              >
-                Propose
-              </Button>
-            </Stack>
-          )}
         </>
       )}
       {message && <Alert severity="info">{message}</Alert>}

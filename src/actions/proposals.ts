@@ -38,7 +38,19 @@ import {
   runProposalEnforcement,
 } from "@/lib/proposals/enforcement";
 import { PARTNERSHIP_CARD_PREFIX, RESIDENCY_CARD_PREFIX } from "@/lib/proposals/constants";
-import { sleepingScheduleFromSlotRows } from "@/lib/proposals/sleeping-schedule";
+import {
+  sleepingDateToStartIso,
+  isoToSleepingDateInput,
+  sleepingScheduleFromSlotRows,
+} from "@/lib/proposals/sleeping-schedule";
+import {
+  batchSleepingEntriesSchema,
+  encodeBatchSlotMeta,
+  parseBatchEntriesJson,
+  unionBatchInvitees,
+  newBatchEntryId,
+  type BatchSleepingEntry,
+} from "@/lib/proposals/batch-sleeping";
 import { buildPartnershipProposalCopy } from "@/lib/partnerships/copy";
 import type { UserRole } from "@/types/user";
 
@@ -74,6 +86,8 @@ const draftProposalSchema = z.object({
   isRecurring: z.boolean().optional(),
   recurrenceRule: recurrenceRuleSchema.optional(),
   bedroomIndex: z.number().int().min(0).max(19).optional(),
+  isBatchSleeping: z.boolean().optional(),
+  batchEntries: batchSleepingEntriesSchema.optional(),
 });
 
 const commentSchema = z.object({
@@ -234,6 +248,8 @@ export interface ProposalDetail {
   recurrenceRule: RecurrenceRule | null;
   occurrenceIndex: number | null;
   bedroomIndex: number | null;
+  isBatchSleeping: boolean;
+  batchEntries: BatchSleepingEntry[];
   invitees: ProposalInviteeView[];
   timeSlots: ProposalTimeSlotView[];
   slotVotes: ProposalSlotVoteView[];
@@ -992,6 +1008,150 @@ async function getEligibleLocationIdsForUser(
   return [...new Set([...directRows.map((row) => row.locationId), ...networkLocationIds])];
 }
 
+/** Accepted sleeping partner user ids for invitee validation. */
+async function getAcceptedSleepingPartnerIds(
+  db: ReturnType<typeof getDb>,
+  userId: string,
+): Promise<Set<string>> {
+  const partnershipRows = await db
+    .select({
+      userLowId: sleepingPartnerships.userLowId,
+      userHighId: sleepingPartnerships.userHighId,
+    })
+    .from(sleepingPartnerships)
+    .where(
+      and(
+        eq(sleepingPartnerships.status, "accepted"),
+        or(
+          eq(sleepingPartnerships.userLowId, userId),
+          eq(sleepingPartnerships.userHighId, userId),
+        ),
+      ),
+    );
+
+  return new Set(
+    partnershipRows.map((row) => (row.userLowId === userId ? row.userHighId : row.userLowId)),
+  );
+}
+
+/**
+ * Sleeping proposals may only invite accepted sleeping partners (or be solo).
+ */
+async function assertSleepingInviteesAllowed(
+  db: ReturnType<typeof getDb>,
+  proposerId: string,
+  proposalType: ProposalType,
+  intentionalSolo: boolean,
+  invitees: { userId: string }[],
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (proposalType !== "sleeping") return { ok: true };
+  if (intentionalSolo || invitees.length === 0) return { ok: true };
+
+  const partners = await getAcceptedSleepingPartnerIds(db, proposerId);
+  for (const invitee of invitees) {
+    if (!partners.has(invitee.userId)) {
+      return {
+        ok: false,
+        error:
+          "Sleeping arrangements can only include people you have an accepted sleeping partnership with, or be solo.",
+      };
+    }
+  }
+  return { ok: true };
+}
+
+/** Eligible residence places for a set of users (for sleeping location picker). */
+async function getEligibleLocationIdsForUsers(
+  db: ReturnType<typeof getDb>,
+  userIds: string[],
+): Promise<string[]> {
+  const ids = new Set<string>();
+  for (const userId of userIds) {
+    for (const locationId of await getEligibleLocationIdsForUser(db, userId)) {
+      ids.add(locationId);
+    }
+  }
+  return [...ids];
+}
+
+/**
+ * Public list of accepted sleeping partner ids for the signed-in user (proposal UI).
+ */
+export async function listAcceptedSleepingPartnerIdsAction(): Promise<string[]> {
+  await ensureDbReady();
+  const session = await auth();
+  if (!session?.user) return [];
+  const db = getDb();
+  return [...(await getAcceptedSleepingPartnerIds(db, session.user.id))];
+}
+
+/**
+ * Places available at invitee residences plus the proposer's network (sleeping location picker).
+ */
+export async function listSleepingLocationOptionsAction(
+  inviteeUserIds: string[],
+): Promise<ProposalPlaceOption[]> {
+  await ensureDbReady();
+  const session = await auth();
+  if (!session?.user) return [];
+
+  const db = getDb();
+  const isAdmin = await userHasAdminAccess(session.user.role);
+  const placeSelect = {
+    id: locations.id,
+    name: locations.name,
+    bedroomCount: locations.bedroomCount,
+    bedroomNames: locations.bedroomNames,
+  };
+
+  if (isAdmin) {
+    const all = await db.select(placeSelect).from(locations).orderBy(asc(locations.name));
+    return all.map(mapPlaceOption);
+  }
+
+  const userIds = [session.user.id, ...inviteeUserIds];
+  const locationIds = await getEligibleLocationIdsForUsers(db, userIds);
+  if (locationIds.length === 0) return [];
+
+  const placeRows = await db
+    .select(placeSelect)
+    .from(locations)
+    .where(inArray(locations.id, locationIds))
+    .orderBy(asc(locations.name));
+
+  return placeRows.map(mapPlaceOption);
+}
+
+async function persistBatchSleepingDraft(
+  db: ReturnType<typeof getDb>,
+  proposalId: string,
+  entries: BatchSleepingEntry[],
+): Promise<void> {
+  const slots = entries.map((entry, index) => {
+    const startIso = sleepingDateToStartIso(entry.nightDate.slice(0, 10));
+    if (!startIso) {
+      throw new Error("Invalid batch night date.");
+    }
+    return {
+      startAt: startIso,
+      endAt: undefined as string | undefined,
+      label: encodeBatchSlotMeta({
+        batchEntryId: entry.id,
+        locationId: entry.locationId,
+        locationText: entry.locationText,
+        bedroomIndex: entry.bedroomIndex,
+        intentionalSolo: entry.intentionalSolo,
+        inviteeUserIds: entry.intentionalSolo
+          ? []
+          : entry.invitees.map((invitee) => invitee.userId),
+      }),
+      sortOrder: index,
+    };
+  });
+
+  await replaceTimeSlots(db, proposalId, slots);
+}
+
 /**
  * Places the current user may attach to a proposal draft (direct + sleeping network residency).
  */
@@ -1093,7 +1253,7 @@ async function replaceInvitees(
 async function replaceTimeSlots(
   db: ReturnType<typeof getDb>,
   proposalId: string,
-  slots: { startAt: string; endAt?: string; label?: string }[],
+  slots: { startAt: string; endAt?: string; label?: string; sortOrder?: number }[],
 ): Promise<void> {
   await db.delete(proposalSlotVotes).where(eq(proposalSlotVotes.proposalId, proposalId));
   await db.delete(proposalTimeSlots).where(eq(proposalTimeSlots.proposalId, proposalId));
@@ -1107,7 +1267,7 @@ async function replaceTimeSlots(
       startAt: slot.startAt,
       endAt: slot.endAt ?? null,
       label: slot.label ?? null,
-      sortOrder: index,
+      sortOrder: slot.sortOrder ?? index,
       createdAt: now,
     });
   }
@@ -1399,9 +1559,15 @@ async function resolveProposal(
     scheduleEnd = winner?.endAt ?? null;
   } else {
     if (proposal.proposalType === "sleeping") {
-      const sleeping = sleepingScheduleFromSlotRows(slots);
-      scheduleStart = sleeping.start;
-      scheduleEnd = sleeping.end;
+      if (proposal.isBatchSleeping && slots.length > 0) {
+        const sorted = [...slots].sort((a, b) => a.startAt.localeCompare(b.startAt));
+        scheduleStart = sorted[0]?.startAt ?? null;
+        scheduleEnd = null;
+      } else {
+        const sleeping = sleepingScheduleFromSlotRows(slots);
+        scheduleStart = sleeping.start;
+        scheduleEnd = sleeping.end;
+      }
     } else {
       const schedule = scheduleFromSlots(slots);
       scheduleStart = schedule.start;
@@ -1898,16 +2064,65 @@ export async function createDraftProposalAction(
     return { ok: false, message: locationCheck.error };
   }
 
+  const isBatchSleeping =
+    parsed.data.proposalType === "sleeping" && Boolean(parsed.data.isBatchSleeping);
+  const batchEntries = parsed.data.batchEntries ?? [];
+
+  if (isBatchSleeping) {
+    if (batchEntries.length === 0) {
+      return { ok: false, message: "Add at least one night to the batch." };
+    }
+    for (const entry of batchEntries) {
+      const inviteeCheck = await assertSleepingInviteesAllowed(
+        db,
+        session.user.id,
+        "sleeping",
+        Boolean(entry.intentionalSolo),
+        entry.invitees,
+      );
+      if (!inviteeCheck.ok) {
+        return { ok: false, message: inviteeCheck.error };
+      }
+      if (entry.locationId) {
+        const entryLocationCheck = await assertLocationAllowed(
+          db,
+          session.user.id,
+          session.user.role,
+          entry.locationId,
+          entry.locationText,
+        );
+        if (!entryLocationCheck.ok) {
+          return { ok: false, message: entryLocationCheck.error };
+        }
+      }
+    }
+  } else {
+    const inviteeCheck = await assertSleepingInviteesAllowed(
+      db,
+      session.user.id,
+      parsed.data.proposalType,
+      Boolean(parsed.data.intentionalSolo),
+      parsed.data.invitees ?? [],
+    );
+    if (!inviteeCheck.ok) {
+      return { ok: false, message: inviteeCheck.error };
+    }
+  }
+
   const now = new Date().toISOString();
   const proposalId = `prop-${randomUUID()}`;
-  const intentionalSolo = Boolean(parsed.data.intentionalSolo);
+  const intentionalSolo = isBatchSleeping
+    ? batchEntries.every((entry) => entry.intentionalSolo)
+    : Boolean(parsed.data.intentionalSolo);
   const isPoll = Boolean(parsed.data.isPoll) || (parsed.data.timeSlots?.length ?? 0) > 1;
   const eventPrivacy = parsed.data.eventPrivacy ?? "open";
-  const isRecurring = Boolean(parsed.data.isRecurring && parsed.data.recurrenceRule);
+  const isRecurring =
+    !isBatchSleeping && Boolean(parsed.data.isRecurring && parsed.data.recurrenceRule);
   const recurrenceJson = isRecurring
     ? serializeRecurrenceRule(parsed.data.recurrenceRule)
     : null;
-  const locationText = parsed.data.locationText?.trim() || null;
+  const locationText = isBatchSleeping ? null : parsed.data.locationText?.trim() || null;
+  const batchInvitees = isBatchSleeping ? unionBatchInvitees(batchEntries) : (parsed.data.invitees ?? []);
 
   await db.insert(proposals).values({
     id: proposalId,
@@ -1916,7 +2131,7 @@ export async function createDraftProposalAction(
     proposalType: parsed.data.proposalType,
     state: "draft",
     proposerId: session.user.id,
-    locationId: parsed.data.locationId ?? null,
+    locationId: isBatchSleeping ? null : (parsed.data.locationId ?? null),
     locationText,
     notes: parsed.data.notes ?? null,
     intentionalSolo,
@@ -1925,16 +2140,20 @@ export async function createDraftProposalAction(
     isRecurrenceParent: isRecurring,
     recurrenceRule: recurrenceJson,
     occurrenceIndex: isRecurring ? 0 : null,
-    bedroomIndex: parsed.data.bedroomIndex ?? null,
+    bedroomIndex: isBatchSleeping ? null : (parsed.data.bedroomIndex ?? null),
+    isBatchSleeping,
+    batchEntriesJson: isBatchSleeping ? JSON.stringify(batchEntries) : null,
     createdAt: now,
     updatedAt: now,
   });
 
-  if (parsed.data.invitees?.length) {
-    await replaceInvitees(db, proposalId, session.user.id, parsed.data.invitees);
+  if (batchInvitees.length) {
+    await replaceInvitees(db, proposalId, session.user.id, batchInvitees);
   }
 
-  if (parsed.data.timeSlots) {
+  if (isBatchSleeping) {
+    await persistBatchSleepingDraft(db, proposalId, batchEntries);
+  } else if (parsed.data.timeSlots) {
     await replaceTimeSlots(db, proposalId, parsed.data.timeSlots);
   }
 
@@ -1974,15 +2193,61 @@ export async function updateDraftProposalAction(
     return { ok: false, message: "Draft not found." };
   }
 
-  const locationCheck = await assertLocationAllowed(
-    db,
-    session.user.id,
-    session.user.role,
-    parsed.data.locationId,
-    parsed.data.locationText,
-  );
-  if (!locationCheck.ok) {
-    return { ok: false, message: locationCheck.error };
+  const isBatchSleeping =
+    parsed.data.proposalType === "sleeping" &&
+    Boolean(parsed.data.isBatchSleeping ?? proposal.isBatchSleeping);
+  const batchEntries = parsed.data.batchEntries ?? [];
+
+  if (isBatchSleeping) {
+    if (batchEntries.length === 0) {
+      return { ok: false, message: "Add at least one night to the batch." };
+    }
+    for (const entry of batchEntries) {
+      const inviteeCheck = await assertSleepingInviteesAllowed(
+        db,
+        session.user.id,
+        "sleeping",
+        Boolean(entry.intentionalSolo),
+        entry.invitees,
+      );
+      if (!inviteeCheck.ok) {
+        return { ok: false, message: inviteeCheck.error };
+      }
+      if (entry.locationId) {
+        const entryLocationCheck = await assertLocationAllowed(
+          db,
+          session.user.id,
+          session.user.role,
+          entry.locationId,
+          entry.locationText,
+        );
+        if (!entryLocationCheck.ok) {
+          return { ok: false, message: entryLocationCheck.error };
+        }
+      }
+    }
+  } else {
+    const locationCheck = await assertLocationAllowed(
+      db,
+      session.user.id,
+      session.user.role,
+      parsed.data.locationId,
+      parsed.data.locationText,
+    );
+    if (!locationCheck.ok) {
+      return { ok: false, message: locationCheck.error };
+    }
+
+    const inviteeCheck = await assertSleepingInviteesAllowed(
+      db,
+      session.user.id,
+      parsed.data.proposalType,
+      Boolean(parsed.data.intentionalSolo),
+      parsed.data.invitees ?? [],
+    );
+    if (!inviteeCheck.ok) {
+      return { ok: false, message: inviteeCheck.error };
+    }
   }
 
   const now = new Date().toISOString();
@@ -1990,10 +2255,18 @@ export async function updateDraftProposalAction(
     parsed.data.isPoll !== undefined
       ? parsed.data.isPoll
       : (parsed.data.timeSlots?.length ?? 0) > 1;
-  const isRecurring = Boolean(parsed.data.isRecurring && parsed.data.recurrenceRule);
+  const isRecurring =
+    !isBatchSleeping && Boolean(parsed.data.isRecurring && parsed.data.recurrenceRule);
   const recurrenceJson = isRecurring
     ? serializeRecurrenceRule(parsed.data.recurrenceRule)
     : proposal.recurrenceRule;
+  const intentionalSolo = isBatchSleeping
+    ? batchEntries.every((entry) => entry.intentionalSolo)
+    : Boolean(parsed.data.intentionalSolo);
+  const afterLocationId = isBatchSleeping ? null : (parsed.data.locationId ?? null);
+  const afterLocationText = isBatchSleeping
+    ? null
+    : parsed.data.locationText?.trim() || null;
 
   const existingSlots = await db
     .select({
@@ -2004,14 +2277,13 @@ export async function updateDraftProposalAction(
     .from(proposalTimeSlots)
     .where(eq(proposalTimeSlots.proposalId, proposal.id));
 
-  const afterLocationId = parsed.data.locationId ?? null;
-  const afterLocationText = parsed.data.locationText?.trim() || null;
-  const afterSlots =
-    parsed.data.timeSlots?.map((slot) => ({
-      startAt: slot.startAt,
-      endAt: slot.endAt ?? null,
-      label: slot.label ?? null,
-    })) ?? existingSlots;
+  const afterSlots = isBatchSleeping
+    ? existingSlots
+    : (parsed.data.timeSlots?.map((slot) => ({
+        startAt: slot.startAt,
+        endAt: slot.endAt ?? null,
+        label: slot.label ?? null,
+      })) ?? existingSlots);
 
   const criticalChanged = criticalProposalFieldsChanged(
     proposal,
@@ -2029,21 +2301,27 @@ export async function updateDraftProposalAction(
       locationId: afterLocationId,
       locationText: afterLocationText,
       notes: parsed.data.notes ?? null,
-      intentionalSolo: Boolean(parsed.data.intentionalSolo),
+      intentionalSolo,
       isPoll: Boolean(isPoll),
       eventPrivacy: parsed.data.eventPrivacy ?? proposal.eventPrivacy,
       isRecurrenceParent: isRecurring || proposal.isRecurrenceParent,
       recurrenceRule: recurrenceJson,
-      bedroomIndex: parsed.data.bedroomIndex ?? proposal.bedroomIndex,
+      bedroomIndex: isBatchSleeping ? null : (parsed.data.bedroomIndex ?? proposal.bedroomIndex),
+      isBatchSleeping,
+      batchEntriesJson: isBatchSleeping ? JSON.stringify(batchEntries) : null,
       updatedAt: now,
     })
     .where(eq(proposals.id, proposal.id));
 
-  if (parsed.data.invitees) {
+  if (isBatchSleeping) {
+    await replaceInvitees(db, proposal.id, session.user.id, unionBatchInvitees(batchEntries));
+  } else if (parsed.data.invitees) {
     await replaceInvitees(db, proposal.id, session.user.id, parsed.data.invitees);
   }
 
-  if (parsed.data.timeSlots) {
+  if (isBatchSleeping) {
+    await persistBatchSleepingDraft(db, proposal.id, batchEntries);
+  } else if (parsed.data.timeSlots) {
     await replaceTimeSlots(db, proposal.id, parsed.data.timeSlots);
   }
 
@@ -2254,6 +2532,8 @@ export async function getProposalDetailAction(
       occurrenceIndex: proposals.occurrenceIndex,
       isRecurrenceParent: proposals.isRecurrenceParent,
       bedroomIndex: proposals.bedroomIndex,
+      isBatchSleeping: proposals.isBatchSleeping,
+      batchEntriesJson: proposals.batchEntriesJson,
     })
     .from(proposals)
     .innerJoin(users, eq(proposals.proposerId, users.id))
@@ -2420,6 +2700,8 @@ export async function getProposalDetailAction(
       recurrenceRule,
       occurrenceIndex: row.occurrenceIndex ?? null,
       bedroomIndex: masked ? null : row.bedroomIndex ?? null,
+      isBatchSleeping: row.isBatchSleeping,
+      batchEntries: masked ? [] : parseBatchEntriesJson(row.batchEntriesJson),
       invitees: canViewSensitive
         ? inviteeRows.map((invitee) => ({
             userId: invitee.userId,
@@ -2876,32 +3158,15 @@ export async function castSlotVoteAction(
 }
 
 /**
- * Creates multiple sleeping draft proposals from a date range (PC-40).
+ * @deprecated Use createDraftProposalAction with isBatchSleeping + batchEntries.
+ * Kept for legacy callers — creates one batch sleeping draft.
  */
 export async function createBatchSleepingProposalsAction(
   input: z.infer<typeof batchSleepingSchema>,
 ): Promise<{ ok: boolean; message: string; proposalIds?: string[] }> {
-  const session = await auth();
-  if (!session?.user) {
-    return { ok: false, message: "Sign in required." };
-  }
-
   const parsed = batchSleepingSchema.safeParse(input);
   if (!parsed.success) {
     return { ok: false, message: parsed.error.issues[0]?.message ?? "Invalid input." };
-  }
-
-  await ensureDbReady();
-  const db = getDb();
-
-  const locationCheck = await assertLocationAllowed(
-    db,
-    session.user.id,
-    session.user.role,
-    parsed.data.locationId,
-  );
-  if (!locationCheck.ok) {
-    return { ok: false, message: locationCheck.error };
   }
 
   const rangeStart = new Date(parsed.data.rangeStart);
@@ -2909,15 +3174,14 @@ export async function createBatchSleepingProposalsAction(
   if (Number.isNaN(rangeStart.getTime()) || Number.isNaN(rangeEnd.getTime())) {
     return { ok: false, message: "Invalid date range." };
   }
-  if (rangeEnd <= rangeStart) {
-    return { ok: false, message: "End date must be after start date." };
-  }
 
   const nights: Date[] = [];
   const cursor = new Date(rangeStart);
-  cursor.setHours(22, 0, 0, 0);
+  cursor.setHours(0, 0, 0, 0);
+  const endCursor = new Date(rangeEnd);
+  endCursor.setHours(0, 0, 0, 0);
 
-  while (cursor <= rangeEnd) {
+  while (cursor <= endCursor) {
     const day = cursor.getDay();
     const isWeekend = day === 0 || day === 6;
     const include =
@@ -2936,63 +3200,33 @@ export async function createBatchSleepingProposalsAction(
     return { ok: false, message: "Batch limited to 14 nights at a time." };
   }
 
-  const batchGroupId = `batch-${randomUUID()}`;
-  const proposalIds: string[] = [];
-  const now = new Date().toISOString();
-  const intentionalSolo = Boolean(parsed.data.intentionalSolo);
+  const batchEntries: BatchSleepingEntry[] = nights.map((night) => ({
+    id: newBatchEntryId(),
+    nightDate: isoToSleepingDateInput(night.toISOString()),
+    locationId: parsed.data.locationId,
+    intentionalSolo: parsed.data.intentionalSolo,
+    invitees: parsed.data.invitees ?? [],
+  }));
 
-  for (const night of nights) {
-    const end = new Date(night);
-    end.setDate(end.getDate() + 1);
-    end.setHours(8, 0, 0, 0);
+  const result = await createDraftProposalAction({
+    title: parsed.data.title,
+    description: parsed.data.description,
+    proposalType: "sleeping",
+    notes: parsed.data.notes,
+    intentionalSolo: parsed.data.intentionalSolo,
+    invitees: parsed.data.invitees,
+    isBatchSleeping: true,
+    batchEntries,
+  });
 
-    const proposalId = `prop-${randomUUID()}`;
-    const nightLabel = night.toLocaleDateString(undefined, {
-      weekday: "short",
-      month: "short",
-      day: "numeric",
-    });
-
-    await db.insert(proposals).values({
-      id: proposalId,
-      title: `${parsed.data.title} — ${nightLabel}`,
-      description: parsed.data.description,
-      proposalType: "sleeping",
-      state: "draft",
-      proposerId: session.user.id,
-      locationId: parsed.data.locationId ?? null,
-      notes: parsed.data.notes ?? null,
-      intentionalSolo,
-      isPoll: false,
-      eventPrivacy: "open",
-      batchGroupId,
-      createdAt: now,
-      updatedAt: now,
-    });
-
-    await db.insert(proposalTimeSlots).values({
-      id: `pts-${randomUUID()}`,
-      proposalId,
-      startAt: night.toISOString(),
-      endAt: end.toISOString(),
-      label: nightLabel,
-      sortOrder: 0,
-      createdAt: now,
-    });
-
-    if (parsed.data.invitees?.length) {
-      await replaceInvitees(db, proposalId, session.user.id, parsed.data.invitees);
-    }
-
-    await logProposalTransition(db, proposalId, session.user.id, "draft.batch_created", batchGroupId);
-    proposalIds.push(proposalId);
+  if (!result.ok || !result.proposalId) {
+    return { ok: false, message: result.message };
   }
 
-  revalidatePath("/proposals");
   return {
     ok: true,
-    message: `Created ${proposalIds.length} sleeping drafts.`,
-    proposalIds,
+    message: `Created batch sleeping draft with ${batchEntries.length} nights.`,
+    proposalIds: [result.proposalId],
   };
 }
 

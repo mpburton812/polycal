@@ -186,6 +186,11 @@ export const proposals = sqliteTable("proposals", {
   /** Place bedroom index for sleeping proposals (MVP place-level lock when unset). */
   bedroomIndex: integer("bedroom_index"),
   batchGroupId: text("batch_group_id"),
+  /** Single batch sleeping proposal with embedded mini-proposals (JSON array). */
+  isBatchSleeping: integer("is_batch_sleeping", { mode: "boolean" })
+    .notNull()
+    .default(false),
+  batchEntriesJson: text("batch_entries_json"),
   winningSlotId: text("winning_slot_id"),
   notes: text("notes"),
   createdAt: text("created_at").notNull(),

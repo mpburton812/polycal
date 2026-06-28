@@ -10,11 +10,11 @@ const LEVEL_COLORS = ["#e8f5e9", "#fff9c4", "#ffe0b2", "#ffcdd2"];
 
 export type HeatmapLayout = "week" | "twoWeek" | "month";
 
-/** Formats a day label as DD/MM for heatmap cells (PC-56). */
+/** Formats a day label as MM/DD for heatmap cells. */
 function formatHeatmapDate(day: Date): string {
-  const dd = String(day.getDate()).padStart(2, "0");
   const mm = String(day.getMonth() + 1).padStart(2, "0");
-  return `${dd}/${mm}`;
+  const dd = String(day.getDate()).padStart(2, "0");
+  return `${mm}/${dd}`;
 }
 
 function computeBusynessLevels(
