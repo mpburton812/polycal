@@ -111,3 +111,27 @@ export function localDateKey(iso: string, timeZone = "UTC"): string {
   const day = parts.find((p) => p.type === "day")?.value ?? "01";
   return `${year}-${month}-${day}`;
 }
+
+/** True when `day` falls on today in the viewer timezone (PC-59). */
+export function isTodayDate(day: Date, timeZone = "UTC"): boolean {
+  return localDateKey(day.toISOString(), timeZone) === localDateKey(new Date().toISOString(), timeZone);
+}
+
+/** True when `day` is strictly before today in the viewer timezone (PC-59). */
+export function isPastDate(day: Date, timeZone = "UTC"): boolean {
+  return localDateKey(day.toISOString(), timeZone) < localDateKey(new Date().toISOString(), timeZone);
+}
+
+/** Shared calendar cell styles for past/today emphasis (PC-59). */
+export function scheduleDayCellSx(
+  day: Date,
+  timeZone = "UTC",
+): { borderColor: string; bgcolor: string; opacity: number } {
+  const isToday = isTodayDate(day, timeZone);
+  const isPast = isPastDate(day, timeZone);
+  return {
+    borderColor: isToday ? "primary.main" : "divider",
+    bgcolor: isToday ? "action.hover" : isPast ? "action.disabledBackground" : "background.paper",
+    opacity: isPast ? 0.55 : 1,
+  };
+}

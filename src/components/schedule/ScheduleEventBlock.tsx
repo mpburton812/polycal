@@ -17,7 +17,9 @@ interface ScheduleEventBlockProps {
 /** Formats stakeholder names for calendar blocks, respecting privacy masking (PC-43). */
 function formatStakeholders(event: ScheduleEvent): string | null {
   if (event.isContentMasked) return "Private";
-  if (event.intentionalSolo) return "Solo";
+  if (event.intentionalSolo) {
+    return event.proposalType === "sleeping" ? event.proposerName : "Solo";
+  }
   if (event.participantNames.length === 0) return null;
   return event.participantNames.join(", ");
 }

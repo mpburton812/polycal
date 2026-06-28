@@ -9,6 +9,8 @@ export const batchSleepingEntrySchema = z.object({
   locationText: z.string().optional(),
   bedroomIndex: z.number().int().min(0).optional(),
   intentionalSolo: z.boolean().optional(),
+  /** Optional per-night note stored in batchEntriesJson (PC-59). */
+  comment: z.string().trim().max(500).optional(),
   invitees: z
     .array(
       z.object({

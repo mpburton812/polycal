@@ -291,6 +291,23 @@ export function BatchSleepingEntriesEditor({
                 </Select>
               </FormControl>
             )}
+
+            <TextField
+              label="Comment (optional)"
+              value={entry.comment ?? ""}
+              onChange={(event) =>
+                updateEntry(index, {
+                  comment: event.target.value.trim() || undefined,
+                })
+              }
+              fullWidth
+              size="small"
+              multiline
+              minRows={1}
+              maxRows={3}
+              placeholder="Notes for this night"
+              sx={{ mt: bedroomOptions.length > 0 ? 1 : 0 }}
+            />
           </Box>
         );
       })}

@@ -1966,6 +1966,7 @@ export async function checkProposalConflictsAction(
       title: proposals.title,
       state: proposals.state,
       proposerId: proposals.proposerId,
+      proposalType: proposals.proposalType,
       scheduledStartAt: proposals.scheduledStartAt,
       scheduledEndAt: proposals.scheduledEndAt,
     })
@@ -1992,6 +1993,8 @@ export async function checkProposalConflictsAction(
   for (const other of activeProposals) {
     if (other.id === proposalId) continue;
     if (!other.scheduledStartAt) continue;
+    // Sleeping arrangements do not schedule-conflict with events (PC-59).
+    if (proposal.proposalType !== other.proposalType) continue;
 
     const otherStakeholders = new Set([
       other.proposerId,
@@ -2149,6 +2152,8 @@ export async function createDraftProposalAction(
 
   if (batchInvitees.length) {
     await replaceInvitees(db, proposalId, session.user.id, batchInvitees);
+  } else if (isBatchSleeping) {
+    await replaceInvitees(db, proposalId, session.user.id, []);
   }
 
   if (isBatchSleeping) {
@@ -2394,8 +2399,29 @@ export async function submitProposalAction(
     .from(proposalInvitees)
     .where(eq(proposalInvitees.proposalId, proposalId));
 
-  const requiredCount = invitees.filter((row) => row.role === "required").length;
-  if (requiredCount === 0 && !proposal.intentionalSolo) {
+  let requiredCount = invitees.filter((row) => row.role === "required").length;
+  let intentionalSolo = proposal.intentionalSolo;
+
+  if (proposal.isBatchSleeping) {
+    const batchEntries = parseBatchEntriesJson(proposal.batchEntriesJson);
+    if (batchEntries.length === 0) {
+      return { ok: false, message: "Add at least one night to the batch." };
+    }
+    const union = unionBatchInvitees(batchEntries);
+    requiredCount = union.filter((row) => row.role === "required").length;
+    intentionalSolo = batchEntries.every((entry) => entry.intentionalSolo);
+    for (const entry of batchEntries) {
+      if (entry.intentionalSolo) continue;
+      if (!entry.invitees.some((invitee) => invitee.role === "required")) {
+        return {
+          ok: false,
+          message: "Each batch night with invitees needs at least one required invitee.",
+        };
+      }
+    }
+  }
+
+  if (requiredCount === 0 && !intentionalSolo) {
     return {
       ok: false,
       message: "Add at least one required invitee or enable solo before submitting.",
@@ -2404,7 +2430,7 @@ export async function submitProposalAction(
 
   const autoResolve = shouldAutoResolveOnSubmit(
     proposal.proposalType,
-    proposal.intentionalSolo,
+    intentionalSolo,
     requiredCount,
   );
 

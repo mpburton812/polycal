@@ -64,7 +64,7 @@ test.describe("Proposal invitee journey", () => {
     await expect(hanDialog.getByText("RESOLVED", { exact: true }).first()).toBeVisible();
     await expect(hanDialog.getByText("Abstained", { exact: true })).toBeVisible();
     await expect(hanDialog.getByText("Accepted", { exact: true })).toBeVisible();
-    await expect(hanDialog.getByText(/proposal · submitted/i)).toBeVisible();
+    await expect(hanDialog.getByText(/Submitted to network/i)).toBeVisible();
     await expect(hanDialog.getByText(/added required: Han Solo/i)).toBeVisible();
   });
 });

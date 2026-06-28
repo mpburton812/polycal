@@ -4,7 +4,7 @@ import { Box, Tooltip, Typography } from "@mui/material";
 import { useMemo } from "react";
 
 import type { ScheduleEvent } from "@/actions/schedule";
-import { addDays, startOfWeekMonday } from "@/lib/schedule/dates";
+import { addDays, isPastDate, isTodayDate, startOfWeekMonday } from "@/lib/schedule/dates";
 
 const LEVEL_COLORS = ["#e8f5e9", "#fff9c4", "#ffe0b2", "#ffcdd2"];
 
@@ -51,27 +51,33 @@ interface HeatmapCellProps {
   level: number;
   day: Date;
   compact?: boolean;
+  timeZone?: string;
 }
 
-/** Single busyness cell with DD/MM label (PC-56). */
-function HeatmapCell({ level, day, compact = false }: HeatmapCellProps) {
+/** Single busyness cell with DD/MM label (PC-56, PC-59 past/today styling). */
+function HeatmapCell({ level, day, compact = false, timeZone = "UTC" }: HeatmapCellProps) {
   const label = formatHeatmapDate(day);
   const busyLabel = level === 0 ? "open" : level === 3 ? "very busy" : "busy";
+  const isToday = isTodayDate(day, timeZone);
+  const isPast = isPastDate(day, timeZone);
   return (
-    <Tooltip title={`${day.toLocaleDateString(undefined, { weekday: "short" })} ${label}: ${busyLabel}`}>
+    <Tooltip
+      title={`${day.toLocaleDateString(undefined, { weekday: "short" })} ${label}: ${busyLabel}${isToday ? " (today)" : ""}`}
+    >
       <Box
         sx={{
           borderRadius: 0.5,
           bgcolor: LEVEL_COLORS[level],
           border: "1px solid",
-          borderColor: "divider",
+          borderColor: isToday ? "primary.main" : "divider",
           minHeight: compact ? 18 : 28,
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
           fontSize: compact ? "0.6rem" : "0.65rem",
-          fontWeight: 600,
-          color: "text.secondary",
+          fontWeight: isToday ? 700 : 600,
+          color: isPast ? "text.disabled" : "text.secondary",
+          opacity: isPast ? 0.55 : 1,
         }}
       >
         {label}
@@ -88,11 +94,13 @@ export function ScheduleHeatmap({
   weekStartIso,
   dayCount,
   layout = "week",
+  timeZone = "UTC",
 }: {
   events: ScheduleEvent[];
   weekStartIso: string;
   dayCount: number;
   layout?: HeatmapLayout;
+  timeZone?: string;
 }) {
   const weekStart = useMemo(() => startOfWeekMonday(new Date(weekStartIso)), [weekStartIso]);
 
@@ -138,6 +146,7 @@ export function ScheduleHeatmap({
                     level={level}
                     day={day}
                     compact={layout === "twoWeek"}
+                    timeZone={timeZone}
                   />
                 );
               })}
