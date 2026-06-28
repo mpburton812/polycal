@@ -113,3 +113,4 @@
 2026-06-28 | c0d0cf0 | PC-59 | wait for residency dialog close before people-places nav | e2e/residency-proposal-journey.spec.ts
 2026-06-28 | a0b41c9 | PC-59 | close residency dialog before people-places navigation | e2e/residency-proposal-journey.spec.ts
 2026-06-28 | e08ea9b | PC-59 | stabilize schedule E2E week scan for ensureFuture seed slots | e2e/schedule.spec.ts
+2026-06-28 | c538df1 | PC-61 | split death-star poll journey into serial phases | e2e/death-star-poll-journey.spec.ts
