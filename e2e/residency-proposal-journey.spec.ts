@@ -62,6 +62,7 @@ test.describe("Residency proposal journey", () => {
     await hanDialog.getByRole("button", { name: "Post" }).click();
     await expect(hanDialog.getByText(comment)).toBeVisible({ timeout: 15_000 });
     await hanDialog.getByRole("button", { name: "Accept" }).click();
+    await expect(hanDialog).toBeHidden({ timeout: 15_000 });
 
     // —— Phase 5: Han edits place bedrooms as accepted resident ——
     await goToPeoplePlaces(page);
