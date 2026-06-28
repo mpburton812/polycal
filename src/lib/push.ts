@@ -80,7 +80,8 @@ export async function sendPushToUser(
     return;
   }
 
-  const webpush = await import("web-push");
+  const imported = await import("web-push");
+  const webpush = imported.default ?? imported;
   webpush.setVapidDetails(
     process.env.VAPID_SUBJECT!,
     process.env.VAPID_PUBLIC_KEY!,
