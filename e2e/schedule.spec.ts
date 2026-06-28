@@ -20,14 +20,25 @@ test.describe("Schedule calendar", () => {
   test("shows resolved and proposed seed events for invitee", async ({ page }) => {
     await expect(page.getByRole("button", { name: /Yavin 4 victory celebration/i })).toBeVisible();
     const rescueHan = page.getByRole("button", { name: /Rescue Han from carbonite/i });
-    if (!(await rescueHan.isVisible({ timeout: 2_000 }).catch(() => false))) {
+
+    /** Proposed seed slots use ensureFuture and may render in a later week than resolved events. */
+    async function waitForScheduleReady(): Promise<void> {
+      await expect(page.getByLabel("Next period")).toBeEnabled({ timeout: 10_000 });
+    }
+
+    if (await rescueHan.isVisible({ timeout: 3_000 }).catch(() => false)) {
+      return;
+    }
+
+    for (let week = 0; week < 6; week += 1) {
       await page.getByLabel("Next period").click();
+      await waitForScheduleReady();
+      if (await rescueHan.isVisible({ timeout: 5_000 }).catch(() => false)) {
+        return;
+      }
     }
-    if (!(await rescueHan.isVisible({ timeout: 2_000 }).catch(() => false))) {
-      await page.getByLabel("Previous period").click();
-      await page.getByLabel("Previous period").click();
-    }
-    await expect(rescueHan).toBeVisible({ timeout: 15_000 });
+
+    await expect(rescueHan).toBeVisible({ timeout: 5_000 });
   });
 
   test("opens proposal detail from calendar block", async ({ page }) => {
