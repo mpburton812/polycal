@@ -107,3 +107,5 @@
 2026-06-28 | 1f0576c | PC-59 | align Playwright with sleeping proposal UX | e2e/helpers/proposals.ts
 2026-06-28 | a6aed82 | PC-59 | schedule polish, proposal UX fixes, and journey E2E | src/actions/profile.ts
 2026-06-28 | 21e232f | PC-59 | stabilize schedule seed event E2E across week boundaries | e2e/schedule.spec.ts
+2026-06-28 | 95c3d62 | PC-60 | migrate residency and group name proposals to standard draft workflow | src/actions/places.ts
+2026-06-28 | a279ef8 | PC-60 | include proposals access module required by CI build | src/lib/proposals/access.test.ts

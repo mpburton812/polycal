@@ -80,15 +80,20 @@ export function ProposalCard({
             Visible only to proposer, invitee, and admins.
           </Typography>
         )}
-        {proposal.cardKind === "residency" && (
+        {(proposal.specialKind === "residency" || proposal.cardKind === "residency") && (
           <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 0.5 }}>
             Place residency — no date or time required.
+          </Typography>
+        )}
+        {proposal.specialKind === "group_name" && (
+          <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 0.5 }}>
+            Poly group rename — consensus required before applying.
           </Typography>
         )}
 
         <Stack direction="row" justifyContent="space-between" alignItems="flex-start" sx={{ mb: 1 }}>
           <Chip
-            label={typeBadgeLabel(proposal.proposalType, proposal.cardKind)}
+            label={typeBadgeLabel(proposal.proposalType, proposal.cardKind, proposal.specialKind)}
             size="small"
             sx={typeChipSx}
           />

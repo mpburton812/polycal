@@ -84,6 +84,9 @@ export function AdminPolyGroupSettingsPanel({
       }
       setProposalMessage(result.message);
       setProposedName("");
+      if (result.proposalId) {
+        router.push(`/proposals?open=${encodeURIComponent(result.proposalId)}`);
+      }
       router.refresh();
     });
   }
@@ -117,7 +120,7 @@ export function AdminPolyGroupSettingsPanel({
               onClick={proposeNameChange}
               disabled={pending || !proposedName.trim()}
             >
-              Propose name change
+              Propose name change (draft)
             </Button>
           </Stack>
         )}

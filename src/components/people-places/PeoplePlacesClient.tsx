@@ -42,7 +42,6 @@ import {
   getPlaceDeleteImpactAction,
   listResidentsForPlaceAction,
   proposeResidencyAction,
-  respondResidencyAction,
   updatePlaceAction,
   type PlaceDeleteImpact,
   type PlaceSummary,
@@ -593,41 +592,10 @@ function PlaceDetail({
         <Stack key={row.id} direction="row" spacing={1} alignItems="center">
           <Chip size="small" label={row.status} color={residentStatusColor(row.status)} />
           <Typography variant="body2">{row.displayName}</Typography>
-          {row.isIncoming && row.userId === currentUserId && (
-            <>
-              <Button
-                size="small"
-                onClick={() =>
-                  startTransition(async () => {
-                    const result = await respondResidencyAction({
-                      residencyId: row.id,
-                      accept: true,
-                    });
-                    setMessage(result.message);
-                    refreshResidents();
-                    router.refresh();
-                  })
-                }
-              >
-                Accept
-              </Button>
-              <Button
-                size="small"
-                onClick={() =>
-                  startTransition(async () => {
-                    const result = await respondResidencyAction({
-                      residencyId: row.id,
-                      accept: false,
-                    });
-                    setMessage(result.message);
-                    refreshResidents();
-                    router.refresh();
-                  })
-                }
-              >
-                Decline
-              </Button>
-            </>
+          {row.isIncoming && row.userId === currentUserId && row.status === "proposed" && (
+            <Typography variant="caption" color="text.secondary">
+              Respond in Proposals
+            </Typography>
           )}
         </Stack>
       ))}

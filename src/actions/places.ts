@@ -542,115 +542,23 @@ export async function deletePlaceAction(
 }
 
 /**
- * Associates a user with a place; passive users auto-accept residency (PC-37).
+ * Associates a user with a place via the standard proposal draft workflow (PC-60).
  */
 export async function proposeResidencyAction(
   locationId: string,
   targetUserId: string,
 ): Promise<{ ok: boolean; message: string }> {
-  const session = await auth();
-  if (!session?.user) {
-    return { ok: false, message: "Sign in required." };
-  }
-
-  if (!(await userHasAdminAccess(session.user.role)) && targetUserId !== session.user.id) {
-    return { ok: false, message: "You can only associate yourself with a place." };
-  }
-
-  await ensureDbReady();
-  const db = getDb();
-  const [place] = await db.select().from(locations).where(eq(locations.id, locationId)).limit(1);
-  const [target] = await db.select().from(users).where(eq(users.id, targetUserId)).limit(1);
-  if (!place || !target || target.status !== "active") {
-    return { ok: false, message: "Place or user not found." };
-  }
-
-  const isAdmin = await userHasAdminAccess(session.user.role);
-  if (!isAdmin && place.createdById !== session.user.id) {
-    return { ok: false, message: "You cannot associate with this place." };
-  }
-
-  const [existing] = await db
-    .select()
-    .from(locationResidents)
-    .where(
-      and(
-        eq(locationResidents.locationId, locationId),
-        eq(locationResidents.userId, targetUserId),
-      ),
-    )
-    .limit(1);
-
-  if (existing?.status === "accepted") {
-    return { ok: false, message: "User is already associated with this place." };
-  }
-
-  const now = new Date().toISOString();
-  const autoAccept = target.role === "passive";
-  const status = autoAccept ? "accepted" : "proposed";
-  const residencyId = existing?.id ?? `lr-${randomUUID()}`;
-
-  if (existing) {
-    await db
-      .update(locationResidents)
-      .set({
-        status,
-        proposedById: session.user.id,
-        updatedAt: now,
-        respondedAt: autoAccept ? now : null,
-      })
-      .where(eq(locationResidents.id, existing.id));
-  } else {
-    await db.insert(locationResidents).values({
-      id: residencyId,
-      locationId,
-      userId: targetUserId,
-      status,
-      proposedById: session.user.id,
-      createdAt: now,
-      updatedAt: now,
-      respondedAt: autoAccept ? now : null,
-    });
-  }
-
-  const [proposer] = await db
-    .select({ displayName: users.displayName })
-    .from(users)
-    .where(eq(users.id, session.user.id))
-    .limit(1);
-
-  if (!autoAccept) {
-    await notifyUser(
-      targetUserId,
-      "residency_proposed",
-      `${proposer?.displayName ?? "Someone"} proposed residency at ${place.name} for you.`,
-      {
-        residencyId: existing?.id ?? residencyId,
-        locationId,
-        placeName: place.name,
-        proposerId: session.user.id,
-      },
-    );
-  }
-
-  await logUserActivity(
-    session.user.id,
-    "places.propose_residency",
-    JSON.stringify({ locationId, targetUserId, status, placeName: place.name }),
-  );
-  revalidatePath("/people-places");
-  revalidatePath("/proposals");
-
-  return {
-    ok: true,
-    message: autoAccept
-      ? `${target.displayName} associated with place.`
-      : `Residency proposal sent to ${target.displayName}.`,
-  };
+  const { createResidencyDraftProposalAction } = await import("@/actions/residency-proposals");
+  const result = await createResidencyDraftProposalAction({
+    locationId,
+    targetUserId,
+    submitImmediately: true,
+  });
+  return { ok: result.ok, message: result.message };
 }
 
 /**
- * Accept or decline an incoming residency proposal (PC-37).
+ * Accept or decline an incoming residency proposal via the linked standard proposal (PC-60).
  */
 export async function respondResidencyAction(
   input: z.infer<typeof respondResidencySchema>,
@@ -673,53 +581,24 @@ export async function respondResidencyAction(
     .where(eq(locationResidents.id, parsed.data.residencyId))
     .limit(1);
 
-  if (!row || row.status !== "proposed" || row.userId !== session.user.id) {
+  if (!row || row.userId !== session.user.id) {
     return { ok: false, message: "Proposal not found." };
   }
 
-  const now = new Date().toISOString();
-  const status = parsed.data.accept ? "accepted" : "declined";
+  if (row.proposalId) {
+    const { castProposalVoteAction } = await import("@/actions/proposals");
+    const vote = parsed.data.accept ? "accept" : "decline";
+    const result = await castProposalVoteAction({ proposalId: row.proposalId, vote });
+    return { ok: result.ok, message: result.message };
+  }
 
-  await db
-    .update(locationResidents)
-    .set({ status, updatedAt: now, respondedAt: now })
-    .where(eq(locationResidents.id, row.id));
-
-  const [place] = await db
-    .select({ name: locations.name })
-    .from(locations)
-    .where(eq(locations.id, row.locationId))
-    .limit(1);
-  const [responder] = await db
-    .select({ displayName: users.displayName })
-    .from(users)
-    .where(eq(users.id, session.user.id))
-    .limit(1);
-  const placeName = place?.name ?? "a place";
-
-  await notifyUser(
-    row.proposedById,
-    parsed.data.accept ? "residency_accepted" : "residency_declined",
-    `${responder?.displayName ?? "Someone"} ${parsed.data.accept ? "accepted" : "declined"} residency at ${placeName}.`,
-    { residencyId: row.id, locationId: row.locationId, placeName },
-  );
-
-  await logUserActivity(
-    session.user.id,
-    parsed.data.accept ? "places.accept_residency" : "places.decline_residency",
-    JSON.stringify({
-      residencyId: row.id,
-      placeName,
-      inviteeName: responder?.displayName,
-      accept: parsed.data.accept,
-    }),
-  );
-  revalidatePath("/people-places");
-  revalidatePath("/proposals");
+  if (row.status !== "proposed") {
+    return { ok: false, message: "Proposal not found." };
+  }
 
   return {
-    ok: true,
-    message: parsed.data.accept ? "Residency accepted." : "Residency declined.",
+    ok: false,
+    message: "This legacy residency proposal must be responded to from Proposals.",
   };
 }
 
@@ -931,7 +810,16 @@ export async function deleteDeclinedResidencyAction(
     .where(eq(locationResidents.id, residencyId))
     .limit(1);
 
-  if (!row || row.status !== "declined") {
+  if (!row) {
+    return { ok: false, message: "Declined residency draft not found." };
+  }
+
+  if (row.proposalId) {
+    const { deleteDraftProposalAction } = await import("@/actions/proposals");
+    return deleteDraftProposalAction(row.proposalId);
+  }
+
+  if (row.status !== "declined") {
     return { ok: false, message: "Declined residency draft not found." };
   }
 
