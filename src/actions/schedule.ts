@@ -20,8 +20,13 @@ import {
   type ProposalType,
 } from "@/lib/db/schema";
 import { eventInRange, intervalsOverlap } from "@/lib/schedule/dates";
+import {
+  getPrivacyAdminFlags,
+  MASKED_TITLE,
+  shouldMaskProposalContent,
+  viewerCanSeeProposal,
+} from "@/lib/proposals/access";
 
-const MASKED_TITLE = "Private event";
 const HIDDEN_SLEEPING_TITLE = "Sleeping arrangement";
 
 const rangeSchema = z.object({
@@ -66,31 +71,19 @@ export interface SchedulePayload {
   planningItems: SchedulePlanningItem[];
 }
 
-async function getPrivacyAdminFlags(
+async function getSchedulePrivacyFlags(
   db: ReturnType<typeof getDb>,
 ): Promise<{ adminCanSeePrivate: boolean; adminCanSeeSuperPrivate: boolean; hideSleeping: boolean }> {
-  const [group] = await db.select().from(polyGroup).where(eq(polyGroup.id, 1)).limit(1);
+  const privacy = await getPrivacyAdminFlags(db);
+  const [group] = await db
+    .select({ hideSleepingArrangements: polyGroup.hideSleepingArrangements })
+    .from(polyGroup)
+    .where(eq(polyGroup.id, 1))
+    .limit(1);
   return {
-    adminCanSeePrivate: group?.adminCanSeePrivate ?? false,
-    adminCanSeeSuperPrivate: group?.adminCanSeeSuperPrivate ?? false,
+    ...privacy,
     hideSleeping: group?.hideSleepingArrangements ?? false,
   };
-}
-
-function shouldMaskProposalContent(
-  viewerId: string,
-  isAdmin: boolean,
-  proposerId: string,
-  inviteeUserIds: string[],
-  eventPrivacy: EventPrivacyLevel,
-  adminCanSeePrivate: boolean,
-  adminCanSeeSuperPrivate: boolean,
-): boolean {
-  if (eventPrivacy === "open") return false;
-  if (proposerId === viewerId || inviteeUserIds.includes(viewerId)) return false;
-  if (eventPrivacy === "private" && isAdmin && adminCanSeePrivate) return false;
-  if (eventPrivacy === "super_private" && isAdmin && adminCanSeeSuperPrivate) return false;
-  return true;
 }
 
 function shouldMaskSleepingForViewer(
@@ -111,7 +104,28 @@ function shouldMaskSleepingForViewer(
   return true;
 }
 
-function viewerCanSeeProposal(
+function shouldMaskScheduleProposalContent(
+  viewerId: string,
+  isAdmin: boolean,
+  proposerId: string,
+  inviteeUserIds: string[],
+  eventPrivacy: EventPrivacyLevel,
+  adminCanSeePrivate: boolean,
+  adminCanSeeSuperPrivate: boolean,
+): boolean {
+  return shouldMaskProposalContent(
+    viewerId,
+    isAdmin,
+    proposerId,
+    inviteeUserIds,
+    eventPrivacy,
+    adminCanSeePrivate,
+    adminCanSeeSuperPrivate,
+    "resolved",
+  );
+}
+
+function viewerCanSeeScheduleProposal(
   viewerId: string,
   isAdmin: boolean,
   proposerId: string,
@@ -196,7 +210,7 @@ export async function listScheduleEventsAction(
   const db = getDb();
   const viewerId = session.user.id;
   const isAdmin = await userHasAdminAccess(session.user.role);
-  const privacyFlags = await getPrivacyAdminFlags(db);
+  const privacyFlags = await getSchedulePrivacyFlags(db);
   const partnerIds = await acceptedSleepingPartnerIds(db, viewerId);
   const { rangeStart, rangeEnd } = parsed.data;
 
@@ -300,7 +314,7 @@ export async function listScheduleEventsAction(
       });
     }
 
-    const privacyMasked = shouldMaskProposalContent(
+    const privacyMasked = shouldMaskScheduleProposalContent(
       viewerId,
       isAdmin,
       row.proposerId,
