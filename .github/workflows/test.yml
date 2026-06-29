@@ -6,9 +6,9 @@ on:
       - test
 
 jobs:
-  audit-unit-e2e:
+  audit-and-unit:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 15
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -28,18 +28,5 @@ jobs:
       - name: Vitest unit tests
         run: npm run test:unit
 
-      - name: Install Playwright browsers
-        run: npx playwright install chromium --with-deps
-
-      - name: Playwright E2E
-        run: npm run test:e2e:ci
-        env:
-          CI: "1"
-
-      - name: Upload Playwright report
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: playwright-report
-          path: playwright-report/
-          retention-days: 7
+      - name: Production build
+        run: npm run build

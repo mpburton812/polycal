@@ -5,7 +5,8 @@ export {
   acknowledgeProposalOverlapAction,
   checkProposalConflictsAction,
   createDraftProposalAction,
-  deleteDraftProposalAction,
   submitProposalAction,
   updateDraftProposalAction,
 } from "./_core";
+
+export { deleteDraftProposalAction } from "./mutations";
