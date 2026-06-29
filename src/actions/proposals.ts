@@ -26,7 +26,6 @@ export {
   checkProposalConflictsAction,
   cloneProposalAction,
   createDraftProposalAction,
-  deleteDraftProposalAction,
   getProposalDetailAction,
   listAcceptedSleepingPartnerIdsAction,
   listProposalPlaceOptionsAction,
@@ -41,3 +40,4 @@ export {
 } from "./proposals/_core";
 
 export { listProposalBoardAction } from "./proposals/board";
+export { deleteDraftProposalAction } from "./proposals/mutations";

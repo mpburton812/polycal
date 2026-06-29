@@ -79,7 +79,16 @@ function createTursoToken(database) {
 }
 
 async function testTursoDirect(name, url, token, expectations) {
-  const result = { name, url, ok: false, users: null, schema: false, error: null, fixtureOk: null };
+  const result = {
+    name,
+    url,
+    ok: false,
+    users: null,
+    schema: false,
+    schemaVersion: null,
+    error: null,
+    fixtureOk: null,
+  };
   if (!url?.trim() || !token?.trim()) {
     result.error = "missing url or token";
     return result;
@@ -92,6 +101,19 @@ async function testTursoDirect(name, url, token, expectations) {
       const users = await client.execute("SELECT COUNT(*) AS c FROM users");
       result.users = Number(users.rows[0]?.c ?? 0);
       result.schema = true;
+      try {
+        const versionRow = await client.execute(
+          "SELECT value FROM schema_meta WHERE key = 'version' LIMIT 1",
+        );
+        result.schemaVersion = versionRow.rows[0]?.value ?? null;
+        if (result.schemaVersion !== "13") {
+          result.ok = false;
+          result.error = `schema_meta version expected 13, got ${String(result.schemaVersion ?? "missing")}`;
+        }
+      } catch {
+        result.ok = false;
+        result.error = "schema_meta version row missing";
+      }
       if (expectations) {
         let fixtureOk = true;
         if (expectations.userCount != null && result.users !== expectations.userCount) {
@@ -239,7 +261,7 @@ for (const { key, db, token } of dbTargets) {
   const expectations = db === "polycal-test" ? testDbExpectations : undefined;
   const r = await testTursoDirect(key, url, resolvedToken, expectations);
   console.log(
-    `${status(r.ok)} ${key} → ${db} | schema=${r.schema} users=${r.users ?? "n/a"}${r.fixtureOk === false ? " fixture=FAIL" : r.fixtureOk ? " fixture=ok" : ""}${r.error ? ` | ${r.error}` : ""}`,
+    `${status(r.ok)} ${key} → ${db} | schema=${r.schema} v=${r.schemaVersion ?? "n/a"} users=${r.users ?? "n/a"}${r.fixtureOk === false ? " fixture=FAIL" : r.fixtureOk ? " fixture=ok" : ""}${r.error ? ` | ${r.error}` : ""}`,
   );
 }
 

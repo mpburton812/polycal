@@ -15,6 +15,7 @@ import { useTransition, type MouseEvent } from "react";
 import type { ActivityLogEntry } from "@/actions/admin";
 import { exportActivityLogAction } from "@/actions/admin";
 import { AdminCollapsibleSection } from "@/components/admin/AdminCollapsibleSection";
+import { formatActivityLogDetails } from "@/lib/audit/activity-log-display";
 
 function eventColor(eventType: string): string {
   if (eventType === "error") return "#ffcdd2";
@@ -85,7 +86,7 @@ export function AdminActivityLogPanel({ entries }: { entries: ActivityLogEntry[]
                   <TableCell>{entry.userDisplayName ?? "—"}</TableCell>
                   <TableCell>{entry.action}</TableCell>
                   <TableCell sx={{ maxWidth: 280, overflow: "hidden", textOverflow: "ellipsis" }}>
-                    {entry.details ?? ""}
+                    {formatActivityLogDetails(entry.action, entry.details ?? null)}
                   </TableCell>
                 </TableRow>
               ))}

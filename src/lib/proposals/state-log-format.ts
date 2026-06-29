@@ -1,3 +1,5 @@
+import { formatActivityLogDetails } from "@/lib/audit/activity-log-display";
+
 export interface ProposalLogEntry {
   action: string;
   actorName: string | null;
@@ -73,10 +75,10 @@ function formatProposalLogDetails(entry: ProposalLogEntry): string {
       return ` · moved to ${parsed.nextState}`;
     }
   } catch {
-    return ` · ${entry.details}`;
+    return ` · ${formatActivityLogDetails(entry.action, entry.details)}`;
   }
 
-  return ` · ${entry.details}`;
+  return ` · ${formatActivityLogDetails(entry.action, entry.details)}`;
 }
 
 export { formatVoteLabel };

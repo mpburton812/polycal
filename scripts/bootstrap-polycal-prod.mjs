@@ -65,7 +65,7 @@ for (const statement of bootstrap.split(";").map((s) => s.trim()).filter(Boolean
 await client.execute({
   sql: `INSERT INTO schema_meta (key, value) VALUES ('version', ?)
         ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
-  args: ["1"],
+  args: ["13"],
 });
 
 console.log("Applied schema to polycal-prod (no users seeded)");
