@@ -1,0 +1,133 @@
+import { expect, test } from "./helpers/test";
+
+import { loginWithOnboardingIfNeeded, logout } from "./helpers/auth";
+import { BT_PLACES, BT_USERS, BURTON_THOMPSON_PASSWORD } from "./helpers/burton-thompson";
+import { goToProposals, openProposalCard, selectProposalTab } from "./helpers/navigation";
+import { expectInAppNotification } from "./helpers/notifications";
+import {
+  configureBatchNight,
+  openDraftForEdit,
+  openSleepingProposalDraft,
+  proposalCard,
+  submitProposalDraft,
+} from "./helpers/proposals";
+
+test.describe("Batch sleeping partners journey", () => {
+  test("Katie/Michael batch week with decline, edit, and accept", async ({ page }) => {
+    test.setTimeout(360_000);
+
+    const title = `August getaway ${Date.now()}`;
+    const declineComment = "I need to be at my place on August 2.";
+    const escape = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+    // —— Phase 1: Katie proposes a four-night batch ——
+    await loginWithOnboardingIfNeeded(
+      page,
+      BT_USERS.katie.username,
+      BURTON_THOMPSON_PASSWORD,
+    );
+    await goToProposals(page);
+
+    const dialog = await openSleepingProposalDraft(page);
+    await dialog.getByRole("checkbox", { name: "Batch (multiple nights in one proposal)" }).click();
+    await dialog.getByLabel("Title").fill(title);
+
+    await configureBatchNight(dialog, page, 0, {
+      nightDate: "2099-08-01",
+      mode: "solo",
+      locationName: BT_PLACES.katiesPlace,
+    });
+
+    await dialog.getByRole("button", { name: "Add night" }).click();
+    await configureBatchNight(dialog, page, 1, {
+      nightDate: "2099-08-02",
+      mode: "solo",
+      customLocation: BT_PLACES.michaelsPlace,
+    });
+
+    await dialog.getByRole("button", { name: "Add night" }).click();
+    await configureBatchNight(dialog, page, 2, {
+      nightDate: "2099-08-03",
+      mode: "withInvitees",
+      requiredInvitees: [BT_USERS.michael.displayName],
+      locationName: BT_PLACES.katiesPlace,
+    });
+
+    await dialog.getByRole("button", { name: "Add night" }).click();
+    await configureBatchNight(dialog, page, 3, {
+      nightDate: "2099-08-04",
+      mode: "withInvitees",
+      requiredInvitees: [BT_USERS.michael.displayName],
+      locationName: BT_PLACES.michaelsPlace,
+      comment: "It's our anniversary!",
+    });
+
+    await dialog.getByRole("button", { name: "Create draft" }).click();
+    await submitProposalDraft(page, dialog);
+    await logout(page);
+
+    // —— Phase 2: Michael reviews batch nights and declines ——
+    await loginWithOnboardingIfNeeded(
+      page,
+      BT_USERS.michael.username,
+      BURTON_THOMPSON_PASSWORD,
+    );
+    await expectInAppNotification(page, new RegExp(escape(title)));
+    await goToProposals(page);
+    await selectProposalTab(page, "Proposed");
+    await openProposalCard(page, title);
+
+    const michaelDialog = page.getByRole("dialog");
+    await expect(michaelDialog.getByText("Batch nights (4)")).toBeVisible({ timeout: 15_000 });
+    await expect(michaelDialog.getByText(/2099-08-01/)).toBeVisible();
+    await expect(michaelDialog.getByText(/Night 1:.*Katie's Place/)).toBeVisible();
+    await expect(michaelDialog.getByText(/It's our anniversary!/)).toBeVisible();
+
+    await michaelDialog.getByPlaceholder("Add a comment…").fill(declineComment);
+    await michaelDialog.getByRole("button", { name: "Post" }).click();
+    await expect(michaelDialog.getByText(declineComment)).toBeVisible({ timeout: 15_000 });
+    await michaelDialog.getByRole("button", { name: "Decline" }).click();
+    await michaelDialog.getByRole("button", { name: "Close" }).click({ timeout: 25_000 });
+    await logout(page);
+
+    // —— Phase 3: Katie edits night 2 and re-submits ——
+    await loginWithOnboardingIfNeeded(
+      page,
+      BT_USERS.katie.username,
+      BURTON_THOMPSON_PASSWORD,
+    );
+    await expectInAppNotification(page, /moved back to drafts|vote was cast/i);
+    await goToProposals(page);
+    await selectProposalTab(page, "Drafts");
+
+    const editDialog = await openDraftForEdit(page, title);
+    await configureBatchNight(editDialog, page, 1, {
+      nightDate: "2099-08-02",
+      mode: "withInvitees",
+      requiredInvitees: [BT_USERS.michael.displayName],
+      locationName: BT_PLACES.michaelsPlace,
+    });
+    await editDialog.getByRole("button", { name: "Save draft" }).click();
+    await submitProposalDraft(page, editDialog);
+    await logout(page);
+
+    // —— Phase 4: Michael accepts the revised batch ——
+    await loginWithOnboardingIfNeeded(
+      page,
+      BT_USERS.michael.username,
+      BURTON_THOMPSON_PASSWORD,
+    );
+    await goToProposals(page);
+    await selectProposalTab(page, "Proposed");
+    await openProposalCard(page, title);
+    const acceptDialog = page.getByRole("dialog");
+    await acceptDialog.getByRole("button", { name: "Accept" }).click();
+    await expect(acceptDialog.getByText("RESOLVED", { exact: true }).first()).toBeVisible({
+      timeout: 15_000,
+    });
+    await acceptDialog.getByRole("button", { name: "Close" }).click();
+
+    await selectProposalTab(page, "Resolved");
+    await expect(proposalCard(page, title)).toBeVisible({ timeout: 25_000 });
+  });
+});

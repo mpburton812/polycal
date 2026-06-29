@@ -26,6 +26,10 @@ async function main(): Promise<void> {
   console.log("[e2e] Seeding Star Wars + demo proposals (local e2e.db — not polycal-test)…");
   const { resetTestDatabase } = await import("../src/lib/seed/reset-test-database");
   const result = await resetTestDatabase();
+  const { seedE2eBurtonThompsonOverlay } = await import(
+    "../src/lib/seed/e2e-burton-thompson-overlay"
+  );
+  await seedE2eBurtonThompsonOverlay();
   console.log(`[e2e] Ready (${result.userCount} users, ${result.proposalCount} proposals).`);
 }
 

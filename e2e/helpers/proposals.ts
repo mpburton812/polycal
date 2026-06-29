@@ -1,7 +1,7 @@
 import { type Locator, type Page, expect } from "@playwright/test";
 
 import { fillProposalDateField, fillProposalDateTimeField } from "./datePickers";
-import { selectProposalTab } from "./navigation";
+import { openProposalCard, selectProposalTab } from "./navigation";
 
 /** Locates a proposal Kanban card by exact title heading. */
 export function proposalCard(page: Page, title: string) {
@@ -182,6 +182,39 @@ export async function createAndSubmitSoloEvent(
   await submitProposalDraft(page, dialog);
 }
 
+/** Creates and submits a solo event with a pre-event reminder offset. */
+export async function createAndSubmitSoloEventWithReminder(
+  page: Page,
+  options: {
+    title: string;
+    start: string;
+    end: string;
+    reminderAmount: number;
+    reminderUnit: "days" | "hours" | "minutes";
+  },
+): Promise<void> {
+  const dialog = await openEventProposalDraft(page);
+  await dialog.getByLabel("Title").fill(options.title);
+  await dialog.getByRole("button", { name: "Solo event (just me)" }).click();
+  await dialog.getByRole("checkbox", { name: "Reminder before event" }).check();
+  await dialog.getByLabel("Amount").fill(String(options.reminderAmount));
+  await dialog.getByLabel("Unit").click();
+  await page
+    .getByRole("option", {
+      name:
+        options.reminderUnit === "days"
+          ? "Days"
+          : options.reminderUnit === "hours"
+            ? "Hours"
+            : "Minutes",
+    })
+    .click();
+  await fillProposalDateTimeField(dialog.getByLabel("Start").first(), options.start);
+  await fillProposalDateTimeField(dialog.getByLabel("End (optional)").first(), options.end);
+  await dialog.getByRole("button", { name: "Create draft" }).click();
+  await submitProposalDraft(page, dialog);
+}
+
 /** Creates and submits a weekly recurring event inviting every visible invitee. */
 export async function createAndSubmitRecurringEventForEveryone(
   page: Page,
@@ -237,6 +270,18 @@ export async function createAndSubmitSoloSleepingWeek(
   return nightDates.length;
 }
 
+/** Opens a special draft (group rename, residency) via detail dialog Edit. */
+export async function openSpecialDraftForEdit(page: Page, title: string): Promise<Locator> {
+  await openProposalCard(page, title);
+  const detailDialog = page.getByRole("dialog");
+  await detailDialog.getByRole("button", { name: "Edit" }).click();
+  const editDialog = page.getByRole("dialog");
+  await expect(editDialog.getByRole("heading", { name: /Edit draft/i })).toBeVisible({
+    timeout: 15_000,
+  });
+  return editDialog;
+}
+
 /** Opens a draft card in the edit dialog via Continue Editing. */
 export async function openDraftForEdit(page: Page, title: string): Promise<Locator> {
   const card = proposalCard(page, title);
@@ -289,6 +334,68 @@ export async function createAndSubmitPoll(
     );
   }
   await submitProposalDraft(page, dialog);
+}
+
+/** Locates the bordered night editor block inside a batch sleeping draft dialog. */
+export function batchNightSection(dialog: Locator, nightIndex: number): Locator {
+  return dialog
+    .getByText(`Night ${nightIndex + 1}`, { exact: true })
+    .locator("xpath=ancestor::div[contains(@class,'MuiBox-root')][1]");
+}
+
+export type BatchNightConfig = {
+  nightDate: string;
+  mode: "solo" | "withInvitees";
+  requiredInvitees?: string[];
+  locationName?: string;
+  /** Free-text location when the place is not in the solo-night dropdown (PC-69). */
+  customLocation?: string;
+  comment?: string;
+};
+
+/**
+ * Configures one batch sleeping night row (date, solo/invitees, location, comment).
+ * Uses nth-index fields and night-section scoping for invitee chips (PC-69).
+ */
+export async function configureBatchNight(
+  dialog: Locator,
+  page: Page,
+  nightIndex: number,
+  config: BatchNightConfig,
+): Promise<void> {
+  const section = batchNightSection(dialog, nightIndex);
+
+  await fillProposalDateField(section.getByLabel("Night of"), config.nightDate);
+
+  if (config.mode === "solo") {
+    await section.getByRole("button", { name: "Solo", exact: true }).click();
+  } else {
+    await section.getByRole("button", { name: "With invitees" }).click();
+    for (const displayName of config.requiredInvitees ?? []) {
+      const chip = section.getByRole("button", { name: new RegExp(displayName, "i") });
+      await chip.click();
+      await expect(chip).toHaveText(new RegExp(`${displayName} \\(required\\)`, "i"));
+    }
+  }
+
+  if (config.customLocation) {
+    const locationSelect = section.getByRole("combobox", { name: "Location (optional)" });
+    await locationSelect.click();
+    await page.getByRole("option", { name: "None" }).click();
+    await section.getByLabel("Custom location (optional)").fill(config.customLocation);
+  } else if (config.locationName) {
+    const locationSelect = section.getByRole("combobox", { name: "Location (optional)" });
+    await expect(async () => {
+      await locationSelect.click();
+      const option = page.getByRole("option", { name: config.locationName });
+      await expect(option).toBeVisible({ timeout: 2_000 });
+      await option.click();
+    }).toPass({ timeout: 20_000 });
+  }
+
+  if (config.comment) {
+    await section.getByLabel("Comment (optional)").fill(config.comment);
+  }
 }
 
 /** Creates and submits a batch sleeping night with a required partner invitee. */

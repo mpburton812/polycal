@@ -122,6 +122,8 @@ export interface ProposalDetail {
   bedroomIndex: number | null;
   isBatchSleeping: boolean;
   batchEntries: BatchSleepingEntry[];
+  /** Resolved place names for batch entry locationId values (PC-69). */
+  batchPlaceNames: Record<string, string>;
   invitees: ProposalInviteeView[];
   timeSlots: ProposalTimeSlotView[];
   slotVotes: ProposalSlotVoteView[];

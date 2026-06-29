@@ -7,7 +7,7 @@ export default edgeAuth((request) => {
   const { pathname } = request.nextUrl;
   const session = request.auth;
 
-  const publicPaths = ["/login", "/paused", "/offline", "/api/auth", "/api/e2e"];
+  const publicPaths = ["/login", "/paused", "/offline", "/api/auth", "/api/e2e", "/api/cron"];
   const isPublic =
     publicPaths.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)) ||
     pathname.startsWith("/api/verify-email");

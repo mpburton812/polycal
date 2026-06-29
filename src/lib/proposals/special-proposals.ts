@@ -94,3 +94,26 @@ export function serializeGroupNameProposalMeta(
 export function isNonScheduleProposal(description: string | null): boolean {
   return getProposalSpecialKind(description) !== null;
 }
+
+/**
+ * Returns user-facing proposal description text; hides internal JSON metadata blobs (PC-68).
+ */
+export function proposalDescriptionForDisplay(description: string | null): string | null {
+  if (!description?.trim()) return null;
+
+  const groupMeta = parseGroupNameProposalMeta(description);
+  if (groupMeta) {
+    const from = groupMeta.previousName ? ` (from "${groupMeta.previousName}")` : "";
+    return `Rename to "${groupMeta.proposedName}"${from}`;
+  }
+
+  if (parseResidencyProposalMeta(description)) {
+    return null;
+  }
+
+  if (getProposalSpecialKind(description)) {
+    return null;
+  }
+
+  return description;
+}

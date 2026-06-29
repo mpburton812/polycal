@@ -25,6 +25,7 @@
     "test:promote": "npm run audit:check && npm run test:unit",
     "test:e2e": "tsx scripts/e2e-prepare.ts && playwright test",
     "test:e2e:ci": "npm run build && tsx scripts/e2e-prepare.ts && playwright test",
+    "verify:schema:turso": "node scripts/verify-turso-schema.mjs",
     "test:e2e:ui": "tsx scripts/e2e-prepare.ts && playwright test --ui",
     "test:e2e:report": "playwright show-report",
     "jira:keys": "tsx scripts/extract-jira-keys-from-range.ts",
