@@ -14,6 +14,8 @@ export function resolveE2eAnchorDate(): string {
 
 export const E2E_ANCHOR_DATE = resolveE2eAnchorDate();
 
+export const E2E_CRON_SECRET = "e2e-cron-secret-for-playwright-tests";
+
 export const E2E_ENV = {
   TURSO_DATABASE_URL: "file:e2e.db",
   NEXT_PUBLIC_APP_ENV: "feature",
@@ -21,4 +23,5 @@ export const E2E_ENV = {
   AUTH_URL: `http://localhost:${E2E_PORT}`,
   E2E_TEST_MODE: "1",
   E2E_ANCHOR_DATE,
+  CRON_SECRET: E2E_CRON_SECRET,
 } as const;

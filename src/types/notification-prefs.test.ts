@@ -2,9 +2,23 @@ import { describe, expect, it } from "vitest";
 
 import {
   DEFAULT_NOTIFICATION_PREFS,
+  migrateAlertTypes,
   migrateNotificationChannels,
   parseNotificationPrefs,
 } from "@/types/notification-prefs";
+
+describe("migrateAlertTypes", () => {
+  it("maps legacy proposals/partnerships/events to PC-65 categories", () => {
+    expect(
+      migrateAlertTypes({ proposals: false, partnerships: true, events: false }),
+    ).toEqual({
+      sleepingProposals: false,
+      eventProposals: false,
+      sleepingPartnerProposals: true,
+      reminders: false,
+    });
+  });
+});
 
 describe("migrateNotificationChannels", () => {
   it("maps legacy device=true to both inApp and push", () => {
