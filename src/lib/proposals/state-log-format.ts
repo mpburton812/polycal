@@ -78,7 +78,7 @@ function formatProposalLogDetails(entry: ProposalLogEntry): string {
     return ` · ${formatActivityLogDetails(entry.action, entry.details)}`;
   }
 
-  return ` · ${entry.details}`;
+  return ` · ${formatActivityLogDetails(entry.action, entry.details)}`;
 }
 
 export { formatVoteLabel };
