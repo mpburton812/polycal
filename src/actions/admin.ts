@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 
 import { auth } from "@/lib/auth";
 import { logUserActivity } from "@/lib/audit";
+import { formatActivityLogDetails } from "@/lib/audit/activity-log-display";
 import { userHasAdminAccess } from "@/lib/admin-access";
 import { ensureDbReady } from "@/lib/db/ensure-ready";
 import { getAppEnvironment, isNonProductionEnvironment } from "@/lib/env";
@@ -185,7 +186,7 @@ export async function exportActivityLogAction(): Promise<{ ok: boolean; csv?: st
       esc(e.eventType),
       esc(e.userDisplayName ?? ""),
       esc(e.action),
-      esc(e.details ?? ""),
+      esc(formatActivityLogDetails(e.action, e.details ?? null)),
     ].join(",");
   });
 

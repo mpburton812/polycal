@@ -3111,45 +3111,6 @@ export async function rescheduleProposalAction(
 }
 
 /**
- * Deletes a draft owned by the signed-in user (PC-40).
- */
-export async function deleteDraftProposalAction(
-  proposalId: string,
-): Promise<{ ok: boolean; message: string }> {
-  const session = await auth();
-  if (!session?.user) {
-    return { ok: false, message: "Sign in required." };
-  }
-
-  await ensureDbReady();
-  const db = getDb();
-  const [proposal] = await db
-    .select()
-    .from(proposals)
-    .where(eq(proposals.id, proposalId))
-    .limit(1);
-
-  if (!proposal || proposal.proposerId !== session.user.id || proposal.state !== "draft") {
-    return { ok: false, message: "Draft not found." };
-  }
-
-  await cleanupResidencyProposalLinkage(db, proposal, true);
-
-  await db.delete(proposalSlotVotes).where(eq(proposalSlotVotes.proposalId, proposalId));
-  await db.delete(proposalTimeSlots).where(eq(proposalTimeSlots.proposalId, proposalId));
-  await db.delete(proposalInvitees).where(eq(proposalInvitees.proposalId, proposalId));
-  await db.delete(proposalComments).where(eq(proposalComments.proposalId, proposalId));
-  await db.delete(proposalStateLog).where(eq(proposalStateLog.proposalId, proposalId));
-  await db.delete(proposals).where(eq(proposals.id, proposalId));
-
-  await logUserActivity(session.user.id, "proposals.draft_delete", proposalId);
-  revalidatePath("/proposals");
-  revalidatePath("/people-places");
-
-  return { ok: true, message: "Draft deleted." };
-}
-
-/**
  * Adds a comment on a visible proposal (PC-40).
  */
 export async function addProposalCommentAction(
