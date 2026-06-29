@@ -182,6 +182,39 @@ export async function createAndSubmitSoloEvent(
   await submitProposalDraft(page, dialog);
 }
 
+/** Creates and submits a solo event with a pre-event reminder offset. */
+export async function createAndSubmitSoloEventWithReminder(
+  page: Page,
+  options: {
+    title: string;
+    start: string;
+    end: string;
+    reminderAmount: number;
+    reminderUnit: "days" | "hours" | "minutes";
+  },
+): Promise<void> {
+  const dialog = await openEventProposalDraft(page);
+  await dialog.getByLabel("Title").fill(options.title);
+  await dialog.getByRole("button", { name: "Solo event (just me)" }).click();
+  await dialog.getByRole("checkbox", { name: "Reminder before event" }).check();
+  await dialog.getByLabel("Amount").fill(String(options.reminderAmount));
+  await dialog.getByLabel("Unit").click();
+  await page
+    .getByRole("option", {
+      name:
+        options.reminderUnit === "days"
+          ? "Days"
+          : options.reminderUnit === "hours"
+            ? "Hours"
+            : "Minutes",
+    })
+    .click();
+  await fillProposalDateTimeField(dialog.getByLabel("Start").first(), options.start);
+  await fillProposalDateTimeField(dialog.getByLabel("End (optional)").first(), options.end);
+  await dialog.getByRole("button", { name: "Create draft" }).click();
+  await submitProposalDraft(page, dialog);
+}
+
 /** Creates and submits a weekly recurring event inviting every visible invitee. */
 export async function createAndSubmitRecurringEventForEveryone(
   page: Page,
