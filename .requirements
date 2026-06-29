@@ -117,3 +117,4 @@
 2026-06-28 | eb1e134 | PC-62 | split proposals into domain modules | src/actions/proposals.ts
 2026-06-29 | d799926 | PC-65 | complete proposals UX, alerts, reminders, and calendar fixes | src/actions/proposals/_core.ts
 2026-06-29 | dcf9b44 | PC-66 | backlog week 1-2 — display layer, draft fix, board split | src/actions/proposals.ts
+2026-06-29 | aaa32cd | PC-69 | backlog week 3 — batch partners + group rename E2E journeys | app/api/e2e/reset/route.ts
