@@ -381,7 +381,7 @@ export function ProposalDraftDialog({
       setReminderEnabled(reminder.enabled);
       setReminderValue(reminder.value);
       setReminderUnit(reminder.unit);
-    } else {
+    } else if (!savedDraftId) {
       setProposalType(lockedProposalType ?? "event");
       setTitle("");
       setDescription("");
@@ -405,7 +405,7 @@ export function ProposalDraftDialog({
       setReminderValue(1);
       setReminderUnit("hours");
     }
-  }, [open, initialDetail, lockedProposalType]);
+  }, [open, initialDetail, lockedProposalType, savedDraftId]);
 
   function handleClose() {
     setSavedDraftId(null);
@@ -562,7 +562,14 @@ export function ProposalDraftDialog({
     setSavedDraftId(proposalId);
     const detailResult = await getProposalDetailAction(proposalId);
     if (detailResult.ok && detailResult.detail) {
-      applyDetailToForm(detailResult.detail);
+      const localPayload = buildDraftPayload();
+      const detail = detailResult.detail;
+      applyDetailToForm({
+        ...detail,
+        title: detail.title.trim() || localPayload.title,
+        description: detail.description?.trim() ? detail.description : localPayload.description ?? null,
+        notes: detail.notes?.trim() ? detail.notes : localPayload.notes ?? null,
+      });
     }
     return proposalId;
   }

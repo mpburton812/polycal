@@ -4,7 +4,8 @@
 export {
   getProposalDetailAction,
   listAcceptedSleepingPartnerIdsAction,
-  listProposalBoardAction,
   listProposalPlaceOptionsAction,
   listSleepingLocationOptionsAction,
 } from "./_core";
+
+export { listProposalBoardAction } from "./board";

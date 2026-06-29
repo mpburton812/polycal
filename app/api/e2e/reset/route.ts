@@ -12,6 +12,10 @@ export async function POST(): Promise<NextResponse> {
 
   try {
     const result = await resetTestDatabase();
+    const { seedE2eBurtonThompsonOverlay } = await import(
+      "@/lib/seed/e2e-burton-thompson-overlay"
+    );
+    await seedE2eBurtonThompsonOverlay();
     return NextResponse.json({ ok: true, ...result });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Reset failed";

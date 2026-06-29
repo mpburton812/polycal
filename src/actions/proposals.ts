@@ -29,7 +29,6 @@ export {
   deleteDraftProposalAction,
   getProposalDetailAction,
   listAcceptedSleepingPartnerIdsAction,
-  listProposalBoardAction,
   listProposalPlaceOptionsAction,
   listSleepingLocationOptionsAction,
   redraftProposalAction,
@@ -40,3 +39,5 @@ export {
   updateDraftProposalAction,
   updateResolvedAttendeesAction,
 } from "./proposals/_core";
+
+export { listProposalBoardAction } from "./proposals/board";

@@ -43,6 +43,7 @@ import {
   isNonScheduleProposal,
   parseGroupNameProposalMeta,
   parseResidencyProposalMeta,
+  proposalDescriptionForDisplay,
 } from "@/lib/proposals/special-proposals";
 import {
   applyResidencyProposalResolution,
@@ -176,24 +177,7 @@ function requiredCompletedPollMatrix(
   });
 }
 
-/**
- * True when an optional invitee still owes poll matrix votes on a resolved poll (PC-49).
- */
-function optionalPollVotesPending(
-  proposal: { state: ProposalState; isPoll: boolean },
-  invitee: { role: InviteeRole; voteStatus: InviteeVoteStatus } | undefined,
-  pollSlotCount: number,
-): boolean {
-  return (
-    proposal.state === "resolved" &&
-    proposal.isPoll &&
-    pollSlotCount > 1 &&
-    invitee?.role === "optional" &&
-    invitee.voteStatus === "not_seen"
-  );
-}
-
-/** Advances a date by recurrence pattern for occurrence generation (PC-40 MVP). */
+import { optionalPollVotesPending } from "@/lib/proposals/poll-utils";
 function advanceOccurrenceDate(date: Date, pattern: RecurrencePattern, interval: number): Date {
   const next = new Date(date);
   switch (pattern) {
@@ -350,267 +334,6 @@ async function notifyProposalStakeholders(
       ...extra,
     });
   }
-}
-
-/**
- * Lists Kanban columns scoped to the signed-in user (PC-40).
- */
-export async function listProposalBoardAction(): Promise<ProposalBoard> {
-  await ensureDbReady();
-  const session = await auth();
-  if (!session?.user) {
-    return { draft: [], proposed: [], resolved: [], archived: [] };
-  }
-
-  const db = getDb();
-  const { bridgeLegacyResidencyProposals } = await import("@/actions/residency-proposals");
-  await bridgeLegacyResidencyProposals(db);
-  const viewerId = session.user.id;
-  const isAdmin = await userHasAdminAccess(session.user.role);
-  const privacyFlags = await getPrivacyAdminFlags(db);
-  const nowIso = new Date().toISOString();
-
-  const viewerInviteeProposalRows = isAdmin
-    ? []
-    : await db
-        .select({ proposalId: proposalInvitees.proposalId })
-        .from(proposalInvitees)
-        .where(eq(proposalInvitees.userId, viewerId));
-  const viewerInviteeProposalIds = viewerInviteeProposalRows.map((row) => row.proposalId);
-
-  const boardVisibilityFilter = isAdmin
-    ? undefined
-    : or(
-        and(eq(proposals.state, "draft"), eq(proposals.proposerId, viewerId)),
-        and(
-          ne(proposals.state, "draft"),
-          or(
-            eq(proposals.proposerId, viewerId),
-            viewerInviteeProposalIds.length > 0
-              ? inArray(proposals.id, viewerInviteeProposalIds)
-              : eq(proposals.id, "__none__"),
-            and(
-              inArray(proposals.state, ["resolved", "archived"]),
-              eq(proposals.eventPrivacy, "open"),
-            ),
-          ),
-        ),
-      );
-
-  const rows = await db
-    .select({
-      id: proposals.id,
-      title: proposals.title,
-      description: proposals.description,
-      proposalType: proposals.proposalType,
-      state: proposals.state,
-      proposerId: proposals.proposerId,
-      proposerName: users.displayName,
-      locationName: locations.name,
-      locationText: proposals.locationText,
-      scheduledStartAt: proposals.scheduledStartAt,
-      scheduledEndAt: proposals.scheduledEndAt,
-      atRisk: proposals.atRisk,
-      isPoll: proposals.isPoll,
-      eventPrivacy: proposals.eventPrivacy,
-    })
-    .from(proposals)
-    .innerJoin(users, eq(proposals.proposerId, users.id))
-    .leftJoin(locations, eq(proposals.locationId, locations.id))
-    .where(boardVisibilityFilter)
-    .orderBy(asc(proposals.updatedAt));
-
-  const visibleProposalIds = rows.map((row) => row.id);
-  const inviteeRows =
-    visibleProposalIds.length > 0
-      ? await db
-          .select({
-            proposalId: proposalInvitees.proposalId,
-            userId: proposalInvitees.userId,
-            role: proposalInvitees.role,
-            voteStatus: proposalInvitees.voteStatus,
-          })
-          .from(proposalInvitees)
-          .where(inArray(proposalInvitees.proposalId, visibleProposalIds))
-      : [];
-
-  const inviteesByProposal = new Map<string, typeof inviteeRows>();
-  for (const row of inviteeRows) {
-    const list = inviteesByProposal.get(row.proposalId) ?? [];
-    list.push(row);
-    inviteesByProposal.set(row.proposalId, list);
-  }
-
-  const pollSlotCountRows =
-    visibleProposalIds.length > 0
-      ? await db
-          .select({
-            proposalId: proposalTimeSlots.proposalId,
-          })
-          .from(proposalTimeSlots)
-          .innerJoin(proposals, eq(proposalTimeSlots.proposalId, proposals.id))
-          .where(
-            and(eq(proposals.isPoll, true), inArray(proposals.id, visibleProposalIds)),
-          )
-      : [];
-
-  const pollSlotCounts = new Map<string, number>();
-  for (const slotRow of pollSlotCountRows) {
-    pollSlotCounts.set(slotRow.proposalId, (pollSlotCounts.get(slotRow.proposalId) ?? 0) + 1);
-  }
-
-  const empty: ProposalBoard = { draft: [], proposed: [], resolved: [], archived: [] };
-
-  for (const row of rows) {
-    const invitees = inviteesByProposal.get(row.id) ?? [];
-    const inviteeUserIds = invitees.map((invitee) => invitee.userId);
-
-    if (
-      row.state === "proposed" ||
-      row.state === "resolved" ||
-      row.state === "archived"
-    ) {
-      if (!viewerCanSeeProposal(viewerId, isAdmin, row.proposerId, inviteeUserIds, {
-        state: row.state,
-        eventPrivacy: row.eventPrivacy,
-      })) {
-        continue;
-      }
-    }
-
-    const masked = shouldMaskProposalContent(
-      viewerId,
-      isAdmin,
-      row.proposerId,
-      inviteeUserIds,
-      row.eventPrivacy,
-      privacyFlags.adminCanSeePrivate,
-      privacyFlags.adminCanSeeSuperPrivate,
-      row.state,
-    );
-    const display = applyProposalMask(row, masked);
-
-    const viewerInvitee = invitees.find((invitee) => invitee.userId === viewerId);
-    const pollSlotCount = pollSlotCounts.get(row.id) ?? 0;
-    const optionalPollPending = optionalPollVotesPending(row, viewerInvitee, pollSlotCount);
-    const respondedCount = invitees.filter((inv) => inv.voteStatus !== "not_seen").length;
-    const needsViewerAction =
-      !masked &&
-      viewerInvitee !== undefined &&
-      viewerInvitee.voteStatus === "not_seen" &&
-      (row.state === "proposed" ||
-        (row.state === "resolved" && row.atRisk) ||
-        optionalPollPending);
-
-    const scheduleEnd = display.scheduledEndAt ?? display.scheduledStartAt;
-    const isPastSchedule = Boolean(scheduleEnd && scheduleEnd < nowIso);
-
-    const card: ProposalCard = {
-      id: row.id,
-      title: display.title,
-      description: display.description,
-      proposalType: row.proposalType,
-      state: optionalPollPending ? "proposed" : row.state,
-      proposerId: row.proposerId,
-      proposerName: row.proposerName,
-      locationName: display.locationName ?? display.locationText ?? null,
-      scheduledStartAt: display.scheduledStartAt ?? null,
-      scheduledEndAt: display.scheduledEndAt ?? null,
-      atRisk: row.atRisk,
-      isPoll: row.isPoll,
-      eventPrivacy: row.eventPrivacy,
-      isContentMasked: masked,
-      needsViewerAction,
-      inviteeCount: invitees.length,
-      respondedCount,
-      isPastSchedule,
-      specialKind: getProposalSpecialKind(row.description) ?? undefined,
-    };
-
-    const column: keyof ProposalBoard = optionalPollPending
-      ? "proposed"
-      : (row.state as keyof ProposalBoard);
-    empty[column].push(card);
-  }
-
-  const partnershipRows = await db
-    .select({
-      id: sleepingPartnerships.id,
-      userLowId: sleepingPartnerships.userLowId,
-      userHighId: sleepingPartnerships.userHighId,
-      proposedById: sleepingPartnerships.proposedById,
-      initiatedByUserId: sleepingPartnerships.initiatedByUserId,
-      proposerName: users.displayName,
-    })
-    .from(sleepingPartnerships)
-    .innerJoin(users, eq(sleepingPartnerships.proposedById, users.id))
-    .where(eq(sleepingPartnerships.status, "proposed"));
-
-  if (partnershipRows.length > 0) {
-    const partnerIds = new Set<string>();
-    for (const row of partnershipRows) {
-      partnerIds.add(row.userLowId);
-      partnerIds.add(row.userHighId);
-      if (row.initiatedByUserId) partnerIds.add(row.initiatedByUserId);
-    }
-    const partnerRows = await db
-      .select({ id: users.id, displayName: users.displayName })
-      .from(users)
-      .where(inArray(users.id, [...partnerIds]));
-    const partnerMap = new Map(partnerRows.map((row) => [row.id, row.displayName]));
-
-    for (const row of partnershipRows) {
-      const isParticipant =
-        row.userLowId === viewerId || row.userHighId === viewerId;
-      if (!isParticipant && !isAdmin) continue;
-
-      const partnerId =
-        row.userLowId === viewerId ? row.userHighId : row.userLowId;
-      const partnerName = partnerMap.get(partnerId) ?? "Partner";
-      const lowName = partnerMap.get(row.userLowId) ?? "Member";
-      const highName = partnerMap.get(row.userHighId) ?? "Member";
-      const initiatedByName = row.initiatedByUserId
-        ? (partnerMap.get(row.initiatedByUserId) ?? null)
-        : null;
-      const copy = buildPartnershipProposalCopy({
-        viewerId,
-        userLowId: row.userLowId,
-        userHighId: row.userHighId,
-        proposedById: row.proposedById,
-        proposerName: row.proposerName,
-        initiatedByName,
-        partnerName,
-        lowName,
-        highName,
-      });
-
-      empty.proposed.push({
-        id: `${PARTNERSHIP_CARD_PREFIX}${row.id}`,
-        title: `Sleeping partnership with ${partnerName}`,
-        description: copy.description,
-        proposalType: "event",
-        state: "proposed",
-        proposerId: row.proposedById,
-        proposerName: copy.proposerDisplayName,
-        locationName: null,
-        scheduledStartAt: null,
-        scheduledEndAt: null,
-        atRisk: false,
-        isPoll: false,
-        eventPrivacy: "open",
-        isContentMasked: false,
-        needsViewerAction: copy.needsViewerAction,
-        inviteeCount: 1,
-        respondedCount: copy.needsViewerAction ? 0 : 0,
-        isPastSchedule: false,
-        cardKind: "partnership",
-        partnershipId: row.id,
-        partnerName,
-      });
-    }
-  }
-
-  return empty;
 }
 
 /** Parses bedroom label JSON stored on locations (PC-40). */
@@ -2401,9 +2124,9 @@ export async function getProposalDetailAction(
     row.state,
   );
   const display = applyProposalMask(row, masked);
-  const userFacingDescription = isNonScheduleProposal(row.description)
+  const userFacingDescription = masked
     ? null
-    : display.description;
+    : proposalDescriptionForDisplay(row.description);
 
   const slotRows = await db
     .select()
@@ -2486,6 +2209,24 @@ export async function getProposalDetailAction(
 
   const optionalPollPending = optionalPollVotesPending(row, viewerInvitee, slotRows.length);
   const displayState: ProposalState = optionalPollPending ? "proposed" : row.state;
+  const batchEntries = masked ? [] : parseBatchEntriesJson(row.batchEntriesJson);
+  const batchLocationIds = [
+    ...new Set(
+      batchEntries
+        .map((entry) => entry.locationId)
+        .filter((id): id is string => Boolean(id)),
+    ),
+  ];
+  const batchPlaceRows =
+    batchLocationIds.length > 0
+      ? await db
+          .select({ id: locations.id, name: locations.name })
+          .from(locations)
+          .where(inArray(locations.id, batchLocationIds))
+      : [];
+  const batchPlaceNames = Object.fromEntries(
+    batchPlaceRows.map((place) => [place.id, place.name]),
+  );
 
   return {
     ok: true,
@@ -2523,7 +2264,8 @@ export async function getProposalDetailAction(
       occurrenceIndex: row.occurrenceIndex ?? null,
       bedroomIndex: masked ? null : row.bedroomIndex ?? null,
       isBatchSleeping: row.isBatchSleeping,
-      batchEntries: masked ? [] : parseBatchEntriesJson(row.batchEntriesJson),
+      batchEntries,
+      batchPlaceNames,
       invitees: canViewSensitive
         ? inviteeRows.map((invitee) => ({
             userId: invitee.userId,

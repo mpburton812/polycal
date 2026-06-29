@@ -162,7 +162,7 @@ export function resolveNotificationUrl(
 
   if (typeof metadata?.proposalId === "string") {
 
-    return `/proposals?highlight=${encodeURIComponent(metadata.proposalId)}`;
+    return `/proposals?open=${encodeURIComponent(metadata.proposalId)}`;
 
   }
 
