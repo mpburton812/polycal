@@ -9,6 +9,42 @@ function userRow(page: Page, displayName: string) {
   return page.getByRole("row").filter({ hasText: displayName });
 }
 
+/** Locates the expanded Poly group settings accordion panel. */
+function polyGroupSettingsPanel(page: Page) {
+  return page.locator("div").filter({
+    has: page.getByRole("heading", { name: "Poly group settings", level: 2 }),
+  });
+}
+
+/** Selects a value from the Group name change mode MUI combobox. */
+export async function selectGroupNameChangeMode(
+  page: Page,
+  modeLabel: string | RegExp,
+): Promise<void> {
+  const panel = polyGroupSettingsPanel(page);
+  await panel.getByRole("combobox").first().click();
+  await page.getByRole("option", { name: modeLabel }).click();
+}
+
+/** Enables group rename proposals and sets the change mode in admin settings. */
+export async function configureGroupNameProposals(
+  page: Page,
+  options: { mode: string },
+): Promise<void> {
+  await expandAdminSection(page, "Poly group settings");
+  const allowSwitch = page.getByRole("checkbox", {
+    name: "Allow proposals to change group name",
+  });
+  if (!(await allowSwitch.isChecked())) {
+    await page.getByText("Allow proposals to change group name").click();
+  }
+  await selectGroupNameChangeMode(page, options.mode);
+  await page.getByRole("button", { name: "Save settings" }).click();
+  await expect(page.getByRole("alert").filter({ hasText: /saved|updated/i })).toBeVisible({
+    timeout: 15_000,
+  });
+}
+
 /** Pauses a user from the admin user management table. */
 export async function pauseUserInAdmin(page: Page, displayName: string): Promise<void> {
   await expandAdminSection(page, "User management");

@@ -51,6 +51,7 @@ import {
   type ProposalConflictWarning,
   type ProposalDetail,
 } from "@/actions/proposals";
+import { BatchNightsSummary } from "./BatchNightsSummary";
 import { useToast } from "@/components/providers/ToastProvider";
 import type { InviteeVoteStatus } from "@/lib/db/schema";
 import type { PersonSummary } from "@/actions/users";
@@ -542,6 +543,8 @@ export function ProposalDetailDialog({
                   <Typography variant="body2">{detail.description}</Typography>
                 </Stack>
               )}
+
+              {!detail.isContentMasked && <BatchNightsSummary detail={detail} />}
 
               {whenLabel && (
                 <Stack direction="row" spacing={0.5} alignItems="center" sx={{ mt: 0.5 }}>

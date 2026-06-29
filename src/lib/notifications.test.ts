@@ -7,9 +7,15 @@ describe("resolveNotificationUrl", () => {
     expect(resolveNotificationUrl("proposal_submitted", { url: "/profile" })).toBe("/profile");
   });
 
-  it("links proposals with highlight query", () => {
+  it("links proposals with open query", () => {
     expect(resolveNotificationUrl("proposal_submitted", { proposalId: "prop-1" })).toBe(
-      "/proposals?highlight=prop-1",
+      "/proposals?open=prop-1",
+    );
+  });
+
+  it("links event reminders to the proposal detail", () => {
+    expect(resolveNotificationUrl("event_reminder", { proposalId: "prop-2" })).toBe(
+      "/proposals?open=prop-2",
     );
   });
 
