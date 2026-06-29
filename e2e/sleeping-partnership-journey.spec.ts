@@ -6,7 +6,7 @@ import { fillProposalDateField } from "./helpers/datePickers";
 import { goToProposals, openProposalCard, selectProposalTab } from "./helpers/navigation";
 import { expectInAppNotification } from "./helpers/notifications";
 import {
-  openEventOrSleepingProposalDraft,
+  openEventProposalDraft,
   openSleepingPartnerProposal,
   proposalCard,
   submitProposalDraft,
@@ -64,7 +64,7 @@ test.describe("Sleeping partnership journey", () => {
 
     // —— Phase 5: Han proposes sleeping event with Anakin at Millennium Falcon ——
     await goToProposals(page);
-    const draft = await openEventOrSleepingProposalDraft(page);
+    const draft = await openEventProposalDraft(page);
     await draft.getByLabel("Type").click();
     await page.getByRole("option", { name: "Sleeping" }).click();
     await draft.getByLabel("Title").fill(sleepingTitle);

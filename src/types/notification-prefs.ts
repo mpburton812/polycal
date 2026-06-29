@@ -9,9 +9,10 @@ export interface NotificationPrefs {
   quietHoursStart: string | null;
   quietHoursEnd: string | null;
   alertTypes: {
-    proposals: boolean;
-    partnerships: boolean;
-    events: boolean;
+    sleepingProposals: boolean;
+    eventProposals: boolean;
+    sleepingPartnerProposals: boolean;
+    reminders: boolean;
   };
 }
 
@@ -24,12 +25,28 @@ type LegacyStoredChannels = {
   push?: boolean;
 };
 
+/** Legacy alert type keys before PC-65 taxonomy. */
+type LegacyAlertTypes = {
+  proposals?: boolean;
+  partnerships?: boolean;
+  events?: boolean;
+  sleepingProposals?: boolean;
+  eventProposals?: boolean;
+  sleepingPartnerProposals?: boolean;
+  reminders?: boolean;
+};
+
 export const DEFAULT_NOTIFICATION_PREFS: NotificationPrefs = {
   globalEnabled: true,
   channels: { email: false, sms: false, inApp: true, push: false },
   quietHoursStart: null,
   quietHoursEnd: null,
-  alertTypes: { proposals: true, partnerships: true, events: true },
+  alertTypes: {
+    sleepingProposals: true,
+    eventProposals: true,
+    sleepingPartnerProposals: true,
+    reminders: true,
+  },
 };
 
 /**
@@ -55,17 +72,54 @@ export function migrateNotificationChannels(
   return { email, sms, inApp: device, push: device };
 }
 
+/**
+ * Maps legacy proposals/partnerships/events toggles to PC-65 alert categories.
+ */
+export function migrateAlertTypes(
+  alertTypes: LegacyAlertTypes | undefined,
+): NotificationPrefs["alertTypes"] {
+  if (!alertTypes) return DEFAULT_NOTIFICATION_PREFS.alertTypes;
+
+  if (
+    "sleepingProposals" in alertTypes ||
+    "eventProposals" in alertTypes ||
+    "sleepingPartnerProposals" in alertTypes ||
+    "reminders" in alertTypes
+  ) {
+    return {
+      sleepingProposals:
+        alertTypes.sleepingProposals ?? DEFAULT_NOTIFICATION_PREFS.alertTypes.sleepingProposals,
+      eventProposals: alertTypes.eventProposals ?? DEFAULT_NOTIFICATION_PREFS.alertTypes.eventProposals,
+      sleepingPartnerProposals:
+        alertTypes.sleepingPartnerProposals ??
+        DEFAULT_NOTIFICATION_PREFS.alertTypes.sleepingPartnerProposals,
+      reminders: alertTypes.reminders ?? DEFAULT_NOTIFICATION_PREFS.alertTypes.reminders,
+    };
+  }
+
+  const proposals = alertTypes.proposals ?? true;
+  const partnerships = alertTypes.partnerships ?? true;
+  const events = alertTypes.events ?? true;
+  return {
+    sleepingProposals: proposals,
+    eventProposals: proposals,
+    sleepingPartnerProposals: partnerships,
+    reminders: events,
+  };
+}
+
 export function parseNotificationPrefs(json: string | null | undefined): NotificationPrefs {
   if (!json) return DEFAULT_NOTIFICATION_PREFS;
   try {
     const parsed = JSON.parse(json) as Partial<NotificationPrefs> & {
       channels?: LegacyStoredChannels;
+      alertTypes?: LegacyAlertTypes;
     };
     return {
       ...DEFAULT_NOTIFICATION_PREFS,
       ...parsed,
       channels: migrateNotificationChannels(parsed.channels),
-      alertTypes: { ...DEFAULT_NOTIFICATION_PREFS.alertTypes, ...parsed.alertTypes },
+      alertTypes: migrateAlertTypes(parsed.alertTypes),
     };
   } catch {
     return DEFAULT_NOTIFICATION_PREFS;

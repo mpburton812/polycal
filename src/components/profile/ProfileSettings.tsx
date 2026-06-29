@@ -43,6 +43,14 @@ import {
 } from "@/lib/schedule/timezone";
 import type { NotificationPrefs } from "@/types/notification-prefs";
 import { subscribeToWebPush } from "@/lib/push-client";
+import { AvatarCropDialog } from "@/components/profile/AvatarCropDialog";
+
+const ALERT_TYPE_LABELS: Record<keyof NotificationPrefs["alertTypes"], string> = {
+  sleepingProposals: "Sleeping Proposals",
+  eventProposals: "Event Proposals",
+  sleepingPartnerProposals: "Sleeping Partner Proposals",
+  reminders: "Reminders",
+};
 
 export function ProfileSettings({
   initialDisplayName,
@@ -93,6 +101,8 @@ export function ProfileSettings({
   const [notifPending, startNotifTransition] = useTransition();
   const [avatarUploadPending, startAvatarUploadTransition] = useTransition();
   const [avatarUploadError, setAvatarUploadError] = useState<string | null>(null);
+  const [avatarCropFile, setAvatarCropFile] = useState<File | null>(null);
+  const [avatarCropOpen, setAvatarCropOpen] = useState(false);
   const [pushMessage, setPushMessage] = useState<string | null>(null);
   const [pushError, setPushError] = useState<string | null>(null);
   const [pushPending, startPushTransition] = useTransition();
@@ -173,6 +183,14 @@ export function ProfileSettings({
     const file = event.target.files?.[0];
     if (!file) return;
     setAvatarUploadError(null);
+    setAvatarCropFile(file);
+    setAvatarCropOpen(true);
+    event.target.value = "";
+  }
+
+  function uploadCroppedAvatar(file: File) {
+    setAvatarCropOpen(false);
+    setAvatarCropFile(null);
     const formData = new FormData();
     formData.set("avatar", file);
     startAvatarUploadTransition(async () => {
@@ -185,7 +203,6 @@ export function ProfileSettings({
       await update({ user: { avatarKey: result.avatarKey } });
       router.refresh();
     });
-    event.target.value = "";
   }
 
   function handleNotificationEmailSave() {
@@ -564,48 +581,25 @@ export function ProfileSettings({
         </Stack>
         <Typography variant="subtitle2">Alert types</Typography>
         <FormGroup sx={{ mb: 2 }}>
-          <FormControlLabel
-            control={
-              <Checkbox
-                checked={notificationPrefs.alertTypes.proposals}
-                onChange={(e) =>
-                  setNotificationPrefs({
-                    ...notificationPrefs,
-                    alertTypes: { ...notificationPrefs.alertTypes, proposals: e.target.checked },
-                  })
+          {(Object.keys(ALERT_TYPE_LABELS) as Array<keyof NotificationPrefs["alertTypes"]>).map(
+            (key) => (
+              <FormControlLabel
+                key={key}
+                control={
+                  <Checkbox
+                    checked={notificationPrefs.alertTypes[key]}
+                    onChange={(e) =>
+                      setNotificationPrefs({
+                        ...notificationPrefs,
+                        alertTypes: { ...notificationPrefs.alertTypes, [key]: e.target.checked },
+                      })
+                    }
+                  />
                 }
+                label={ALERT_TYPE_LABELS[key]}
               />
-            }
-            label="Proposals"
-          />
-          <FormControlLabel
-            control={
-              <Checkbox
-                checked={notificationPrefs.alertTypes.partnerships}
-                onChange={(e) =>
-                  setNotificationPrefs({
-                    ...notificationPrefs,
-                    alertTypes: { ...notificationPrefs.alertTypes, partnerships: e.target.checked },
-                  })
-                }
-              />
-            }
-            label="Partnerships"
-          />
-          <FormControlLabel
-            control={
-              <Checkbox
-                checked={notificationPrefs.alertTypes.events}
-                onChange={(e) =>
-                  setNotificationPrefs({
-                    ...notificationPrefs,
-                    alertTypes: { ...notificationPrefs.alertTypes, events: e.target.checked },
-                  })
-                }
-              />
-            }
-            label="Events"
-          />
+            ),
+          )}
         </FormGroup>
         <Button variant="contained" onClick={handleNotificationSave} disabled={notifPending}>
           {notifPending ? "Saving…" : "Save notification preferences"}
@@ -624,6 +618,16 @@ export function ProfileSettings({
           Log out
         </Button>
       </Paper>
+
+      <AvatarCropDialog
+        open={avatarCropOpen}
+        file={avatarCropFile}
+        onClose={() => {
+          setAvatarCropOpen(false);
+          setAvatarCropFile(null);
+        }}
+        onConfirm={uploadCroppedAvatar}
+      />
     </Stack>
   );
 }

@@ -65,6 +65,7 @@ import {
   typeChipSx,
 } from "./proposalCardTheme";
 import { formatProposalLogLine } from "@/lib/proposals/state-log-format";
+import { getProposalSpecialKind } from "@/lib/proposals/special-proposals";
 
 const VOTE_STATUS_LABELS: Record<InviteeVoteStatus, string> = {
   not_seen: "Not yet viewed",
@@ -399,6 +400,8 @@ export function ProposalDetailDialog({
           )
         : null)
     : null;
+  const detailSpecialKind =
+    detail?.description != null ? getProposalSpecialKind(detail.description) : null;
 
   const isPollMatrix = detail?.isPoll && (detail.timeSlots.length ?? 0) > 1;
 
@@ -543,7 +546,7 @@ export function ProposalDetailDialog({
                 </Stack>
               )}
 
-              {whenLabel && (
+              {whenLabel && detailSpecialKind !== "residency" && (
                 <Stack direction="row" spacing={0.5} alignItems="center" sx={{ mt: 0.5 }}>
                   <AccessTimeIcon sx={{ fontSize: 16, color: "text.secondary" }} />
                   <Typography variant="body2" color="text.secondary">{whenLabel}</Typography>

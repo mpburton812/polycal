@@ -23,10 +23,21 @@ export async function openNewProposalFabMenu(page: Page): Promise<void> {
   await page.getByRole("button", { name: "New proposal" }).click();
 }
 
-/** Opens the event/sleeping draft dialog from the FAB menu. */
-export async function openEventOrSleepingProposalDraft(page: Page): Promise<Locator> {
+/** Opens the event proposal draft dialog from the FAB menu. */
+export async function openEventProposalDraft(page: Page): Promise<Locator> {
   await openNewProposalFabMenu(page);
-  await page.getByRole("menuitem", { name: "Event or sleeping proposal" }).click();
+  await page.getByRole("menuitem", { name: "Event proposal" }).click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog.getByRole("heading", { name: "New proposal" })).toBeVisible({
+    timeout: 15_000,
+  });
+  return dialog;
+}
+
+/** Opens the sleeping proposal draft dialog from the FAB menu. */
+export async function openSleepingProposalDraft(page: Page): Promise<Locator> {
+  await openNewProposalFabMenu(page);
+  await page.getByRole("menuitem", { name: "Sleeping proposal" }).click();
   const dialog = page.getByRole("dialog");
   await expect(dialog.getByRole("heading", { name: "New proposal" })).toBeVisible({
     timeout: 15_000,
@@ -132,7 +143,7 @@ export async function createAndSubmitEvent(
     start: string;
   },
 ): Promise<void> {
-  const dialog = await openEventOrSleepingProposalDraft(page);
+  const dialog = await openEventProposalDraft(page);
   await dialog.getByLabel("Title").fill(options.title);
   if (options.description) {
     await dialog.getByLabel(/Description/i).fill(options.description);
@@ -154,7 +165,7 @@ export async function createAndSubmitSoloEvent(
     end: string;
   },
 ): Promise<void> {
-  const dialog = await openEventOrSleepingProposalDraft(page);
+  const dialog = await openEventProposalDraft(page);
   await dialog.getByLabel("Title").fill(options.title);
   await dialog.getByRole("button", { name: "Solo event (just me)" }).click();
   if (options.notes) {
@@ -176,7 +187,7 @@ export async function createAndSubmitRecurringEventForEveryone(
     occurrenceCount?: number;
   },
 ): Promise<void> {
-  const dialog = await openEventOrSleepingProposalDraft(page);
+  const dialog = await openEventProposalDraft(page);
   await dialog.getByLabel("Title").fill(options.title);
   await dialog.getByRole("checkbox", { name: /Recurring series/i }).check();
   await dialog.getByLabel("Occurrences").fill(String(options.occurrenceCount ?? 4));
@@ -200,8 +211,7 @@ export async function createAndSubmitSoloSleepingWeek(
   },
 ): Promise<number> {
   const nightDates = inclusiveNightDates(options.rangeStart, options.rangeEnd);
-  const dialog = await openEventOrSleepingProposalDraft(page);
-  await selectProposalType(page, dialog, "Sleeping");
+  const dialog = await openSleepingProposalDraft(page);
   await dialog
     .getByRole("checkbox", { name: "Batch (multiple nights in one proposal)" })
     .check();
@@ -252,7 +262,7 @@ export async function createAndSubmitPoll(
     slotLabels?: string[];
   },
 ): Promise<void> {
-  const dialog = await openEventOrSleepingProposalDraft(page);
+  const dialog = await openEventProposalDraft(page);
   await dialog.getByLabel("Title").fill(options.title);
   if (options.description) {
     await dialog.getByLabel(/Description/i).fill(options.description);
@@ -287,8 +297,7 @@ export async function createAndSubmitBatchSleepingWithInvitee(
     comment?: string;
   },
 ): Promise<void> {
-  const dialog = await openEventOrSleepingProposalDraft(page);
-  await selectProposalType(page, dialog, "Sleeping");
+  const dialog = await openSleepingProposalDraft(page);
   await dialog.getByRole("checkbox", { name: /Batch/i }).check();
   await dialog.getByLabel("Title").fill(options.title);
   await fillProposalDateField(dialog.getByLabel("Night of").first(), options.nightDate);

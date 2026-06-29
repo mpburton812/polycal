@@ -115,3 +115,4 @@
 2026-06-28 | e08ea9b | PC-59 | stabilize schedule E2E week scan for ensureFuture seed slots | e2e/schedule.spec.ts
 2026-06-28 | c538df1 | PC-61 | split death-star poll journey into serial phases | e2e/death-star-poll-journey.spec.ts
 2026-06-28 | eb1e134 | PC-62 | split proposals into domain modules | src/actions/proposals.ts
+2026-06-29 | d528912 | PC-65 | proposals FAB split, calendar fixes, reminders, and alerts | src/actions/proposals/_core.ts

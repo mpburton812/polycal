@@ -74,6 +74,7 @@ export function ProposalsClient({
   const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState<TabKey>("draft");
   const [createOpen, setCreateOpen] = useState(false);
+  const [draftProposalType, setDraftProposalType] = useState<"event" | "sleeping">("event");
   const [partnerCreateOpen, setPartnerCreateOpen] = useState(false);
   const [residencyCreateOpen, setResidencyCreateOpen] = useState(false);
   const [fabMenuAnchor, setFabMenuAnchor] = useState<null | HTMLElement>(null);
@@ -234,10 +235,21 @@ export function ProposalsClient({
           onClick={() => {
             setFabMenuAnchor(null);
             setEditDetail(null);
+            setDraftProposalType("event");
             setCreateOpen(true);
           }}
         >
-          Event or sleeping proposal
+          Event proposal
+        </MenuItem>
+        <MenuItem
+          onClick={() => {
+            setFabMenuAnchor(null);
+            setEditDetail(null);
+            setDraftProposalType("sleeping");
+            setCreateOpen(true);
+          }}
+        >
+          Sleeping proposal
         </MenuItem>
         <MenuItem
           onClick={() => {
@@ -264,6 +276,7 @@ export function ProposalsClient({
         places={places}
         currentUserId={currentUserId}
         initialDetail={editDetail}
+        defaultProposalType={draftProposalType}
       />
       <SleepingPartnerCreateDialog
         open={partnerCreateOpen}
