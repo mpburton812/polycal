@@ -118,3 +118,4 @@
 2026-06-29 | d799926 | PC-65 | complete proposals UX, alerts, reminders, and calendar fixes | src/actions/proposals/_core.ts
 2026-06-29 | dcf9b44 | PC-66 | backlog week 1-2 — display layer, draft fix, board split | src/actions/proposals.ts
 2026-06-29 | aaa32cd | PC-69 | backlog week 3 — batch partners + group rename E2E journeys | app/api/e2e/reset/route.ts
+2026-06-29 | 6ebf517 | PC-70 | backlog week 4 — event reminder and alert prefs E2E journeys | src/types/notification-prefs.test.ts
