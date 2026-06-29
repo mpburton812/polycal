@@ -4,7 +4,7 @@ import { login } from "./helpers/auth";
 import { fillProposalDateTimeField } from "./helpers/datePickers";
 import { DEMO, USERS } from "./helpers/constants";
 import { goToProposals, openProposalCard, selectProposalTab } from "./helpers/navigation";
-import { openEventOrSleepingProposalDraft } from "./helpers/proposals";
+import { openEventProposalDraft } from "./helpers/proposals";
 
 function proposalCard(page: import("@playwright/test").Page, title: string) {
   return page.locator(".MuiCard-root").filter({
@@ -60,7 +60,7 @@ test.describe("Poll proposal draft", () => {
 
   test("creates a poll draft with multiple time slots", async ({ page }) => {
     const title = `E2E Poll ${Date.now()}`;
-    const dialog = await openEventOrSleepingProposalDraft(page);
+    const dialog = await openEventProposalDraft(page);
     await dialog.getByLabel("Title").fill(title);
     await dialog.getByLabel(/Description/i).fill("Poll with two options.");
     await dialog.getByRole("checkbox", { name: /Time poll/i }).check();
@@ -87,7 +87,7 @@ test.describe("Recurring event draft", () => {
 
   test("creates a recurring event draft with pattern controls", async ({ page }) => {
     const title = `E2E Recurring ${Date.now()}`;
-    const dialog = await openEventOrSleepingProposalDraft(page);
+    const dialog = await openEventProposalDraft(page);
     await dialog.getByLabel("Title").fill(title);
     await dialog.getByLabel(/Description/i).fill("Weekly council meetings.");
     await dialog.getByRole("checkbox", { name: /Recurring series/i }).check();

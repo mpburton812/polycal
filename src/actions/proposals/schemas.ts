@@ -36,6 +36,7 @@ export const draftProposalSchema = z.object({
   bedroomIndex: z.number().int().min(0).max(19).optional(),
   isBatchSleeping: z.boolean().optional(),
   batchEntries: batchSleepingEntriesSchema.optional(),
+  reminderOffsetMinutes: z.number().int().min(1).max(525600).nullable().optional(),
 });
 
 export const commentSchema = z.object({

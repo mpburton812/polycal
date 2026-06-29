@@ -3,7 +3,7 @@ import { expect, test } from "./helpers/test";
 import { login } from "./helpers/auth";
 import { DEMO, USERS } from "./helpers/constants";
 import { goToProposals, selectProposalTab } from "./helpers/navigation";
-import { openEventOrSleepingProposalDraft } from "./helpers/proposals";
+import { openEventProposalDraft } from "./helpers/proposals";
 
 function proposalCard(page: import("@playwright/test").Page, title: string) {
   return page.locator(".MuiCard-root").filter({
@@ -20,7 +20,7 @@ test.describe("Proposal draft workflows", () => {
   test("creates a new event draft and lists it on the board", async ({ page }) => {
     const title = `E2E Test Event ${Date.now()}`;
 
-    const dialog = await openEventOrSleepingProposalDraft(page);
+    const dialog = await openEventProposalDraft(page);
     await dialog.getByLabel("Title").fill(title);
     await dialog.getByLabel(/Description/i).fill("Automated E2E draft creation.");
     await dialog.getByRole("button", { name: "Create draft" }).click();
@@ -59,7 +59,7 @@ test.describe("Proposal draft workflows", () => {
   test("creates a draft without optional description", async ({ page }) => {
     const title = `E2E No Description ${Date.now()}`;
 
-    const dialog = await openEventOrSleepingProposalDraft(page);
+    const dialog = await openEventProposalDraft(page);
     await dialog.getByLabel("Title").fill(title);
     await dialog.getByRole("button", { name: "Create draft" }).click();
 
@@ -77,7 +77,7 @@ test.describe("Proposal submit and conflict warnings", () => {
 
   test("submits a draft to proposed state", async ({ page }) => {
     const title = `E2E Submit ${Date.now()}`;
-    const dialog = await openEventOrSleepingProposalDraft(page);
+    const dialog = await openEventProposalDraft(page);
     await dialog.getByLabel("Title").fill(title);
     await dialog.getByLabel(/Description/i).fill("Needs invitee vote.");
     await dialog.getByRole("button", { name: /Leia Organa/i }).click();

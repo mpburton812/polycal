@@ -4,7 +4,7 @@ import { login, logout } from "./helpers/auth";
 import { fillProposalDateTimeField } from "./helpers/datePickers";
 import { USERS } from "./helpers/constants";
 import { goToProposals, openProposalCard, selectProposalTab } from "./helpers/navigation";
-import { openEventOrSleepingProposalDraft } from "./helpers/proposals";
+import { openEventProposalDraft } from "./helpers/proposals";
 import { expectToast } from "./helpers/toast";
 
 function proposalCard(page: import("@playwright/test").Page, title: string) {
@@ -21,7 +21,7 @@ test.describe("Proposal invitee journey", () => {
 
     await login(page, USERS.luke.username);
     await goToProposals(page);
-    const draftDialog = await openEventOrSleepingProposalDraft(page);
+    const draftDialog = await openEventProposalDraft(page);
     await draftDialog.getByLabel("Title").fill(title);
     await draftDialog.getByLabel(/Description/i).fill("Single invitee then attendee add.");
     await draftDialog.getByRole("button", { name: /Leia Organa/i }).click();

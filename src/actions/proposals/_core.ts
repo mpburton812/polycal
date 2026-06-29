@@ -346,6 +346,7 @@ async function notifyProposalStakeholders(
     await notifyUser(userId, notificationType, message, {
       proposalId: proposal.id,
       proposalTitle: proposal.title,
+      proposalType: proposal.proposalType,
       ...extra,
     });
   }
@@ -1878,6 +1879,9 @@ export async function createDraftProposalAction(
     bedroomIndex: isBatchSleeping ? null : (parsed.data.bedroomIndex ?? null),
     isBatchSleeping,
     batchEntriesJson: isBatchSleeping ? JSON.stringify(batchEntries) : null,
+    reminderOffsetMinutes:
+      parsed.data.proposalType === "event" ? (parsed.data.reminderOffsetMinutes ?? null) : null,
+    reminderSentAt: null,
     createdAt: now,
     updatedAt: now,
   });
@@ -2046,6 +2050,15 @@ export async function updateDraftProposalAction(
       bedroomIndex: isBatchSleeping ? null : (parsed.data.bedroomIndex ?? proposal.bedroomIndex),
       isBatchSleeping,
       batchEntriesJson: isBatchSleeping ? JSON.stringify(batchEntries) : null,
+      reminderOffsetMinutes:
+        parsed.data.proposalType === "event"
+          ? (parsed.data.reminderOffsetMinutes ?? proposal.reminderOffsetMinutes ?? null)
+          : null,
+      reminderSentAt:
+        parsed.data.proposalType === "event" &&
+        parsed.data.reminderOffsetMinutes !== proposal.reminderOffsetMinutes
+          ? null
+          : proposal.reminderSentAt,
       updatedAt: now,
     })
     .where(eq(proposals.id, proposal.id));
@@ -2331,6 +2344,7 @@ export async function getProposalDetailAction(
       bedroomIndex: proposals.bedroomIndex,
       isBatchSleeping: proposals.isBatchSleeping,
       batchEntriesJson: proposals.batchEntriesJson,
+      reminderOffsetMinutes: proposals.reminderOffsetMinutes,
     })
     .from(proposals)
     .innerJoin(users, eq(proposals.proposerId, users.id))
@@ -2593,6 +2607,8 @@ export async function getProposalDetailAction(
       canAcknowledgeOverlap: hasOverlapWarning,
       optionalPollPending,
       displayState,
+      reminderOffsetMinutes: row.reminderOffsetMinutes ?? null,
+      specialKind: getProposalSpecialKind(row.description) ?? undefined,
     },
   };
 }
