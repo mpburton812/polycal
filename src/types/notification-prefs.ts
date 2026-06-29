@@ -9,9 +9,10 @@ export interface NotificationPrefs {
   quietHoursStart: string | null;
   quietHoursEnd: string | null;
   alertTypes: {
-    proposals: boolean;
-    partnerships: boolean;
-    events: boolean;
+    sleepingProposals: boolean;
+    eventProposals: boolean;
+    sleepingPartnerProposals: boolean;
+    reminders: boolean;
   };
 }
 
@@ -24,17 +25,43 @@ type LegacyStoredChannels = {
   push?: boolean;
 };
 
+/** Legacy alert toggles before PC-65 split. */
+export type LegacyAlertTypes = {
+  proposals?: boolean;
+  partnerships?: boolean;
+  events?: boolean;
+};
+
 export const DEFAULT_NOTIFICATION_PREFS: NotificationPrefs = {
   globalEnabled: true,
   channels: { email: false, sms: false, inApp: true, push: false },
   quietHoursStart: null,
   quietHoursEnd: null,
-  alertTypes: { proposals: true, partnerships: true, events: true },
+  alertTypes: {
+    sleepingProposals: true,
+    eventProposals: true,
+    sleepingPartnerProposals: true,
+    reminders: true,
+  },
 };
 
 /**
+ * Maps legacy proposal/partnership/event toggles to PC-65 alert categories.
+ */
+export function migrateAlertTypes(legacy: LegacyAlertTypes): NotificationPrefs["alertTypes"] {
+  const proposals = legacy.proposals ?? true;
+  const partnerships = legacy.partnerships ?? true;
+  const events = legacy.events ?? true;
+  return {
+    sleepingProposals: proposals,
+    eventProposals: proposals,
+    sleepingPartnerProposals: partnerships,
+    reminders: events,
+  };
+}
+
+/**
  * Maps legacy `device` channel to split inApp/push booleans (PC-58).
- * When only `device` is present, both channels inherit its value.
  */
 export function migrateNotificationChannels(
   channels: LegacyStoredChannels | undefined,
@@ -55,17 +82,42 @@ export function migrateNotificationChannels(
   return { email, sms, inApp: device, push: device };
 }
 
+function normalizeAlertTypes(
+  parsed: Partial<NotificationPrefs> & { alertTypes?: LegacyAlertTypes & NotificationPrefs["alertTypes"] },
+): NotificationPrefs["alertTypes"] {
+  const at = parsed.alertTypes;
+  if (!at) return DEFAULT_NOTIFICATION_PREFS.alertTypes;
+
+  if (
+    "sleepingProposals" in at ||
+    "eventProposals" in at ||
+    "sleepingPartnerProposals" in at ||
+    "reminders" in at
+  ) {
+    return {
+      sleepingProposals: at.sleepingProposals ?? DEFAULT_NOTIFICATION_PREFS.alertTypes.sleepingProposals,
+      eventProposals: at.eventProposals ?? DEFAULT_NOTIFICATION_PREFS.alertTypes.eventProposals,
+      sleepingPartnerProposals:
+        at.sleepingPartnerProposals ?? DEFAULT_NOTIFICATION_PREFS.alertTypes.sleepingPartnerProposals,
+      reminders: at.reminders ?? DEFAULT_NOTIFICATION_PREFS.alertTypes.reminders,
+    };
+  }
+
+  return migrateAlertTypes(at as LegacyAlertTypes);
+}
+
 export function parseNotificationPrefs(json: string | null | undefined): NotificationPrefs {
   if (!json) return DEFAULT_NOTIFICATION_PREFS;
   try {
     const parsed = JSON.parse(json) as Partial<NotificationPrefs> & {
       channels?: LegacyStoredChannels;
+      alertTypes?: LegacyAlertTypes & NotificationPrefs["alertTypes"];
     };
     return {
       ...DEFAULT_NOTIFICATION_PREFS,
       ...parsed,
       channels: migrateNotificationChannels(parsed.channels),
-      alertTypes: { ...DEFAULT_NOTIFICATION_PREFS.alertTypes, ...parsed.alertTypes },
+      alertTypes: normalizeAlertTypes(parsed),
     };
   } catch {
     return DEFAULT_NOTIFICATION_PREFS;

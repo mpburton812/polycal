@@ -194,6 +194,10 @@ export const proposals = sqliteTable("proposals", {
   batchEntriesJson: text("batch_entries_json"),
   winningSlotId: text("winning_slot_id"),
   notes: text("notes"),
+  /** Minutes before event start to notify invitees (PC-65). */
+  reminderOffsetMinutes: integer("reminder_offset_minutes"),
+  /** ISO timestamp when reminder notifications were sent (PC-65). */
+  reminderSentAt: text("reminder_sent_at"),
   createdAt: text("created_at").notNull(),
   updatedAt: text("updated_at").notNull(),
 });

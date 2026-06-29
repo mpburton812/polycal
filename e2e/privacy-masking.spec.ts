@@ -4,7 +4,7 @@ import { loginWithOnboardingIfNeeded, logout } from "./helpers/auth";
 import { USERS } from "./helpers/constants";
 import { fillProposalDateTimeField } from "./helpers/datePickers";
 import { goToProposals, selectProposalTab } from "./helpers/navigation";
-import { openEventOrSleepingProposalDraft, proposalCard, submitProposalDraft } from "./helpers/proposals";
+import { openEventProposalDraft, proposalCard, submitProposalDraft } from "./helpers/proposals";
 
 test.describe("Privacy masking", () => {
   test("admin without private visibility sees masked resolved private event", async ({ page }) => {
@@ -15,7 +15,7 @@ test.describe("Privacy masking", () => {
     await loginWithOnboardingIfNeeded(page, USERS.han.username);
     await goToProposals(page);
 
-    const dialog = await openEventOrSleepingProposalDraft(page);
+    const dialog = await openEventProposalDraft(page);
     await dialog.getByLabel("Title").fill(title);
     await dialog.getByLabel("Privacy").click();
     await page.getByRole("option", { name: "Private", exact: true }).click();

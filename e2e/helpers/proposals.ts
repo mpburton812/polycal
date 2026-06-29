@@ -23,15 +23,31 @@ export async function openNewProposalFabMenu(page: Page): Promise<void> {
   await page.getByRole("button", { name: "New proposal" }).click();
 }
 
-/** Opens the event/sleeping draft dialog from the FAB menu. */
-export async function openEventOrSleepingProposalDraft(page: Page): Promise<Locator> {
+/** Opens the event proposal draft dialog from the FAB menu. */
+export async function openEventProposalDraft(page: Page): Promise<Locator> {
   await openNewProposalFabMenu(page);
-  await page.getByRole("menuitem", { name: "Event or sleeping proposal" }).click();
+  await page.getByRole("menuitem", { name: "Event proposal" }).click();
   const dialog = page.getByRole("dialog");
   await expect(dialog.getByRole("heading", { name: "New proposal" })).toBeVisible({
     timeout: 15_000,
   });
   return dialog;
+}
+
+/** Opens the sleeping proposal draft dialog from the FAB menu. */
+export async function openSleepingProposalDraft(page: Page): Promise<Locator> {
+  await openNewProposalFabMenu(page);
+  await page.getByRole("menuitem", { name: "Sleeping proposal" }).click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog.getByRole("heading", { name: "New proposal" })).toBeVisible({
+    timeout: 15_000,
+  });
+  return dialog;
+}
+
+/** @deprecated Use openEventProposalDraft or openSleepingProposalDraft */
+export async function openEventOrSleepingProposalDraft(page: Page): Promise<Locator> {
+  return openEventProposalDraft(page);
 }
 
 /** Opens the sleeping partner proposal dialog from the FAB menu. */
@@ -200,8 +216,7 @@ export async function createAndSubmitSoloSleepingWeek(
   },
 ): Promise<number> {
   const nightDates = inclusiveNightDates(options.rangeStart, options.rangeEnd);
-  const dialog = await openEventOrSleepingProposalDraft(page);
-  await selectProposalType(page, dialog, "Sleeping");
+  const dialog = await openSleepingProposalDraft(page);
   await dialog
     .getByRole("checkbox", { name: "Batch (multiple nights in one proposal)" })
     .check();
@@ -287,8 +302,7 @@ export async function createAndSubmitBatchSleepingWithInvitee(
     comment?: string;
   },
 ): Promise<void> {
-  const dialog = await openEventOrSleepingProposalDraft(page);
-  await selectProposalType(page, dialog, "Sleeping");
+  const dialog = await openSleepingProposalDraft(page);
   await dialog.getByRole("checkbox", { name: /Batch/i }).check();
   await dialog.getByLabel("Title").fill(options.title);
   await fillProposalDateField(dialog.getByLabel("Night of").first(), options.nightDate);

@@ -73,6 +73,7 @@ export function ScheduleClient({
   const router = useRouter();
   const pathname = usePathname();
   const previousPathRef = useRef<string | null>(null);
+  const initialPayloadHydratedRef = useRef(false);
   const [viewState, setViewState] = useState<ScheduleViewState>(() => ({
     ...loadScheduleViewState(),
     weekStartIso: initialWeekStartIso,
@@ -151,7 +152,10 @@ export function ScheduleClient({
   }, [viewState]);
 
   useEffect(() => {
-    setPayload(initialPayload);
+    if (!initialPayloadHydratedRef.current) {
+      setPayload(initialPayload);
+      initialPayloadHydratedRef.current = true;
+    }
   }, [initialPayload]);
 
   /**
@@ -454,7 +458,6 @@ export function ScheduleClient({
         onClose={() => {
           setDetailOpen(false);
           setSelectedProposalId(null);
-          router.refresh();
           refreshSchedule(isMonthLayout ? monthAnchor : weekStart);
         }}
         onEdit={handleEditFromDetail}
@@ -466,7 +469,6 @@ export function ScheduleClient({
         onClose={() => {
           setDraftOpen(false);
           setEditDetail(null);
-          router.refresh();
           refreshSchedule(isMonthLayout ? monthAnchor : weekStart);
         }}
         people={people}

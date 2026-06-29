@@ -22,6 +22,8 @@ export async function applyProposalsMigrations(sql: Client): Promise<void> {
   await ensureColumn(sql, "proposals", "bedroom_index", "INTEGER");
   await ensureColumn(sql, "proposals", "location_text", "TEXT");
   await ensureColumn(sql, "proposals", "pending_recovery_until", "TEXT");
+  await ensureColumn(sql, "proposals", "reminder_offset_minutes", "INTEGER");
+  await ensureColumn(sql, "proposals", "reminder_sent_at", "TEXT");
   await ensureColumn(sql, "poly_group", "recovery_max_hours", "INTEGER NOT NULL DEFAULT 48");
 
   await sql.execute(`

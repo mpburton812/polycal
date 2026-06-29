@@ -18,7 +18,7 @@ interface ScheduleEventBlockProps {
 function formatStakeholders(event: ScheduleEvent): string | null {
   if (event.isContentMasked) return "Private";
   if (event.intentionalSolo) {
-    return event.proposalType === "sleeping" ? event.proposerName : "Solo";
+    return event.proposerName;
   }
   if (event.participantNames.length === 0) return null;
   return event.participantNames.join(", ");

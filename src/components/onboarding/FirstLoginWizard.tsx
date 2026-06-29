@@ -346,7 +346,14 @@ export function FirstLoginWizard({
           </FormGroup>
           <Typography variant="subtitle2">Alert types</Typography>
           <FormGroup>
-            {(["proposals", "partnerships", "events"] as const).map((key) => (
+            {(
+              [
+                ["sleepingProposals", "Sleeping proposals"],
+                ["eventProposals", "Event proposals"],
+                ["sleepingPartnerProposals", "Sleeping partner proposals"],
+                ["reminders", "Reminders"],
+              ] as const
+            ).map(([key, label]) => (
               <FormControlLabel
                 key={key}
                 control={
@@ -360,7 +367,7 @@ export function FirstLoginWizard({
                     }
                   />
                 }
-                label={key.charAt(0).toUpperCase() + key.slice(1)}
+                label={label}
               />
             ))}
           </FormGroup>

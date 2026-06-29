@@ -15,9 +15,10 @@ test.describe("Profile settings", () => {
     await expect(page.getByLabel("Start")).toBeVisible();
     await expect(page.getByLabel("End")).toBeVisible();
     await expect(page.getByText("Alert types")).toBeVisible();
-    await expect(page.getByRole("checkbox", { name: "Proposals" })).toBeVisible();
-    await expect(page.getByRole("checkbox", { name: "Partnerships" })).toBeVisible();
-    await expect(page.getByRole("checkbox", { name: "Events" })).toBeVisible();
+    await expect(page.getByRole("checkbox", { name: "Sleeping proposals" })).toBeVisible();
+    await expect(page.getByRole("checkbox", { name: "Event proposals" })).toBeVisible();
+    await expect(page.getByRole("checkbox", { name: "Sleeping partner proposals" })).toBeVisible();
+    await expect(page.getByRole("checkbox", { name: "Reminders" })).toBeVisible();
   });
 
   test("saves notification preferences", async ({ page }) => {
@@ -49,6 +50,10 @@ test.describe("Profile settings", () => {
         "base64",
       ),
     });
+    const cropDialog = page.getByRole("dialog", { name: /adjust avatar/i });
+    await expect(cropDialog).toBeVisible({ timeout: 10_000 });
+    await cropDialog.getByRole("button", { name: "Use photo" }).click();
+    await expect(cropDialog).toBeHidden({ timeout: 15_000 });
     await expect(page.getByText(/Could not save avatar/i)).not.toBeVisible({ timeout: 15_000 });
     await expect(page.getByText("Custom avatar selected")).toBeVisible({ timeout: 15_000 });
   });
