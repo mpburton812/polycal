@@ -120,3 +120,4 @@
 2026-06-29 | aaa32cd | PC-69 | backlog week 3 — batch partners + group rename E2E journeys | app/api/e2e/reset/route.ts
 2026-06-29 | 6ebf517 | PC-70 | backlog week 4 — event reminder and alert prefs E2E journeys | src/types/notification-prefs.test.ts
 2026-06-29 | a64aa81 | PC-71 | backlog week 5 — CI sharding, JSON audit, schema verify, _core split | src/actions/proposals.ts
+2026-06-29 | 36d8bf7 | PC-71 | close JSON audit gaps, schema v13 checks, 4-shard CI | src/actions/admin.ts
