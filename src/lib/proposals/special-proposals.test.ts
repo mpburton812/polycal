@@ -5,6 +5,7 @@ import {
   isNonScheduleProposal,
   parseGroupNameProposalMeta,
   parseResidencyProposalMeta,
+  proposalDescriptionForDisplay,
   serializeResidencyProposalMeta,
 } from "@/lib/proposals/special-proposals";
 
@@ -41,5 +42,23 @@ describe("special-proposals metadata", () => {
     expect(parseResidencyProposalMeta("plain text")).toBeNull();
     expect(getProposalSpecialKind(null)).toBeNull();
     expect(isNonScheduleProposal(null)).toBe(false);
+  });
+
+  it("formats group rename and hides residency JSON for display", () => {
+    const residencyJson = serializeResidencyProposalMeta({
+      residencyProposal: true,
+      targetUserId: "user-1",
+    });
+    expect(proposalDescriptionForDisplay(residencyJson)).toBeNull();
+    expect(
+      proposalDescriptionForDisplay(
+        JSON.stringify({
+          groupNameProposal: true,
+          proposedName: "New Name",
+          previousName: "Old Name",
+        }),
+      ),
+    ).toBe('Rename to "New Name" (from "Old Name")');
+    expect(proposalDescriptionForDisplay("A regular note")).toBe("A regular note");
   });
 });
