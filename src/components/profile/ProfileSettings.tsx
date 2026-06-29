@@ -46,9 +46,9 @@ import { subscribeToWebPush } from "@/lib/push-client";
 import { AvatarCropDialog } from "@/components/profile/AvatarCropDialog";
 
 const ALERT_TYPE_LABELS: Record<keyof NotificationPrefs["alertTypes"], string> = {
-  sleepingProposals: "Sleeping Proposals",
-  eventProposals: "Event Proposals",
-  sleepingPartnerProposals: "Sleeping Partner Proposals",
+  sleepingProposals: "Sleeping proposals",
+  eventProposals: "Event proposals",
+  sleepingPartnerProposals: "Sleeping partner proposals",
   reminders: "Reminders",
 };
 
@@ -101,11 +101,11 @@ export function ProfileSettings({
   const [notifPending, startNotifTransition] = useTransition();
   const [avatarUploadPending, startAvatarUploadTransition] = useTransition();
   const [avatarUploadError, setAvatarUploadError] = useState<string | null>(null);
-  const [avatarCropFile, setAvatarCropFile] = useState<File | null>(null);
-  const [avatarCropOpen, setAvatarCropOpen] = useState(false);
   const [pushMessage, setPushMessage] = useState<string | null>(null);
   const [pushError, setPushError] = useState<string | null>(null);
   const [pushPending, startPushTransition] = useTransition();
+  const [cropFile, setCropFile] = useState<File | null>(null);
+  const [cropOpen, setCropOpen] = useState(false);
 
   const customAvatarSrc = isCustomAvatarKey(avatarKey) ? avatarSrcForKey(avatarKey) : undefined;
 
@@ -183,14 +183,12 @@ export function ProfileSettings({
     const file = event.target.files?.[0];
     if (!file) return;
     setAvatarUploadError(null);
-    setAvatarCropFile(file);
-    setAvatarCropOpen(true);
+    setCropFile(file);
+    setCropOpen(true);
     event.target.value = "";
   }
 
   function uploadCroppedAvatar(file: File) {
-    setAvatarCropOpen(false);
-    setAvatarCropFile(null);
     const formData = new FormData();
     formData.set("avatar", file);
     startAvatarUploadTransition(async () => {
@@ -591,7 +589,10 @@ export function ProfileSettings({
                     onChange={(e) =>
                       setNotificationPrefs({
                         ...notificationPrefs,
-                        alertTypes: { ...notificationPrefs.alertTypes, [key]: e.target.checked },
+                        alertTypes: {
+                          ...notificationPrefs.alertTypes,
+                          [key]: e.target.checked,
+                        },
                       })
                     }
                   />
@@ -620,13 +621,17 @@ export function ProfileSettings({
       </Paper>
 
       <AvatarCropDialog
-        open={avatarCropOpen}
-        file={avatarCropFile}
+        open={cropOpen}
+        file={cropFile}
         onClose={() => {
-          setAvatarCropOpen(false);
-          setAvatarCropFile(null);
+          setCropOpen(false);
+          setCropFile(null);
         }}
-        onConfirm={uploadCroppedAvatar}
+        onConfirm={(croppedFile) => {
+          setCropOpen(false);
+          setCropFile(null);
+          uploadCroppedAvatar(croppedFile);
+        }}
       />
     </Stack>
   );

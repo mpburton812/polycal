@@ -3,7 +3,7 @@ import { expect, test } from "./helpers/test";
 import { login } from "./helpers/auth";
 import { DEMO, USERS } from "./helpers/constants";
 import { goToProposals, selectProposalTab } from "./helpers/navigation";
-import { openEventProposalDraft } from "./helpers/proposals";
+import { openEventOrSleepingProposalDraft } from "./helpers/proposals";
 
 function proposalCard(page: import("@playwright/test").Page, title: string) {
   return page.locator(".MuiCard-root").filter({
@@ -46,7 +46,7 @@ test.describe("Proposals board", () => {
   });
 
   test("FAB opens new proposal draft dialog", async ({ page }) => {
-    const dialog = await openEventProposalDraft(page);
+    const dialog = await openEventOrSleepingProposalDraft(page);
     await expect(dialog.getByRole("heading", { name: "New proposal" })).toBeVisible();
     await expect(dialog.getByText("EVENT PROPOSAL")).toBeVisible();
     await expect(dialog.getByLabel("Title")).toBeVisible();

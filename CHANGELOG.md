@@ -8,6 +8,14 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- PC-65: Split FAB entries for event vs sleeping proposals; variable event reminders (schema, draft UI, cron sender); four alert-type notification prefs with legacy migration; avatar crop before upload; solo calendar labels show proposer name.
+
+### Fixed
+
+- PC-65: Calendar week anchor preserved when closing event detail; residency proposal metadata safe-parse on cleanup; block standard draft editor from corrupting special-proposal JSON.
+
+### Added
+
 - PC-53: Pending-recovery TTL when resolved proposals lose all required invitees; admin-configurable recovery hours.
 - PC-53: Schedule network busyness heatmap (privacy-masked) and sticky week/filter toolbar.
 - PC-53: Resend email delivery for notifications and profile email verification when `RESEND_API_KEY` is set.

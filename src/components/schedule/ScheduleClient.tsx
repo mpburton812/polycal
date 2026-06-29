@@ -73,7 +73,7 @@ export function ScheduleClient({
   const router = useRouter();
   const pathname = usePathname();
   const previousPathRef = useRef<string | null>(null);
-  const skipInitialPayloadSyncRef = useRef(false);
+  const initialPayloadHydratedRef = useRef(false);
   const [viewState, setViewState] = useState<ScheduleViewState>(() => ({
     ...loadScheduleViewState(),
     weekStartIso: initialWeekStartIso,
@@ -152,12 +152,10 @@ export function ScheduleClient({
   }, [viewState]);
 
   useEffect(() => {
-    // Server refresh after dialog close must not overwrite client-fetched week range (PC-65).
-    if (skipInitialPayloadSyncRef.current) {
-      skipInitialPayloadSyncRef.current = false;
-      return;
+    if (!initialPayloadHydratedRef.current) {
+      setPayload(initialPayload);
+      initialPayloadHydratedRef.current = true;
     }
-    setPayload(initialPayload);
   }, [initialPayload]);
 
   /**
@@ -460,7 +458,6 @@ export function ScheduleClient({
         onClose={() => {
           setDetailOpen(false);
           setSelectedProposalId(null);
-          skipInitialPayloadSyncRef.current = true;
           refreshSchedule(isMonthLayout ? monthAnchor : weekStart);
         }}
         onEdit={handleEditFromDetail}
@@ -472,7 +469,6 @@ export function ScheduleClient({
         onClose={() => {
           setDraftOpen(false);
           setEditDetail(null);
-          skipInitialPayloadSyncRef.current = true;
           refreshSchedule(isMonthLayout ? monthAnchor : weekStart);
         }}
         people={people}

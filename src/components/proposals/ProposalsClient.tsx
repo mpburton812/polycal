@@ -74,7 +74,7 @@ export function ProposalsClient({
   const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState<TabKey>("draft");
   const [createOpen, setCreateOpen] = useState(false);
-  const [draftProposalType, setDraftProposalType] = useState<"event" | "sleeping">("event");
+  const [createProposalType, setCreateProposalType] = useState<"event" | "sleeping">("event");
   const [partnerCreateOpen, setPartnerCreateOpen] = useState(false);
   const [residencyCreateOpen, setResidencyCreateOpen] = useState(false);
   const [fabMenuAnchor, setFabMenuAnchor] = useState<null | HTMLElement>(null);
@@ -235,7 +235,7 @@ export function ProposalsClient({
           onClick={() => {
             setFabMenuAnchor(null);
             setEditDetail(null);
-            setDraftProposalType("event");
+            setCreateProposalType("event");
             setCreateOpen(true);
           }}
         >
@@ -245,7 +245,7 @@ export function ProposalsClient({
           onClick={() => {
             setFabMenuAnchor(null);
             setEditDetail(null);
-            setDraftProposalType("sleeping");
+            setCreateProposalType("sleeping");
             setCreateOpen(true);
           }}
         >
@@ -276,7 +276,7 @@ export function ProposalsClient({
         places={places}
         currentUserId={currentUserId}
         initialDetail={editDetail}
-        defaultProposalType={draftProposalType}
+        lockedProposalType={editDetail ? undefined : createProposalType}
       />
       <SleepingPartnerCreateDialog
         open={partnerCreateOpen}

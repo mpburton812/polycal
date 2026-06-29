@@ -348,9 +348,9 @@ export function FirstLoginWizard({
           <FormGroup>
             {(
               [
-                ["sleepingProposals", "Sleeping Proposals"],
-                ["eventProposals", "Event Proposals"],
-                ["sleepingPartnerProposals", "Sleeping Partner Proposals"],
+                ["sleepingProposals", "Sleeping proposals"],
+                ["eventProposals", "Event proposals"],
+                ["sleepingPartnerProposals", "Sleeping partner proposals"],
                 ["reminders", "Reminders"],
               ] as const
             ).map(([key, label]) => (
