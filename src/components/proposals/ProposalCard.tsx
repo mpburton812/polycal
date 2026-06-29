@@ -122,7 +122,7 @@ export function ProposalCard({
             <Chip size="small" label="Private" variant="outlined" sx={{ mt: 1 }} />
           )}
 
-        {timeLabel && !proposal.isContentMasked && (
+        {timeLabel && !proposal.isContentMasked && proposal.specialKind !== "residency" && proposal.cardKind !== "residency" && (
           <Stack direction="row" spacing={0.5} alignItems="center" sx={{ mt: 1 }}>
             <AccessTimeIcon sx={{ fontSize: 16, color: "text.secondary" }} />
             <Typography variant="body2" color="text.secondary">

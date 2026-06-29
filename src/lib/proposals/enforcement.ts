@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import { and, asc, desc, eq, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNotNull, isNull } from "drizzle-orm";
 
 import { getDb } from "@/lib/db/client";
 import { notifyUser } from "@/lib/notifications";
@@ -382,6 +382,66 @@ export async function runProposalEnforcement(db: Db): Promise<void> {
   await archiveExpiredRecurrenceSeries(db, settings);
   await processRedraftDeadlines(db, settings);
   await autoCancelUnresolvedAtRiskResolved(db);
+  await processEventReminders(db);
+}
+
+/**
+ * Sends one-shot event reminders when scheduled start minus offset has passed (PC-65).
+ */
+async function processEventReminders(db: Db): Promise<void> {
+  const nowMs = Date.now();
+  const rows = await db
+    .select({
+      id: proposals.id,
+      title: proposals.title,
+      proposerId: proposals.proposerId,
+      scheduledStartAt: proposals.scheduledStartAt,
+      reminderOffsetMinutes: proposals.reminderOffsetMinutes,
+    })
+    .from(proposals)
+    .where(
+      and(
+        eq(proposals.proposalType, "event"),
+        inArray(proposals.state, ["proposed", "resolved"]),
+        isNotNull(proposals.reminderOffsetMinutes),
+        isNotNull(proposals.scheduledStartAt),
+        isNull(proposals.reminderSentAt),
+      ),
+    );
+
+  for (const row of rows) {
+    if (!row.scheduledStartAt || !row.reminderOffsetMinutes) continue;
+    const fireAtMs =
+      new Date(row.scheduledStartAt).getTime() - row.reminderOffsetMinutes * 60 * 1000;
+    if (nowMs < fireAtMs) continue;
+
+    const invitees = await db
+      .select({ userId: proposalInvitees.userId })
+      .from(proposalInvitees)
+      .where(eq(proposalInvitees.proposalId, row.id));
+
+    const notifyIds = new Set<string>([row.proposerId, ...invitees.map((inv) => inv.userId)]);
+    const message = `Reminder: "${row.title}" starts soon.`;
+    for (const userId of notifyIds) {
+      await notifyUser(userId, "event_reminder", message, {
+        proposalId: row.id,
+        proposalType: "event",
+        url: "/schedule",
+      });
+    }
+
+    await db
+      .update(proposals)
+      .set({ reminderSentAt: new Date().toISOString(), updatedAt: new Date().toISOString() })
+      .where(eq(proposals.id, row.id));
+
+    await logSystemTransition(
+      db,
+      row.id,
+      "reminder.sent",
+      JSON.stringify({ offsetMinutes: row.reminderOffsetMinutes }),
+    );
+  }
 }
 
 /** Returns true when two ISO intervals overlap (open end uses start as instant). */

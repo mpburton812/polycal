@@ -147,6 +147,9 @@ export interface ProposalDetail {
   optionalPollPending: boolean;
   /** Kanban/detail chip state — may show proposed while DB state is resolved (PC-49). */
   displayState: ProposalState;
+  /** Minutes before event start to send reminder (PC-65). */
+  reminderOffsetMinutes: number | null;
+  specialKind?: "residency" | "group_name";
 }
 
 export interface ProposalCommentView {

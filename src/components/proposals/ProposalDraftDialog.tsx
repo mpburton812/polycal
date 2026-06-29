@@ -69,6 +69,7 @@ import {
   PAST_SCHEDULE_TEXT,
 } from "./proposalCardTheme";
 import { sleepingDateToStartIso } from "@/lib/proposals/sleeping-schedule";
+import { minutesToReminderDisplay, reminderOffsetToMinutes } from "@/lib/proposals/event-reminder";
 import { ProposalScheduleField } from "./ProposalScheduleFields";
 
 type InviteeSelection = "none" | "required" | "optional";
@@ -87,6 +88,8 @@ interface ProposalDraftDialogProps {
   currentUserId: string;
   /** When set, dialog edits an existing draft instead of creating one. */
   initialDetail?: ProposalDetail | null;
+  /** Preset type when opening a new draft from the FAB (PC-65). */
+  defaultProposalType?: "event" | "sleeping";
 }
 
 function toLocalInput(iso: string | null | undefined): string {
@@ -180,6 +183,7 @@ export function ProposalDraftDialog({
   places,
   currentUserId,
   initialDetail,
+  defaultProposalType = "event",
 }: ProposalDraftDialogProps) {
   const router = useRouter();
   const [savedDraftId, setSavedDraftId] = useState<string | null>(null);
@@ -210,6 +214,9 @@ export function ProposalDraftDialog({
     "daily" | "weekly" | "monthly" | "yearly"
   >("weekly");
   const [recurrenceCount, setRecurrenceCount] = useState(4);
+  const [reminderEnabled, setReminderEnabled] = useState(false);
+  const [reminderValue, setReminderValue] = useState(1);
+  const [reminderUnit, setReminderUnit] = useState<"days" | "hours" | "minutes">("hours");
   const [slots, setSlots] = useState<SlotDraft[]>([{ startAt: "", endAt: "", label: "" }]);
   const [inviteeMode, setInviteeMode] = useState<Record<string, InviteeSelection>>({});
   const { showToast } = useToast();
@@ -367,8 +374,12 @@ export function ProposalDraftDialog({
         modes[invitee.userId] = invitee.role;
       }
       setInviteeMode(modes);
+      const reminderDisplay = minutesToReminderDisplay(initialDetail.reminderOffsetMinutes);
+      setReminderEnabled(reminderDisplay.enabled);
+      setReminderValue(reminderDisplay.value);
+      setReminderUnit(reminderDisplay.unit);
     } else {
-      setProposalType("event");
+      setProposalType(defaultProposalType);
       setTitle("");
       setDescription("");
       setNotes("");
@@ -387,8 +398,11 @@ export function ProposalDraftDialog({
       setRecurrenceCount(4);
       setSlots([{ startAt: "", endAt: "", label: "" }]);
       setInviteeMode({});
+      setReminderEnabled(false);
+      setReminderValue(1);
+      setReminderUnit("hours");
     }
-  }, [open, initialDetail]);
+  }, [open, initialDetail, defaultProposalType]);
 
   function handleClose() {
     setSavedDraftId(null);
@@ -438,6 +452,10 @@ export function ProposalDraftDialog({
       modes[invitee.userId] = invitee.role;
     }
     setInviteeMode(modes);
+    const reminderDisplay = minutesToReminderDisplay(detail.reminderOffsetMinutes);
+    setReminderEnabled(reminderDisplay.enabled);
+    setReminderValue(reminderDisplay.value);
+    setReminderUnit(reminderDisplay.unit);
   }
 
   function cycleInvitee(personId: string) {
@@ -507,6 +525,10 @@ export function ProposalDraftDialog({
         batchMode && proposalType === "sleeping"
           ? batchEntries.filter((entry) => entry.nightDate.trim())
           : undefined,
+      reminderOffsetMinutes:
+        proposalType === "event" && !batchMode && !isPoll && reminderEnabled
+          ? reminderOffsetToMinutes(reminderValue, reminderUnit)
+          : null,
     };
   }
 
@@ -1041,6 +1063,50 @@ export function ProposalDraftDialog({
                   </Stack>
                 )}
               </>
+            )}
+            {proposalType === "event" && !batchMode && !isPoll && (
+              <Stack spacing={1} sx={{ mt: 1 }}>
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      checked={reminderEnabled}
+                      onChange={(event) => setReminderEnabled(event.target.checked)}
+                      sx={{ color: POLY_GREEN, "&.Mui-checked": { color: POLY_GREEN } }}
+                    />
+                  }
+                  label="Remind me before this event"
+                />
+                {reminderEnabled && (
+                  <Stack direction="row" spacing={1} alignItems="center">
+                    <TextField
+                      label="Remind"
+                      type="number"
+                      size="small"
+                      value={reminderValue}
+                      onChange={(event) =>
+                        setReminderValue(Math.max(1, Number(event.target.value) || 1))
+                      }
+                      inputProps={{ min: 1, max: 365 }}
+                      sx={{ width: 100 }}
+                    />
+                    <FormControl size="small" sx={{ minWidth: 120 }}>
+                      <InputLabel id="reminder-unit-label">Unit</InputLabel>
+                      <Select
+                        labelId="reminder-unit-label"
+                        label="Unit"
+                        value={reminderUnit}
+                        onChange={(event) =>
+                          setReminderUnit(event.target.value as "days" | "hours" | "minutes")
+                        }
+                      >
+                        <MenuItem value="days">Days before</MenuItem>
+                        <MenuItem value="hours">Hours before</MenuItem>
+                        <MenuItem value="minutes">Minutes before</MenuItem>
+                      </Select>
+                    </FormControl>
+                  </Stack>
+                )}
+              </Stack>
             )}
           </Stack>
 

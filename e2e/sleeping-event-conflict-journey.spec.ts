@@ -5,8 +5,8 @@ import { USERS } from "./helpers/constants";
 import { fillProposalDateField, fillProposalDateTimeField } from "./helpers/datePickers";
 import { goToProposals, selectProposalTab } from "./helpers/navigation";
 import {
-  openEventOrSleepingProposalDraft,
-  selectProposalType,
+  openEventProposalDraft,
+  openSleepingProposalDraft,
   setInviteeRequired,
   submitProposalDraft,
 } from "./helpers/proposals";
@@ -24,15 +24,14 @@ test.describe("Sleeping vs events — no false conflicts", () => {
     await login(page, USERS.luke.username);
     await goToProposals(page);
 
-    const sleepingDialog = await openEventOrSleepingProposalDraft(page);
-    await selectProposalType(page, sleepingDialog, "Sleeping");
+    const sleepingDialog = await openSleepingProposalDraft(page);
     await sleepingDialog.getByRole("checkbox", { name: /Batch/i }).check();
     await sleepingDialog.getByLabel("Title").fill(sleepingTitle);
     await fillProposalDateField(sleepingDialog.getByLabel("Night of").first(), nightDate);
     await sleepingDialog.getByRole("button", { name: "Solo", exact: true }).first().click();
     await submitProposalDraft(page, sleepingDialog);
 
-    const eventDialog = await openEventOrSleepingProposalDraft(page);
+    const eventDialog = await openEventProposalDraft(page);
     await eventDialog.getByLabel("Title").fill(eventTitle);
     await setInviteeRequired(eventDialog, USERS.leia.displayName);
     await fillProposalDateTimeField(eventDialog.getByLabel("Start").first(), eventStart);
