@@ -119,21 +119,21 @@ function alertTypeAllowed(
   notificationType: string,
   metadata?: Record<string, unknown>,
 ): boolean {
-  if (notificationType === "event_reminder" || notificationType.startsWith("event_reminder")) {
+  if (notificationType === "event_reminder") {
     return prefs.alertTypes.reminders;
   }
 
-  const prefix = notificationType.split("_")[0];
-
-  if (prefix === "partnership" && !prefs.alertTypes.sleepingPartnerProposals) return false;
-
-  if (prefix === "proposal") {
-    const proposalType = metadata?.proposalType;
-    if (proposalType === "sleeping") return prefs.alertTypes.sleepingProposals;
-    return prefs.alertTypes.eventProposals;
+  if (notificationType.startsWith("partnership")) {
+    return prefs.alertTypes.sleepingPartnerProposals;
   }
 
-  if (prefix === "event" && !prefs.alertTypes.reminders) return false;
+  if (notificationType.startsWith("proposal")) {
+    const proposalType = metadata?.proposalType;
+    if (proposalType === "sleeping") {
+      return prefs.alertTypes.sleepingProposals;
+    }
+    return prefs.alertTypes.eventProposals;
+  }
 
   return true;
 }

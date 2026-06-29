@@ -45,6 +45,11 @@ export async function openSleepingProposalDraft(page: Page): Promise<Locator> {
   return dialog;
 }
 
+/** @deprecated Use openEventProposalDraft or openSleepingProposalDraft */
+export async function openEventOrSleepingProposalDraft(page: Page): Promise<Locator> {
+  return openEventProposalDraft(page);
+}
+
 /** Opens the sleeping partner proposal dialog from the FAB menu. */
 export async function openSleepingPartnerProposal(page: Page): Promise<Locator> {
   await openNewProposalFabMenu(page);
@@ -143,7 +148,7 @@ export async function createAndSubmitEvent(
     start: string;
   },
 ): Promise<void> {
-  const dialog = await openEventProposalDraft(page);
+  const dialog = await openEventOrSleepingProposalDraft(page);
   await dialog.getByLabel("Title").fill(options.title);
   if (options.description) {
     await dialog.getByLabel(/Description/i).fill(options.description);
@@ -165,7 +170,7 @@ export async function createAndSubmitSoloEvent(
     end: string;
   },
 ): Promise<void> {
-  const dialog = await openEventProposalDraft(page);
+  const dialog = await openEventOrSleepingProposalDraft(page);
   await dialog.getByLabel("Title").fill(options.title);
   await dialog.getByRole("button", { name: "Solo event (just me)" }).click();
   if (options.notes) {
@@ -187,7 +192,7 @@ export async function createAndSubmitRecurringEventForEveryone(
     occurrenceCount?: number;
   },
 ): Promise<void> {
-  const dialog = await openEventProposalDraft(page);
+  const dialog = await openEventOrSleepingProposalDraft(page);
   await dialog.getByLabel("Title").fill(options.title);
   await dialog.getByRole("checkbox", { name: /Recurring series/i }).check();
   await dialog.getByLabel("Occurrences").fill(String(options.occurrenceCount ?? 4));
@@ -262,7 +267,7 @@ export async function createAndSubmitPoll(
     slotLabels?: string[];
   },
 ): Promise<void> {
-  const dialog = await openEventProposalDraft(page);
+  const dialog = await openEventOrSleepingProposalDraft(page);
   await dialog.getByLabel("Title").fill(options.title);
   if (options.description) {
     await dialog.getByLabel(/Description/i).fill(options.description);

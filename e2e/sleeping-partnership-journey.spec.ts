@@ -6,9 +6,10 @@ import { fillProposalDateField } from "./helpers/datePickers";
 import { goToProposals, openProposalCard, selectProposalTab } from "./helpers/navigation";
 import { expectInAppNotification } from "./helpers/notifications";
 import {
-  openEventProposalDraft,
   openSleepingPartnerProposal,
+  openSleepingProposalDraft,
   proposalCard,
+  setInviteeRequired,
   submitProposalDraft,
 } from "./helpers/proposals";
 
@@ -56,22 +57,20 @@ test.describe("Sleeping partnership journey", () => {
     const anakinDialog = page.getByRole("dialog");
     await anakinDialog.getByPlaceholder("Add a comment (optional)…").fill("Yes, delighted!");
     await anakinDialog.getByRole("button", { name: "Accept" }).click();
+    await expect(anakinDialog).toBeHidden({ timeout: 15_000 });
     await logout(page);
 
     // —— Phase 4: Han sees acceptance notification ——
     await loginWithOnboardingIfNeeded(page, USERS.han.username);
-    await expectInAppNotification(page, /accepted your sleeping partnership/i);
+    await expectInAppNotification(page, /accepted your sleeping partnership proposal/i);
 
     // —— Phase 5: Han proposes sleeping event with Anakin at Millennium Falcon ——
     await goToProposals(page);
-    const draft = await openEventProposalDraft(page);
-    await draft.getByLabel("Type").click();
-    await page.getByRole("option", { name: "Sleeping" }).click();
+    const draft = await openSleepingProposalDraft(page);
     await draft.getByLabel("Title").fill(sleepingTitle);
-    await setInviteeRequiredIfNeeded(draft, USERS.anakin.displayName);
+    await setInviteeRequired(draft, USERS.anakin.displayName);
     await draft.getByLabel("Custom location (optional)").fill("Millennium Falcon");
     await fillProposalDateField(draft.getByLabel("Night of").first(), "2099-07-06");
-    await draft.getByRole("button", { name: "Create draft" }).click();
     await submitProposalDraft(page, draft);
     await logout(page);
 
@@ -90,14 +89,3 @@ test.describe("Sleeping partnership journey", () => {
     await expect(proposalCard(page, sleepingTitle)).toBeVisible({ timeout: 25_000 });
   });
 });
-
-async function setInviteeRequiredIfNeeded(
-  dialog: import("@playwright/test").Locator,
-  displayName: string,
-): Promise<void> {
-  const chip = dialog.getByRole("button", { name: new RegExp(displayName, "i") });
-  if (await chip.isVisible().catch(() => false)) {
-    await chip.click();
-    await expect(chip).toHaveText(new RegExp(`${displayName} \\(required\\)`, "i"));
-  }
-}

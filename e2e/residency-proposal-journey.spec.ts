@@ -34,7 +34,7 @@ test.describe("Residency proposal journey", () => {
 
     // —— Phase 3: Luke sees declined draft, deletes it ——
     await login(page, USERS.luke.username);
-    await expectInAppNotification(page, /vote was cast|declined residency/i);
+    await expectInAppNotification(page, /moved back to drafts|vote was cast/i);
     await goToProposals(page);
     await selectProposalTab(page, "Drafts");
     await expect(proposalCard(page, RESIDENCY_TITLE)).toBeVisible({ timeout: 20_000 });

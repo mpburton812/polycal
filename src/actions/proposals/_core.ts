@@ -1002,7 +1002,7 @@ async function enterAtRiskProposedState(
     proposal.proposerId,
     "proposal_at_risk",
     `Proposal "${proposal.title}" is at risk. Cancel, re-draft, or update attendees.`,
-    { proposalId: proposal.id, action: "at_risk_options" },
+    { proposalId: proposal.id, action: "at_risk_options", proposalType: proposal.proposalType },
   );
 
   const invitees = await db
@@ -1016,7 +1016,7 @@ async function enterAtRiskProposedState(
       row.userId,
       "proposal_at_risk",
       `Proposal "${proposal.title}" is tentative/at risk on the calendar until re-approved.`,
-      { proposalId: proposal.id, action: "vote" },
+      { proposalId: proposal.id, action: "vote", proposalType: proposal.proposalType },
     );
   }
 }
@@ -1081,7 +1081,7 @@ async function revertProposalToDraft(
       userId,
       "proposal_reverted_to_draft",
       `Proposal "${proposal.title}" was moved back to drafts.`,
-      { proposalId: proposal.id, reason },
+      { proposalId: proposal.id, reason, proposalType: proposal.proposalType },
     );
   }
 }
@@ -1213,7 +1213,7 @@ async function autoDeclineCollidingProposals(
       other.proposerId,
       "proposal_collision_auto_decline",
       `Proposal "${other.title}" was auto-declined because "${resolved.title}" was scheduled.`,
-      { proposalId: other.id, resolvedProposalId: resolved.id },
+      { proposalId: other.id, resolvedProposalId: resolved.id, proposalType: other.proposalType },
     );
   }
 }
@@ -1330,7 +1330,10 @@ async function resolveProposal(
     } else {
       message = `Proposal "${proposal.title}" was approved and scheduled.`;
     }
-    await notifyUser(userId, "proposal_resolved", message, { proposalId: proposal.id });
+    await notifyUser(userId, "proposal_resolved", message, {
+      proposalId: proposal.id,
+      proposalType: proposal.proposalType,
+    });
   }
 
   if (!isNonScheduleProposal(proposal.description)) {
@@ -1934,6 +1937,10 @@ export async function updateDraftProposalAction(
     return { ok: false, message: "Draft not found." };
   }
 
+  if (isNonScheduleProposal(proposal.description)) {
+    return { ok: false, message: "This draft cannot be edited here." };
+  }
+
   const isBatchSleeping =
     parsed.data.proposalType === "sleeping" &&
     Boolean(parsed.data.isBatchSleeping ?? proposal.isBatchSleeping);
@@ -2285,6 +2292,7 @@ export async function submitProposalAction(
         proposalTitle: proposal.title,
         proposerId: session.user.id,
         state: nextState,
+        proposalType: proposal.proposalType,
       });
     }
   }
@@ -2393,6 +2401,9 @@ export async function getProposalDetailAction(
     row.state,
   );
   const display = applyProposalMask(row, masked);
+  const userFacingDescription = isNonScheduleProposal(row.description)
+    ? null
+    : display.description;
 
   const slotRows = await db
     .select()
@@ -2482,7 +2493,7 @@ export async function getProposalDetailAction(
     detail: {
       id: row.id,
       title: display.title,
-      description: display.description,
+      description: userFacingDescription,
       notes: masked
         ? null
         : isProposer ||
@@ -2718,7 +2729,7 @@ export async function acknowledgeProposalOverlapAction(
     proposal.proposerId,
     "proposal_vote_cast",
     `A vote was changed to decline on "${proposal.title}" after a schedule conflict.`,
-    { proposalId: proposal.id, voterId: session.user.id, vote: "decline" },
+    { proposalId: proposal.id, voterId: session.user.id, vote: "decline", proposalType: proposal.proposalType },
   );
 
   if (invitee.role === "required") {
@@ -2842,6 +2853,7 @@ export async function castProposalVoteAction(
     proposalId: proposal.id,
     voterId: session.user.id,
     vote: parsed.data.vote,
+    proposalType: proposal.proposalType,
   });
 
   if (invitee.role === "required") {
@@ -3054,6 +3066,7 @@ export async function updateResolvedAttendeesAction(
 
     await notifyUser(userId, "proposal_attendee_removed", `You were removed from "${proposal.title}".`, {
       proposalId: proposal.id,
+      proposalType: proposal.proposalType,
     });
   }
 
@@ -3086,6 +3099,7 @@ export async function updateResolvedAttendeesAction(
 
     await notifyUser(userId, "proposal_attendee_added", `You were added to "${proposal.title}".`, {
       proposalId: proposal.id,
+      proposalType: proposal.proposalType,
     });
   }
 
@@ -3113,7 +3127,7 @@ export async function updateResolvedAttendeesAction(
           row.userId,
           "proposal_attendee_update",
           `Attendees changed on "${proposal.title}" — maintain your acceptance or decline.`,
-          { proposalId: proposal.id, action: "attendee_update" },
+          { proposalId: proposal.id, action: "attendee_update", proposalType: proposal.proposalType },
         );
       }
     }
