@@ -15,9 +15,9 @@ test.describe("Profile settings", () => {
     await expect(page.getByLabel("Start")).toBeVisible();
     await expect(page.getByLabel("End")).toBeVisible();
     await expect(page.getByText("Alert types")).toBeVisible();
-    await expect(page.getByRole("checkbox", { name: "Sleeping Proposals" })).toBeVisible();
-    await expect(page.getByRole("checkbox", { name: "Event Proposals" })).toBeVisible();
-    await expect(page.getByRole("checkbox", { name: "Sleeping Partner Proposals" })).toBeVisible();
+    await expect(page.getByRole("checkbox", { name: "Sleeping proposals" })).toBeVisible();
+    await expect(page.getByRole("checkbox", { name: "Event proposals" })).toBeVisible();
+    await expect(page.getByRole("checkbox", { name: "Sleeping partner proposals" })).toBeVisible();
     await expect(page.getByRole("checkbox", { name: "Reminders" })).toBeVisible();
   });
 
@@ -50,8 +50,8 @@ test.describe("Profile settings", () => {
         "base64",
       ),
     });
-    const cropDialog = page.getByRole("dialog", { name: "Adjust avatar" });
-    await expect(cropDialog).toBeVisible({ timeout: 15_000 });
+    const cropDialog = page.getByRole("dialog", { name: /adjust avatar/i });
+    await expect(cropDialog).toBeVisible({ timeout: 10_000 });
     await cropDialog.getByRole("button", { name: "Use photo" }).click();
     await expect(cropDialog).toBeHidden({ timeout: 15_000 });
     await expect(page.getByText(/Could not save avatar/i)).not.toBeVisible({ timeout: 15_000 });

@@ -19,7 +19,10 @@ import {
   users,
 } from "@/lib/db/schema";
 import { notifyUser } from "@/lib/notifications";
-import { serializeResidencyProposalMeta } from "@/lib/proposals/special-proposals";
+import {
+  parseResidencyProposalMeta,
+  serializeResidencyProposalMeta,
+} from "@/lib/proposals/special-proposals";
 import type { UserRole } from "@/types/user";
 
 const residencyDraftSchema = z.object({
@@ -189,12 +192,8 @@ export async function applyResidencyProposalResolution(
 ): Promise<void> {
   if (!proposal.description || !proposal.locationId) return;
 
-  const meta = JSON.parse(proposal.description) as {
-    residencyProposal?: boolean;
-    targetUserId?: string;
-    locationResidentsId?: string;
-  };
-  if (!meta.residencyProposal || !meta.targetUserId) return;
+  const meta = parseResidencyProposalMeta(proposal.description);
+  if (!meta) return;
 
   const now = new Date().toISOString();
   let residencyId = meta.locationResidentsId;
@@ -296,12 +295,8 @@ export async function syncResidencyRowOnSubmit(
 ): Promise<void> {
   if (!proposal.description || !proposal.locationId) return;
 
-  const meta = JSON.parse(proposal.description) as {
-    residencyProposal?: boolean;
-    targetUserId?: string;
-    locationResidentsId?: string;
-  };
-  if (!meta.residencyProposal || !meta.targetUserId) return;
+  const meta = parseResidencyProposalMeta(proposal.description);
+  if (!meta) return;
 
   const now = new Date().toISOString();
   let residencyId = meta.locationResidentsId;
@@ -366,11 +361,8 @@ export async function cleanupResidencyProposalLinkage(
 ): Promise<void> {
   if (!proposal.description) return;
 
-  const meta = JSON.parse(proposal.description) as {
-    residencyProposal?: boolean;
-    locationResidentsId?: string;
-  };
-  if (!meta.residencyProposal || !meta.locationResidentsId) return;
+  const meta = parseResidencyProposalMeta(proposal.description);
+  if (!meta?.locationResidentsId) return;
 
   if (removeProposedRow) {
     await db
