@@ -6,8 +6,9 @@ Wall-clock reference for Playwright-heavy promotion steps. Shard times are per-m
 
 | Step | Reference (prior runs) | This run (PC-72) |
 |------|------------------------|------------------|
-| feature → dev CI, 4 E2E shards (PR #120) | ~4–13 min / shard | TBD |
-| dev → test CI, 4 E2E shards (PR #121) | ~4–7 min / shard | TBD |
+| feature → dev CI, 4 E2E shards (PR #120) | ~4–13 min / shard | — |
+| feature → dev CI, 4 E2E shards (PR #123, PC-72) | — | 4m20s–8m45s / shard (run 28445588442) |
+| dev → test CI, 4 E2E shards (PR #121) | ~4–7 min / shard | TBD (PR #124) |
 | test → prod full E2E (PR #122, pre-shard) | ~19 min single job | TBD (4 shards in `production.yml`) |
 | dev → test pre-shard (PR #117 / #119) | ~23–25 min single job | — |
 | Local full E2E serial (`npm run test:e2e`) | ~24 min | TBD |
