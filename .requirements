@@ -123,3 +123,4 @@
 2026-06-29 | 36d8bf7 | PC-71 | close JSON audit gaps, schema v13 checks, 4-shard CI | src/actions/admin.ts
 2026-06-30 | 19efe1b | PC-72 | CI sharding, audit tail, journeys, and parallel docs | src/actions/places.ts
 2026-06-30 | 9937746 | PC-72 | record PR #124 dev-to-test CI shard timings | docs/PROMOTION-TIMINGS.md
+2026-06-30 | 032538b | PC-62 | sleeping calendar UX epic - | src/actions/admin.ts
