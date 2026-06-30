@@ -80,6 +80,7 @@ export const polyGroup = sqliteTable("poly_group", {
   hideSleepingArrangements: integer("hide_sleeping_arrangements", { mode: "boolean" })
     .notNull()
     .default(false),
+  placesMapVisibility: text("places_map_visibility").notNull().default("none"),
   logTailLength: integer("log_tail_length").notNull().default(100),
   onboardingWelcomeMessage: text("onboarding_welcome_message"),
   /** Hours in proposed before auto-expire; 0 = expire only when event start passes (PC-46). */

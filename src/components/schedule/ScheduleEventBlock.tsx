@@ -4,8 +4,8 @@ import BedIcon from "@mui/icons-material/Bed";
 import { Box, Typography } from "@mui/material";
 
 import type { ScheduleEvent } from "@/actions/schedule";
-import { formatEventTime } from "@/lib/schedule/dates";
 import { scheduleBlockSx, scheduleBlockVariant } from "@/lib/schedule/colors";
+import { formatEventTime } from "@/lib/schedule/dates";
 
 interface ScheduleEventBlockProps {
   event: ScheduleEvent;
@@ -34,7 +34,7 @@ function formatStatusLabel(event: ScheduleEvent): string {
 }
 
 /**
- * Clickable calendar block: title, location, status on line one; date and attendees on line two (PC-56).
+ * Clickable calendar block: sleeping uses PC-66 title lines; events use title/location/status (PC-56).
  */
 export function ScheduleEventBlock({
   event,
@@ -53,19 +53,32 @@ export function ScheduleEventBlock({
   const stakeholders = formatStakeholders(event);
   const timeLabel = formatEventTime(event.startAt, event.endAt, event.proposalType, timeZone);
   const statusLabel = formatStatusLabel(event);
-
-  const lineOneParts = [event.title];
-  if (!event.isContentMasked && event.locationName) {
-    lineOneParts.push(event.locationName);
-  }
-  lineOneParts.push(statusLabel);
-  const lineOne = lineOneParts.join(", ");
-
-  const lineTwoParts: string[] = [];
-  if (timeLabel) lineTwoParts.push(timeLabel);
-  if (stakeholders) lineTwoParts.push(stakeholders);
-  const lineTwo = lineTwoParts.join(", ");
   const isSleeping = event.proposalType === "sleeping";
+  const sleepingLines =
+    isSleeping && !event.isContentMasked ? event.title.split("\n") : null;
+
+  let lineOne: string;
+  let lineTwo: string;
+
+  if (sleepingLines) {
+    lineOne = sleepingLines[0] ?? event.title;
+    const lineTwoParts: string[] = [];
+    if (sleepingLines[1]) lineTwoParts.push(sleepingLines[1]);
+    if (timeLabel) lineTwoParts.push(timeLabel);
+    lineTwo = lineTwoParts.join(", ");
+  } else {
+    const lineOneParts = [event.title];
+    if (!event.isContentMasked && event.locationName) {
+      lineOneParts.push(event.locationName);
+    }
+    lineOneParts.push(statusLabel);
+    lineOne = lineOneParts.join(", ");
+
+    const lineTwoParts: string[] = [];
+    if (timeLabel) lineTwoParts.push(timeLabel);
+    if (stakeholders) lineTwoParts.push(stakeholders);
+    lineTwo = lineTwoParts.join(", ");
+  }
 
   return (
     <Box

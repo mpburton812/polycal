@@ -32,10 +32,14 @@ import {
 } from "@/actions/users";
 import {
   listPartnershipsForUserAction,
+  listSleepingPartnershipMapEdgesAction,
   removePartnershipAction,
   respondPartnershipAction,
   type PartnershipView,
+  type SleepingPartnershipMapEdge,
 } from "@/actions/partnerships";
+import type { PlacesMapVisibility } from "@/types/poly-group";
+import { SleepingMapView } from "@/components/people-places/SleepingMapView";
 import {
   createPlaceAction,
   deletePlaceAction,
@@ -56,6 +60,8 @@ interface PeoplePlacesClientProps {
   currentUserId: string;
   canProvision: boolean;
   isAdmin: boolean;
+  placesMapVisibility: PlacesMapVisibility;
+  mapEdges: SleepingPartnershipMapEdge[];
 }
 
 function PersonAvatar({ avatarKey, name }: { avatarKey: string | null; name: string }) {
@@ -913,9 +919,13 @@ export function PeoplePlacesClient({
   currentUserId,
   canProvision,
   isAdmin,
+  placesMapVisibility,
+  mapEdges,
 }: PeoplePlacesClientProps) {
   const router = useRouter();
   const [tab, setTab] = useState(0);
+  const showMapTab =
+    placesMapVisibility === "all" || (placesMapVisibility === "admins" && isAdmin);
   const [createOpen, setCreateOpen] = useState(false);
   const [createPlaceOpen, setCreatePlaceOpen] = useState(false);
   const [selectedPersonId, setSelectedPersonId] = useState<string | null>(null);
@@ -929,6 +939,7 @@ export function PeoplePlacesClient({
         <Tabs value={tab} onChange={(_, value) => setTab(value)}>
           <Tab label="People" />
           <Tab label="Places" />
+          {showMapTab && <Tab label="MAP" />}
         </Tabs>
         {canProvision && tab === 0 && (
           <Button variant="contained" onClick={() => setCreateOpen(true)}>
@@ -1031,6 +1042,15 @@ export function PeoplePlacesClient({
             </AdminCollapsibleSection>
           ))}
         </Stack>
+      )}
+
+      {showMapTab && tab === 2 && (
+        <Box>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            Accepted sleeping partnerships in your network.
+          </Typography>
+          <SleepingMapView edges={mapEdges} />
+        </Box>
       )}
 
       <CreateUserDialog

@@ -2,6 +2,8 @@ import { Typography } from "@mui/material";
 import { redirect } from "next/navigation";
 
 import { listPlacesAction } from "@/actions/places";
+import { listSleepingPartnershipMapEdgesAction } from "@/actions/partnerships";
+import { getPlacesMapVisibilityAction } from "@/actions/poly-group";
 import { listPeopleAction, getProvisioningPolicyAction } from "@/actions/users";
 import { PeoplePlacesClient } from "@/components/people-places/PeoplePlacesClient";
 import { auth } from "@/lib/auth";
@@ -13,11 +15,14 @@ export default async function PeoplePlacesPage() {
     redirect("/login");
   }
 
-  const [people, places, policy, hasAdminAccess] = await Promise.all([
+  const [people, places, policy, hasAdminAccess, placesMapVisibility, mapEdges] =
+    await Promise.all([
     listPeopleAction(),
     listPlacesAction(),
     getProvisioningPolicyAction(),
     userHasAdminAccess(session.user.role),
+    getPlacesMapVisibilityAction(),
+    listSleepingPartnershipMapEdgesAction(),
   ]);
 
   return (
@@ -34,6 +39,8 @@ export default async function PeoplePlacesPage() {
         currentUserId={session.user.id}
         canProvision={policy.canProvision}
         isAdmin={hasAdminAccess}
+        placesMapVisibility={placesMapVisibility}
+        mapEdges={mapEdges}
       />
     </>
   );

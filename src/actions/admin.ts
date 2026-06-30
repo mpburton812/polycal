@@ -96,10 +96,20 @@ export async function adminImpersonateUserAction(userId: string): Promise<AdminA
   }
 
   await ensureDbReady();
+  const db = getDb();
+  const [target] = await db
+    .select({ displayName: users.displayName })
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
+
   await logUserActivity(
     session.user.id,
     "admin.impersonate",
-    JSON.stringify({ targetUserId: userId }),
+    JSON.stringify({
+      targetUserId: userId,
+      targetDisplayName: target?.displayName ?? null,
+    }),
     "system",
   );
 

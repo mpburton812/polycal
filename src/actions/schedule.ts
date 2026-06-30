@@ -20,6 +20,8 @@ import {
   type ProposalType,
 } from "@/lib/db/schema";
 import { eventInRange, intervalsOverlap } from "@/lib/schedule/dates";
+import { parseBatchSlotMeta } from "@/lib/proposals/batch-sleeping";
+import { formatSleepingDisplayTitle } from "@/lib/proposals/sleeping-display";
 import {
   getPrivacyAdminFlags,
   MASKED_TITLE,
@@ -273,6 +275,9 @@ export async function listScheduleEventsAction(
     slotsByProposal.set(slot.proposalId, list);
   }
 
+  const locationRows = await db.select({ id: locations.id, name: locations.name }).from(locations);
+  const locationNameById = new Map(locationRows.map((row) => [row.id, row.name]));
+
   const events: ScheduleEvent[] = [];
   const planningItems: SchedulePlanningItem[] = [];
 
@@ -294,26 +299,6 @@ export async function listScheduleEventsAction(
       }
     }
 
-    if (row.state === "proposed") {
-      planningItems.push({
-        id: row.id,
-        title: row.title,
-        state: row.state,
-        proposalType: row.proposalType,
-        scheduledStartAt: row.scheduledStartAt,
-      });
-    }
-
-    if (row.state === "resolved") {
-      planningItems.push({
-        id: row.id,
-        title: row.title,
-        state: row.state,
-        proposalType: row.proposalType,
-        scheduledStartAt: row.scheduledStartAt,
-      });
-    }
-
     const privacyMasked = shouldMaskScheduleProposalContent(
       viewerId,
       isAdmin,
@@ -333,6 +318,48 @@ export async function listScheduleEventsAction(
         partnerIds,
       );
     const isContentMasked = privacyMasked || sleepingMasked;
+
+    if (row.state === "proposed") {
+      const proposedTitle =
+        row.proposalType === "sleeping" && !privacyMasked && !sleepingMasked
+          ? formatSleepingDisplayTitle({
+              proposerName: row.proposerName,
+              inviteeNames: invitees.map((invitee) => invitee.displayName),
+              intentionalSolo: row.intentionalSolo,
+              locationName: row.locationName ?? row.locationText ?? null,
+              state: "proposed",
+              atRisk: row.atRisk,
+            })
+          : row.title;
+      planningItems.push({
+        id: row.id,
+        title: proposedTitle,
+        state: row.state,
+        proposalType: row.proposalType,
+        scheduledStartAt: row.scheduledStartAt,
+      });
+    }
+
+    if (row.state === "resolved") {
+      const resolvedTitle =
+        row.proposalType === "sleeping" && !privacyMasked && !sleepingMasked
+          ? formatSleepingDisplayTitle({
+              proposerName: row.proposerName,
+              inviteeNames: invitees.map((invitee) => invitee.displayName),
+              intentionalSolo: row.intentionalSolo,
+              locationName: row.locationName ?? row.locationText ?? null,
+              state: "resolved",
+              atRisk: row.atRisk,
+            })
+          : row.title;
+      planningItems.push({
+        id: row.id,
+        title: resolvedTitle,
+        state: row.state,
+        proposalType: row.proposalType,
+        scheduledStartAt: row.scheduledStartAt,
+      });
+    }
 
     const windows: { startAt: string; endAt: string | null; slotLabel: string | null; key: string }[] =
       [];
@@ -384,20 +411,63 @@ export async function listScheduleEventsAction(
         ? HIDDEN_SLEEPING_TITLE
         : MASKED_TITLE;
 
+      let windowParticipantIds = participantIds;
+      let windowParticipantNames = participantNames;
+      let windowLocationName = row.locationName ?? row.locationText ?? null;
+      let windowIntentionalSolo = row.intentionalSolo;
+      let windowTitle = row.title;
+
+      if (row.proposalType === "sleeping" && !isContentMasked) {
+        if (row.isBatchSleeping && window.slotLabel) {
+          const meta = parseBatchSlotMeta(window.slotLabel);
+          if (meta) {
+            windowIntentionalSolo = meta.intentionalSolo ?? row.intentionalSolo;
+            if (meta.intentionalSolo) {
+              windowParticipantIds = [row.proposerId];
+              windowParticipantNames = [row.proposerName];
+            } else {
+              windowParticipantIds = [row.proposerId, ...meta.inviteeUserIds];
+              const names = [row.proposerName];
+              for (const inviteeId of meta.inviteeUserIds) {
+                const invitee = invitees.find((row) => row.userId === inviteeId);
+                if (invitee) names.push(invitee.displayName);
+              }
+              windowParticipantNames = names;
+            }
+            if (meta.locationText?.trim()) {
+              windowLocationName = meta.locationText.trim();
+            } else if (meta.locationId) {
+              windowLocationName = locationNameById.get(meta.locationId) ?? windowLocationName;
+            }
+          }
+        }
+
+        windowTitle = formatSleepingDisplayTitle({
+          proposerName: row.proposerName,
+          inviteeNames: windowIntentionalSolo
+            ? []
+            : windowParticipantNames.slice(1),
+          intentionalSolo: windowIntentionalSolo,
+          locationName: windowLocationName,
+          state: row.state as "proposed" | "resolved",
+          atRisk: row.atRisk,
+        });
+      }
+
       events.push({
         id: window.key,
         proposalId: row.id,
-        title: isContentMasked ? maskedTitle : row.title,
+        title: isContentMasked ? maskedTitle : windowTitle,
         startAt: isContentMasked ? window.startAt : window.startAt,
         endAt: isContentMasked ? window.endAt : window.endAt,
         proposalType: row.proposalType,
         state: row.state as "proposed" | "resolved",
         proposerId: row.proposerId,
         proposerName: row.proposerName,
-        locationName: isContentMasked ? null : (row.locationName ?? row.locationText ?? null),
-        participantIds,
-        participantNames: isContentMasked ? [] : participantNames,
-        intentionalSolo: row.intentionalSolo,
+        locationName: isContentMasked ? null : windowLocationName,
+        participantIds: isContentMasked ? [] : windowParticipantIds,
+        participantNames: isContentMasked ? [] : windowParticipantNames,
+        intentionalSolo: windowIntentionalSolo,
         isContentMasked,
         isTentative: row.state === "proposed",
         atRisk: row.atRisk,

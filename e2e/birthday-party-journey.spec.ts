@@ -39,7 +39,7 @@ test.describe("Birthday party journey", () => {
     }
     await fillProposalDateTimeField(draft.getByLabel("Start").first(), "2099-12-01T14:00");
     await fillProposalDateTimeField(draft.getByLabel("End (optional)").first(), "2099-12-01T18:00");
-    await draft.getByRole("button", { name: "Create draft" }).click();
+    await draft.getByRole("button", { name: "Save", exact: true }).click();
     await submitProposalDraft(page, draft);
     await logout(page);
 

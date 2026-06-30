@@ -3,7 +3,7 @@ import { expect, test } from "./helpers/test";
 import { login } from "./helpers/auth";
 import { DEMO, USERS } from "./helpers/constants";
 import { goToProposals, selectProposalTab } from "./helpers/navigation";
-import { openEventOrSleepingProposalDraft } from "./helpers/proposals";
+import { openEventOrSleepingProposalDraft, sleepingProposalCardsFor } from "./helpers/proposals";
 
 function proposalCard(page: import("@playwright/test").Page, title: string) {
   return page.locator(".MuiCard-root").filter({
@@ -65,7 +65,11 @@ test.describe("Proposals visibility", () => {
     await login(page, USERS.han.username);
     await goToProposals(page);
     await selectProposalTab(page, "Proposed");
-    await expect(proposalCard(page, DEMO.proposedFalcon)).toBeVisible();
+    await expect(
+      sleepingProposalCardsFor(page, USERS.han.displayName, {
+        inviteeName: USERS.leia.displayName,
+      }),
+    ).toBeVisible();
     await expect(proposalCard(page, DEMO.proposedDeathStar)).toHaveCount(0);
   });
 
@@ -73,6 +77,11 @@ test.describe("Proposals visibility", () => {
     await login(page, USERS.han.username);
     await goToProposals(page);
     await selectProposalTab(page, "Archived");
-    await expect(page.getByRole("heading", { name: DEMO.archivedEndor, level: 2 })).toBeVisible();
+    await expect(
+      page.getByRole("heading", {
+        level: 2,
+        name: /Sleeping:.*Dagobah/i,
+      }),
+    ).toBeVisible();
   });
 });

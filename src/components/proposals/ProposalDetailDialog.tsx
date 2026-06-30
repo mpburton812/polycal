@@ -66,6 +66,7 @@ import {
   typeChipSx,
 } from "./proposalCardTheme";
 import { formatProposalLogLine } from "@/lib/proposals/state-log-format";
+import { isoToSleepingDateInput, sleepingDateToStartIso } from "@/lib/proposals/sleeping-schedule";
 
 const VOTE_STATUS_LABELS: Record<InviteeVoteStatus, string> = {
   not_seen: "Not yet viewed",
@@ -295,25 +296,47 @@ export function ProposalDetailDialog({
 
   function openRescheduleDialog() {
     if (!detail?.scheduledStartAt) return;
-    const start = new Date(detail.scheduledStartAt);
-    const end = detail.scheduledEndAt ? new Date(detail.scheduledEndAt) : start;
-    const toLocal = (date: Date) => {
-      const offset = date.getTimezoneOffset();
-      const local = new Date(date.getTime() - offset * 60_000);
-      return local.toISOString().slice(0, 16);
-    };
-    setRescheduleStart(toLocal(start));
-    setRescheduleEnd(toLocal(end));
+    if (detail.proposalType === "sleeping") {
+      setRescheduleStart(isoToSleepingDateInput(detail.scheduledStartAt));
+      setRescheduleEnd(
+        detail.scheduledEndAt
+          ? isoToSleepingDateInput(detail.scheduledEndAt)
+          : isoToSleepingDateInput(detail.scheduledStartAt),
+      );
+    } else {
+      const start = new Date(detail.scheduledStartAt);
+      const end = detail.scheduledEndAt ? new Date(detail.scheduledEndAt) : start;
+      const toLocal = (date: Date) => {
+        const offset = date.getTimezoneOffset();
+        const local = new Date(date.getTime() - offset * 60_000);
+        return local.toISOString().slice(0, 16);
+      };
+      setRescheduleStart(toLocal(start));
+      setRescheduleEnd(toLocal(end));
+    }
     setRescheduleOpen(true);
   }
 
   function handleReschedule() {
-    if (!proposalId || !rescheduleStart) return;
+    if (!proposalId || !rescheduleStart || !detail) return;
     startTransition(async () => {
+      const scheduledStartAt =
+        detail.proposalType === "sleeping"
+          ? (sleepingDateToStartIso(rescheduleStart) ?? "")
+          : new Date(rescheduleStart).toISOString();
+      const scheduledEndAt =
+        detail.proposalType === "sleeping"
+          ? rescheduleEnd && rescheduleEnd !== rescheduleStart
+            ? sleepingDateToStartIso(rescheduleEnd)
+            : undefined
+          : rescheduleEnd
+            ? new Date(rescheduleEnd).toISOString()
+            : undefined;
+
       const result = await rescheduleProposalAction({
         proposalId,
-        scheduledStartAt: new Date(rescheduleStart).toISOString(),
-        scheduledEndAt: rescheduleEnd ? new Date(rescheduleEnd).toISOString() : undefined,
+        scheduledStartAt,
+        scheduledEndAt,
       });
       notifyResult(result);
       if (!result.ok) return;
@@ -939,20 +962,22 @@ export function ProposalDetailDialog({
       </DialogActions>
     </Dialog>
     <Dialog open={rescheduleOpen} onClose={() => setRescheduleOpen(false)} fullWidth maxWidth="xs">
-      <DialogTitle>Reschedule event</DialogTitle>
+      <DialogTitle>
+        {detail?.proposalType === "sleeping" ? "Reschedule sleeping dates" : "Reschedule event"}
+      </DialogTitle>
       <DialogContent>
         <Stack spacing={2} sx={{ mt: 1 }}>
           <TextField
-            label="Start"
-            type="datetime-local"
+            label={detail?.proposalType === "sleeping" ? "Start date" : "Start"}
+            type={detail?.proposalType === "sleeping" ? "date" : "datetime-local"}
             value={rescheduleStart}
             onChange={(event) => setRescheduleStart(event.target.value)}
             fullWidth
             InputLabelProps={{ shrink: true }}
           />
           <TextField
-            label="End"
-            type="datetime-local"
+            label={detail?.proposalType === "sleeping" ? "End date (optional)" : "End"}
+            type={detail?.proposalType === "sleeping" ? "date" : "datetime-local"}
             value={rescheduleEnd}
             onChange={(event) => setRescheduleEnd(event.target.value)}
             fullWidth

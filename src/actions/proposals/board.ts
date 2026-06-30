@@ -27,6 +27,7 @@ import {
   viewerCanSeeProposal,
 } from "@/lib/proposals/access";
 import { buildPartnershipProposalCopy } from "@/lib/partnerships/copy";
+import { formatSleepingDisplayTitle } from "@/lib/proposals/sleeping-display";
 
 import type { ProposalBoard, ProposalCard } from "./types";
 
@@ -91,6 +92,7 @@ export async function listProposalBoardAction(): Promise<ProposalBoard> {
       atRisk: proposals.atRisk,
       isPoll: proposals.isPoll,
       eventPrivacy: proposals.eventPrivacy,
+      intentionalSolo: proposals.intentionalSolo,
     })
     .from(proposals)
     .innerJoin(users, eq(proposals.proposerId, users.id))
@@ -105,10 +107,12 @@ export async function listProposalBoardAction(): Promise<ProposalBoard> {
           .select({
             proposalId: proposalInvitees.proposalId,
             userId: proposalInvitees.userId,
+            displayName: users.displayName,
             role: proposalInvitees.role,
             voteStatus: proposalInvitees.voteStatus,
           })
           .from(proposalInvitees)
+          .innerJoin(users, eq(proposalInvitees.userId, users.id))
           .where(inArray(proposalInvitees.proposalId, visibleProposalIds))
       : [];
 
@@ -183,9 +187,21 @@ export async function listProposalBoardAction(): Promise<ProposalBoard> {
     const scheduleEnd = display.scheduledEndAt ?? display.scheduledStartAt;
     const isPastSchedule = Boolean(scheduleEnd && scheduleEnd < nowIso);
 
+    let cardTitle = display.title;
+    if (!masked && row.proposalType === "sleeping") {
+      cardTitle = formatSleepingDisplayTitle({
+        proposerName: row.proposerName,
+        inviteeNames: invitees.map((invitee) => invitee.displayName),
+        intentionalSolo: row.intentionalSolo,
+        locationName: display.locationName ?? display.locationText ?? null,
+        state: row.state,
+        atRisk: row.atRisk,
+      });
+    }
+
     const card: ProposalCard = {
       id: row.id,
-      title: display.title,
+      title: cardTitle,
       description: masked ? display.description : proposalDescriptionForDisplay(row.description),
       proposalType: row.proposalType,
       state: optionalPollPending ? "proposed" : row.state,

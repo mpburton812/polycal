@@ -1,7 +1,7 @@
 "use server";
 
 import { randomUUID } from "node:crypto";
-import { and, eq, or } from "drizzle-orm";
+import { and, eq, inArray, or } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
@@ -453,4 +453,63 @@ export async function removePartnershipAction(
   revalidatePath("/people-places");
 
   return { ok: true, message: "Sleeping partnership removed." };
+}
+
+export interface SleepingPartnershipMapEdge {
+  userLowId: string;
+  userHighId: string;
+  lowName: string;
+  highName: string;
+}
+
+/**
+ * Accepted partnership edges for the People & Places MAP tab (PC-73).
+ */
+export async function listSleepingPartnershipMapEdgesAction(): Promise<SleepingPartnershipMapEdge[]> {
+  const session = await auth();
+  if (!session?.user) return [];
+
+  await ensureDbReady();
+  const db = getDb();
+  const { polyGroup } = await import("@/lib/db/schema");
+  const [group] = await db
+    .select({ placesMapVisibility: polyGroup.placesMapVisibility })
+    .from(polyGroup)
+    .where(eq(polyGroup.id, 1))
+    .limit(1);
+
+  const visibility = group?.placesMapVisibility ?? "none";
+  const isAdmin = await userHasAdminAccess(session.user.role);
+  if (visibility === "none") return [];
+  if (visibility === "admins" && !isAdmin) return [];
+
+  const rows = await db
+    .select({
+      userLowId: sleepingPartnerships.userLowId,
+      userHighId: sleepingPartnerships.userHighId,
+    })
+    .from(sleepingPartnerships)
+    .where(eq(sleepingPartnerships.status, "accepted"));
+
+  if (rows.length === 0) return [];
+
+  const userIds = new Set<string>();
+  for (const row of rows) {
+    userIds.add(row.userLowId);
+    userIds.add(row.userHighId);
+  }
+
+  const userRows = await db
+    .select({ id: users.id, displayName: users.displayName })
+    .from(users)
+    .where(inArray(users.id, [...userIds]));
+
+  const nameById = new Map(userRows.map((row) => [row.id, row.displayName]));
+
+  return rows.map((row) => ({
+    userLowId: row.userLowId,
+    userHighId: row.userHighId,
+    lowName: nameById.get(row.userLowId) ?? "Member",
+    highName: nameById.get(row.userHighId) ?? "Member",
+  }));
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import AddIcon from "@mui/icons-material/Add";
+import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import {
   Box,
@@ -109,10 +110,32 @@ export function BatchSleepingEntriesEditor({
 
   function addEntry() {
     if (entries.length >= maxEntries) return;
+    const previous = entries[entries.length - 1];
+    let nightDate = "";
+    if (previous?.nightDate?.trim()) {
+      const prev = new Date(`${previous.nightDate.slice(0, 10)}T00:00:00`);
+      prev.setDate(prev.getDate() + 1);
+      const pad = (value: number) => String(value).padStart(2, "0");
+      nightDate = `${prev.getFullYear()}-${pad(prev.getMonth() + 1)}-${pad(prev.getDate())}`;
+    }
     onChange([
       ...entries,
-      { id: newBatchEntryId(), nightDate: "", invitees: [], intentionalSolo: false },
+      { id: newBatchEntryId(), nightDate, invitees: [], intentionalSolo: false },
     ]);
+  }
+
+  function copyPrevious(index: number) {
+    if (index <= 0) return;
+    const previous = entries[index - 1];
+    if (!previous) return;
+    updateEntry(index, {
+      locationId: previous.locationId,
+      locationText: previous.locationText,
+      bedroomIndex: previous.bedroomIndex,
+      intentionalSolo: previous.intentionalSolo,
+      invitees: previous.invitees.map((invitee) => ({ ...invitee })),
+      comment: previous.comment,
+    });
   }
 
   function removeEntry(index: number) {
@@ -165,6 +188,18 @@ export function BatchSleepingEntriesEditor({
               value={entry.nightDate.slice(0, 10)}
               onChange={(next) => updateEntry(index, { nightDate: next })}
             />
+
+            {index > 0 && (
+              <Button
+                size="small"
+                variant="text"
+                startIcon={<ContentCopyIcon />}
+                onClick={() => copyPrevious(index)}
+                sx={{ mt: 1, alignSelf: "flex-start", color: POLY_GREEN }}
+              >
+                Copy previous
+              </Button>
+            )}
 
             <ToggleButtonGroup
               exclusive

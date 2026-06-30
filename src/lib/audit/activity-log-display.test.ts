@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { formatActivityLogDetails } from "@/lib/audit/activity-log-display";
+import { formatActivityLogAction, formatActivityLogDetails } from "@/lib/audit/activity-log-display";
 
 describe("formatActivityLogDetails", () => {
   it("shows notification message instead of raw JSON", () => {
@@ -44,5 +44,14 @@ describe("formatActivityLogDetails", () => {
     const details = JSON.stringify({ proposalId: "p-1", reason: "Not ready yet" });
     expect(formatActivityLogDetails("places.decline_residency", details)).toBe("Not ready yet");
     expect(formatActivityLogDetails("residency.declined", details)).toBe("Not ready yet");
+  });
+
+  it("labels impersonation actions and enriches target name (PC-63)", () => {
+    expect(formatActivityLogAction("admin.impersonate")).toBe("Impersonation");
+    const details = JSON.stringify({
+      targetUserId: "u-1",
+      targetDisplayName: "Leia Organa",
+    });
+    expect(formatActivityLogDetails("admin.impersonate", details)).toBe("Target: Leia Organa");
   });
 });
