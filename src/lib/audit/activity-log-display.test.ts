@@ -18,4 +18,31 @@ describe("formatActivityLogDetails", () => {
       "Signed in from Chrome",
     );
   });
+
+  it("shows residency comment body instead of raw JSON", () => {
+    const details = JSON.stringify({ residencyId: "res-1", body: "Looking forward to it!" });
+    expect(formatActivityLogDetails("residency.comment", details)).toBe(
+      "Looking forward to it!",
+    );
+  });
+
+  it("formats residency propose/accept with place and invitee", () => {
+    const details = JSON.stringify({
+      placeName: "Cloud City",
+      inviteeName: "Leia Organa",
+      proposalId: "p-1",
+    });
+    expect(formatActivityLogDetails("places.propose_residency", details)).toBe(
+      "Cloud City · invitee: Leia Organa",
+    );
+    expect(formatActivityLogDetails("residency.accepted", details)).toBe(
+      "Cloud City · invitee: Leia Organa",
+    );
+  });
+
+  it("formats residency decline with reason", () => {
+    const details = JSON.stringify({ proposalId: "p-1", reason: "Not ready yet" });
+    expect(formatActivityLogDetails("places.decline_residency", details)).toBe("Not ready yet");
+    expect(formatActivityLogDetails("residency.declined", details)).toBe("Not ready yet");
+  });
 });

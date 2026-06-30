@@ -8,6 +8,7 @@ import { z } from "zod";
 import { auth } from "@/lib/auth";
 import { userHasAdminAccess } from "@/lib/admin-access";
 import { logUserActivity } from "@/lib/audit";
+import { formatActivityLogDetails } from "@/lib/audit/activity-log-display";
 import { getDb } from "@/lib/db/client";
 import { ensureDbReady } from "@/lib/db/ensure-ready";
 import {
@@ -711,7 +712,7 @@ export async function getResidencyProposalDetailAction(
     }
     activityLog.push({
       action: entry.action,
-      details: entry.details,
+      details: formatActivityLogDetails(entry.action, entry.details),
       createdAt: entry.createdAt,
     });
   }

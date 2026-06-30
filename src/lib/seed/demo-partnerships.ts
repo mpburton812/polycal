@@ -7,7 +7,6 @@ import { sleepingPartnerships, users } from "@/lib/db/schema";
 import { canonicalUserPair } from "@/lib/users/pair";
 
 const DEMO_EDGES: Array<{ a: string; b: string; status: "accepted" | "proposed" }> = [
-  { a: "sw-luke", b: "sw-leia", status: "accepted" },
   { a: "sw-han", b: "sw-leia", status: "accepted" },
   { a: "sw-luke", b: "sw-han", status: "proposed" },
 ];
