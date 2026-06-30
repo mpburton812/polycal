@@ -14,6 +14,7 @@
     "test:validate:test": "node scripts/validate-test-seed.mjs",
     "test:connectivity": "node scripts/validate-connectivity.mjs",
     "test:env:test": "npm run test:prepare:test && npm run test:validate:test && npm run test:connectivity",
+    "test:env:schema": "node scripts/verify-turso-schema.mjs .env.test",
     "prepare": "husky",
     "requirements:append": "tsx scripts/append-requirement.ts",
     "requirements:validate": "tsx scripts/validate-jira-commits.ts",

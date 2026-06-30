@@ -398,6 +398,36 @@ export async function configureBatchNight(
   }
 }
 
+/** Opens a proposed card and accepts with an optional comment (partnership or event). */
+export async function acceptProposalWithComment(page: Page, comment: string): Promise<void> {
+  const dialog = page.getByRole("dialog");
+  const optionalComment = dialog.getByPlaceholder("Add a comment (optional)…");
+  const threadComment = dialog.getByPlaceholder("Add a comment…");
+
+  if (await optionalComment.isVisible().catch(() => false)) {
+    await optionalComment.fill(comment);
+  } else if (await threadComment.isVisible().catch(() => false)) {
+    await threadComment.fill(comment);
+    await dialog.getByRole("button", { name: "Post" }).click();
+    await expect(dialog.getByText(comment)).toBeVisible({ timeout: 15_000 });
+  }
+
+  await dialog.getByRole("button", { name: "Accept" }).click();
+
+  await dialog
+    .getByText("RESOLVED", { exact: true })
+    .first()
+    .waitFor({ state: "visible", timeout: 8_000 })
+    .catch(() => {});
+
+  const closeButton = dialog.getByRole("button", { name: "Close" });
+  if (await closeButton.isVisible().catch(() => false)) {
+    await closeButton.click();
+  }
+
+  await expect(dialog).toBeHidden({ timeout: 25_000 });
+}
+
 /** Creates and submits a batch sleeping night with a required partner invitee. */
 export async function createAndSubmitBatchSleepingWithInvitee(
   page: Page,
