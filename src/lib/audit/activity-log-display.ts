@@ -1,3 +1,9 @@
+/** Human-readable labels for admin activity-log action codes (PC-63). */
+export function formatActivityLogAction(action: string): string {
+  if (action === "admin.impersonate") return "Impersonation";
+  return action;
+}
+
 /**
  * Formats raw activity-log detail JSON for admin UI (PC-71 JSON presentation audit).
  */
@@ -54,6 +60,19 @@ export function formatActivityLogDetails(action: string, details: string | null)
       if (typeof parsed.placeName === "string") {
         return parsed.placeName;
       }
+    }
+
+    if (action === "admin.impersonate") {
+      const targetName =
+        typeof parsed.targetDisplayName === "string"
+          ? parsed.targetDisplayName
+          : typeof parsed.targetName === "string"
+            ? parsed.targetName
+            : null;
+      const targetId =
+        typeof parsed.targetUserId === "string" ? parsed.targetUserId : null;
+      if (targetName) return `Target: ${targetName}`;
+      if (targetId) return `Target user id: ${targetId}`;
     }
 
     if (typeof parsed.message === "string") {

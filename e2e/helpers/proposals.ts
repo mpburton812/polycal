@@ -4,18 +4,22 @@ import { fillProposalDateField, fillProposalDateTimeField } from "./datePickers"
 import { openProposalCard, selectProposalTab } from "./navigation";
 
 /** Locates a proposal Kanban card by exact title heading. */
-export function proposalCard(page: Page, title: string) {
+export function proposalCard(page: Page, title: string | RegExp) {
   return page.locator(".MuiCard-root").filter({
     has: page.getByRole("heading", { name: title, level: 2 }),
   });
 }
 
-/** Locates cards whose titles start with the given prefix (batch sleeping nights). */
-export function proposalCardsWithPrefix(page: Page, titlePrefix: string) {
-  const escaped = titlePrefix.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+/** Locates cards whose titles match auto-generated sleeping display (PC-66). */
+export function sleepingProposalCards(page: Page) {
   return page.locator(".MuiCard-root").filter({
-    has: page.getByRole("heading", { level: 2, name: new RegExp(`^${escaped}`) }),
+    has: page.getByRole("heading", { level: 2, name: /Sleeping:/ }),
   });
+}
+
+/** @deprecated Use sleepingProposalCards — kept for older specs */
+export function proposalCardsWithPrefix(page: Page, _titlePrefix: string) {
+  return sleepingProposalCards(page);
 }
 
 /** Opens the FAB menu for creating proposals. */
@@ -156,7 +160,7 @@ export async function createAndSubmitEvent(
   await setInviteeRequired(dialog, options.requiredName);
   await setInviteeOptional(dialog, options.optionalName);
   await fillProposalDateTimeField(dialog.getByLabel("Start").first(), options.start);
-  await dialog.getByRole("button", { name: "Create draft" }).click();
+  await dialog.getByRole("button", { name: "Save" }).click();
   await submitProposalDraft(page, dialog);
 }
 
@@ -178,7 +182,7 @@ export async function createAndSubmitSoloEvent(
   }
   await fillProposalDateTimeField(dialog.getByLabel("Start").first(), options.start);
   await fillProposalDateTimeField(dialog.getByLabel("End (optional)").first(), options.end);
-  await dialog.getByRole("button", { name: "Create draft" }).click();
+  await dialog.getByRole("button", { name: "Save" }).click();
   await submitProposalDraft(page, dialog);
 }
 
@@ -211,7 +215,7 @@ export async function createAndSubmitSoloEventWithReminder(
     .click();
   await fillProposalDateTimeField(dialog.getByLabel("Start").first(), options.start);
   await fillProposalDateTimeField(dialog.getByLabel("End (optional)").first(), options.end);
-  await dialog.getByRole("button", { name: "Create draft" }).click();
+  await dialog.getByRole("button", { name: "Save" }).click();
   await submitProposalDraft(page, dialog);
 }
 
@@ -232,7 +236,7 @@ export async function createAndSubmitRecurringEventForEveryone(
   await setAllInviteesRequired(dialog);
   await fillProposalDateTimeField(dialog.getByLabel("Start").first(), options.start);
   await fillProposalDateTimeField(dialog.getByLabel("End (optional)").first(), options.end);
-  await dialog.getByRole("button", { name: "Create draft" }).click();
+  await dialog.getByRole("button", { name: "Save" }).click();
   await submitProposalDraft(page, dialog);
 }
 
@@ -243,7 +247,7 @@ export async function createAndSubmitRecurringEventForEveryone(
 export async function createAndSubmitSoloSleepingWeek(
   page: Page,
   options: {
-    titlePrefix: string;
+    titlePrefix?: string;
     rangeStart: string;
     rangeEnd: string;
   },
@@ -254,8 +258,6 @@ export async function createAndSubmitSoloSleepingWeek(
     .getByRole("checkbox", { name: "Batch (multiple nights in one proposal)" })
     .check();
 
-  await dialog.getByLabel("Title").fill(options.titlePrefix);
-
   for (let index = 0; index < nightDates.length; index += 1) {
     if (index > 0) {
       await dialog.getByRole("button", { name: "Add night" }).click();
@@ -264,7 +266,6 @@ export async function createAndSubmitSoloSleepingWeek(
     await dialog.getByRole("button", { name: "Solo", exact: true }).nth(index).click();
   }
 
-  await dialog.getByRole("button", { name: "Create draft" }).click();
   await submitProposalDraft(page, dialog);
 
   return nightDates.length;
@@ -283,7 +284,7 @@ export async function openSpecialDraftForEdit(page: Page, title: string): Promis
 }
 
 /** Opens a draft card in the edit dialog via Continue Editing. */
-export async function openDraftForEdit(page: Page, title: string): Promise<Locator> {
+export async function openDraftForEdit(page: Page, title: string | RegExp): Promise<Locator> {
   const card = proposalCard(page, title);
   await card.getByRole("button", { name: "Continue Editing" }).click();
   const dialog = page.getByRole("dialog");
@@ -432,7 +433,7 @@ export async function acceptProposalWithComment(page: Page, comment: string): Pr
 export async function createAndSubmitBatchSleepingWithInvitee(
   page: Page,
   options: {
-    title: string;
+    title?: string;
     nightDate: string;
     requiredPartnerName: string;
     locationName?: string;
@@ -441,7 +442,6 @@ export async function createAndSubmitBatchSleepingWithInvitee(
 ): Promise<void> {
   const dialog = await openSleepingProposalDraft(page);
   await dialog.getByRole("checkbox", { name: /Batch/i }).check();
-  await dialog.getByLabel("Title").fill(options.title);
   await fillProposalDateField(dialog.getByLabel("Night of").first(), options.nightDate);
   await dialog.getByRole("button", { name: "With invitees" }).first().click();
   await setInviteeRequired(dialog, options.requiredPartnerName);

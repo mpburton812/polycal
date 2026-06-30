@@ -37,6 +37,7 @@ import { useEffect, useMemo, useRef, useState, useTransition, type ReactNode } f
 
 import {
   createDraftProposalAction,
+  deleteDraftProposalAction,
   getProposalDetailAction,
   listAcceptedSleepingPartnerIdsAction,
   listSleepingLocationOptionsAction,
@@ -69,6 +70,7 @@ import {
   PAST_SCHEDULE_TEXT,
 } from "./proposalCardTheme";
 import { sleepingDateToStartIso } from "@/lib/proposals/sleeping-schedule";
+import { formatSleepingDisplayTitle } from "@/lib/proposals/sleeping-display";
 import {
   minutesToReminderDisplay,
   reminderOffsetToMinutes,
@@ -501,7 +503,32 @@ export function ProposalDraftDialog({
           .filter((slot) => slot !== null);
 
     return {
-      title,
+      title:
+        proposalType === "sleeping"
+          ? formatSleepingDisplayTitle({
+              proposerName,
+              inviteeNames: isSoloProposal
+                ? []
+                : invitees.map(
+                    (invitee) =>
+                      people.find((person) => person.id === invitee.userId)?.displayName ??
+                      invitee.userId,
+                  ),
+              intentionalSolo: isSoloProposal,
+              locationName: batchMode
+                ? (batchEntries.find((entry) => entry.locationText || entry.locationId)
+                    ? locationOptions.find(
+                        (place) =>
+                          place.id ===
+                          batchEntries.find((entry) => entry.locationId)?.locationId,
+                      )?.name ??
+                      batchEntries.find((entry) => entry.locationText)?.locationText ??
+                      null
+                    : null)
+                : locationName,
+              state: "draft",
+            })
+          : title,
       description,
       proposalType,
       locationId: batchMode ? undefined : locationId || undefined,
@@ -573,6 +600,21 @@ export function ProposalDraftDialog({
     }
     return proposalId;
   }
+
+  function handleDelete() {
+    const editId = initialDetail?.id ?? savedDraftId;
+    if (!editId || !window.confirm("Delete this draft?")) return;
+    startTransition(async () => {
+      const result = await deleteDraftProposalAction(editId);
+      showToast(result.message, result.ok ? "success" : "error");
+      if (result.ok) {
+        onClose();
+        router.refresh();
+      }
+    });
+  }
+
+  const draftReady = proposalType === "sleeping" || Boolean(title.trim());
 
   function handleSave() {
     startTransition(async () => {
@@ -734,15 +776,17 @@ export function ProposalDraftDialog({
                 </Select>
               </FormControl>
             )}
-            <TextField
-              label="Title"
-              value={title}
-              onChange={(event) => setTitle(event.target.value)}
-              required
-              fullWidth
-              size="small"
-              placeholder="Untitled Proposal"
-            />
+            {proposalType !== "sleeping" && (
+              <TextField
+                label="Title"
+                value={title}
+                onChange={(event) => setTitle(event.target.value)}
+                required
+                fullWidth
+                size="small"
+                placeholder="Untitled Proposal"
+              />
+            )}
             <TextField
               label="Description (optional)"
               value={description}
@@ -1210,20 +1254,25 @@ export function ProposalDraftDialog({
         </CardContent>
 
         <CardActions sx={{ px: 2, pb: 2, pt: 0, justifyContent: "flex-end", gap: 1, flexShrink: 0 }}>
+          {isEdit && (
+            <Button color="error" onClick={handleDelete} disabled={pending} sx={{ mr: "auto" }}>
+              Delete
+            </Button>
+          )}
           <Button onClick={handleClose} color="inherit">
-            Cancel
+            Exit
           </Button>
           <Button
             variant="contained"
-            disabled={!title.trim() || pending}
+            disabled={!draftReady || pending}
             onClick={handleSave}
             sx={primaryButtonSx}
           >
-            {isEdit ? "Save draft" : "Create draft"}
+            Save
           </Button>
           <Button
             variant="contained"
-            disabled={!title.trim() || pending}
+            disabled={!draftReady || pending}
             onClick={() => handleSubmit()}
             sx={primaryButtonSx}
           >

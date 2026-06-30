@@ -37,7 +37,7 @@ export async function selectProposalTab(page: Page, tab: "Drafts" | "Proposed" |
   await page.getByRole("tab", { name: new RegExp(tab, "i") }).click();
 }
 
-export async function openProposalCard(page: Page, title: string): Promise<void> {
-  await page.getByRole("heading", { name: title, level: 2 }).click();
+export async function openProposalCard(page: Page, title: string | RegExp): Promise<void> {
+  await page.getByRole("heading", { name: title, level: 2 }).first().click();
   await expect(page.getByRole("dialog")).toBeVisible();
 }

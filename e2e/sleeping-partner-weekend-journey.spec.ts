@@ -18,7 +18,10 @@ test.describe("Sleeping partner weekend journey", () => {
   }) => {
     test.setTimeout(420_000);
 
-    const batchTitle = `Weekend with Leia ${Date.now()}`;
+    const sleepingTitle = new RegExp(
+      `Sleeping:.*${USERS.luke.displayName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}.*${USERS.leia.displayName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`,
+      "i",
+    );
 
     await loginWithOnboardingIfNeeded(page, USERS.luke.username);
     await goToProposals(page);
@@ -43,7 +46,6 @@ test.describe("Sleeping partner weekend journey", () => {
     await sleepingDialog
       .getByRole("checkbox", { name: "Batch (multiple nights in one proposal)" })
       .click();
-    await sleepingDialog.getByLabel("Title").fill(batchTitle);
 
     await configureBatchNight(sleepingDialog, page, 0, {
       nightDate: "2099-12-06",
@@ -60,20 +62,19 @@ test.describe("Sleeping partner weekend journey", () => {
       customLocation: "Lars homestead guest room",
     });
 
-    await sleepingDialog.getByRole("button", { name: "Create draft" }).click();
     await submitProposalDraft(page, sleepingDialog);
     await logout(page);
 
     await loginWithOnboardingIfNeeded(page, USERS.leia.username);
     await goToProposals(page);
     await selectProposalTab(page, "Proposed");
-    await openProposalCard(page, batchTitle);
+    await openProposalCard(page, sleepingTitle);
     await acceptProposalWithComment(page, "Both nights work for me.");
     await logout(page);
 
     await loginWithOnboardingIfNeeded(page, USERS.luke.username);
     await goToProposals(page);
     await selectProposalTab(page, "Resolved");
-    await expect(proposalCard(page, batchTitle)).toBeVisible({ timeout: 25_000 });
+    await expect(proposalCard(page, sleepingTitle)).toBeVisible({ timeout: 25_000 });
   });
 });
