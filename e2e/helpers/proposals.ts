@@ -120,6 +120,11 @@ export async function selectProposalType(page: Page, dialog: Locator, type: "Eve
   await page.getByRole("option", { name: type }).click();
 }
 
+/** Persists a proposal draft via the Save button (PC-70 label). */
+export async function saveProposalDraft(dialog: Locator): Promise<void> {
+  await dialog.getByRole("button", { name: "Save", exact: true }).click();
+}
+
 /** Submits a draft, confirming through schedule-conflict dialog when present. */
 export async function submitProposalDraft(page: Page, dialog: Locator) {
   await expect(dialog.getByRole("button", { name: "Submit" })).toBeVisible({ timeout: 15_000 });

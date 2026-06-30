@@ -26,7 +26,7 @@ test.describe("Proposal invitee journey", () => {
     await draftDialog.getByLabel(/Description/i).fill("Single invitee then attendee add.");
     await draftDialog.getByRole("button", { name: /Leia Organa/i }).click();
     await fillProposalDateTimeField(draftDialog.getByLabel("Start").first(), "2099-07-10T18:00");
-    await draftDialog.getByRole("button", { name: "Create draft" }).click();
+    await draftDialog.getByRole("button", { name: "Save", exact: true }).click();
 
     await draftDialog.getByRole("button", { name: "Submit" }).click();
     await expect(draftDialog).toBeHidden({ timeout: 15_000 });

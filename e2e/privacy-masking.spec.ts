@@ -25,7 +25,6 @@ test.describe("Privacy masking", () => {
       dialog.getByLabel("End (optional)").first(),
       "2099-09-01T21:00",
     );
-    await dialog.getByRole("button", { name: "Create draft" }).click();
     await submitProposalDraft(page, dialog);
     await logout(page);
 

@@ -23,7 +23,7 @@ test.describe("Proposal draft workflows", () => {
     const dialog = await openEventOrSleepingProposalDraft(page);
     await dialog.getByLabel("Title").fill(title);
     await dialog.getByLabel(/Description/i).fill("Automated E2E draft creation.");
-    await dialog.getByRole("button", { name: "Create draft" }).click();
+    await dialog.getByRole("button", { name: "Save", exact: true }).click();
 
     await expect(dialog.getByRole("button", { name: "Submit" })).toBeVisible();
     await dialog.getByRole("button", { name: "Cancel" }).click();
@@ -40,7 +40,7 @@ test.describe("Proposal draft workflows", () => {
     await selectProposalTab(page, "Drafts");
     await page.getByRole("button", { name: "Continue Editing" }).first().click();
     await page.getByLabel("Title").fill(updatedTitle);
-    await page.getByRole("button", { name: "Save draft" }).click();
+    await page.getByRole("button", { name: "Save", exact: true }).click();
 
     const dialog = page.getByRole("dialog");
     await expect(dialog.getByRole("button", { name: "Submit" })).toBeVisible();
@@ -61,7 +61,7 @@ test.describe("Proposal draft workflows", () => {
 
     const dialog = await openEventOrSleepingProposalDraft(page);
     await dialog.getByLabel("Title").fill(title);
-    await dialog.getByRole("button", { name: "Create draft" }).click();
+    await dialog.getByRole("button", { name: "Save", exact: true }).click();
 
     await expect(dialog.getByRole("button", { name: "Submit" })).toBeVisible();
     await dialog.getByRole("button", { name: "Cancel" }).click();
@@ -81,7 +81,7 @@ test.describe("Proposal submit and conflict warnings", () => {
     await dialog.getByLabel("Title").fill(title);
     await dialog.getByLabel(/Description/i).fill("Needs invitee vote.");
     await dialog.getByRole("button", { name: /Leia Organa/i }).click();
-    await dialog.getByRole("button", { name: "Create draft" }).click();
+    await dialog.getByRole("button", { name: "Save", exact: true }).click();
 
     await expect(dialog.getByRole("button", { name: "Submit" })).toBeVisible();
     await dialog.getByRole("button", { name: "Submit" }).click();

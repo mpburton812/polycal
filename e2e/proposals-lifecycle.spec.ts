@@ -70,7 +70,7 @@ test.describe("Poll proposal draft", () => {
     await dialog.getByRole("button", { name: "Add poll option" }).click();
     await fillProposalDateTimeField(startInputs.nth(1), "2099-08-02T10:00");
 
-    await dialog.getByRole("button", { name: "Create draft" }).click();
+    await dialog.getByRole("button", { name: "Save", exact: true }).click();
     await expect(dialog.getByRole("button", { name: "Submit" })).toBeVisible();
     await dialog.getByRole("button", { name: "Cancel" }).click();
     await expect(proposalCard(page, title)).toBeVisible();
@@ -92,7 +92,7 @@ test.describe("Recurring event draft", () => {
     await dialog.getByLabel(/Description/i).fill("Weekly council meetings.");
     await dialog.getByRole("checkbox", { name: /Recurring series/i }).check();
     await fillProposalDateTimeField(dialog.getByLabel("Start").first(), "2099-09-01T09:00");
-    await dialog.getByRole("button", { name: "Create draft" }).click();
+    await dialog.getByRole("button", { name: "Save", exact: true }).click();
     await expect(dialog.getByRole("button", { name: "Submit" })).toBeVisible();
     await dialog.getByRole("button", { name: "Cancel" }).click();
     await expect(proposalCard(page, title)).toBeVisible();
