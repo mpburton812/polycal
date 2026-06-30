@@ -15,18 +15,14 @@ test.describe("Sleeping vs events — no false conflicts", () => {
   test("solo sleeping night does not block overlapping event submit", async ({ page }) => {
     test.setTimeout(180_000);
 
-    const tag = Date.now();
     const nightDate = "2099-09-15";
     const eventStart = "2099-09-15T20:00";
-    const sleepingTitle = `E2E Solo night ${tag}`;
-    const eventTitle = `E2E Same-night event ${tag}`;
+    const eventTitle = `E2E Same-night event ${Date.now()}`;
 
     await login(page, USERS.luke.username);
     await goToProposals(page);
 
     const sleepingDialog = await openSleepingProposalDraft(page);
-    await sleepingDialog.getByRole("checkbox", { name: /Batch/i }).check();
-    await sleepingDialog.getByLabel("Title").fill(sleepingTitle);
     await fillProposalDateField(sleepingDialog.getByLabel("Night of").first(), nightDate);
     await sleepingDialog.getByRole("button", { name: "Solo", exact: true }).first().click();
     await submitProposalDraft(page, sleepingDialog);

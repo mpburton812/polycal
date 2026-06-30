@@ -15,6 +15,7 @@ export async function applyAdminMigrations(sql: Client): Promise<void> {
   await ensureColumn(sql, "poly_group", "admin_can_see_super_private", "INTEGER NOT NULL DEFAULT 0");
   await ensureColumn(sql, "poly_group", "audit_log_visibility", "TEXT NOT NULL DEFAULT 'admin_only'");
   await ensureColumn(sql, "poly_group", "hide_sleeping_arrangements", "INTEGER NOT NULL DEFAULT 0");
+  await ensureColumn(sql, "poly_group", "places_map_visibility", "TEXT NOT NULL DEFAULT 'none'");
   await ensureColumn(sql, "poly_group", "log_tail_length", "INTEGER NOT NULL DEFAULT 100");
   await ensureColumn(sql, "poly_group", "onboarding_welcome_message", "TEXT");
 

@@ -54,7 +54,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           if (!row || row.status !== "active" || row.role === "passive") {
             return null;
           }
-          await recordSuccessfulLogin(row.id);
           return {
             id: row.id,
             name: row.displayName,

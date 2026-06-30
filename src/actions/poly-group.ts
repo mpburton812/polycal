@@ -15,9 +15,13 @@ import {
   DEFAULT_ONBOARDING_WELCOME_MESSAGE,
   auditLogVisibilityLevels,
   groupNameChangeModes,
+  placesMapVisibilityLevels,
   powerManagementModes,
+  type PlacesMapVisibility,
   type PolyGroupSettings,
 } from "@/types/poly-group";
+
+export type { PlacesMapVisibility };
 
 export interface PolyGroupActionResult {
   ok: boolean;
@@ -37,6 +41,7 @@ const settingsSchema = z.object({
   auditLogVisibility: z.enum(auditLogVisibilityLevels),
   allowUserProvisioning: z.boolean(),
   hideSleepingArrangements: z.boolean(),
+  placesMapVisibility: z.enum(placesMapVisibilityLevels),
   logTailLength: z.number().int().min(0).max(1000),
   onboardingWelcomeMessage: z.string().trim().min(1).max(2000),
   proposedMaxHours: z.number().int().min(0).max(8760),
@@ -60,6 +65,8 @@ function rowToSettings(row: typeof polyGroup.$inferSelect): PolyGroupSettings {
     auditLogVisibility: row.auditLogVisibility as PolyGroupSettings["auditLogVisibility"],
     allowUserProvisioning: row.allowUserProvisioning,
     hideSleepingArrangements: row.hideSleepingArrangements,
+    placesMapVisibility:
+      (row.placesMapVisibility as PolyGroupSettings["placesMapVisibility"]) ?? "none",
     logTailLength: row.logTailLength,
     onboardingWelcomeMessage:
       row.onboardingWelcomeMessage?.trim() || DEFAULT_ONBOARDING_WELCOME_MESSAGE,
@@ -192,6 +199,7 @@ export async function updatePolyGroupSettingsAction(
       auditLogVisibility: parsed.data.auditLogVisibility,
       allowUserProvisioning: parsed.data.allowUserProvisioning,
       hideSleepingArrangements: parsed.data.hideSleepingArrangements,
+      placesMapVisibility: parsed.data.placesMapVisibility,
       logTailLength: parsed.data.logTailLength,
       onboardingWelcomeMessage: parsed.data.onboardingWelcomeMessage,
       proposedMaxHours: parsed.data.proposedMaxHours,
@@ -316,4 +324,18 @@ export async function proposeGroupNameChangeAction(
     message: "Group name change saved as draft. Submit from Proposals when ready.",
     proposalId,
   };
+}
+
+/**
+ * Returns MAP tab visibility for People & Places (PC-73).
+ */
+export async function getPlacesMapVisibilityAction(): Promise<PlacesMapVisibility> {
+  await ensureDbReady();
+  const db = getDb();
+  const [row] = await db
+    .select({ placesMapVisibility: polyGroup.placesMapVisibility })
+    .from(polyGroup)
+    .where(eq(polyGroup.id, 1))
+    .limit(1);
+  return (row?.placesMapVisibility as PlacesMapVisibility) ?? "none";
 }

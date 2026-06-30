@@ -16,9 +16,11 @@ test.describe("Batch sleeping partners journey", () => {
   test("Katie/Michael batch week with decline, edit, and accept", async ({ page }) => {
     test.setTimeout(360_000);
 
-    const title = `August getaway ${Date.now()}`;
+    const sleepingTitle = new RegExp(
+      `Sleeping:.*${BT_USERS.katie.displayName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`,
+      "i",
+    );
     const declineComment = "I need to be at my place on August 2.";
-    const escape = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
     // —— Phase 1: Katie proposes a four-night batch ——
     await loginWithOnboardingIfNeeded(
@@ -30,7 +32,6 @@ test.describe("Batch sleeping partners journey", () => {
 
     const dialog = await openSleepingProposalDraft(page);
     await dialog.getByRole("checkbox", { name: "Batch (multiple nights in one proposal)" }).click();
-    await dialog.getByLabel("Title").fill(title);
 
     await configureBatchNight(dialog, page, 0, {
       nightDate: "2099-08-01",
@@ -62,7 +63,6 @@ test.describe("Batch sleeping partners journey", () => {
       comment: "It's our anniversary!",
     });
 
-    await dialog.getByRole("button", { name: "Create draft" }).click();
     await submitProposalDraft(page, dialog);
     await logout(page);
 
@@ -72,10 +72,10 @@ test.describe("Batch sleeping partners journey", () => {
       BT_USERS.michael.username,
       BURTON_THOMPSON_PASSWORD,
     );
-    await expectInAppNotification(page, new RegExp(escape(title)));
+    await expectInAppNotification(page, /Sleeping:/i);
     await goToProposals(page);
     await selectProposalTab(page, "Proposed");
-    await openProposalCard(page, title);
+    await openProposalCard(page, sleepingTitle);
 
     const michaelDialog = page.getByRole("dialog");
     await expect(michaelDialog.getByText("Batch nights (4)")).toBeVisible({ timeout: 15_000 });
@@ -100,14 +100,14 @@ test.describe("Batch sleeping partners journey", () => {
     await goToProposals(page);
     await selectProposalTab(page, "Drafts");
 
-    const editDialog = await openDraftForEdit(page, title);
+    const editDialog = await openDraftForEdit(page, sleepingTitle);
     await configureBatchNight(editDialog, page, 1, {
       nightDate: "2099-08-02",
       mode: "withInvitees",
       requiredInvitees: [BT_USERS.michael.displayName],
       locationName: BT_PLACES.michaelsPlace,
     });
-    await editDialog.getByRole("button", { name: "Save draft" }).click();
+    await editDialog.getByRole("button", { name: "Save" }).click();
     await submitProposalDraft(page, editDialog);
     await logout(page);
 
@@ -119,7 +119,7 @@ test.describe("Batch sleeping partners journey", () => {
     );
     await goToProposals(page);
     await selectProposalTab(page, "Proposed");
-    await openProposalCard(page, title);
+    await openProposalCard(page, sleepingTitle);
     const acceptDialog = page.getByRole("dialog");
     await acceptDialog.getByRole("button", { name: "Accept" }).click();
     await expect(acceptDialog.getByText("RESOLVED", { exact: true }).first()).toBeVisible({
@@ -128,6 +128,6 @@ test.describe("Batch sleeping partners journey", () => {
     await acceptDialog.getByRole("button", { name: "Close" }).click();
 
     await selectProposalTab(page, "Resolved");
-    await expect(proposalCard(page, title)).toBeVisible({ timeout: 25_000 });
+    await expect(proposalCard(page, sleepingTitle)).toBeVisible({ timeout: 25_000 });
   });
 });

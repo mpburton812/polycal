@@ -18,6 +18,9 @@ export const auditLogVisibilityLevels = [
 ] as const;
 export type AuditLogVisibility = (typeof auditLogVisibilityLevels)[number];
 
+export const placesMapVisibilityLevels = ["all", "admins", "none"] as const;
+export type PlacesMapVisibility = (typeof placesMapVisibilityLevels)[number];
+
 export interface PolyGroupSettings {
   name: string;
   allowGroupNameProposals: boolean;
@@ -31,6 +34,7 @@ export interface PolyGroupSettings {
   auditLogVisibility: AuditLogVisibility;
   allowUserProvisioning: boolean;
   hideSleepingArrangements: boolean;
+  placesMapVisibility: PlacesMapVisibility;
   logTailLength: number;
   onboardingWelcomeMessage: string;
   proposedMaxHours: number;
