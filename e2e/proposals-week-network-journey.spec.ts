@@ -7,7 +7,7 @@ import { goToProposals, openProposalCard, selectProposalTab } from "./helpers/na
 import {
   createAndSubmitEvent,
   createAndSubmitSoloSleepingWeek,
-  proposalCardsWithPrefix,
+  sleepingProposalCardsFor,
 } from "./helpers/proposals";
 import { expectToast } from "./helpers/toast";
 
@@ -30,14 +30,13 @@ test.describe("Week schedule poly-family journey", () => {
     await goToProposals(page);
 
     const nightCount = await createAndSubmitSoloSleepingWeek(page, {
-      titlePrefix: weekPrefix,
       rangeStart: "2099-07-07",
       rangeEnd: "2099-07-13",
     });
     expect(nightCount).toBe(7);
 
     await selectProposalTab(page, "Resolved");
-    await expect(proposalCardsWithPrefix(page, weekPrefix)).toHaveCount(1);
+    await expect(sleepingProposalCardsFor(page, USERS.luke.displayName)).toHaveCount(1);
 
     // —— Phase 2: Luke schedules social events through the week with poly family ——
     await createAndSubmitEvent(page, {
@@ -62,7 +61,7 @@ test.describe("Week schedule poly-family journey", () => {
 
     // —— Phase 3: Luke cancels the batch week proposal ——
     await selectProposalTab(page, "Resolved");
-    const batchCard = proposalCardsWithPrefix(page, weekPrefix).first();
+    const batchCard = sleepingProposalCardsFor(page, USERS.luke.displayName).first();
     const cancelledBatchTitle = await batchCard.getByRole("heading", { level: 2 }).innerText();
 
     page.once("dialog", (dialog) => dialog.accept());
@@ -74,7 +73,7 @@ test.describe("Week schedule poly-family journey", () => {
     await selectProposalTab(page, "Archived");
     await expect(page.getByRole("heading", { name: cancelledBatchTitle, level: 2 })).toBeVisible();
     await selectProposalTab(page, "Resolved");
-    await expect(proposalCardsWithPrefix(page, weekPrefix)).toHaveCount(0);
+    await expect(sleepingProposalCardsFor(page, USERS.luke.displayName)).toHaveCount(0);
 
     // —— Phase 4: Luke proposes dinner with required + optional invitees ——
     await createAndSubmitEvent(page, {

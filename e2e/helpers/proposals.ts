@@ -10,16 +10,37 @@ export function proposalCard(page: Page, title: string | RegExp) {
   });
 }
 
-/** Locates cards whose titles match auto-generated sleeping display (PC-66). */
+/** Escapes a string for use inside a RegExp. */
+function escapeRegex(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/** Locates cards whose titles start with the given prefix (events, recurring series). */
+export function proposalCardsWithPrefix(page: Page, titlePrefix: string) {
+  const escaped = escapeRegex(titlePrefix);
+  return page.locator(".MuiCard-root").filter({
+    has: page.getByRole("heading", { level: 2, name: new RegExp(`^${escaped}`) }),
+  });
+}
+
+/** Locates all auto-titled sleeping proposal cards (PC-66). */
 export function sleepingProposalCards(page: Page) {
   return page.locator(".MuiCard-root").filter({
     has: page.getByRole("heading", { level: 2, name: /Sleeping:/ }),
   });
 }
 
-/** @deprecated Use sleepingProposalCards — kept for older specs */
-export function proposalCardsWithPrefix(page: Page, _titlePrefix: string) {
-  return sleepingProposalCards(page);
+/** Locates a sleeping card by proposer and optional invitee display names. */
+export function sleepingProposalCardsFor(
+  page: Page,
+  proposerName: string,
+  options?: { inviteeName?: string },
+) {
+  const parts = [escapeRegex(proposerName)];
+  if (options?.inviteeName) {
+    parts.push(escapeRegex(options.inviteeName));
+  }
+  return proposalCard(page, new RegExp(`Sleeping:.*${parts.join(".*")}`, "i"));
 }
 
 /** Opens the FAB menu for creating proposals. */
@@ -123,6 +144,12 @@ export async function selectProposalType(page: Page, dialog: Locator, type: "Eve
 /** Persists a proposal draft via the Save button (PC-70 label). */
 export async function saveProposalDraft(dialog: Locator): Promise<void> {
   await dialog.getByRole("button", { name: "Save", exact: true }).click();
+}
+
+/** Closes the draft dialog via Exit (PC-70 label). */
+export async function exitDraftDialog(dialog: Locator): Promise<void> {
+  await dialog.getByRole("button", { name: "Exit" }).click();
+  await expect(dialog).toBeHidden();
 }
 
 /** Submits a draft, confirming through schedule-conflict dialog when present. */

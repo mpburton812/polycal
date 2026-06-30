@@ -14,6 +14,11 @@ export async function login(
 ): Promise<void> {
   for (let attempt = 0; attempt < 3; attempt += 1) {
     await page.goto("/login");
+    if (!(await page.getByLabel("Username").isVisible().catch(() => false))) {
+      await page.context().clearCookies();
+      await page.goto("/login");
+    }
+    await expect(page.getByLabel("Username")).toBeVisible({ timeout: 30_000 });
     await page.getByLabel("Username").fill(username);
     await page.getByLabel("Password").fill(password);
     await page.getByRole("button", { name: "Sign in" }).click();
@@ -65,9 +70,18 @@ export async function signOutViaMenu(page: Page): Promise<void> {
 }
 
 /**
- * Signs out by clearing session cookies (faster than hunting for a logout button).
+ * Signs out the current user so the next `login` starts from a clean session.
  */
 export async function logout(page: Page): Promise<void> {
+  const onAuthShell = await page
+    .getByRole("navigation", { name: "Main navigation" })
+    .isVisible()
+    .catch(() => false);
+
+  if (onAuthShell) {
+    await signOutViaMenu(page);
+  }
+
   await page.context().clearCookies();
 }
 

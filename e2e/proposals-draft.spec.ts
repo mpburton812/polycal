@@ -3,7 +3,7 @@ import { expect, test } from "./helpers/test";
 import { login } from "./helpers/auth";
 import { DEMO, USERS } from "./helpers/constants";
 import { goToProposals, selectProposalTab } from "./helpers/navigation";
-import { openEventOrSleepingProposalDraft } from "./helpers/proposals";
+import { exitDraftDialog, openEventOrSleepingProposalDraft } from "./helpers/proposals";
 
 function proposalCard(page: import("@playwright/test").Page, title: string) {
   return page.locator(".MuiCard-root").filter({
@@ -26,8 +26,7 @@ test.describe("Proposal draft workflows", () => {
     await dialog.getByRole("button", { name: "Save", exact: true }).click();
 
     await expect(dialog.getByRole("button", { name: "Submit" })).toBeVisible();
-    await dialog.getByRole("button", { name: "Cancel" }).click();
-    await expect(dialog).toBeHidden();
+    await exitDraftDialog(dialog);
 
     const card = proposalCard(page, title);
     await expect(card).toBeVisible();
@@ -44,7 +43,7 @@ test.describe("Proposal draft workflows", () => {
 
     const dialog = page.getByRole("dialog");
     await expect(dialog.getByRole("button", { name: "Submit" })).toBeVisible();
-    await dialog.getByRole("button", { name: "Cancel" }).click();
+    await exitDraftDialog(dialog);
 
     await expect(proposalCard(page, updatedTitle)).toBeVisible();
   });
@@ -64,7 +63,7 @@ test.describe("Proposal draft workflows", () => {
     await dialog.getByRole("button", { name: "Save", exact: true }).click();
 
     await expect(dialog.getByRole("button", { name: "Submit" })).toBeVisible();
-    await dialog.getByRole("button", { name: "Cancel" }).click();
+    await exitDraftDialog(dialog);
     await expect(proposalCard(page, title)).toBeVisible();
   });
 });
