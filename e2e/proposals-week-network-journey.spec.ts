@@ -1,6 +1,6 @@
 import { expect, test } from "./helpers/test";
 
-import { login, logout } from "./helpers/auth";
+import { loginWithOnboardingIfNeeded, logout } from "./helpers/auth";
 import { USERS } from "./helpers/constants";
 import { expectInAppNotification } from "./helpers/notifications";
 import { goToProposals, openProposalCard, selectProposalTab } from "./helpers/navigation";
@@ -15,7 +15,7 @@ test.describe("Week schedule poly-family journey", () => {
   test("proposer schedules solo week + social events, cancels a night, required accepts and optional declines with notes, notifications match actions", async ({
     page,
   }) => {
-    test.setTimeout(360_000);
+    test.setTimeout(420_000);
 
     const tag = Date.now();
     const weekPrefix = `E2E Week ${tag}`;
@@ -26,7 +26,7 @@ test.describe("Week schedule poly-family journey", () => {
     const escape = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
     // —— Phase 1: Luke schedules a week of intentional-solo sleeping nights ——
-    await login(page, USERS.luke.username);
+    await loginWithOnboardingIfNeeded(page, USERS.luke.username);
     await goToProposals(page);
 
     const nightCount = await createAndSubmitSoloSleepingWeek(page, {
@@ -87,7 +87,7 @@ test.describe("Week schedule poly-family journey", () => {
 
     // —— Phase 5: Leia (required) accepts ——
     await logout(page);
-    await login(page, USERS.leia.username);
+    await loginWithOnboardingIfNeeded(page, USERS.leia.username);
     await goToProposals(page);
     await selectProposalTab(page, "Proposed");
     await openProposalCard(page, dinnerTitle);
@@ -102,7 +102,7 @@ test.describe("Week schedule poly-family journey", () => {
 
     // —— Phase 6: Han (optional) declines with a comment note ——
     await logout(page);
-    await login(page, USERS.han.username);
+    await loginWithOnboardingIfNeeded(page, USERS.han.username);
     await goToProposals(page);
     await selectProposalTab(page, "Resolved");
     await openProposalCard(page, dinnerTitle);
@@ -125,13 +125,13 @@ test.describe("Week schedule poly-family journey", () => {
     await expectInAppNotification(page, /approved and scheduled/i);
 
     await logout(page);
-    await login(page, USERS.leia.username);
+    await loginWithOnboardingIfNeeded(page, USERS.leia.username);
     await expectInAppNotification(page, new RegExp(escape(dinnerTitle)));
     await expectInAppNotification(page, /needs your review/i);
     await expectInAppNotification(page, /approved and scheduled/i);
 
     await logout(page);
-    await login(page, USERS.luke.username);
+    await loginWithOnboardingIfNeeded(page, USERS.luke.username);
     await expectInAppNotification(page, /A vote was cast on/i);
     await expectInAppNotification(page, new RegExp(escape(cancelledBatchTitle)));
     await expectInAppNotification(page, /was cancelled/i);
