@@ -4,6 +4,7 @@ import { Box, Typography } from "@mui/material";
 import { useMemo } from "react";
 
 import type { ScheduleEvent } from "@/actions/schedule";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { ScheduleEventBlock } from "@/components/schedule/ScheduleEventBlock";
 import {
   addDays,
@@ -13,6 +14,8 @@ import {
   scheduleDayCellSx,
   startOfWeekMonday,
 } from "@/lib/schedule/dates";
+import { fontFamilies } from "@/theme/fonts";
+import { GARDEN_TOKENS, ORGANIC_RADIUS } from "@/theme/tokens";
 
 interface ScheduleWeekViewProps {
   weekStart: Date;
@@ -102,16 +105,17 @@ export function ScheduleWeekView({
                 }}
               >
                 {dayEvents.length === 0 ? (
-                  <Typography variant="caption" color="text.disabled">
+                  <Typography variant="caption" sx={{ color: GARDEN_TOKENS.inkMuted }}>
                     —
                   </Typography>
                 ) : (
-                  dayEvents.map((event) => (
+                  dayEvents.map((event, index) => (
                     <Box key={event.id} sx={{ flex: 1, minWidth: 0 }}>
                       <ScheduleEventBlock
                         event={event}
                         compact
                         timeZone={timeZone}
+                        rotationIndex={index}
                         onClick={() => onEventClick(event.proposalId)}
                       />
                     </Box>
@@ -137,44 +141,54 @@ export function ScheduleWeekView({
         gap: 1,
       }}
     >
-      {days.map((day) => {
+      {days.map((day, dayIndex) => {
         const key = localDateKey(day.toISOString(), timeZone);
         const dayEvents = eventsByDay.get(key) ?? [];
         const daySx = scheduleDayCellSx(day, timeZone);
         const isToday = isTodayDate(day, timeZone);
+        const stagger = dayIndex % 2 === 1 ? { mt: 0.75 } : undefined;
         return (
           <Box
             key={key}
             sx={{
               minHeight: 120,
               minWidth: 0,
-              border: 1,
-              borderColor: daySx.borderColor,
-              borderRadius: 1,
+              border: `2px solid ${GARDEN_TOKENS.ink}`,
+              borderRadius: ORGANIC_RADIUS,
               p: 1,
-              bgcolor: daySx.bgcolor,
+              bgcolor: daySx.bgcolor ?? GARDEN_TOKENS.surface,
               opacity: daySx.opacity,
               overflow: "hidden",
+              boxShadow: "none",
+              ...stagger,
             }}
           >
             <Typography
               variant="subtitle2"
               fontWeight={isToday ? 800 : 700}
-              color={isToday ? "primary.main" : "text.primary"}
-              sx={{ mb: 1 }}
+              sx={{
+                mb: 1,
+                fontFamily: fontFamilies.label,
+                color: isToday ? GARDEN_TOKENS.sage : GARDEN_TOKENS.ink,
+              }}
             >
               {formatDayHeader(day, timeZone)}
             </Typography>
             {dayEvents.length === 0 ? (
-              <Typography variant="caption" color="text.disabled">
-                No events
-              </Typography>
+              <EmptyState
+                illustration="schedule-day"
+                title="Nothing on the calendar"
+                description="Enjoy the quiet."
+                compact
+                data-testid="schedule-day-empty"
+              />
             ) : (
-              dayEvents.map((event) => (
+              dayEvents.map((event, index) => (
                 <ScheduleEventBlock
                   key={event.id}
                   event={event}
                   timeZone={timeZone}
+                  rotationIndex={index}
                   onClick={() => onEventClick(event.proposalId)}
                 />
               ))

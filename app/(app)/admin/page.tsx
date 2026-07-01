@@ -12,6 +12,8 @@ import { AdminUserManagementPanel } from "@/components/admin/AdminUserManagement
 import { auth } from "@/lib/auth";
 import { userHasAdminAccess } from "@/lib/admin-access";
 import { isNonProductionEnvironment } from "@/lib/env";
+import { brutalPageTitleSx } from "@/theme/brutalUi";
+import { GARDEN_TOKENS } from "@/theme/tokens";
 
 export default async function AdminPage() {
   const session = await auth();
@@ -31,8 +33,11 @@ export default async function AdminPage() {
 
   return (
     <>
-      <Typography variant="h5" component="h1" gutterBottom>
+      <Typography variant="h5" component="h1" gutterBottom sx={brutalPageTitleSx}>
         Admin
+      </Typography>
+      <Typography sx={{ mb: 2, color: GARDEN_TOKENS.inkMuted }}>
+        Group settings, members, and environment controls.
       </Typography>
       <Stack spacing={3}>
         <AdminForceReloadPanel />

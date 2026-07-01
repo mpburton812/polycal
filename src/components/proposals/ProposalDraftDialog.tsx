@@ -69,6 +69,7 @@ import {
   PAST_SCHEDULE_ICON,
   PAST_SCHEDULE_TEXT,
 } from "./proposalCardTheme";
+import { GARDEN_TOKENS } from "@/theme/tokens";
 import { sleepingDateToStartIso } from "@/lib/proposals/sleeping-schedule";
 import { formatSleepingDisplayTitle } from "@/lib/proposals/sleeping-display";
 import {
@@ -662,7 +663,7 @@ export function ProposalDraftDialog({
         sx: { bgcolor: "transparent", boxShadow: "none", overflow: "visible", maxHeight: "92vh" },
       }}
     >
-      <Card variant="outlined" sx={{ ...proposalCardSx, bgcolor: "background.paper", maxHeight: "92vh", display: "flex", flexDirection: "column" }}>
+      <Card variant="outlined" sx={{ ...proposalCardSx, bgcolor: GARDEN_TOKENS.surface, maxHeight: "92vh", display: "flex", flexDirection: "column" }}>
         <CardContent ref={contentRef} sx={{ pb: 1, overflow: "auto", flex: 1 }}>
           <Stack direction="row" justifyContent="space-between" alignItems="flex-start" sx={{ mb: 1.5 }}>
             <Chip label={typeBadgeLabel(proposalType)} size="small" sx={typeChipSx} />

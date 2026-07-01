@@ -6,7 +6,7 @@ import { revalidatePath } from "next/cache";
 import { auth } from "@/lib/auth";
 import { logUserActivity } from "@/lib/audit";
 import { AVATAR_OPTIONS, isCustomAvatarKey, type AvatarKey } from "@/lib/constants/avatars";
-import { isUserThemeId, type UserThemeId } from "@/lib/constants/themes";
+import { isUserThemeId, normalizeUserThemeId, type UserThemeId } from "@/lib/constants/themes";
 import { getDb } from "@/lib/db/client";
 import { ensureDbReady } from "@/lib/db/ensure-ready";
 import { polyGroup, users } from "@/lib/db/schema";
@@ -74,7 +74,7 @@ export async function saveOnboardingPreferencesAction(input: {
     .update(users)
     .set({
       avatarKey: input.avatarKey,
-      theme: input.theme as UserThemeId,
+      theme: normalizeUserThemeId(input.theme),
       timezone: resolveTimezone("UTC"),
       updatedAt: now,
     })

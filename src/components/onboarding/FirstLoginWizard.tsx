@@ -11,8 +11,6 @@ import {
   FormGroup,
   FormLabel,
   Paper,
-  Radio,
-  RadioGroup,
   Stack,
   Step,
   StepLabel,
@@ -32,11 +30,11 @@ import {
   updateNotificationPrefsAction,
 } from "@/actions/profile";
 import { AVATAR_OPTIONS } from "@/lib/constants/avatars";
-import {
-  USER_THEME_IDS,
-  USER_THEME_LABELS,
-  type UserThemeId,
-} from "@/lib/constants/themes";
+import { ThemeAccentPicker } from "@/components/ui/ThemeAccentPicker";
+import { normalizeUserThemeId, type UserThemeId } from "@/lib/constants/themes";
+import { brutalPaperSx } from "@/theme/brutalUi";
+import { fontFamilies } from "@/theme/fonts";
+import { GARDEN_TOKENS } from "@/theme/tokens";
 import {
   DEFAULT_NOTIFICATION_PREFS,
   type NotificationPrefs,
@@ -69,11 +67,7 @@ export function FirstLoginWizard({
   const [activeStep, setActiveStep] = useState(startStep);
   const [error, setError] = useState<string | null>(null);
   const [avatarKey, setAvatarKey] = useState(initialAvatarKey ?? "bird_blue");
-  const [theme, setTheme] = useState<UserThemeId>(
-    (USER_THEME_IDS.includes(initialTheme as UserThemeId)
-      ? initialTheme
-      : "mint") as UserThemeId,
-  );
+  const [theme, setTheme] = useState<UserThemeId>(normalizeUserThemeId(initialTheme));
   const [selectedPartners, setSelectedPartners] = useState<string[]>([]);
   const [prefs, setPrefs] = useState<NotificationPrefs>(DEFAULT_NOTIFICATION_PREFS);
   const [welcomeMessage, setWelcomeMessage] = useState<string | null>(null);
@@ -148,8 +142,13 @@ export function FirstLoginWizard({
 
   if (welcomeMessage !== null && activeStep === 4) {
     return (
-      <Paper sx={{ p: 3, maxWidth: 640, mx: "auto" }}>
-        <Typography variant="h5" component="h1" gutterBottom>
+      <Paper elevation={0} sx={{ ...brutalPaperSx, maxWidth: 640, mx: "auto" }}>
+        <Typography
+          variant="h5"
+          component="h1"
+          gutterBottom
+          sx={{ fontFamily: fontFamilies.display, fontWeight: 700, color: GARDEN_TOKENS.ink }}
+        >
           Welcome!
         </Typography>
         <Typography sx={{ mb: 3, whiteSpace: "pre-wrap" }}>{welcomeMessage}</Typography>
@@ -161,11 +160,16 @@ export function FirstLoginWizard({
   }
 
   return (
-    <Paper sx={{ p: 3, maxWidth: 640, mx: "auto" }}>
-      <Typography variant="h5" component="h1" gutterBottom>
+    <Paper elevation={0} sx={{ ...brutalPaperSx, maxWidth: 640, mx: "auto" }}>
+      <Typography
+        variant="h5"
+        component="h1"
+        gutterBottom
+        sx={{ fontFamily: fontFamilies.display, fontWeight: 700, color: GARDEN_TOKENS.ink }}
+      >
         Welcome to PolyCal
       </Typography>
-      <Typography color="text.secondary" sx={{ mb: 3 }}>
+      <Typography sx={{ mb: 3, color: GARDEN_TOKENS.inkMuted }}>
         Complete these steps before using the app.
       </Typography>
       <Stepper activeStep={activeStep} sx={{ mb: 3 }}>
@@ -234,16 +238,7 @@ export function FirstLoginWizard({
           </FormControl>
           <FormControl component="fieldset">
             <FormLabel component="legend">Accent theme</FormLabel>
-            <RadioGroup value={theme} onChange={(e) => setTheme(e.target.value as UserThemeId)}>
-              {USER_THEME_IDS.map((id) => (
-                <FormControlLabel
-                  key={id}
-                  value={id}
-                  control={<Radio />}
-                  label={USER_THEME_LABELS[id]}
-                />
-              ))}
-            </RadioGroup>
+            <ThemeAccentPicker value={theme} onChange={setTheme} />
           </FormControl>
           <Button variant="contained" onClick={saveAvatarAndTheme} disabled={pending}>
             Continue

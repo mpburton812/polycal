@@ -12,8 +12,6 @@ import {
   FormLabel,
   MenuItem,
   Paper,
-  Radio,
-  RadioGroup,
   Select,
   Stack,
   TextField,
@@ -32,18 +30,16 @@ import {
   uploadCustomAvatarAction,
 } from "@/actions/profile";
 import { AVATAR_OPTIONS, avatarSrcForKey, isCustomAvatarKey } from "@/lib/constants/avatars";
-import {
-  USER_THEME_IDS,
-  USER_THEME_LABELS,
-  type UserThemeId,
-} from "@/lib/constants/themes";
+import { AvatarCropDialog } from "@/components/profile/AvatarCropDialog";
+import { ThemeAccentPicker } from "@/components/ui/ThemeAccentPicker";
+import { normalizeUserThemeId, type UserThemeId } from "@/lib/constants/themes";
 import {
   COMMON_TIMEZONES,
   resolveTimezone,
 } from "@/lib/schedule/timezone";
 import type { NotificationPrefs } from "@/types/notification-prefs";
 import { subscribeToWebPush } from "@/lib/push-client";
-import { AvatarCropDialog } from "@/components/profile/AvatarCropDialog";
+import { brutalPaperSx, brutalSectionTitleSx } from "@/theme/brutalUi";
 
 const ALERT_TYPE_LABELS: Record<keyof NotificationPrefs["alertTypes"], string> = {
   sleepingProposals: "Sleeping proposals",
@@ -77,11 +73,7 @@ export function ProfileSettings({
   const { update } = useSession();
   const [displayName, setDisplayName] = useState(initialDisplayName);
   const [avatarKey, setAvatarKey] = useState(initialAvatarKey ?? "bird_blue");
-  const [theme, setTheme] = useState<UserThemeId>(
-    (USER_THEME_IDS.includes(initialTheme as UserThemeId)
-      ? initialTheme
-      : "mint") as UserThemeId,
-  );
+  const [theme, setTheme] = useState<UserThemeId>(normalizeUserThemeId(initialTheme));
   const [timezone, setTimezone] = useState(resolveTimezone(initialTimezone));
   const [notificationPrefs, setNotificationPrefs] = useState(initialNotificationPrefs);
   const [notificationEmail, setNotificationEmail] = useState(initialNotificationEmail ?? "");
@@ -271,8 +263,8 @@ export function ProfileSettings({
 
   return (
     <Stack spacing={3}>
-      <Paper sx={{ p: 3 }}>
-        <Typography variant="h6" gutterBottom>
+      <Paper elevation={0} sx={brutalPaperSx}>
+        <Typography variant="h6" gutterBottom sx={brutalSectionTitleSx}>
           Display name
         </Typography>
         {nameError && <Alert severity="error" sx={{ mb: 2 }}>{nameError}</Alert>}
@@ -290,8 +282,8 @@ export function ProfileSettings({
         </Stack>
       </Paper>
 
-      <Paper sx={{ p: 3 }}>
-        <Typography variant="h6" gutterBottom>
+      <Paper elevation={0} sx={brutalPaperSx}>
+        <Typography variant="h6" gutterBottom sx={brutalSectionTitleSx}>
           Password
         </Typography>
         {mustChangePassword && (
@@ -342,8 +334,8 @@ export function ProfileSettings({
         </Box>
       </Paper>
 
-      <Paper sx={{ p: 3 }}>
-        <Typography variant="h6" gutterBottom>
+      <Paper elevation={0} sx={brutalPaperSx}>
+        <Typography variant="h6" gutterBottom sx={brutalSectionTitleSx}>
           Avatar & accent theme
         </Typography>
         {prefsError && (
@@ -407,19 +399,7 @@ export function ProfileSettings({
 
           <FormControl component="fieldset" sx={{ mb: 2 }}>
             <FormLabel component="legend">Accent theme</FormLabel>
-            <RadioGroup
-              value={theme}
-              onChange={(event) => setTheme(event.target.value as UserThemeId)}
-            >
-              {USER_THEME_IDS.map((id) => (
-                <FormControlLabel
-                  key={id}
-                  value={id}
-                  control={<Radio />}
-                  label={USER_THEME_LABELS[id]}
-                />
-              ))}
-            </RadioGroup>
+            <ThemeAccentPicker value={theme} onChange={setTheme} />
           </FormControl>
 
           <FormControl fullWidth sx={{ mb: 2 }}>
@@ -446,8 +426,8 @@ export function ProfileSettings({
         </Box>
       </Paper>
 
-      <Paper sx={{ p: 3 }}>
-        <Typography variant="h6" gutterBottom>
+      <Paper elevation={0} sx={brutalPaperSx}>
+        <Typography variant="h6" gutterBottom sx={brutalSectionTitleSx}>
           Notifications
         </Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
@@ -607,8 +587,8 @@ export function ProfileSettings({
         </Button>
       </Paper>
 
-      <Paper sx={{ p: 3 }}>
-        <Typography variant="h6" gutterBottom>
+      <Paper elevation={0} sx={brutalPaperSx}>
+        <Typography variant="h6" gutterBottom sx={brutalSectionTitleSx}>
           Session
         </Typography>
         <Button

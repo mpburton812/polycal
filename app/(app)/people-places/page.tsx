@@ -8,6 +8,8 @@ import { listPeopleAction, getProvisioningPolicyAction } from "@/actions/users";
 import { PeoplePlacesClient } from "@/components/people-places/PeoplePlacesClient";
 import { auth } from "@/lib/auth";
 import { userHasAdminAccess } from "@/lib/admin-access";
+import { brutalPageTitleSx } from "@/theme/brutalUi";
+import { GARDEN_TOKENS } from "@/theme/tokens";
 
 export default async function PeoplePlacesPage() {
   const session = await auth();
@@ -27,10 +29,10 @@ export default async function PeoplePlacesPage() {
 
   return (
     <>
-      <Typography variant="h5" component="h1" gutterBottom>
+      <Typography variant="h5" component="h1" gutterBottom sx={brutalPageTitleSx}>
         People &amp; Places
       </Typography>
-      <Typography color="text.secondary" sx={{ mb: 3 }}>
+      <Typography sx={{ mb: 3, color: GARDEN_TOKENS.inkMuted }}>
         Manage network members, sleeping partnerships, and shared locations.
       </Typography>
       <PeoplePlacesClient

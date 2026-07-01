@@ -9,7 +9,7 @@ import { z } from "zod";
 import { auth } from "@/lib/auth";
 import { logUserActivity } from "@/lib/audit";
 import { sendEmail } from "@/lib/email/send";
-import { isUserThemeId, type UserThemeId } from "@/lib/constants/themes";
+import { isUserThemeId, normalizeUserThemeId, type UserThemeId } from "@/lib/constants/themes";
 import { resolveTimezone } from "@/lib/schedule/timezone";
 import { AVATAR_OPTIONS, isCustomAvatarKey, type AvatarKey } from "@/lib/constants/avatars";
 import { getDb } from "@/lib/db/client";
@@ -220,7 +220,7 @@ export async function updateProfilePreferencesAction(
     .update(users)
     .set({
       avatarKey: parsed.data.avatarKey,
-      theme: parsed.data.theme as UserThemeId,
+      theme: normalizeUserThemeId(parsed.data.theme),
       timezone,
       updatedAt: now,
     })

@@ -6,6 +6,8 @@ import { listProposalBoardAction, listProposalPlaceOptionsAction } from "@/actio
 import { listPeopleAction } from "@/actions/users";
 import { ProposalsClient } from "@/components/proposals/ProposalsClient";
 import { auth } from "@/lib/auth";
+import { brutalPageTitleSx } from "@/theme/brutalUi";
+import { GARDEN_TOKENS } from "@/theme/tokens";
 
 export default async function ProposalsPage() {
   const session = await auth();
@@ -21,10 +23,10 @@ export default async function ProposalsPage() {
 
   return (
     <>
-      <Typography variant="h5" component="h1" gutterBottom>
+      <Typography variant="h5" component="h1" gutterBottom sx={brutalPageTitleSx}>
         Proposals
       </Typography>
-      <Typography color="text.secondary" sx={{ mb: 3 }}>
+      <Typography sx={{ mb: 3, color: GARDEN_TOKENS.inkMuted }}>
         Draft, submit, vote, and resolve proposals. Click any card for details and actions.
       </Typography>
       <Suspense fallback={null}>
