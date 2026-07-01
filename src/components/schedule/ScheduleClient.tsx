@@ -45,8 +45,7 @@ import {
   startOfWeekMonday,
 } from "@/lib/schedule/dates";
 import { endOfMonth, startOfMonth } from "@/lib/schedule/month-grid";
-
-const POLY_GREEN = "#004d40";
+import { GARDEN_TOKENS, SCHEDULE_SEMANTIC_COLORS } from "@/theme/tokens";
 
 interface ScheduleClientProps {
   initialPayload: SchedulePayload;
@@ -384,11 +383,6 @@ export function ScheduleClient({
           sx={{
             alignSelf: "center",
             textTransform: "none",
-            ...(viewState.planningOpen && {
-              bgcolor: POLY_GREEN,
-              color: "#fff",
-              "&:hover": { bgcolor: "#00695c" },
-            }),
           }}
         >
           <EventNoteIcon sx={{ mr: 0.5, fontSize: 18 }} />
@@ -397,17 +391,19 @@ export function ScheduleClient({
       </Stack>
 
       <Stack direction="row" spacing={2} sx={{ mb: 1 }} flexWrap="wrap" useFlexGap>
-        <Typography variant="caption">■ Proposed</Typography>
-        <Typography variant="caption" color="#2e7d32">
+        <Typography variant="caption" sx={{ color: SCHEDULE_SEMANTIC_COLORS.proposed.text }}>
+          ■ Proposed
+        </Typography>
+        <Typography variant="caption" sx={{ color: SCHEDULE_SEMANTIC_COLORS.resolved_event.text }}>
           ■ Approved events
         </Typography>
-        <Typography variant="caption" color="#1565c0">
+        <Typography variant="caption" sx={{ color: SCHEDULE_SEMANTIC_COLORS.resolved_sleeping.text }}>
           ■ Sleeping
         </Typography>
-        <Typography variant="caption" color="#c62828">
+        <Typography variant="caption" sx={{ color: SCHEDULE_SEMANTIC_COLORS.conflict.text }}>
           ■ Conflict
         </Typography>
-        <Typography variant="caption" color="#e65100">
+        <Typography variant="caption" sx={{ color: SCHEDULE_SEMANTIC_COLORS.at_risk.text }}>
           ■ At risk / tentative
         </Typography>
       </Stack>

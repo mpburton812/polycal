@@ -1,8 +1,20 @@
+:root {
+  --garden-background: #f7f2ea;
+  --garden-surface: #fffdf8;
+  --garden-ink: #1a1a1a;
+  --garden-ink-muted: #5c534a;
+  --garden-outline-soft: #d4c4b0;
+  --garden-sage: #6b8f71;
+  --garden-organic-radius: 20px 8px 18px 10px;
+}
+
 html,
 body {
   margin: 0;
   padding: 0;
   min-height: 100%;
+  background-color: var(--garden-background);
+  color: var(--garden-ink);
 }
 
 * {

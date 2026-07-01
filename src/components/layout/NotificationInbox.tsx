@@ -27,6 +27,10 @@ import {
   dismissNotificationAction,
   type NotificationItem,
 } from "@/actions/notifications";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { brutalPopoverPaperSx } from "@/theme/brutalUi";
+import { fontFamilies } from "@/theme/fonts";
+import { GARDEN_TOKENS } from "@/theme/tokens";
 
 function formatNotificationType(type: string): string {
   return type.replaceAll("_", " ");
@@ -155,10 +159,13 @@ export function NotificationInbox({
         onClose={handleClose}
         anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
         transformOrigin={{ vertical: "top", horizontal: "right" }}
-        slotProps={{ paper: { sx: { width: 360, maxWidth: "95vw" } } }}
+        slotProps={{ paper: { sx: { ...brutalPopoverPaperSx, width: 360, maxWidth: "95vw" } } }}
       >
         <Box sx={{ px: 2, py: 1.5, display: "flex", alignItems: "center", gap: 1 }}>
-          <Typography variant="subtitle1" sx={{ flexGrow: 1 }}>
+          <Typography
+            variant="subtitle1"
+            sx={{ flexGrow: 1, fontFamily: fontFamilies.display, fontWeight: 700 }}
+          >
             Notifications
           </Typography>
           {items.length > 0 && (
@@ -172,11 +179,14 @@ export function NotificationInbox({
         </Box>
         <Divider />
         {items.length === 0 ? (
-          <Typography variant="body2" color="text.secondary" sx={{ p: 2 }}>
-            No new notifications.
-          </Typography>
+          <EmptyState
+            title="All caught up"
+            description="No new notifications right now."
+            compact
+            data-testid="notifications-empty"
+          />
         ) : (
-          <List dense disablePadding sx={{ maxHeight: 360, overflow: "auto" }}>
+          <List dense disablePadding sx={{ maxHeight: 360, overflow: "auto", px: 1.5, pb: 1 }}>
             {items.map((item) => {
               const partnershipId =
                 typeof item.metadata.partnershipId === "string"
@@ -211,7 +221,16 @@ export function NotificationInbox({
                       <CloseIcon fontSize="small" />
                     </IconButton>
                   }
-                  sx={{ alignItems: "flex-start", py: 1.5, flexDirection: "column" }}
+                  sx={{
+                    alignItems: "flex-start",
+                    py: 1.5,
+                    flexDirection: "column",
+                    mb: 1,
+                    mx: 0,
+                    border: `2px solid ${GARDEN_TOKENS.ink}`,
+                    borderRadius: "16px 6px 14px 8px",
+                    bgcolor: GARDEN_TOKENS.surface,
+                  }}
                 >
                   <ListItemText
                     primary={item.message}

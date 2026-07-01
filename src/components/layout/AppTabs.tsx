@@ -12,6 +12,9 @@ import {
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
+import { fontFamilies } from "@/theme/fonts";
+import { GARDEN_TOKENS } from "@/theme/tokens";
+
 const tabs = [
   { label: "Schedule", href: "/schedule", icon: EventNoteIcon },
   { label: "Proposals", href: "/proposals", icon: HowToVoteIcon },
@@ -20,7 +23,7 @@ const tabs = [
 ] as const;
 
 /**
- * Bottom tab navigation — spec order: Schedule, Proposals, People & Places, Admin.
+ * Bottom tab navigation with ink border and flat fill (Garden Brutalism).
  */
 export function AppTabs({ isAdmin }: { isAdmin: boolean }) {
   const pathname = usePathname();
@@ -33,10 +36,36 @@ export function AppTabs({ isAdmin }: { isAdmin: boolean }) {
     <Paper
       component="nav"
       aria-label="Main navigation"
-      sx={{ position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 1100 }}
-      elevation={3}
+      elevation={0}
+      sx={{
+        position: "fixed",
+        bottom: 0,
+        left: 0,
+        right: 0,
+        zIndex: 1100,
+        bgcolor: GARDEN_TOKENS.surface,
+        borderTop: `3px solid ${GARDEN_TOKENS.ink}`,
+        borderRadius: 0,
+        boxShadow: "none",
+      }}
     >
-      <BottomNavigation value={current} showLabels>
+      <BottomNavigation
+        value={current}
+        showLabels
+        sx={{
+          bgcolor: "transparent",
+          "& .MuiBottomNavigationAction-root": {
+            fontFamily: fontFamilies.label,
+            fontWeight: 600,
+            fontSize: "0.7rem",
+            color: GARDEN_TOKENS.inkMuted,
+            minWidth: 0,
+            "&.Mui-selected": {
+              color: GARDEN_TOKENS.sage,
+            },
+          },
+        }}
+      >
         {visibleTabs.map((tab) => {
           const Icon = tab.icon;
           return (
