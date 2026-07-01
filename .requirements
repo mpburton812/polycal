@@ -128,3 +128,4 @@
 2026-06-30 | fb4d948 | PC-62 | align E2E with sleeping auto titles and Exit draft UX | e2e/helpers/auth.ts
 2026-06-30 | 6f6a95a | PC-40 | extend Playful Collective theme to all app pages | src/actions/onboarding.ts
 2026-07-01 | 743e1e3 | PC-40 | Garden Brutalism and Playful Collective theme across app | src/actions/onboarding.ts
+2026-07-01 | a4be87b | PC-40 | raise toast z-index above bottom nav for E2E visibility | src/components/providers/ToastProvider.tsx
