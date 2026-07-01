@@ -53,6 +53,7 @@ import {
 } from "@/actions/places";
 import { AdminCollapsibleSection } from "@/components/admin/AdminCollapsibleSection";
 import { AVATAR_OPTIONS, avatarSrcForKey } from "@/lib/constants/avatars";
+import { brutalPersonRowSx } from "@/theme/brutalUi";
 
 interface PeoplePlacesClientProps {
   people: PersonSummary[];
@@ -960,12 +961,7 @@ export function PeoplePlacesClient({
             return (
             <Box
               key={person.id}
-              sx={{
-                p: 2,
-                border: 1,
-                borderColor: selectedPersonId === person.id ? "primary.main" : "divider",
-                borderRadius: 1,
-              }}
+              sx={brutalPersonRowSx(selectedPersonId === person.id)}
             >
               <Stack
                 direction="row"

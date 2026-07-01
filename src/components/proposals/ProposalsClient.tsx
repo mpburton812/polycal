@@ -31,6 +31,8 @@ import { ResidencyCreateDialog } from "./ResidencyCreateDialog";
 import { SleepingPartnerCreateDialog } from "./SleepingPartnerCreateDialog";
 import { PARTNERSHIP_CARD_PREFIX } from "@/lib/proposals/constants";
 import { useToast } from "@/components/providers/ToastProvider";
+import { EmptyState, type EmptyStateIllustration } from "@/components/ui/EmptyState";
+import { GARDEN_TOKENS } from "@/theme/tokens";
 
 const TAB_KEYS = ["draft", "proposed", "resolved", "archived"] as const;
 type TabKey = (typeof TAB_KEYS)[number];
@@ -42,7 +44,28 @@ const TAB_LABELS: Record<TabKey, string> = {
   archived: "Archived",
 };
 
-const POLY_GREEN = "#004d40";
+const TAB_EMPTY: Record<
+  TabKey,
+  { title: string; description: string; illustration?: EmptyStateIllustration }
+> = {
+  draft: {
+    title: "No drafts yet",
+    description: "Start a proposal when inspiration strikes.",
+  },
+  proposed: {
+    title: "Nothing in flight",
+    description: "Proposed plans waiting for votes will show up here.",
+  },
+  resolved: {
+    title: "Nothing resolved yet",
+    description: "Approved plans land here once everyone agrees.",
+  },
+  archived: {
+    title: "Nothing archived yet",
+    description: "Your resolved plans will live here for safekeeping.",
+    illustration: "proposals-archived",
+  },
+};
 
 /** Event/sleeping drafts edited via ProposalDraftDialog — not residency or group rename. */
 function isStandardDraftProposal(proposal: ProposalCardData): boolean {
@@ -166,10 +189,16 @@ export function ProposalsClient({
         variant="fullWidth"
         sx={{
           mb: 3,
-          borderBottom: 1,
-          borderColor: "divider",
-          "& .MuiTab-root.Mui-selected": { color: POLY_GREEN, fontWeight: 600 },
-          "& .MuiTabs-indicator": { bgcolor: POLY_GREEN },
+          borderBottom: `2px solid ${GARDEN_TOKENS.ink}`,
+          "& .MuiTab-root": {
+            fontFamily: "var(--font-space-grotesk), sans-serif",
+            fontWeight: 600,
+          },
+          "& .MuiTab-root.Mui-selected": { color: GARDEN_TOKENS.sage },
+          "& .MuiTabs-indicator": {
+            bgcolor: GARDEN_TOKENS.sage,
+            height: 3,
+          },
         }}
       >
         {TAB_KEYS.map((key) => (
@@ -182,9 +211,12 @@ export function ProposalsClient({
       </Tabs>
 
       {proposals.length === 0 ? (
-        <Typography variant="body2" color="text.secondary" sx={{ py: 4, textAlign: "center" }}>
-          No proposals in {TAB_LABELS[activeTab].toLowerCase()}.
-        </Typography>
+        <EmptyState
+          illustration={TAB_EMPTY[activeTab].illustration}
+          title={TAB_EMPTY[activeTab].title}
+          description={TAB_EMPTY[activeTab].description}
+          data-testid={`proposals-empty-${activeTab}`}
+        />
       ) : (
         <Box
           sx={{
@@ -217,8 +249,14 @@ export function ProposalsClient({
           position: "fixed",
           bottom: 88,
           right: 24,
-          bgcolor: POLY_GREEN,
-          "&:hover": { bgcolor: "#00332c" },
+          bgcolor: GARDEN_TOKENS.sage,
+          color: GARDEN_TOKENS.surface,
+          border: `3px solid ${GARDEN_TOKENS.ink}`,
+          boxShadow: "none",
+          "&:hover": {
+            bgcolor: "#557A5C",
+            boxShadow: "none",
+          },
         }}
       >
         <AddIcon />

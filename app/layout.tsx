@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from "next";
 
 import { AppProviders } from "@/components/providers/AppProviders";
+import { fontClassNames } from "@/theme/fonts";
+import { GARDEN_TOKENS } from "@/theme/tokens";
 
 import "./globals.css";
 
@@ -14,7 +16,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#5c6bc0",
+  themeColor: GARDEN_TOKENS.sage,
   width: "device-width",
   initialScale: 1,
 };
@@ -26,7 +28,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body>
+      <body className={fontClassNames}>
         <AppProviders>{children}</AppProviders>
       </body>
     </html>

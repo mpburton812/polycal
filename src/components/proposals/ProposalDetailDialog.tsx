@@ -67,6 +67,7 @@ import {
 } from "./proposalCardTheme";
 import { formatProposalLogLine } from "@/lib/proposals/state-log-format";
 import { isoToSleepingDateInput, sleepingDateToStartIso } from "@/lib/proposals/sleeping-schedule";
+import { GARDEN_TOKENS } from "@/theme/tokens";
 
 const VOTE_STATUS_LABELS: Record<InviteeVoteStatus, string> = {
   not_seen: "Not yet viewed",
@@ -439,7 +440,7 @@ export function ProposalDetailDialog({
         variant="outlined"
         sx={{
           ...proposalCardSx,
-          bgcolor: "background.paper",
+          bgcolor: GARDEN_TOKENS.surface,
           maxHeight: "min(90vh, 900px)",
           display: "flex",
           flexDirection: "column",

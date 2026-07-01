@@ -126,3 +126,4 @@
 2026-06-30 | 032538b | PC-62 | sleeping calendar UX epic - | src/actions/admin.ts
 2026-06-30 | 010126d | PC-70 | align E2E with Save draft button label | e2e/birthday-party-journey.spec.ts
 2026-06-30 | fb4d948 | PC-62 | align E2E with sleeping auto titles and Exit draft UX | e2e/helpers/auth.ts
+2026-06-30 | 6f6a95a | PC-40 | extend Playful Collective theme to all app pages | src/actions/onboarding.ts

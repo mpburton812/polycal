@@ -4,6 +4,9 @@ import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import { Box, Collapse, IconButton, Paper, Stack, Typography } from "@mui/material";
 import { useId, useState, type ReactNode } from "react";
 
+import { brutalSectionTitleSx } from "@/theme/brutalUi";
+import { GARDEN_TOKENS, ORGANIC_RADIUS, STROKE_DEFAULT } from "@/theme/tokens";
+
 interface AdminCollapsibleSectionProps {
   title: string;
   children: ReactNode;
@@ -27,7 +30,16 @@ export function AdminCollapsibleSection({
   }
 
   return (
-    <Paper sx={{ overflow: "hidden" }}>
+    <Paper
+      elevation={0}
+      sx={{
+        overflow: "hidden",
+        bgcolor: GARDEN_TOKENS.surface,
+        border: STROKE_DEFAULT,
+        borderRadius: ORGANIC_RADIUS,
+        boxShadow: "none",
+      }}
+    >
       <Stack
         direction="row"
         alignItems="center"
@@ -43,9 +55,15 @@ export function AdminCollapsibleSection({
         tabIndex={0}
         aria-expanded={expanded}
         aria-controls={panelId}
-        sx={{ px: 2, py: 1.5, cursor: "pointer", userSelect: "none" }}
+        sx={{
+          px: 2,
+          py: 1.5,
+          cursor: "pointer",
+          userSelect: "none",
+          bgcolor: expanded ? `${GARDEN_TOKENS.mustard}33` : "transparent",
+        }}
       >
-        <Typography variant="h6" component="h2" sx={{ flex: 1 }}>
+        <Typography variant="h6" component="h2" sx={{ flex: 1, ...brutalSectionTitleSx }}>
           {title}
         </Typography>
         {headerAction}
