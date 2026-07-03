@@ -3,6 +3,7 @@
 import CloseIcon from "@mui/icons-material/Close";
 import NotificationsNoneIcon from "@mui/icons-material/NotificationsNone";
 import {
+  Alert,
   Badge,
   Box,
   Button,
@@ -20,7 +21,11 @@ import { useState, useTransition, type MouseEvent } from "react";
 
 import { respondPartnershipAction } from "@/actions/partnerships";
 import { respondResidencyAction } from "@/actions/places";
-import { respondAttendeeUpdateAction } from "@/actions/proposals";
+import {
+  castProposalVoteAction,
+  respondAttendeeUpdateAction,
+} from "@/actions/proposals";
+import { buildProposalNotificationDetail } from "@/lib/notifications-detail";
 import { RESIDENCY_CARD_PREFIX } from "@/lib/proposals/constants";
 import {
   clearAllNotificationsAction,
@@ -47,6 +52,20 @@ function isProposalOpenAction(
 }
 
 /**
+ * True when the signed-in recipient can accept (vote) directly from the inbox.
+ * These notifications are only delivered to invitees who still need to respond.
+ */
+function canAcceptFromNotification(
+  type: string,
+  proposalId: string | null,
+  metadata: Record<string, unknown>,
+): boolean {
+  if (!proposalId) return false;
+  if (type === "proposal_submitted") return true;
+  return metadata.action === "vote";
+}
+
+/**
  * Header notification bell with dismissible inbox popover (PC-40, PC-43).
  */
 export function NotificationInbox({
@@ -60,6 +79,7 @@ export function NotificationInbox({
   const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
   const [items, setItems] = useState(initialItems);
   const [count, setCount] = useState(initialCount);
+  const [feedback, setFeedback] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
   const open = Boolean(anchorEl);
@@ -106,6 +126,17 @@ export function NotificationInbox({
       removeFromList(logId);
       handleClose();
       router.push(`/proposals?open=${encodeURIComponent(openTarget)}`);
+      router.refresh();
+    });
+  }
+
+  function acceptProposal(logId: number, proposalId: string) {
+    startTransition(async () => {
+      const result = await castProposalVoteAction({ proposalId, vote: "accept" });
+      setFeedback(result.message);
+      if (!result.ok) return;
+      await dismissNotificationAction(logId);
+      removeFromList(logId);
       router.refresh();
     });
   }
@@ -178,6 +209,15 @@ export function NotificationInbox({
           </IconButton>
         </Box>
         <Divider />
+        {feedback && (
+          <Alert
+            severity="info"
+            onClose={() => setFeedback(null)}
+            sx={{ mx: 1.5, mt: 1 }}
+          >
+            {feedback}
+          </Alert>
+        )}
         {items.length === 0 ? (
           <EmptyState
             title="All caught up"
@@ -206,6 +246,12 @@ export function NotificationInbox({
               const openTarget = residencyId
                 ? `${RESIDENCY_CARD_PREFIX}${residencyId}`
                 : proposalId;
+              const showAccept = canAcceptFromNotification(
+                item.type,
+                proposalId,
+                item.metadata,
+              );
+              const detail = buildProposalNotificationDetail(item.metadata);
 
               return (
                 <ListItem
@@ -235,10 +281,22 @@ export function NotificationInbox({
                   <ListItemText
                     primary={item.message}
                     secondary={
-                      <Typography component="span" variant="caption" display="block">
-                        {formatNotificationType(item.type)} ·{" "}
-                        {new Date(item.createdAt).toLocaleString()}
-                      </Typography>
+                      <>
+                        {detail && (
+                          <Typography
+                            component="span"
+                            variant="caption"
+                            display="block"
+                            sx={{ fontWeight: 600, mb: 0.25 }}
+                          >
+                            {detail}
+                          </Typography>
+                        )}
+                        <Typography component="span" variant="caption" display="block">
+                          {formatNotificationType(item.type)} ·{" "}
+                          {new Date(item.createdAt).toLocaleString()}
+                        </Typography>
+                      </>
                     }
                     primaryTypographyProps={{ variant: "body2" }}
                   />
@@ -304,6 +362,16 @@ export function NotificationInbox({
                         </Button>
                       </>
                     )}
+                    {showAccept && proposalId && (
+                      <Button
+                        size="small"
+                        variant="contained"
+                        disabled={pending}
+                        onClick={() => acceptProposal(item.id, proposalId)}
+                      >
+                        Accept
+                      </Button>
+                    )}
                     {showOpenProposal && openTarget && (
                       <Button
                         size="small"
@@ -311,7 +379,7 @@ export function NotificationInbox({
                         disabled={pending}
                         onClick={() => openProposalTarget(item.id, openTarget)}
                       >
-                        Open Proposal
+                        Open Notification
                       </Button>
                     )}
                   </Stack>

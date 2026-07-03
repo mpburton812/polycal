@@ -98,6 +98,14 @@ self.addEventListener("push", (event) => {
 
   const targetUrl = payload.url ?? "/";
 
+  // `actions` and `proposalId` arrive as parsed JSON on the payload; cast the
+  // loosely-typed record to read them for inline action buttons (Accept / Open).
+  const raw = payload as unknown as {
+    actions?: { action: string; title: string }[];
+    proposalId?: string;
+  };
+  const actions = Array.isArray(raw.actions) ? raw.actions.slice(0, 2) : undefined;
+
   event.waitUntil(
 
     self.registration.showNotification(payload.title ?? fallback.title, {
@@ -108,7 +116,9 @@ self.addEventListener("push", (event) => {
 
       requireInteraction: requiresInteraction(payload.notificationType),
 
-      data: { url: targetUrl },
+      ...(actions ? { actions } : {}),
+
+      data: { url: targetUrl, proposalId: raw.proposalId },
 
     }),
 
@@ -122,28 +132,53 @@ self.addEventListener("notificationclick", (event) => {
 
   event.notification.close();
 
-  const targetUrl = (event.notification.data?.url as string | undefined) ?? "/";
+  const data = (event.notification.data ?? {}) as {
+    url?: string;
+    proposalId?: string;
+  };
+  const targetUrl = data.url ?? "/";
 
+  // Inline "Accept" action: POST the accept vote from the service worker using
+  // the recipient's cookie session, then focus/open the app. Falls through to a
+  // normal open on failure so the user can act manually.
+  if (event.action === "accept" && data.proposalId) {
+    event.waitUntil(
+      fetch("/api/notifications/accept", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ proposalId: data.proposalId }),
+      })
+        .catch(() => undefined)
+        .then(() => focusOrOpen(targetUrl)),
+    );
+    return;
+  }
 
-
-  event.waitUntil(
-
-    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clientList) => {
-
-      for (const client of clientList) {
-        if ("focus" in client) {
-          const windowClient = client as WindowClient;
-          return windowClient
-            .navigate(targetUrl)
-            .then((navigated) => navigated?.focus() ?? windowClient.focus());
-        }
-      }
-
-      return self.clients.openWindow(targetUrl);
-
-    }),
-
-  );
+  event.waitUntil(focusOrOpen(targetUrl));
 
 });
+
+
+
+/** Focuses an existing app window (navigating it) or opens a new one. */
+async function focusOrOpen(targetUrl: string): Promise<void> {
+
+  const clientList = await self.clients.matchAll({
+    type: "window",
+    includeUncontrolled: true,
+  });
+
+  for (const client of clientList) {
+    if ("focus" in client) {
+      const windowClient = client as WindowClient;
+      const navigated = await windowClient.navigate(targetUrl);
+      (navigated ?? windowClient).focus();
+      return;
+    }
+  }
+
+  await self.clients.openWindow(targetUrl);
+
+}
 
