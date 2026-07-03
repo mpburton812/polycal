@@ -1,4 +1,8 @@
 import { addDays, localDateKey, startOfWeekMonday } from "./dates";
+import { isAllDayEventSlot } from "@/lib/proposals/all-day-events";
+
+const TWELVE_HOURS_MS = 12 * 60 * 60 * 1000;
+const TWENTY_FIVE_HOURS_MS = 25 * 60 * 60 * 1000;
 
 /** First calendar day of the month containing `date`. */
 export function startOfMonth(date: Date): Date {
@@ -50,9 +54,27 @@ export function eventSpanInGrid(
   if (startIndex < 0) return null;
 
   const endIso = endAt ?? startAt;
+  const startDay = localDateKey(startAt, timeZone);
+  const endDay = localDateKey(endIso, timeZone);
   let endIndex = dayIndexInGrid(grid, endIso, timeZone);
   if (endIndex < 0) endIndex = startIndex;
   if (endIndex < startIndex) endIndex = startIndex;
+
+  const durationMs = new Date(endIso).getTime() - new Date(startAt).getTime();
+
+  // Month bars represent calendar days, not clock durations — keep short/single-day
+  // events in one column (avoids UTC end-of-day spill and midnight boundary noise).
+  if (startDay === endDay) {
+    return { startIndex, endIndex: startIndex };
+  }
+
+  if (
+    durationMs > 0 &&
+    (durationMs <= TWELVE_HOURS_MS ||
+      (isAllDayEventSlot(startAt, endAt) && durationMs <= TWENTY_FIVE_HOURS_MS))
+  ) {
+    return { startIndex, endIndex: startIndex };
+  }
 
   return { startIndex, endIndex };
 }

@@ -70,7 +70,13 @@ import {
   PAST_SCHEDULE_TEXT,
 } from "./proposalCardTheme";
 import { GARDEN_TOKENS } from "@/theme/tokens";
-import { sleepingDateToStartIso } from "@/lib/proposals/sleeping-schedule";
+import {
+  sleepingDateToStartIso,
+} from "@/lib/proposals/sleeping-schedule";
+import {
+  allDayEventFromDates,
+  isAllDayEventSlot,
+} from "@/lib/proposals/all-day-events";
 import { formatSleepingDisplayTitle } from "@/lib/proposals/sleeping-display";
 import {
   minutesToReminderDisplay,
@@ -136,8 +142,13 @@ function localDateToEndIso(value: string): string | undefined {
   return new Date(y, m - 1, d, 23, 59, 59, 999).toISOString();
 }
 
-function slotStartInput(iso: string | null | undefined, proposalType: "event" | "sleeping"): string {
-  return proposalType === "sleeping" ? toLocalDateInput(iso) : toLocalInput(iso);
+function slotStartInput(
+  iso: string | null | undefined,
+  proposalType: "event" | "sleeping",
+  allDay = false,
+): string {
+  if (proposalType === "sleeping" || allDay) return toLocalDateInput(iso);
+  return toLocalInput(iso);
 }
 
 function SectionHeader({
@@ -208,6 +219,7 @@ export function ProposalDraftDialog({
   const [intentionalSolo, setIntentionalSolo] = useState(false);
   const [soloEvent, setSoloEvent] = useState(false);
   const [isPoll, setIsPoll] = useState(false);
+  const [eventAllDay, setEventAllDay] = useState(false);
   const [batchMode, setBatchMode] = useState(false);
   const [batchEntries, setBatchEntries] = useState<BatchSleepingEntry[]>([]);
   const [acceptedPartnerIds, setAcceptedPartnerIds] = useState<string[]>([]);
@@ -277,10 +289,14 @@ export function ProposalDraftDialog({
     }
     const first = slots.find((s) => s.startAt);
     if (!first) return undefined;
-    return proposalType === "sleeping"
-      ? localDateToStartIso(first.startAt)
-      : localInputToIso(first.startAt);
-  }, [batchMode, batchEntries, slots, proposalType]);
+    if (proposalType === "sleeping") {
+      return localDateToStartIso(first.startAt);
+    }
+    if (eventAllDay) {
+      return allDayEventFromDates(first.startAt, first.endAt || first.startAt)?.startAt;
+    }
+    return localInputToIso(first.startAt);
+  }, [batchMode, batchEntries, slots, proposalType, eventAllDay]);
 
   const previewEndIso = useMemo(() => {
     if (batchMode && batchEntries.length > 0) {
@@ -297,8 +313,11 @@ export function ProposalDraftDialog({
         ? localDateToEndIso(first.endAt)
         : localDateToEndIso(first.startAt);
     }
+    if (eventAllDay) {
+      return allDayEventFromDates(first.startAt, first.endAt || first.startAt)?.endAt;
+    }
     return first.endAt ? localInputToIso(first.endAt) : undefined;
-  }, [batchMode, batchEntries, slots, proposalType]);
+  }, [batchMode, batchEntries, slots, proposalType, eventAllDay]);
 
   useEffect(() => {
     if (!open) return;
@@ -358,6 +377,11 @@ export function ProposalDraftDialog({
       );
       setSoloEvent(initialDetail.proposalType === "event" && initialDetail.intentionalSolo);
       setIsPoll(initialDetail.isPoll);
+      const firstSlot = initialDetail.timeSlots[0];
+      setEventAllDay(
+        initialDetail.proposalType === "event" &&
+          Boolean(firstSlot && isAllDayEventSlot(firstSlot.startAt, firstSlot.endAt)),
+      );
       setEventPrivacy(initialDetail.eventPrivacy);
       setIsRecurring(initialDetail.isRecurrenceParent);
       if (initialDetail.recurrenceRule) {
@@ -366,13 +390,18 @@ export function ProposalDraftDialog({
       }
       setSlots(
         initialDetail.timeSlots.length > 0
-          ? initialDetail.timeSlots.map((slot) => ({
-              startAt: slotStartInput(slot.startAt, initialDetail.proposalType),
-              endAt: slot.endAt
-                ? slotStartInput(slot.endAt, initialDetail.proposalType)
-                : "",
-              label: slot.label ?? "",
-            }))
+          ? initialDetail.timeSlots.map((slot) => {
+              const allDay =
+                initialDetail.proposalType === "event" &&
+                isAllDayEventSlot(slot.startAt, slot.endAt);
+              return {
+                startAt: slotStartInput(slot.startAt, initialDetail.proposalType, allDay),
+                endAt: slot.endAt
+                  ? slotStartInput(slot.endAt, initialDetail.proposalType, allDay)
+                  : "",
+                label: slot.label ?? "",
+              };
+            })
           : [{ startAt: "", endAt: "", label: "" }],
       );
       const modes: Record<string, InviteeSelection> = {};
@@ -396,6 +425,7 @@ export function ProposalDraftDialog({
       setSoloEvent(false);
       setSavedDraftId(null);
       setIsPoll(false);
+      setEventAllDay(false);
       setBatchMode(false);
       setBatchEntries([]);
       setEventPrivacy("open");
@@ -438,6 +468,11 @@ export function ProposalDraftDialog({
     setIntentionalSolo(detail.proposalType === "sleeping" ? detail.intentionalSolo : false);
     setSoloEvent(detail.proposalType === "event" && detail.intentionalSolo);
     setIsPoll(detail.isPoll);
+    const firstSlot = detail.timeSlots[0];
+    setEventAllDay(
+      detail.proposalType === "event" &&
+        Boolean(firstSlot && isAllDayEventSlot(firstSlot.startAt, firstSlot.endAt)),
+    );
     setEventPrivacy(detail.eventPrivacy);
     setIsRecurring(detail.isRecurrenceParent);
     if (detail.recurrenceRule) {
@@ -446,11 +481,16 @@ export function ProposalDraftDialog({
     }
     setSlots(
       detail.timeSlots.length > 0
-        ? detail.timeSlots.map((slot) => ({
-            startAt: slotStartInput(slot.startAt, detail.proposalType),
-            endAt: slot.endAt ? slotStartInput(slot.endAt, detail.proposalType) : "",
-            label: slot.label ?? "",
-          }))
+        ? detail.timeSlots.map((slot) => {
+            const allDay =
+              detail.proposalType === "event" &&
+              isAllDayEventSlot(slot.startAt, slot.endAt);
+            return {
+              startAt: slotStartInput(slot.startAt, detail.proposalType, allDay),
+              endAt: slot.endAt ? slotStartInput(slot.endAt, detail.proposalType, allDay) : "",
+              label: slot.label ?? "",
+            };
+          })
         : [{ startAt: "", endAt: "", label: "" }],
     );
     const modes: Record<string, InviteeSelection> = {};
@@ -490,6 +530,15 @@ export function ProposalDraftDialog({
               return {
                 startAt: startIso,
                 endAt: endIso ?? undefined,
+                label: slot.label.trim() || undefined,
+              };
+            }
+            if (eventAllDay) {
+              const bounds = allDayEventFromDates(slot.startAt, slot.endAt || slot.startAt);
+              if (!bounds) return null;
+              return {
+                startAt: bounds.startAt,
+                endAt: bounds.endAt,
                 label: slot.label.trim() || undefined,
               };
             }
@@ -929,7 +978,9 @@ export function ProposalDraftDialog({
                   ? "Add up to 5 options for invitees to choose from"
                   : proposalType === "sleeping"
                     ? "Which night(s) — dates only, no times"
-                    : "When does this proposal happen?"
+                    : eventAllDay
+                      ? "All-day dates — no specific times"
+                      : "When does this proposal happen?"
             }
           />
           <Stack spacing={1.5} sx={{ mb: 2 }}>
@@ -945,6 +996,30 @@ export function ProposalDraftDialog({
                       />
                     }
                     label="Time poll (multiple slot options)"
+                  />
+                )}
+                {proposalType === "event" && (
+                  <FormControlLabel
+                    control={
+                      <Checkbox
+                        checked={eventAllDay}
+                        onChange={(event) => {
+                          const checked = event.target.checked;
+                          setEventAllDay(checked);
+                          if (checked) {
+                            setSlots((current) =>
+                              current.map((slot) => ({
+                                ...slot,
+                                startAt: slot.startAt.slice(0, 10),
+                                endAt: (slot.endAt || slot.startAt).slice(0, 10),
+                              })),
+                            );
+                          }
+                        }}
+                        sx={{ color: POLY_GREEN, "&.Mui-checked": { color: POLY_GREEN } }}
+                      />
+                    }
+                    label="All day (no specific times)"
                   />
                 )}
                 {slots.map((slot, index) => (
@@ -974,8 +1049,16 @@ export function ProposalDraftDialog({
                     )}
                     <Stack spacing={1}>
                       <ProposalScheduleField
-                        label={proposalType === "sleeping" ? "Night of" : "Start"}
-                        mode={proposalType === "sleeping" ? "date" : "datetime"}
+                        label={
+                          proposalType === "sleeping"
+                            ? "Night of"
+                            : eventAllDay
+                              ? "Start date"
+                              : "Start"
+                        }
+                        mode={
+                          proposalType === "sleeping" || eventAllDay ? "date" : "datetime"
+                        }
                         value={slot.startAt}
                         onChange={(next) => {
                           const updated = [...slots];
@@ -989,9 +1072,15 @@ export function ProposalDraftDialog({
                       />
                       <ProposalScheduleField
                         label={
-                          proposalType === "sleeping" ? "Through (optional)" : "End (optional)"
+                          proposalType === "sleeping"
+                            ? "Through (optional)"
+                            : eventAllDay
+                              ? "End date (optional)"
+                              : "End (optional)"
                         }
-                        mode={proposalType === "sleeping" ? "date" : "datetime"}
+                        mode={
+                          proposalType === "sleeping" || eventAllDay ? "date" : "datetime"
+                        }
                         value={slot.endAt}
                         disabled={!slot.startAt}
                         onChange={(next) => {

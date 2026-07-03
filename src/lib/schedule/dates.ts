@@ -1,5 +1,10 @@
 /** Monday-based week boundaries for the schedule tab (PC-42). */
 
+import {
+  formatAllDayEventLabel,
+  isAllDayEventSlot,
+} from "@/lib/proposals/all-day-events";
+
 /**
  * Returns midnight local time for the Monday starting the week containing `date`.
  */
@@ -77,6 +82,10 @@ export function formatEventTime(
       timeZone,
     };
     return new Date(startAt).toLocaleDateString(undefined, dateOpts);
+  }
+
+  if (isAllDayEventSlot(startAt, endAt)) {
+    return formatAllDayEventLabel(startAt, endAt);
   }
 
   const start = new Date(startAt);
