@@ -1,23 +1,37 @@
 import { type Page, expect } from "@playwright/test";
 
+/**
+ * Clicks a bottom-nav link and waits for route change.
+ * Retries because client navigation can lag under parallel E2E load.
+ */
+async function goToMainNavLink(
+  page: Page,
+  linkName: string,
+  urlPattern: RegExp,
+): Promise<void> {
+  const nav = page.getByRole("navigation", { name: "Main navigation" });
+  await expect(nav).toBeVisible();
+
+  await expect(async () => {
+    await nav.getByRole("link", { name: linkName }).click();
+    await expect(page).toHaveURL(urlPattern);
+  }).toPass({ timeout: 20_000 });
+}
+
 export async function goToSchedule(page: Page): Promise<void> {
-  await page.getByRole("link", { name: "Schedule" }).click();
-  await expect(page).toHaveURL(/\/schedule/);
+  await goToMainNavLink(page, "Schedule", /\/schedule/);
 }
 
 export async function goToProposals(page: Page): Promise<void> {
-  await page.getByRole("link", { name: "Proposals" }).click();
-  await expect(page).toHaveURL(/\/proposals/);
+  await goToMainNavLink(page, "Proposals", /\/proposals/);
 }
 
 export async function goToPeoplePlaces(page: Page): Promise<void> {
-  await page.getByRole("link", { name: "People & Places" }).click();
-  await expect(page).toHaveURL(/\/people-places/);
+  await goToMainNavLink(page, "People & Places", /\/people-places/);
 }
 
 export async function goToAdmin(page: Page): Promise<void> {
-  await page.getByRole("link", { name: "Admin" }).click();
-  await expect(page).toHaveURL(/\/admin/);
+  await goToMainNavLink(page, "Admin", /\/admin/);
 }
 
 /** Opens the header profile menu (avatar button). */
