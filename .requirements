@@ -131,3 +131,4 @@
 2026-07-01 | a4be87b | PC-40 | raise toast z-index above bottom nav for E2E visibility | src/components/providers/ToastProvider.tsx
 2026-07-03 | b995cd6 | PC-74 | add all-day events and fix month view single-day spans | src/components/proposals/ProposalDraftDialog.tsx
 2026-07-03 | f3e3fe7 | PC-75 | admin Version panel and changelog promotion gate | src/components/admin/AdminForceReloadPanel.tsx
+2026-07-03 | 460a7b3 | PC-75 | retry bottom-nav clicks in E2E helpers | e2e/helpers/navigation.ts
