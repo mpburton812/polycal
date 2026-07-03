@@ -55,7 +55,13 @@ export function ScheduleEventBlock({
   });
   const colors = scheduleBlockSx(variant, rotationIndex);
   const stakeholders = formatStakeholders(event);
-  const timeLabel = formatEventTime(event.startAt, event.endAt, event.proposalType, timeZone);
+  const timeLabel = formatEventTime(
+    event.startAt,
+    event.endAt,
+    event.proposalType,
+    timeZone,
+    event.isAllDay,
+  );
   const statusLabel = formatStatusLabel(event);
   const isSleeping = event.proposalType === "sleeping";
   const sleepingLines =

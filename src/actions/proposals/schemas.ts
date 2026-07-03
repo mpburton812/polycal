@@ -11,6 +11,7 @@ export const timeSlotInputSchema = z.object({
   startAt: z.string().min(1),
   endAt: z.string().optional(),
   label: z.string().trim().max(120).optional(),
+  isAllDay: z.boolean().optional(),
 });
 
 export const recurrenceRuleSchema = z.object({
@@ -28,6 +29,7 @@ export const draftProposalSchema = z.object({
   notes: z.string().trim().max(500).optional(),
   intentionalSolo: z.boolean().optional(),
   isPoll: z.boolean().optional(),
+  isAllDay: z.boolean().optional(),
   eventPrivacy: z.enum(["open", "private", "super_private"]).optional(),
   invitees: z.array(inviteeInputSchema).optional(),
   timeSlots: z.array(timeSlotInputSchema).max(10).optional(),
@@ -71,4 +73,5 @@ export const rescheduleProposalSchema = z.object({
   proposalId: z.string().min(1),
   scheduledStartAt: z.string().min(1),
   scheduledEndAt: z.string().optional(),
+  isAllDay: z.boolean().optional(),
 });

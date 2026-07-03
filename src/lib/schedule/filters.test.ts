@@ -22,6 +22,10 @@ function event(overrides: Partial<ScheduleEvent> = {}): ScheduleEvent {
     isContentMasked: false,
     isTentative: false,
     atRisk: false,
+    hasOverlap: false,
+    isPoll: false,
+    isAllDay: false,
+    slotLabel: null,
     ...overrides,
   };
 }
