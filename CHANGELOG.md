@@ -8,6 +8,8 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- PC-74: All-day event proposals with date pickers; consistent all-day labels; month view no longer spans two columns for short single-day events.
+- PC-75: Admin **Version** section shows build name, date, time, and latest changelog entry; **Reload** clears PWA caches. Promotion scripts require a matching `CHANGELOG.md` [Unreleased] entry per Jira key.
 - PC-65: Split FAB entries for event vs sleeping proposals; variable event reminders (schema, draft UI, cron sender); four alert-type notification prefs with legacy migration; avatar crop before upload; solo calendar labels show proposer name.
 
 ### Fixed

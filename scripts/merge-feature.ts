@@ -104,6 +104,9 @@ function main(): void {
   console.log("[merge-feature] Validating Jira keys in commits...");
   runInherit("npx", ["tsx", "scripts/validate-jira-commits.ts", "--range", `origin/dev...HEAD`, "--branch", branch]);
 
+  console.log("[merge-feature] Validating CHANGELOG.md [Unreleased] entries...");
+  runInherit("npx", ["tsx", "scripts/validate-changelog.ts", "--range", `origin/dev...HEAD`, "--branch", branch]);
+
   console.log("[merge-feature] Pushing to origin...");
   runInherit("git", ["push", "-u", "origin", "HEAD"]);
 

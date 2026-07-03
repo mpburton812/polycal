@@ -20,17 +20,17 @@ test.describe("Admin", () => {
     await expect(
       page.getByText("Poly group settings, user management, and system log"),
     ).toHaveCount(0);
-    await expect(page.getByRole("heading", { name: "Force Reload", level: 2 })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Version", level: 2 })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Poly group settings", level: 2 })).toBeVisible();
     await expect(
       page.getByRole("heading", { name: "System administrator log", level: 2 }),
     ).toBeVisible();
     await expect(page.getByRole("heading", { name: "Test data", level: 2 })).toBeVisible();
 
-    await expandAdminSection(page, "Force Reload");
-    await expect(
-      page.getByRole("button", { name: "Force reload newest version" }),
-    ).toBeVisible();
+    await expandAdminSection(page, "Version");
+    await expect(page.getByRole("button", { name: "Reload" })).toBeVisible();
+    await expect(page.getByText(/Name:/)).toBeVisible();
+    await expect(page.getByText(/Changelog:/)).toBeVisible();
   });
 
   test("shows user management list with icon actions and no username column", async ({

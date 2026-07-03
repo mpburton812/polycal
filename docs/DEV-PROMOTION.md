@@ -31,8 +31,9 @@ The shortcut runs:
 1. `npm audit --audit-level=low`
 2. `npm run test:unit` (Vitest)
 3. Jira key validation (`origin/dev...HEAD`)
-4. `git push -u origin HEAD`
-5. `gh pr create --base dev --fill` (skips if PR already open)
+4. `CHANGELOG.md` [Unreleased] validation for each Jira key in the branch
+5. `git push -u origin HEAD`
+6. `gh pr create --base dev --fill` (skips if PR already open)
 
 ### Manual steps
 
