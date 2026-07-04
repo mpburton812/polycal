@@ -68,15 +68,27 @@ export function formatEventTime(
   endAt: string | null,
   proposalType: "event" | "sleeping" = "event",
   timeZone = "UTC",
+  isAllDay = false,
 ): string {
-  if (proposalType === "sleeping") {
+  const dateOnly = proposalType === "sleeping" || isAllDay;
+  if (dateOnly) {
     const dateOpts: Intl.DateTimeFormatOptions = {
       weekday: "short",
       month: "short",
       day: "numeric",
       timeZone,
     };
-    return new Date(startAt).toLocaleDateString(undefined, dateOpts);
+    const startLabel = new Date(startAt).toLocaleDateString(undefined, dateOpts);
+    // All-day events may span multiple calendar days — show the inclusive range.
+    if (isAllDay && endAt) {
+      const endKey = localDateKey(endAt, timeZone);
+      const startKey = localDateKey(startAt, timeZone);
+      if (endKey !== startKey) {
+        const endLabel = new Date(endAt).toLocaleDateString(undefined, dateOpts);
+        return `All day · ${startLabel} – ${endLabel}`;
+      }
+    }
+    return isAllDay ? `All day · ${startLabel}` : startLabel;
   }
 
   const start = new Date(startAt);

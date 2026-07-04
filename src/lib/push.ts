@@ -6,11 +6,20 @@ import { ensureDbReady } from "@/lib/db/ensure-ready";
 import { pushSubscriptions, users } from "@/lib/db/schema";
 import { parseNotificationPrefs } from "@/types/notification-prefs";
 
+export interface PushNotificationAction {
+  action: string;
+  title: string;
+}
+
 export interface PushPayload {
   title: string;
   body: string;
   url?: string;
   notificationType?: string;
+  /** Proposal id surfaced to the service worker for inline Accept handling. */
+  proposalId?: string;
+  /** Notification action buttons rendered by the service worker (PC). */
+  actions?: PushNotificationAction[];
   metadata?: Record<string, unknown>;
 }
 

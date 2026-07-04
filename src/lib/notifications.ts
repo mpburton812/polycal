@@ -10,6 +10,8 @@ import { users } from "@/lib/db/schema";
 
 import { sendPushToUser } from "@/lib/push";
 
+import { buildProposalNotificationDetail } from "@/lib/notifications-detail";
+
 import { parseNotificationPrefs, type NotificationPrefs } from "@/types/notification-prefs";
 
 import { eq } from "drizzle-orm";
@@ -236,6 +238,11 @@ export async function notifyUser(
 
   const url = resolveNotificationUrl(notificationType, metadata);
 
+  // Enrich outward-facing surfaces (push + email) with proposal context (when /
+  // where) when the metadata carries it. The in-app inbox renders this detail
+  // itself from metadata, so the stored message string is left unchanged.
+  const detail = buildProposalNotificationDetail(metadata);
+
 
 
   if (prefs.channels.inApp && !shouldSuppressInAppDelivery(prefs, notificationType)) {
@@ -258,15 +265,29 @@ export async function notifyUser(
 
   if (prefs.channels.push && !shouldSuppressPushDelivery(prefs, notificationType)) {
 
+    const proposalId =
+      typeof metadata?.proposalId === "string" ? metadata.proposalId : undefined;
+    const actions =
+      proposalId && canAcceptFromNotification(notificationType, metadata)
+        ? [
+            { action: "accept", title: "Accept" },
+            { action: "open", title: "Open Notification" },
+          ]
+        : undefined;
+
     await sendPushToUser(userId, {
 
       title: formatPushTitle(notificationType),
 
-      body: message,
+      body: detail ? `${message}\n${detail}` : message,
 
       url,
 
       notificationType,
+
+      proposalId,
+
+      actions,
 
       metadata,
 
@@ -276,7 +297,7 @@ export async function notifyUser(
 
 
 
-  await maybeQueueEmailNotification(userId, notificationType, message, metadata, prefs);
+  await maybeQueueEmailNotification(userId, notificationType, message, metadata, prefs, detail);
 
 }
 
@@ -286,6 +307,21 @@ function formatPushTitle(notificationType: string): string {
 
   return notificationType.replaceAll("_", " ").replace(/\b\w/g, (c) => c.toUpperCase());
 
+}
+
+
+
+/**
+ * True when a recipient can accept (vote) directly from the notification. These
+ * types are only delivered to invitees who still need to respond, so exposing an
+ * Accept action button is safe (the vote action re-validates server-side).
+ */
+export function canAcceptFromNotification(
+  notificationType: string,
+  metadata?: Record<string, unknown>,
+): boolean {
+  if (notificationType === "proposal_submitted") return true;
+  return metadata?.action === "vote";
 }
 
 
@@ -307,6 +343,8 @@ async function maybeQueueEmailNotification(
   metadata?: Record<string, unknown>,
 
   prefsOverride?: NotificationPrefs,
+
+  detail?: string,
 
 ): Promise<void> {
 
@@ -376,7 +414,7 @@ async function maybeQueueEmailNotification(
 
       subject: `PolyCal: ${formatPushTitle(notificationType)}`,
 
-      html: `<p>${message}</p>`,
+      html: detail ? `<p>${message}</p><p>${detail}</p>` : `<p>${message}</p>`,
 
     });
 

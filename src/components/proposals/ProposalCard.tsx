@@ -63,6 +63,7 @@ export function ProposalCard({
     proposal.scheduledStartAt,
     proposal.scheduledEndAt,
     proposal.proposalType,
+    proposal.isAllDay,
   );
   const responsePct =
     proposal.inviteeCount > 0

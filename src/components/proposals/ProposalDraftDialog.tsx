@@ -136,8 +136,14 @@ function localDateToEndIso(value: string): string | undefined {
   return new Date(y, m - 1, d, 23, 59, 59, 999).toISOString();
 }
 
-function slotStartInput(iso: string | null | undefined, proposalType: "event" | "sleeping"): string {
-  return proposalType === "sleeping" ? toLocalDateInput(iso) : toLocalInput(iso);
+function slotStartInput(
+  iso: string | null | undefined,
+  proposalType: "event" | "sleeping",
+  isAllDay = false,
+): string {
+  return proposalType === "sleeping" || isAllDay
+    ? toLocalDateInput(iso)
+    : toLocalInput(iso);
 }
 
 function SectionHeader({
@@ -208,6 +214,7 @@ export function ProposalDraftDialog({
   const [intentionalSolo, setIntentionalSolo] = useState(false);
   const [soloEvent, setSoloEvent] = useState(false);
   const [isPoll, setIsPoll] = useState(false);
+  const [allDay, setAllDay] = useState(false);
   const [batchMode, setBatchMode] = useState(false);
   const [batchEntries, setBatchEntries] = useState<BatchSleepingEntry[]>([]);
   const [acceptedPartnerIds, setAcceptedPartnerIds] = useState<string[]>([]);
@@ -277,10 +284,10 @@ export function ProposalDraftDialog({
     }
     const first = slots.find((s) => s.startAt);
     if (!first) return undefined;
-    return proposalType === "sleeping"
+    return proposalType === "sleeping" || allDay
       ? localDateToStartIso(first.startAt)
       : localInputToIso(first.startAt);
-  }, [batchMode, batchEntries, slots, proposalType]);
+  }, [batchMode, batchEntries, slots, proposalType, allDay]);
 
   const previewEndIso = useMemo(() => {
     if (batchMode && batchEntries.length > 0) {
@@ -292,13 +299,13 @@ export function ProposalDraftDialog({
     }
     const first = slots.find((s) => s.startAt);
     if (!first) return undefined;
-    if (proposalType === "sleeping") {
+    if (proposalType === "sleeping" || allDay) {
       return first.endAt
         ? localDateToEndIso(first.endAt)
         : localDateToEndIso(first.startAt);
     }
     return first.endAt ? localInputToIso(first.endAt) : undefined;
-  }, [batchMode, batchEntries, slots, proposalType]);
+  }, [batchMode, batchEntries, slots, proposalType, allDay]);
 
   useEffect(() => {
     if (!open) return;
@@ -327,6 +334,7 @@ export function ProposalDraftDialog({
     previewStartIso ?? null,
     previewEndIso ?? null,
     proposalType,
+    proposalType === "event" && allDay,
   );
   const showPastWarning = isPastSchedule(previewStartIso);
 
@@ -358,6 +366,7 @@ export function ProposalDraftDialog({
       );
       setSoloEvent(initialDetail.proposalType === "event" && initialDetail.intentionalSolo);
       setIsPoll(initialDetail.isPoll);
+      setAllDay(initialDetail.proposalType === "event" && initialDetail.isAllDay);
       setEventPrivacy(initialDetail.eventPrivacy);
       setIsRecurring(initialDetail.isRecurrenceParent);
       if (initialDetail.recurrenceRule) {
@@ -367,9 +376,17 @@ export function ProposalDraftDialog({
       setSlots(
         initialDetail.timeSlots.length > 0
           ? initialDetail.timeSlots.map((slot) => ({
-              startAt: slotStartInput(slot.startAt, initialDetail.proposalType),
+              startAt: slotStartInput(
+                slot.startAt,
+                initialDetail.proposalType,
+                initialDetail.isAllDay,
+              ),
               endAt: slot.endAt
-                ? slotStartInput(slot.endAt, initialDetail.proposalType)
+                ? slotStartInput(
+                    slot.endAt,
+                    initialDetail.proposalType,
+                    initialDetail.isAllDay,
+                  )
                 : "",
               label: slot.label ?? "",
             }))
@@ -396,6 +413,7 @@ export function ProposalDraftDialog({
       setSoloEvent(false);
       setSavedDraftId(null);
       setIsPoll(false);
+      setAllDay(false);
       setBatchMode(false);
       setBatchEntries([]);
       setEventPrivacy("open");
@@ -438,6 +456,7 @@ export function ProposalDraftDialog({
     setIntentionalSolo(detail.proposalType === "sleeping" ? detail.intentionalSolo : false);
     setSoloEvent(detail.proposalType === "event" && detail.intentionalSolo);
     setIsPoll(detail.isPoll);
+    setAllDay(detail.proposalType === "event" && detail.isAllDay);
     setEventPrivacy(detail.eventPrivacy);
     setIsRecurring(detail.isRecurrenceParent);
     if (detail.recurrenceRule) {
@@ -447,8 +466,10 @@ export function ProposalDraftDialog({
     setSlots(
       detail.timeSlots.length > 0
         ? detail.timeSlots.map((slot) => ({
-            startAt: slotStartInput(slot.startAt, detail.proposalType),
-            endAt: slot.endAt ? slotStartInput(slot.endAt, detail.proposalType) : "",
+            startAt: slotStartInput(slot.startAt, detail.proposalType, detail.isAllDay),
+            endAt: slot.endAt
+              ? slotStartInput(slot.endAt, detail.proposalType, detail.isAllDay)
+              : "",
             label: slot.label ?? "",
           }))
         : [{ startAt: "", endAt: "", label: "" }],
@@ -493,12 +514,26 @@ export function ProposalDraftDialog({
                 label: slot.label.trim() || undefined,
               };
             }
+            if (allDay) {
+              // All-day event: slot inputs are calendar dates; store as local
+              // midnight start and end-of-day end so overlap/display work.
+              const startIso = localDateToStartIso(slot.startAt);
+              if (!startIso) return null;
+              const endSource = slot.endAt || slot.startAt;
+              return {
+                startAt: startIso,
+                endAt: localDateToEndIso(endSource),
+                label: slot.label.trim() || undefined,
+                isAllDay: true,
+              };
+            }
             const startIso = localInputToIso(slot.startAt);
             if (!startIso) return null;
             return {
               startAt: startIso,
               endAt: localInputToIso(slot.endAt),
               label: slot.label.trim() || undefined,
+              isAllDay: false,
             };
           })
           .filter((slot) => slot !== null);
@@ -539,6 +574,7 @@ export function ProposalDraftDialog({
       notes: notes || undefined,
       intentionalSolo: batchMode ? false : isSoloProposal,
       isPoll: proposalType === "event" ? isPoll : false,
+      isAllDay: proposalType === "event" ? allDay : false,
       eventPrivacy,
       isRecurring: !batchMode && isRecurring,
       recurrenceRule:
@@ -947,6 +983,38 @@ export function ProposalDraftDialog({
                     label="Time poll (multiple slot options)"
                   />
                 )}
+                {proposalType === "event" && (
+                  <FormControlLabel
+                    control={
+                      <Checkbox
+                        checked={allDay}
+                        onChange={(event) => {
+                          const nextAllDay = event.target.checked;
+                          setAllDay(nextAllDay);
+                          // Convert existing slot values between date-only and
+                          // date-time so the pickers stay valid across the toggle.
+                          setSlots((current) =>
+                            current.map((slot) => ({
+                              ...slot,
+                              startAt: slot.startAt
+                                ? nextAllDay
+                                  ? slot.startAt.slice(0, 10)
+                                  : `${slot.startAt.slice(0, 10)}T09:00`
+                                : "",
+                              endAt: slot.endAt
+                                ? nextAllDay
+                                  ? slot.endAt.slice(0, 10)
+                                  : `${slot.endAt.slice(0, 10)}T10:00`
+                                : "",
+                            })),
+                          );
+                        }}
+                        sx={{ color: POLY_GREEN, "&.Mui-checked": { color: POLY_GREEN } }}
+                      />
+                    }
+                    label="All-day event (dates only, no clock times)"
+                  />
+                )}
                 {slots.map((slot, index) => (
                   <Box
                     key={`slot-${index}`}
@@ -974,8 +1042,16 @@ export function ProposalDraftDialog({
                     )}
                     <Stack spacing={1}>
                       <ProposalScheduleField
-                        label={proposalType === "sleeping" ? "Night of" : "Start"}
-                        mode={proposalType === "sleeping" ? "date" : "datetime"}
+                        label={
+                          proposalType === "sleeping"
+                            ? "Night of"
+                            : allDay
+                              ? "Day"
+                              : "Start"
+                        }
+                        mode={
+                          proposalType === "sleeping" || allDay ? "date" : "datetime"
+                        }
                         value={slot.startAt}
                         onChange={(next) => {
                           const updated = [...slots];
@@ -989,9 +1065,15 @@ export function ProposalDraftDialog({
                       />
                       <ProposalScheduleField
                         label={
-                          proposalType === "sleeping" ? "Through (optional)" : "End (optional)"
+                          proposalType === "sleeping"
+                            ? "Through (optional)"
+                            : allDay
+                              ? "End day (optional)"
+                              : "End (optional)"
                         }
-                        mode={proposalType === "sleeping" ? "date" : "datetime"}
+                        mode={
+                          proposalType === "sleeping" || allDay ? "date" : "datetime"
+                        }
                         value={slot.endAt}
                         disabled={!slot.startAt}
                         onChange={(next) => {

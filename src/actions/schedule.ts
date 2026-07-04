@@ -57,6 +57,7 @@ export interface ScheduleEvent {
   atRisk: boolean;
   hasOverlap: boolean;
   isPoll: boolean;
+  isAllDay: boolean;
   slotLabel: string | null;
 }
 
@@ -231,6 +232,7 @@ export async function listScheduleEventsAction(
       intentionalSolo: proposals.intentionalSolo,
       atRisk: proposals.atRisk,
       isPoll: proposals.isPoll,
+      isAllDay: proposals.isAllDay,
       eventPrivacy: proposals.eventPrivacy,
       isBatchSleeping: proposals.isBatchSleeping,
     })
@@ -473,6 +475,7 @@ export async function listScheduleEventsAction(
         atRisk: row.atRisk,
         hasOverlap: false,
         isPoll: row.isPoll,
+        isAllDay: row.isAllDay,
         slotLabel: isContentMasked ? null : window.slotLabel,
       });
     }
