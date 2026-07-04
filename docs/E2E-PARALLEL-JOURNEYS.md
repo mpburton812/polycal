@@ -7,6 +7,7 @@ Playwright config (`playwright.config.ts`): `workers: 1`, `fullyParallel: false`
 | Spec | Primary users | Burton-Thompson overlay | Classification | CI shard safe |
 |------|---------------|----------------------|----------------|---------------|
 | `admin-bad-user-journey.spec.ts` | luke, bad_user | No | SERIAL_ONLY (mutates bad_user lifecycle) | Yes |
+| `admin-code-status-journey.spec.ts` | luke | No | SAFE_PARALLEL (read-only Code Status panel) | Yes |
 | `alert-prefs-journey.spec.ts` | leia | No | SAFE_PARALLEL | Yes |
 | `batch-sleeping-journey.spec.ts` | han | No | SAFE_PARALLEL | Yes |
 | `batch-sleeping-partners-journey.spec.ts` | katie, michael (BT) | **Yes** | SAFE_PARALLEL | Yes |

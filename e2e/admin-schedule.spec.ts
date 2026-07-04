@@ -20,16 +20,20 @@ test.describe("Admin", () => {
     await expect(
       page.getByText("Poly group settings, user management, and system log"),
     ).toHaveCount(0);
-    await expect(page.getByRole("heading", { name: "Force Reload", level: 2 })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Code Status", level: 2 })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Poly group settings", level: 2 })).toBeVisible();
     await expect(
       page.getByRole("heading", { name: "System administrator log", level: 2 }),
     ).toBeVisible();
     await expect(page.getByRole("heading", { name: "Test data", level: 2 })).toBeVisible();
 
-    await expandAdminSection(page, "Force Reload");
+    await expandAdminSection(page, "Code Status");
+    await expect(page.getByText("Build number")).toBeVisible();
     await expect(
-      page.getByRole("button", { name: "Force reload newest version" }),
+      page.getByText("Made live in this environment"),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Check for Update" }),
     ).toBeVisible();
   });
 
