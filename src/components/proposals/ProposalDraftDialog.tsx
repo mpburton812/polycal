@@ -1012,7 +1012,7 @@ export function ProposalDraftDialog({
                         sx={{ color: POLY_GREEN, "&.Mui-checked": { color: POLY_GREEN } }}
                       />
                     }
-                    label="All day (no start/end times)"
+                    label="All-day event (dates only, no clock times)"
                   />
                 )}
                 {slots.map((slot, index) => (
