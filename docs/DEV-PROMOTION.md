@@ -58,10 +58,27 @@ EOF
 gh pr merge --merge   # or --squash
 ```
 
+## Change control log (required on every promotion)
+
+Every time code is promoted to an environment (`feature` → `dev`, `dev` → `test`,
+`test` → `production`), add a new entry to the change control log describing what
+changed in that version:
+
+1. Prepend a new `ChangelogEntry` (newest first) to `src/lib/changelog/entries.ts`
+   with a date-based `version`, the promotion `date`, a one-line `summary`, and the
+   list of `changes` (`added` / `changed` / `fixed`).
+2. Mirror the human-readable summary in `CHANGELOG.md`.
+
+The in-app **Admin → Code Status** panel reads `src/lib/changelog/entries.ts`,
+shows the live build number and when it went live, surfaces the most recent entry,
+and exposes the full log via the build-number link. This keeps the deployed change
+history visible per environment.
+
 ## Do not
 
 - `git checkout dev && git merge feature/... && git push` (bypasses PR checks and Jira In Review)
 - `git push origin dev` from a feature branch
+- Promote without adding a change control log entry (see above)
 
 ## GitHub branch protection (recommended)
 

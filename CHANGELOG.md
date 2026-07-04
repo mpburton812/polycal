@@ -8,6 +8,19 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- Admin **Code Status** panel (replaces Force Reload): shows the live build number and when it went live in the current environment, the most recent change control entry, a **Check for Update** button that force-reloads when a newer build is available, and the full change control log behind the build-number link.
+- Structured change control log (`src/lib/changelog/entries.ts`) updated on every environment promotion, `/api/build-info` endpoint, and build-time stamp (`NEXT_PUBLIC_BUILD_TIME`).
+- All-day event proposals (no clock times) across schedule, cards, and detail.
+- Proposal notifications include when/where detail plus inline Accept / Open Notification actions (in-app + Web Push).
+
+### Changed
+
+- Replaced the admin "Force Reload" panel with "Code Status".
+
+### Fixed
+
+- Onboarding sign-in URL is derived from the running deployment instead of hardcoding production.
+
 - PC-65: Split FAB entries for event vs sleeping proposals; variable event reminders (schema, draft UI, cron sender); four alert-type notification prefs with legacy migration; avatar crop before upload; solo calendar labels show proposer name.
 
 ### Fixed
