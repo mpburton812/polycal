@@ -415,12 +415,14 @@ export function ProposalDetailDialog({
         detail.scheduledStartAt,
         detail.scheduledEndAt,
         detail.proposalType,
+        detail.isAllDay,
       ) ??
       (detail.timeSlots[0]
         ? formatTimeRange(
             detail.timeSlots[0].startAt,
             detail.timeSlots[0].endAt,
             detail.proposalType,
+            detail.isAllDay,
           )
         : null)
     : null;

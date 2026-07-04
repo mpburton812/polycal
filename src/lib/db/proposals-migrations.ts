@@ -24,6 +24,7 @@ export async function applyProposalsMigrations(sql: Client): Promise<void> {
   await ensureColumn(sql, "proposals", "pending_recovery_until", "TEXT");
   await ensureColumn(sql, "proposals", "reminder_offset_minutes", "INTEGER");
   await ensureColumn(sql, "proposals", "reminder_sent_at", "TEXT");
+  await ensureColumn(sql, "proposals", "is_all_day", "INTEGER NOT NULL DEFAULT 0");
   await ensureColumn(sql, "poly_group", "recovery_max_hours", "INTEGER NOT NULL DEFAULT 48");
 
   await sql.execute(`
@@ -58,6 +59,8 @@ export async function applyProposalsMigrations(sql: Client): Promise<void> {
       created_at TEXT NOT NULL
     );
   `);
+
+  await ensureColumn(sql, "proposal_time_slots", "is_all_day", "INTEGER NOT NULL DEFAULT 0");
 
   await sql.execute(`
     CREATE TABLE IF NOT EXISTS proposal_slot_votes (

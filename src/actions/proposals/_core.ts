@@ -402,6 +402,11 @@ async function notifyProposalStakeholders(
       proposalId: proposal.id,
       proposalTitle: proposal.title,
       proposalType: proposal.proposalType,
+      // Extra proposal context so notification surfaces can render when/where.
+      scheduledStartAt: proposal.scheduledStartAt ?? undefined,
+      scheduledEndAt: proposal.scheduledEndAt ?? undefined,
+      locationText: proposal.locationText ?? undefined,
+      isAllDay: proposal.isAllDay ?? undefined,
       ...extra,
     });
   }
@@ -734,7 +739,13 @@ async function replaceInvitees(
 async function replaceTimeSlots(
   db: ReturnType<typeof getDb>,
   proposalId: string,
-  slots: { startAt: string; endAt?: string; label?: string; sortOrder?: number }[],
+  slots: {
+    startAt: string;
+    endAt?: string;
+    label?: string;
+    sortOrder?: number;
+    isAllDay?: boolean;
+  }[],
 ): Promise<void> {
   await db.delete(proposalSlotVotes).where(eq(proposalSlotVotes.proposalId, proposalId));
   await db.delete(proposalTimeSlots).where(eq(proposalTimeSlots.proposalId, proposalId));
@@ -749,6 +760,7 @@ async function replaceTimeSlots(
       endAt: slot.endAt ?? null,
       label: slot.label ?? null,
       sortOrder: slot.sortOrder ?? index,
+      isAllDay: slot.isAllDay ?? false,
       createdAt: now,
     });
   }
@@ -1648,6 +1660,9 @@ export async function createDraftProposalAction(
     ? batchEntries.every((entry) => entry.intentionalSolo)
     : Boolean(parsed.data.intentionalSolo);
   const isPoll = Boolean(parsed.data.isPoll) || (parsed.data.timeSlots?.length ?? 0) > 1;
+  // All-day only applies to timed event proposals (sleeping is already date-only).
+  const isAllDay =
+    parsed.data.proposalType === "event" && Boolean(parsed.data.isAllDay);
   const eventPrivacy = parsed.data.eventPrivacy ?? "open";
   const isRecurring =
     !isBatchSleeping && Boolean(parsed.data.isRecurring && parsed.data.recurrenceRule);
@@ -1688,6 +1703,7 @@ export async function createDraftProposalAction(
     notes: parsed.data.notes ?? null,
     intentionalSolo,
     isPoll,
+    isAllDay,
     eventPrivacy,
     isRecurrenceParent: isRecurring,
     recurrenceRule: recurrenceJson,
@@ -1885,6 +1901,8 @@ export async function updateDraftProposalAction(
       notes: parsed.data.notes ?? null,
       intentionalSolo,
       isPoll: Boolean(isPoll),
+      isAllDay:
+        parsed.data.proposalType === "event" && Boolean(parsed.data.isAllDay),
       eventPrivacy: parsed.data.eventPrivacy ?? proposal.eventPrivacy,
       isRecurrenceParent: isRecurring || proposal.isRecurrenceParent,
       recurrenceRule: recurrenceJson,
@@ -2148,6 +2166,11 @@ export async function submitProposalAction(
     : `Proposal "${proposal.title}" needs your review.`;
 
   if (!(autoResolve && isSpecial)) {
+    // Surface the proposed time (resolved schedule, else earliest slot) and
+    // location so review notifications carry richer context than the title.
+    const earliestSlot = [...slots].sort((a, b) =>
+      a.startAt.localeCompare(b.startAt),
+    )[0];
     const notifyIds = new Set<string>(invitees.map((row) => row.userId));
     for (const userId of notifyIds) {
       await notifyUser(userId, "proposal_submitted", notificationMessage, {
@@ -2156,6 +2179,10 @@ export async function submitProposalAction(
         proposerId: session.user.id,
         state: nextState,
         proposalType: proposal.proposalType,
+        scheduledStartAt: schedule.start ?? earliestSlot?.startAt ?? undefined,
+        scheduledEndAt: schedule.end ?? earliestSlot?.endAt ?? undefined,
+        locationText: proposal.locationText ?? undefined,
+        isAllDay: proposal.isAllDay ?? undefined,
       });
     }
   }
@@ -2203,6 +2230,7 @@ export async function getProposalDetailAction(
       locationName: locations.name,
       intentionalSolo: proposals.intentionalSolo,
       isPoll: proposals.isPoll,
+      isAllDay: proposals.isAllDay,
       eventPrivacy: proposals.eventPrivacy,
       scheduledStartAt: proposals.scheduledStartAt,
       scheduledEndAt: proposals.scheduledEndAt,
@@ -2407,6 +2435,7 @@ export async function getProposalDetailAction(
       locationName: display.locationName ?? display.locationText ?? null,
       intentionalSolo: row.intentionalSolo,
       isPoll: row.isPoll,
+      isAllDay: row.isAllDay,
       eventPrivacy: row.eventPrivacy,
       scheduledStartAt: display.scheduledStartAt ?? null,
       scheduledEndAt: display.scheduledEndAt ?? null,
@@ -2436,6 +2465,7 @@ export async function getProposalDetailAction(
             startAt: slot.startAt,
             endAt: slot.endAt ?? null,
             label: slot.label ?? null,
+            isAllDay: slot.isAllDay ?? false,
           })),
       slotVotes: masked
         ? []

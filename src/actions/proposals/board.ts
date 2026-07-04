@@ -91,6 +91,7 @@ export async function listProposalBoardAction(): Promise<ProposalBoard> {
       scheduledEndAt: proposals.scheduledEndAt,
       atRisk: proposals.atRisk,
       isPoll: proposals.isPoll,
+      isAllDay: proposals.isAllDay,
       eventPrivacy: proposals.eventPrivacy,
       intentionalSolo: proposals.intentionalSolo,
     })
@@ -212,6 +213,7 @@ export async function listProposalBoardAction(): Promise<ProposalBoard> {
       scheduledEndAt: display.scheduledEndAt ?? null,
       atRisk: row.atRisk,
       isPoll: row.isPoll,
+      isAllDay: row.isAllDay,
       eventPrivacy: row.eventPrivacy,
       isContentMasked: masked,
       needsViewerAction,
@@ -291,6 +293,7 @@ export async function listProposalBoardAction(): Promise<ProposalBoard> {
         scheduledEndAt: null,
         atRisk: false,
         isPoll: false,
+        isAllDay: false,
         eventPrivacy: "open",
         isContentMasked: false,
         needsViewerAction: copy.needsViewerAction,
