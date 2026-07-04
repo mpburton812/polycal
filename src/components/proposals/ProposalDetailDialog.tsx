@@ -159,7 +159,10 @@ export function ProposalDetailDialog({
     startTransition(async () => {
       const result = await getProposalDetailAction(id);
       if (!result.ok || !result.detail) {
-        notifyResult(result);
+        // The proposal may have left the viewer's scope after their own action
+        // (e.g. a decline that reverts it to a draft only the proposer can see).
+        // Clear the detail silently so a reload error doesn't clobber the
+        // action's own success toast (fixes a flaky "Vote recorded" assertion).
         setDetail(null);
         return;
       }
