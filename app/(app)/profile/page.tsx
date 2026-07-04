@@ -10,6 +10,8 @@ import { ensureDbReady } from "@/lib/db/ensure-ready";
 import { users } from "@/lib/db/schema";
 import { getVapidPublicKey } from "@/lib/push";
 import { resolveTimezone } from "@/lib/schedule/timezone";
+import { brutalPageTitleSx } from "@/theme/brutalUi";
+import { GARDEN_TOKENS } from "@/theme/tokens";
 
 export default async function ProfilePage() {
   const session = await auth();
@@ -36,10 +38,10 @@ export default async function ProfilePage() {
 
   return (
     <>
-      <Typography variant="h5" component="h1" gutterBottom>
-        Profile
+      <Typography variant="h5" component="h1" gutterBottom sx={brutalPageTitleSx}>
+        Profile &amp; Settings
       </Typography>
-      <Typography color="text.secondary" sx={{ mb: 3 }}>
+      <Typography sx={{ mb: 3, color: GARDEN_TOKENS.inkMuted }}>
         Signed in as <strong>{session.user.displayName}</strong> ({session.user.role})
       </Typography>
       <ProfileSettings

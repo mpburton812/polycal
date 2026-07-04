@@ -4,18 +4,43 @@ import { fillProposalDateField, fillProposalDateTimeField } from "./datePickers"
 import { openProposalCard, selectProposalTab } from "./navigation";
 
 /** Locates a proposal Kanban card by exact title heading. */
-export function proposalCard(page: Page, title: string) {
+export function proposalCard(page: Page, title: string | RegExp) {
   return page.locator(".MuiCard-root").filter({
     has: page.getByRole("heading", { name: title, level: 2 }),
   });
 }
 
-/** Locates cards whose titles start with the given prefix (batch sleeping nights). */
+/** Escapes a string for use inside a RegExp. */
+function escapeRegex(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/** Locates cards whose titles start with the given prefix (events, recurring series). */
 export function proposalCardsWithPrefix(page: Page, titlePrefix: string) {
-  const escaped = titlePrefix.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const escaped = escapeRegex(titlePrefix);
   return page.locator(".MuiCard-root").filter({
     has: page.getByRole("heading", { level: 2, name: new RegExp(`^${escaped}`) }),
   });
+}
+
+/** Locates all auto-titled sleeping proposal cards (PC-66). */
+export function sleepingProposalCards(page: Page) {
+  return page.locator(".MuiCard-root").filter({
+    has: page.getByRole("heading", { level: 2, name: /Sleeping:/ }),
+  });
+}
+
+/** Locates a sleeping card by proposer and optional invitee display names. */
+export function sleepingProposalCardsFor(
+  page: Page,
+  proposerName: string,
+  options?: { inviteeName?: string },
+) {
+  const parts = [escapeRegex(proposerName)];
+  if (options?.inviteeName) {
+    parts.push(escapeRegex(options.inviteeName));
+  }
+  return proposalCard(page, new RegExp(`Sleeping:.*${parts.join(".*")}`, "i"));
 }
 
 /** Opens the FAB menu for creating proposals. */
@@ -116,6 +141,17 @@ export async function selectProposalType(page: Page, dialog: Locator, type: "Eve
   await page.getByRole("option", { name: type }).click();
 }
 
+/** Persists a proposal draft via the Save button (PC-70 label). */
+export async function saveProposalDraft(dialog: Locator): Promise<void> {
+  await dialog.getByRole("button", { name: "Save", exact: true }).click();
+}
+
+/** Closes the draft dialog via Exit (PC-70 label). */
+export async function exitDraftDialog(dialog: Locator): Promise<void> {
+  await dialog.getByRole("button", { name: "Exit" }).click();
+  await expect(dialog).toBeHidden();
+}
+
 /** Submits a draft, confirming through schedule-conflict dialog when present. */
 export async function submitProposalDraft(page: Page, dialog: Locator) {
   await expect(dialog.getByRole("button", { name: "Submit" })).toBeVisible({ timeout: 15_000 });
@@ -156,7 +192,7 @@ export async function createAndSubmitEvent(
   await setInviteeRequired(dialog, options.requiredName);
   await setInviteeOptional(dialog, options.optionalName);
   await fillProposalDateTimeField(dialog.getByLabel("Start").first(), options.start);
-  await dialog.getByRole("button", { name: "Create draft" }).click();
+  await dialog.getByRole("button", { name: "Save" }).click();
   await submitProposalDraft(page, dialog);
 }
 
@@ -178,7 +214,7 @@ export async function createAndSubmitSoloEvent(
   }
   await fillProposalDateTimeField(dialog.getByLabel("Start").first(), options.start);
   await fillProposalDateTimeField(dialog.getByLabel("End (optional)").first(), options.end);
-  await dialog.getByRole("button", { name: "Create draft" }).click();
+  await dialog.getByRole("button", { name: "Save" }).click();
   await submitProposalDraft(page, dialog);
 }
 
@@ -211,7 +247,7 @@ export async function createAndSubmitSoloEventWithReminder(
     .click();
   await fillProposalDateTimeField(dialog.getByLabel("Start").first(), options.start);
   await fillProposalDateTimeField(dialog.getByLabel("End (optional)").first(), options.end);
-  await dialog.getByRole("button", { name: "Create draft" }).click();
+  await dialog.getByRole("button", { name: "Save" }).click();
   await submitProposalDraft(page, dialog);
 }
 
@@ -232,7 +268,7 @@ export async function createAndSubmitRecurringEventForEveryone(
   await setAllInviteesRequired(dialog);
   await fillProposalDateTimeField(dialog.getByLabel("Start").first(), options.start);
   await fillProposalDateTimeField(dialog.getByLabel("End (optional)").first(), options.end);
-  await dialog.getByRole("button", { name: "Create draft" }).click();
+  await dialog.getByRole("button", { name: "Save" }).click();
   await submitProposalDraft(page, dialog);
 }
 
@@ -243,7 +279,7 @@ export async function createAndSubmitRecurringEventForEveryone(
 export async function createAndSubmitSoloSleepingWeek(
   page: Page,
   options: {
-    titlePrefix: string;
+    titlePrefix?: string;
     rangeStart: string;
     rangeEnd: string;
   },
@@ -254,8 +290,6 @@ export async function createAndSubmitSoloSleepingWeek(
     .getByRole("checkbox", { name: "Batch (multiple nights in one proposal)" })
     .check();
 
-  await dialog.getByLabel("Title").fill(options.titlePrefix);
-
   for (let index = 0; index < nightDates.length; index += 1) {
     if (index > 0) {
       await dialog.getByRole("button", { name: "Add night" }).click();
@@ -264,7 +298,6 @@ export async function createAndSubmitSoloSleepingWeek(
     await dialog.getByRole("button", { name: "Solo", exact: true }).nth(index).click();
   }
 
-  await dialog.getByRole("button", { name: "Create draft" }).click();
   await submitProposalDraft(page, dialog);
 
   return nightDates.length;
@@ -283,7 +316,7 @@ export async function openSpecialDraftForEdit(page: Page, title: string): Promis
 }
 
 /** Opens a draft card in the edit dialog via Continue Editing. */
-export async function openDraftForEdit(page: Page, title: string): Promise<Locator> {
+export async function openDraftForEdit(page: Page, title: string | RegExp): Promise<Locator> {
   const card = proposalCard(page, title);
   await card.getByRole("button", { name: "Continue Editing" }).click();
   const dialog = page.getByRole("dialog");
@@ -398,11 +431,41 @@ export async function configureBatchNight(
   }
 }
 
+/** Opens a proposed card and accepts with an optional comment (partnership or event). */
+export async function acceptProposalWithComment(page: Page, comment: string): Promise<void> {
+  const dialog = page.getByRole("dialog");
+  const optionalComment = dialog.getByPlaceholder("Add a comment (optional)…");
+  const threadComment = dialog.getByPlaceholder("Add a comment…");
+
+  if (await optionalComment.isVisible().catch(() => false)) {
+    await optionalComment.fill(comment);
+  } else if (await threadComment.isVisible().catch(() => false)) {
+    await threadComment.fill(comment);
+    await dialog.getByRole("button", { name: "Post" }).click();
+    await expect(dialog.getByText(comment)).toBeVisible({ timeout: 15_000 });
+  }
+
+  await dialog.getByRole("button", { name: "Accept" }).click();
+
+  await dialog
+    .getByText("RESOLVED", { exact: true })
+    .first()
+    .waitFor({ state: "visible", timeout: 8_000 })
+    .catch(() => {});
+
+  const closeButton = dialog.getByRole("button", { name: "Close" });
+  if (await closeButton.isVisible().catch(() => false)) {
+    await closeButton.click();
+  }
+
+  await expect(dialog).toBeHidden({ timeout: 25_000 });
+}
+
 /** Creates and submits a batch sleeping night with a required partner invitee. */
 export async function createAndSubmitBatchSleepingWithInvitee(
   page: Page,
   options: {
-    title: string;
+    title?: string;
     nightDate: string;
     requiredPartnerName: string;
     locationName?: string;
@@ -411,7 +474,6 @@ export async function createAndSubmitBatchSleepingWithInvitee(
 ): Promise<void> {
   const dialog = await openSleepingProposalDraft(page);
   await dialog.getByRole("checkbox", { name: /Batch/i }).check();
-  await dialog.getByLabel("Title").fill(options.title);
   await fillProposalDateField(dialog.getByLabel("Night of").first(), options.nightDate);
   await dialog.getByRole("button", { name: "With invitees" }).first().click();
   await setInviteeRequired(dialog, options.requiredPartnerName);

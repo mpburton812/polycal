@@ -16,18 +16,20 @@ import {
 } from "@mui/material";
 
 import { type ProposalCard as ProposalCardData } from "@/actions/proposals";
+import { fontFamilies } from "@/theme/fonts";
+import { GARDEN_TOKENS } from "@/theme/tokens";
 
 import {
+  brutalPressSx,
   formatTimeRange,
-  POLY_GREEN,
-  POLY_GREEN_LIGHT,
   PAST_SCHEDULE_BG,
   PAST_SCHEDULE_ICON,
   PAST_SCHEDULE_TEXT,
   primaryButtonSx,
+  proposalCardRotation,
   proposalCardSx,
   typeBadgeLabel,
-  typeChipSx,
+  typeChipSxForProposal,
 } from "./proposalCardTheme";
 
 function stateBadgeLabel(proposal: ProposalCardData): string {
@@ -49,7 +51,7 @@ interface ProposalCardProps {
 }
 
 /**
- * Graphical proposal card matching Phase 4 mockup (PC-40).
+ * Proposal card with Garden Brutalism ink borders and pastel type chips.
  */
 export function ProposalCard({
   proposal,
@@ -57,36 +59,55 @@ export function ProposalCard({
   onContinueEdit,
   onDeleteDraft,
 }: ProposalCardProps) {
-  const timeLabel = formatTimeRange(proposal.scheduledStartAt, proposal.scheduledEndAt);
+  const timeLabel = formatTimeRange(
+    proposal.scheduledStartAt,
+    proposal.scheduledEndAt,
+    proposal.proposalType,
+    proposal.isAllDay,
+  );
   const responsePct =
     proposal.inviteeCount > 0
       ? Math.round((proposal.respondedCount / proposal.inviteeCount) * 100)
       : 0;
+  const rotation = proposalCardRotation(proposal.id);
 
   return (
     <Card
       variant="outlined"
       sx={{
         ...proposalCardSx,
+        ...brutalPressSx,
         cursor: "pointer",
-        transition: "box-shadow 0.2s",
-        "&:hover": { boxShadow: 3 },
+        transform: `rotate(${rotation})`,
+        "&:hover": {
+          ...brutalPressSx["&:hover"],
+          transform: `rotate(${rotation}) translate(1px, 1px)`,
+        },
       }}
       onClick={() => onOpen(proposal.id)}
     >
       <CardContent sx={{ pb: 1 }}>
         {proposal.cardKind === "partnership" && (
-          <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 0.5 }}>
+          <Typography
+            variant="caption"
+            sx={{ display: "block", mb: 0.5, color: GARDEN_TOKENS.inkMuted }}
+          >
             Visible only to proposer, invitee, and admins.
           </Typography>
         )}
         {(proposal.specialKind === "residency" || proposal.cardKind === "residency") && (
-          <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 0.5 }}>
+          <Typography
+            variant="caption"
+            sx={{ display: "block", mb: 0.5, color: GARDEN_TOKENS.inkMuted }}
+          >
             Place residency — no date or time required.
           </Typography>
         )}
         {proposal.specialKind === "group_name" && (
-          <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 0.5 }}>
+          <Typography
+            variant="caption"
+            sx={{ display: "block", mb: 0.5, color: GARDEN_TOKENS.inkMuted }}
+          >
             Poly group rename — consensus required before applying.
           </Typography>
         )}
@@ -95,49 +116,97 @@ export function ProposalCard({
           <Chip
             label={typeBadgeLabel(proposal.proposalType, proposal.cardKind, proposal.specialKind)}
             size="small"
-            sx={typeChipSx}
+            sx={typeChipSxForProposal(
+              proposal.proposalType,
+              proposal.cardKind,
+              proposal.specialKind,
+            )}
           />
-          <Typography variant="caption" color="text.secondary" sx={{ textAlign: "right" }}>
+          <Typography
+            variant="caption"
+            sx={{
+              textAlign: "right",
+              fontFamily: fontFamilies.label,
+              color: GARDEN_TOKENS.inkMuted,
+              fontSize: "0.65rem",
+            }}
+          >
             PROPOSED BY {proposal.proposerName.toUpperCase()}
           </Typography>
         </Stack>
 
         <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" sx={{ mb: 0.5 }}>
-          <Typography variant="h6" component="h2" sx={{ fontSize: "1.1rem", fontWeight: 600 }}>
+          <Typography
+            variant="h6"
+            component="h2"
+            sx={{
+              fontFamily: fontFamilies.label,
+              fontSize: "1.1rem",
+              fontWeight: 600,
+            }}
+          >
             {proposal.title}
           </Typography>
           <Chip
             label={stateBadgeLabel(proposal)}
             size="small"
             variant="outlined"
-            sx={{ fontWeight: 600, fontSize: "0.65rem" }}
+            sx={{
+              fontWeight: 600,
+              fontSize: "0.65rem",
+              borderColor: GARDEN_TOKENS.ink,
+              color: GARDEN_TOKENS.ink,
+            }}
           />
-          {proposal.atRisk && <Chip size="small" label="At risk" color="warning" />}
+          {proposal.atRisk && (
+            <Chip
+              size="small"
+              label="At risk"
+              sx={{
+                bgcolor: "#F0C878",
+                color: GARDEN_TOKENS.ink,
+                border: `2px solid ${GARDEN_TOKENS.ink}`,
+              }}
+            />
+          )}
           {proposal.needsViewerAction && (
-            <Chip size="small" label="Action needed" sx={{ bgcolor: POLY_GREEN, color: "#fff" }} />
+            <Chip
+              size="small"
+              label="Action needed"
+              sx={{
+                bgcolor: GARDEN_TOKENS.sage,
+                color: GARDEN_TOKENS.surface,
+                border: `2px solid ${GARDEN_TOKENS.ink}`,
+              }}
+            />
           )}
         </Stack>
 
-          {proposal.isContentMasked && (
-            <Chip size="small" label="Private" variant="outlined" sx={{ mt: 1 }} />
-          )}
+        {proposal.isContentMasked && (
+          <Chip
+            size="small"
+            label="Private"
+            variant="outlined"
+            sx={{ mt: 1, borderColor: GARDEN_TOKENS.ink }}
+          />
+        )}
 
         {timeLabel &&
           !proposal.isContentMasked &&
           proposal.specialKind !== "residency" &&
           proposal.cardKind !== "residency" && (
-          <Stack direction="row" spacing={0.5} alignItems="center" sx={{ mt: 1 }}>
-            <AccessTimeIcon sx={{ fontSize: 16, color: "text.secondary" }} />
-            <Typography variant="body2" color="text.secondary">
-              {timeLabel}
-            </Typography>
-          </Stack>
-        )}
+            <Stack direction="row" spacing={0.5} alignItems="center" sx={{ mt: 1 }}>
+              <AccessTimeIcon sx={{ fontSize: 16, color: GARDEN_TOKENS.inkMuted }} />
+              <Typography variant="body2" sx={{ color: GARDEN_TOKENS.inkMuted }}>
+                {timeLabel}
+              </Typography>
+            </Stack>
+          )}
 
         {proposal.locationName && !proposal.isContentMasked && (
           <Stack direction="row" spacing={0.5} alignItems="center" sx={{ mt: 0.5 }}>
-            <LocationOnOutlinedIcon sx={{ fontSize: 16, color: "text.secondary" }} />
-            <Typography variant="body2" color="text.secondary">
+            <LocationOnOutlinedIcon sx={{ fontSize: 16, color: GARDEN_TOKENS.inkMuted }} />
+            <Typography variant="body2" sx={{ color: GARDEN_TOKENS.inkMuted }}>
               {proposal.locationName}
             </Typography>
           </Stack>
@@ -149,7 +218,8 @@ export function ProposalCard({
               mt: 1.5,
               p: 1,
               bgcolor: PAST_SCHEDULE_BG,
-              borderRadius: 1,
+              borderRadius: "12px 6px 10px 8px",
+              border: `2px solid ${GARDEN_TOKENS.ink}`,
               display: "flex",
               alignItems: "center",
               gap: 0.5,
@@ -164,7 +234,7 @@ export function ProposalCard({
 
         {proposal.state !== "draft" && proposal.inviteeCount > 0 && (
           <Box sx={{ mt: 1.5 }}>
-            <Typography variant="caption" color="text.secondary">
+            <Typography variant="caption" sx={{ color: GARDEN_TOKENS.inkMuted }}>
               {responseLabel(proposal)}
             </Typography>
             <LinearProgress
@@ -172,10 +242,14 @@ export function ProposalCard({
               value={responsePct}
               sx={{
                 mt: 0.5,
-                height: 6,
-                borderRadius: 3,
-                bgcolor: POLY_GREEN_LIGHT,
-                "& .MuiLinearProgress-bar": { bgcolor: POLY_GREEN },
+                height: 8,
+                borderRadius: 999,
+                border: `2px solid ${GARDEN_TOKENS.ink}`,
+                bgcolor: "#E8F0E9",
+                "& .MuiLinearProgress-bar": {
+                  bgcolor: GARDEN_TOKENS.sage,
+                  borderRadius: 999,
+                },
               }}
             />
           </Box>
@@ -201,7 +275,11 @@ export function ProposalCard({
             <Button
               variant="outlined"
               size="small"
-              color="error"
+              sx={{
+                border: `2px solid ${GARDEN_TOKENS.ink}`,
+                color: GARDEN_TOKENS.terracotta,
+                boxShadow: "none",
+              }}
               onClick={(event) => {
                 event.stopPropagation();
                 onDeleteDraft(proposal.id);

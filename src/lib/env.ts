@@ -38,6 +38,35 @@ export function getEnvironmentBannerColors(): (typeof ENVIRONMENT_BANNER_COLORS)
   return ENVIRONMENT_BANNER_COLORS[getAppEnvironment()];
 }
 
+/**
+ * Canonical public base URL per deployment tier. Used as a fallback when
+ * AUTH_URL / NEXTAUTH_URL are not present in the environment (e.g. local dev).
+ * Mirrors scripts/validate-connectivity.mjs so onboarding links are correct.
+ */
+export const ENVIRONMENT_APP_URLS: Record<AppEnvironment, string> = {
+  feature: "http://localhost:3000",
+  dev: "https://polycal-git-dev-michael-burton-s-projects.vercel.app",
+  test: "https://polycal-git-test-michael-burton-s-projects.vercel.app",
+  production: "https://polycal-ebon.vercel.app",
+};
+
+/**
+ * Resolves the public origin of the running deployment for links embedded in
+ * emails / onboarding text. Prefers the auth base URL that Vercel sync scripts
+ * set per environment (AUTH_URL), falling back to NEXTAUTH_URL and finally the
+ * tier map so a test deployment never emits a production URL. Trailing slashes
+ * are stripped so callers can safely append paths like "/login".
+ */
+export function getPublicAppUrl(): string {
+  const explicit =
+    process.env.AUTH_URL?.trim() || process.env.NEXTAUTH_URL?.trim();
+  const base =
+    explicit && explicit.length > 0
+      ? explicit
+      : ENVIRONMENT_APP_URLS[getAppEnvironment()];
+  return base.replace(/\/+$/, "");
+}
+
 /** Short git SHA surfaced in the dev bar (injected at build time on Vercel). */
 export function getBuildSha(): string {
   return process.env.NEXT_PUBLIC_BUILD_SHA ?? "local";
@@ -46,4 +75,30 @@ export function getBuildSha(): string {
 /** Active git branch name for the dev bar. */
 export function getBuildBranch(): string {
   return process.env.NEXT_PUBLIC_BUILD_BRANCH ?? "local";
+}
+
+/**
+ * ISO timestamp captured when this build was produced (deploy time on Vercel).
+ * Surfaced in the admin Code Status panel as when the build went live.
+ */
+export function getBuildTime(): string | null {
+  return process.env.NEXT_PUBLIC_BUILD_TIME ?? null;
+}
+
+/** Consolidated build/deploy descriptor for the Code Status panel + build-info API. */
+export interface BuildInfo {
+  sha: string;
+  branch: string;
+  time: string | null;
+  environment: AppEnvironment;
+}
+
+/** Returns the current deployment's build descriptor. */
+export function getBuildInfo(): BuildInfo {
+  return {
+    sha: getBuildSha(),
+    branch: getBuildBranch(),
+    time: getBuildTime(),
+    environment: getAppEnvironment(),
+  };
 }

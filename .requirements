@@ -121,3 +121,11 @@
 2026-06-29 | 6ebf517 | PC-70 | backlog week 4 — event reminder and alert prefs E2E journeys | src/types/notification-prefs.test.ts
 2026-06-29 | a64aa81 | PC-71 | backlog week 5 — CI sharding, JSON audit, schema verify, _core split | src/actions/proposals.ts
 2026-06-29 | 36d8bf7 | PC-71 | close JSON audit gaps, schema v13 checks, 4-shard CI | src/actions/admin.ts
+2026-06-30 | 19efe1b | PC-72 | CI sharding, audit tail, journeys, and parallel docs | src/actions/places.ts
+2026-06-30 | 9937746 | PC-72 | record PR #124 dev-to-test CI shard timings | docs/PROMOTION-TIMINGS.md
+2026-06-30 | 032538b | PC-62 | sleeping calendar UX epic - | src/actions/admin.ts
+2026-06-30 | 010126d | PC-70 | align E2E with Save draft button label | e2e/birthday-party-journey.spec.ts
+2026-06-30 | fb4d948 | PC-62 | align E2E with sleeping auto titles and Exit draft UX | e2e/helpers/auth.ts
+2026-06-30 | 6f6a95a | PC-40 | extend Playful Collective theme to all app pages | src/actions/onboarding.ts
+2026-07-01 | 743e1e3 | PC-40 | Garden Brutalism and Playful Collective theme across app | src/actions/onboarding.ts
+2026-07-01 | a4be87b | PC-40 | raise toast z-index above bottom nav for E2E visibility | src/components/providers/ToastProvider.tsx

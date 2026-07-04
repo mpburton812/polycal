@@ -22,6 +22,7 @@ export interface ProposalCard {
   scheduledEndAt: string | null;
   atRisk: boolean;
   isPoll: boolean;
+  isAllDay: boolean;
   eventPrivacy: EventPrivacyLevel;
   isContentMasked: boolean;
   /** True when the viewer must act on a proposed item. */
@@ -75,6 +76,7 @@ export interface ProposalTimeSlotView {
   startAt: string;
   endAt: string | null;
   label: string | null;
+  isAllDay: boolean;
 }
 
 export interface ProposalSlotVoteView {
@@ -109,6 +111,7 @@ export interface ProposalDetail {
   locationName: string | null;
   intentionalSolo: boolean;
   isPoll: boolean;
+  isAllDay: boolean;
   eventPrivacy: EventPrivacyLevel;
   scheduledStartAt: string | null;
   scheduledEndAt: string | null;

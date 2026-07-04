@@ -43,7 +43,7 @@ test.describe("Admin bad user lifecycle journey", () => {
     // —— Phase 3: paused bad_user lands on /paused, not the app ——
     await login(page, USERS.badUser.username);
     await expect(page).toHaveURL(/\/paused/);
-    await expect(page.getByText(/account has been paused/i)).toBeVisible();
+    await expect(page.getByRole("heading", { name: /account paused/i })).toBeVisible();
     await expect(page.getByRole("navigation", { name: "Main navigation" })).toHaveCount(0);
 
     await logout(page);

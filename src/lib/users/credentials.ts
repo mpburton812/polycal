@@ -1,5 +1,7 @@
 import { randomBytes } from "node:crypto";
 
+import { getPublicAppUrl } from "@/lib/env";
+
 const PASSWORD_ALPHABET =
   "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
 
@@ -21,7 +23,10 @@ export function buildLoginInstructions(options: {
   password: string;
   appUrl?: string;
 }): string {
-  const baseUrl = options.appUrl ?? "https://polycal-ebon.vercel.app";
+  // Derive the sign-in URL from the running deployment (AUTH_URL per Vercel
+  // environment) instead of hardcoding production, so credentials provisioned
+  // on dev/test point at the matching environment. Callers may still override.
+  const baseUrl = (options.appUrl ?? getPublicAppUrl()).replace(/\/+$/, "");
   return [
     "Welcome to PolyCal!",
     "",

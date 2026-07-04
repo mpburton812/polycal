@@ -1,8 +1,12 @@
 import { Box, Button, Paper, Typography } from "@mui/material";
+import Image from "next/image";
 import { redirect } from "next/navigation";
 
 import { auth, signOut } from "@/lib/auth";
 import { getLiveUserStatus } from "@/lib/auth-session";
+import { fontFamilies } from "@/theme/fonts";
+import { brutalPaperSx } from "@/theme/brutalUi";
+import { GARDEN_TOKENS } from "@/theme/tokens";
 
 /**
  * Minimal shell for paused accounts — no app navigation (PC-55).
@@ -33,19 +37,43 @@ export default async function PausedPage() {
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        bgcolor: "background.default",
+        bgcolor: GARDEN_TOKENS.background,
         p: 2,
       }}
     >
-      <Paper sx={{ p: 4, width: "100%", maxWidth: 440 }} elevation={2}>
-        <Typography variant="h5" component="h1" gutterBottom>
+      <Paper elevation={0} sx={{ ...brutalPaperSx, width: "100%", maxWidth: 440 }}>
+        <Box sx={{ display: "flex", justifyContent: "center", mb: 2 }}>
+          <Image
+            src="/illustrations/empty-schedule-day.svg"
+            alt=""
+            width={96}
+            height={80}
+            priority
+          />
+        </Box>
+        <Typography
+          variant="h5"
+          component="h1"
+          gutterBottom
+          sx={{ fontFamily: fontFamilies.display, fontWeight: 700, color: GARDEN_TOKENS.ink }}
+        >
           Account paused
         </Typography>
-        <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
-          Your account has been paused. Please discuss with a system administrator.
+        <Typography variant="body1" sx={{ mb: 3, color: GARDEN_TOKENS.inkMuted }}>
+          An administrator has temporarily paused your access. Your data is safe — reach out to
+          your group admin if you think this is a mistake.
         </Typography>
         <Box component="form" action={signOutAction}>
-          <Button type="submit" variant="contained" fullWidth>
+          <Button
+            type="submit"
+            variant="contained"
+            fullWidth
+            sx={{
+              bgcolor: GARDEN_TOKENS.sage,
+              color: GARDEN_TOKENS.surface,
+              "&:hover": { bgcolor: "#557A5C" },
+            }}
+          >
             Sign out
           </Button>
         </Box>

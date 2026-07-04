@@ -1,4 +1,5 @@
 import { Box, Button, Paper, TextField, Typography } from "@mui/material";
+import Image from "next/image";
 import { eq } from "drizzle-orm";
 import { redirect } from "next/navigation";
 
@@ -8,6 +9,9 @@ import { getDb } from "@/lib/db/client";
 import { ensureDbReady } from "@/lib/db/ensure-ready";
 import { users } from "@/lib/db/schema";
 import { getNonProductionLoginHint } from "@/lib/seed/login-hint";
+import { fontFamilies } from "@/theme/fonts";
+import { brutalPaperSx } from "@/theme/brutalUi";
+import { GARDEN_TOKENS } from "@/theme/tokens";
 
 interface LoginPageProps {
   searchParams: Promise<{ error?: string; callbackUrl?: string }>;
@@ -64,16 +68,30 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        bgcolor: "background.default",
+        bgcolor: GARDEN_TOKENS.background,
         p: 2,
       }}
     >
-      <Paper sx={{ p: 4, width: "100%", maxWidth: 400 }} elevation={2}>
-        <Typography variant="h5" component="h1" gutterBottom>
+      <Paper elevation={0} sx={{ ...brutalPaperSx, width: "100%", maxWidth: 400 }}>
+        <Box sx={{ display: "flex", justifyContent: "center", mb: 2 }}>
+          <Image
+            src="/illustrations/empty-schedule-day.svg"
+            alt=""
+            width={96}
+            height={80}
+            priority
+          />
+        </Box>
+        <Typography
+          variant="h5"
+          component="h1"
+          gutterBottom
+          sx={{ fontFamily: fontFamilies.display, fontWeight: 700, color: GARDEN_TOKENS.ink }}
+        >
           PolyCal
         </Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-          Sign in with your username and password.
+        <Typography variant="body2" sx={{ mb: 3, color: GARDEN_TOKENS.inkMuted }}>
+          Coordinate your constellation — sign in with your username and password.
         </Typography>
         {params.error && (
           <Typography color="error" variant="body2" sx={{ mb: 2 }}>
@@ -103,12 +121,22 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
             autoComplete="current-password"
             margin="normal"
           />
-          <Button type="submit" variant="contained" fullWidth sx={{ mt: 2 }}>
+          <Button
+            type="submit"
+            variant="contained"
+            fullWidth
+            sx={{
+              mt: 2,
+              bgcolor: GARDEN_TOKENS.sage,
+              color: GARDEN_TOKENS.surface,
+              "&:hover": { bgcolor: "#557A5C" },
+            }}
+          >
             Sign in
           </Button>
         </Box>
         {loginHint && (
-          <Typography variant="caption" display="block" sx={{ mt: 2 }}>
+          <Typography variant="caption" display="block" sx={{ mt: 2, color: GARDEN_TOKENS.inkMuted }}>
             {loginHint}
           </Typography>
         )}

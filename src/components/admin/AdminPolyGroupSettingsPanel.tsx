@@ -26,6 +26,7 @@ import type { PolyGroupSettings } from "@/types/poly-group";
 import {
   auditLogVisibilityLevels,
   groupNameChangeModes,
+  placesMapVisibilityLevels,
   powerManagementModes,
 } from "@/types/poly-group";
 
@@ -41,6 +42,12 @@ const AUDIT_LABELS: Record<string, string> = {
   invitees_proposer_admin: "Invitees + proposer + admin",
   proposer_admin: "Proposer + admin",
   admin_only: "Admin only",
+};
+
+const MAP_VISIBILITY_LABELS: Record<string, string> = {
+  all: "Everyone",
+  admins: "Admins only",
+  none: "Hidden",
 };
 
 /**
@@ -268,6 +275,25 @@ export function AdminPolyGroupSettingsPanel({
           }
           label="Hide sleeping arrangements from non-sleeping partners on calendar"
         />
+        <FormControl fullWidth>
+          <InputLabel>Places MAP tab visibility</InputLabel>
+          <Select
+            label="Places MAP tab visibility"
+            value={settings.placesMapVisibility}
+            onChange={(e) =>
+              setSettings({
+                ...settings,
+                placesMapVisibility: e.target.value as PolyGroupSettings["placesMapVisibility"],
+              })
+            }
+          >
+            {placesMapVisibilityLevels.map((level) => (
+              <MenuItem key={level} value={level}>
+                {MAP_VISIBILITY_LABELS[level] ?? level}
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
         <TextField
           label="System log tail length"
           type="number"

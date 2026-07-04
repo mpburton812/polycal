@@ -4,13 +4,16 @@ import BedIcon from "@mui/icons-material/Bed";
 import { Box, Typography } from "@mui/material";
 
 import type { ScheduleEvent } from "@/actions/schedule";
-import { formatEventTime } from "@/lib/schedule/dates";
 import { scheduleBlockSx, scheduleBlockVariant } from "@/lib/schedule/colors";
+import { formatEventTime } from "@/lib/schedule/dates";
+import { fontFamilies } from "@/theme/fonts";
+import { GARDEN_TOKENS } from "@/theme/tokens";
 
 interface ScheduleEventBlockProps {
   event: ScheduleEvent;
   compact?: boolean;
   timeZone?: string;
+  rotationIndex?: number;
   onClick: () => void;
 }
 
@@ -34,12 +37,13 @@ function formatStatusLabel(event: ScheduleEvent): string {
 }
 
 /**
- * Clickable calendar block: title, location, status on line one; date and attendees on line two (PC-56).
+ * Clickable calendar block with Garden Brutalism pastel fills and ink borders.
  */
 export function ScheduleEventBlock({
   event,
   compact = false,
   timeZone = "UTC",
+  rotationIndex = 0,
   onClick,
 }: ScheduleEventBlockProps) {
   const variant = scheduleBlockVariant({
@@ -49,23 +53,42 @@ export function ScheduleEventBlock({
     hasOverlap: event.hasOverlap,
     atRisk: event.atRisk,
   });
-  const colors = scheduleBlockSx(variant);
+  const colors = scheduleBlockSx(variant, rotationIndex);
   const stakeholders = formatStakeholders(event);
-  const timeLabel = formatEventTime(event.startAt, event.endAt, event.proposalType, timeZone);
+  const timeLabel = formatEventTime(
+    event.startAt,
+    event.endAt,
+    event.proposalType,
+    timeZone,
+    event.isAllDay,
+  );
   const statusLabel = formatStatusLabel(event);
-
-  const lineOneParts = [event.title];
-  if (!event.isContentMasked && event.locationName) {
-    lineOneParts.push(event.locationName);
-  }
-  lineOneParts.push(statusLabel);
-  const lineOne = lineOneParts.join(", ");
-
-  const lineTwoParts: string[] = [];
-  if (timeLabel) lineTwoParts.push(timeLabel);
-  if (stakeholders) lineTwoParts.push(stakeholders);
-  const lineTwo = lineTwoParts.join(", ");
   const isSleeping = event.proposalType === "sleeping";
+  const sleepingLines =
+    isSleeping && !event.isContentMasked ? event.title.split("\n") : null;
+
+  let lineOne: string;
+  let lineTwo: string;
+
+  if (sleepingLines) {
+    lineOne = sleepingLines[0] ?? event.title;
+    const lineTwoParts: string[] = [];
+    if (sleepingLines[1]) lineTwoParts.push(sleepingLines[1]);
+    if (timeLabel) lineTwoParts.push(timeLabel);
+    lineTwo = lineTwoParts.join(", ");
+  } else {
+    const lineOneParts = [event.title];
+    if (!event.isContentMasked && event.locationName) {
+      lineOneParts.push(event.locationName);
+    }
+    lineOneParts.push(statusLabel);
+    lineOne = lineOneParts.join(", ");
+
+    const lineTwoParts: string[] = [];
+    if (timeLabel) lineTwoParts.push(timeLabel);
+    if (stakeholders) lineTwoParts.push(stakeholders);
+    lineTwo = lineTwoParts.join(", ");
+  }
 
   return (
     <Box
@@ -83,15 +106,25 @@ export function ScheduleEventBlock({
         overflow: "hidden",
         textAlign: "left",
         cursor: "pointer",
-        borderRadius: 1,
         px: compact ? 0.75 : 1,
         py: compact ? 0.5 : 0.75,
         mb: compact ? 0.5 : 0.75,
         bgcolor: colors.bgcolor,
         color: colors.color,
         border: colors.border,
+        borderRadius: colors.borderRadius,
+        transform: colors.transform,
         backgroundImage: colors.backgroundImage,
-        "&:hover": { filter: "brightness(0.97)" },
+        boxShadow: "none",
+        transition: "transform 0.12s ease, filter 0.12s ease",
+        "&:hover": {
+          filter: "brightness(0.97)",
+          transform: `${colors.transform} translate(1px, 1px)`,
+        },
+        "&:focus-visible": {
+          outline: `2px solid ${GARDEN_TOKENS.ink}`,
+          outlineOffset: 2,
+        },
       }}
     >
       {isSleeping && (
@@ -113,7 +146,11 @@ export function ScheduleEventBlock({
           variant={compact ? "caption" : "body2"}
           fontWeight={600}
           noWrap
-          sx={{ overflow: "hidden", textOverflow: "ellipsis" }}
+          sx={{
+            fontFamily: fontFamilies.label,
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+          }}
         >
           {lineOne}
         </Typography>
@@ -121,7 +158,11 @@ export function ScheduleEventBlock({
           variant="caption"
           display="block"
           noWrap
-          sx={{ overflow: "hidden", textOverflow: "ellipsis" }}
+          sx={{
+            fontFamily: fontFamilies.body,
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+          }}
         >
           {lineTwo}
         </Typography>

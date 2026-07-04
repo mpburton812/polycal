@@ -13,7 +13,6 @@ test.describe("Batch sleeping journey", () => {
     await goToProposals(page);
 
     const nightCount = await createAndSubmitSoloSleepingWeek(page, {
-      titlePrefix: `Batch week ${Date.now()}`,
       rangeStart: "2099-08-04",
       rangeEnd: "2099-08-10",
     });
@@ -21,6 +20,6 @@ test.describe("Batch sleeping journey", () => {
     expect(nightCount).toBeGreaterThan(0);
 
     await selectProposalTab(page, "Resolved");
-    await expect(page.getByText(/Batch week/i).first()).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText(/Sleeping:/i).first()).toBeVisible({ timeout: 15_000 });
   });
 });

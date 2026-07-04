@@ -1,13 +1,13 @@
 import { expect, test } from "./helpers/test";
 
-import { login, logout } from "./helpers/auth";
+import { loginWithOnboardingIfNeeded, logout } from "./helpers/auth";
 import { USERS } from "./helpers/constants";
 import { expectInAppNotification } from "./helpers/notifications";
 import { goToProposals, openProposalCard, selectProposalTab } from "./helpers/navigation";
 import {
   createAndSubmitEvent,
   createAndSubmitSoloSleepingWeek,
-  proposalCardsWithPrefix,
+  sleepingProposalCardsFor,
 } from "./helpers/proposals";
 import { expectToast } from "./helpers/toast";
 
@@ -15,7 +15,7 @@ test.describe("Week schedule poly-family journey", () => {
   test("proposer schedules solo week + social events, cancels a night, required accepts and optional declines with notes, notifications match actions", async ({
     page,
   }) => {
-    test.setTimeout(360_000);
+    test.setTimeout(420_000);
 
     const tag = Date.now();
     const weekPrefix = `E2E Week ${tag}`;
@@ -26,18 +26,17 @@ test.describe("Week schedule poly-family journey", () => {
     const escape = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
     // —— Phase 1: Luke schedules a week of intentional-solo sleeping nights ——
-    await login(page, USERS.luke.username);
+    await loginWithOnboardingIfNeeded(page, USERS.luke.username);
     await goToProposals(page);
 
     const nightCount = await createAndSubmitSoloSleepingWeek(page, {
-      titlePrefix: weekPrefix,
       rangeStart: "2099-07-07",
       rangeEnd: "2099-07-13",
     });
     expect(nightCount).toBe(7);
 
     await selectProposalTab(page, "Resolved");
-    await expect(proposalCardsWithPrefix(page, weekPrefix)).toHaveCount(1);
+    await expect(sleepingProposalCardsFor(page, USERS.luke.displayName)).toHaveCount(1);
 
     // —— Phase 2: Luke schedules social events through the week with poly family ——
     await createAndSubmitEvent(page, {
@@ -62,7 +61,7 @@ test.describe("Week schedule poly-family journey", () => {
 
     // —— Phase 3: Luke cancels the batch week proposal ——
     await selectProposalTab(page, "Resolved");
-    const batchCard = proposalCardsWithPrefix(page, weekPrefix).first();
+    const batchCard = sleepingProposalCardsFor(page, USERS.luke.displayName).first();
     const cancelledBatchTitle = await batchCard.getByRole("heading", { level: 2 }).innerText();
 
     page.once("dialog", (dialog) => dialog.accept());
@@ -74,7 +73,7 @@ test.describe("Week schedule poly-family journey", () => {
     await selectProposalTab(page, "Archived");
     await expect(page.getByRole("heading", { name: cancelledBatchTitle, level: 2 })).toBeVisible();
     await selectProposalTab(page, "Resolved");
-    await expect(proposalCardsWithPrefix(page, weekPrefix)).toHaveCount(0);
+    await expect(sleepingProposalCardsFor(page, USERS.luke.displayName)).toHaveCount(0);
 
     // —— Phase 4: Luke proposes dinner with required + optional invitees ——
     await createAndSubmitEvent(page, {
@@ -87,7 +86,7 @@ test.describe("Week schedule poly-family journey", () => {
 
     // —— Phase 5: Leia (required) accepts ——
     await logout(page);
-    await login(page, USERS.leia.username);
+    await loginWithOnboardingIfNeeded(page, USERS.leia.username);
     await goToProposals(page);
     await selectProposalTab(page, "Proposed");
     await openProposalCard(page, dinnerTitle);
@@ -102,7 +101,7 @@ test.describe("Week schedule poly-family journey", () => {
 
     // —— Phase 6: Han (optional) declines with a comment note ——
     await logout(page);
-    await login(page, USERS.han.username);
+    await loginWithOnboardingIfNeeded(page, USERS.han.username);
     await goToProposals(page);
     await selectProposalTab(page, "Resolved");
     await openProposalCard(page, dinnerTitle);
@@ -125,13 +124,13 @@ test.describe("Week schedule poly-family journey", () => {
     await expectInAppNotification(page, /approved and scheduled/i);
 
     await logout(page);
-    await login(page, USERS.leia.username);
+    await loginWithOnboardingIfNeeded(page, USERS.leia.username);
     await expectInAppNotification(page, new RegExp(escape(dinnerTitle)));
     await expectInAppNotification(page, /needs your review/i);
     await expectInAppNotification(page, /approved and scheduled/i);
 
     await logout(page);
-    await login(page, USERS.luke.username);
+    await loginWithOnboardingIfNeeded(page, USERS.luke.username);
     await expectInAppNotification(page, /A vote was cast on/i);
     await expectInAppNotification(page, new RegExp(escape(cancelledBatchTitle)));
     await expectInAppNotification(page, /was cancelled/i);

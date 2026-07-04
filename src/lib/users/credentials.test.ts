@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { buildLoginInstructions, generateTemporaryPassword } from "./credentials";
 
@@ -26,5 +26,40 @@ describe("buildLoginInstructions", () => {
     expect(text).toContain("Temporary password: TempPass123");
     expect(text).toContain("https://example.test/login");
     expect(text).toContain("change your password");
+  });
+
+  describe("environment-derived sign-in URL", () => {
+    const originalAuthUrl = process.env.AUTH_URL;
+    const originalNextAuthUrl = process.env.NEXTAUTH_URL;
+    const originalAppEnv = process.env.NEXT_PUBLIC_APP_ENV;
+
+    beforeEach(() => {
+      delete process.env.AUTH_URL;
+      delete process.env.NEXTAUTH_URL;
+      delete process.env.NEXT_PUBLIC_APP_ENV;
+    });
+
+    afterEach(() => {
+      process.env.AUTH_URL = originalAuthUrl;
+      process.env.NEXTAUTH_URL = originalNextAuthUrl;
+      process.env.NEXT_PUBLIC_APP_ENV = originalAppEnv;
+    });
+
+    it("uses AUTH_URL when appUrl is not provided", () => {
+      process.env.AUTH_URL = "https://polycal-git-test-example.vercel.app/";
+      const text = buildLoginInstructions({ username: "u", password: "p" });
+      expect(text).toContain(
+        "Sign in: https://polycal-git-test-example.vercel.app/login",
+      );
+      expect(text).not.toContain("polycal-ebon.vercel.app");
+    });
+
+    it("falls back to the tier URL from NEXT_PUBLIC_APP_ENV", () => {
+      process.env.NEXT_PUBLIC_APP_ENV = "test";
+      const text = buildLoginInstructions({ username: "u", password: "p" });
+      expect(text).toContain(
+        "Sign in: https://polycal-git-test-michael-burton-s-projects.vercel.app/login",
+      );
+    });
   });
 });

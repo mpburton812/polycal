@@ -10,7 +10,7 @@ import { UserThemeProvider } from "@/components/providers/UserThemeProvider";
 import { auth } from "@/lib/auth";
 import { getLiveUserStatus } from "@/lib/auth-session";
 import { userHasAdminAccess } from "@/lib/admin-access";
-import { isUserThemeId } from "@/lib/constants/themes";
+import { normalizeUserThemeId } from "@/lib/constants/themes";
 
 export default async function AppLayout({
   children,
@@ -31,9 +31,7 @@ export default async function AppLayout({
   }
 
   const hasAdminAccess = await userHasAdminAccess(session.user.role);
-  const themeId = isUserThemeId(session.user.theme ?? "")
-    ? session.user.theme!
-    : "mint";
+  const themeId = normalizeUserThemeId(session.user.theme ?? "sage");
 
   const notificationInbox = await getNotificationInboxAction();
   const notificationPrefs = await getNotificationPrefsAction();

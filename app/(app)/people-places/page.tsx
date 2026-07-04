@@ -2,10 +2,14 @@ import { Typography } from "@mui/material";
 import { redirect } from "next/navigation";
 
 import { listPlacesAction } from "@/actions/places";
+import { listSleepingPartnershipMapEdgesAction } from "@/actions/partnerships";
+import { getPlacesMapVisibilityAction } from "@/actions/poly-group";
 import { listPeopleAction, getProvisioningPolicyAction } from "@/actions/users";
 import { PeoplePlacesClient } from "@/components/people-places/PeoplePlacesClient";
 import { auth } from "@/lib/auth";
 import { userHasAdminAccess } from "@/lib/admin-access";
+import { brutalPageTitleSx } from "@/theme/brutalUi";
+import { GARDEN_TOKENS } from "@/theme/tokens";
 
 export default async function PeoplePlacesPage() {
   const session = await auth();
@@ -13,19 +17,22 @@ export default async function PeoplePlacesPage() {
     redirect("/login");
   }
 
-  const [people, places, policy, hasAdminAccess] = await Promise.all([
+  const [people, places, policy, hasAdminAccess, placesMapVisibility, mapEdges] =
+    await Promise.all([
     listPeopleAction(),
     listPlacesAction(),
     getProvisioningPolicyAction(),
     userHasAdminAccess(session.user.role),
+    getPlacesMapVisibilityAction(),
+    listSleepingPartnershipMapEdgesAction(),
   ]);
 
   return (
     <>
-      <Typography variant="h5" component="h1" gutterBottom>
+      <Typography variant="h5" component="h1" gutterBottom sx={brutalPageTitleSx}>
         People &amp; Places
       </Typography>
-      <Typography color="text.secondary" sx={{ mb: 3 }}>
+      <Typography sx={{ mb: 3, color: GARDEN_TOKENS.inkMuted }}>
         Manage network members, sleeping partnerships, and shared locations.
       </Typography>
       <PeoplePlacesClient
@@ -34,6 +41,8 @@ export default async function PeoplePlacesPage() {
         currentUserId={session.user.id}
         canProvision={policy.canProvision}
         isAdmin={hasAdminAccess}
+        placesMapVisibility={placesMapVisibility}
+        mapEdges={mapEdges}
       />
     </>
   );

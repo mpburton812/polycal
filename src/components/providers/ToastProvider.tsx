@@ -49,6 +49,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
         autoHideDuration={5000}
         onClose={() => setToast((current) => ({ ...current, open: false }))}
         anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+        sx={{ zIndex: (theme) => theme.zIndex.snackbar + 100 }}
       >
         <Alert
           onClose={() => setToast((current) => ({ ...current, open: false }))}

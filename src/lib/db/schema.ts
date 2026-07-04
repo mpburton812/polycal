@@ -80,6 +80,7 @@ export const polyGroup = sqliteTable("poly_group", {
   hideSleepingArrangements: integer("hide_sleeping_arrangements", { mode: "boolean" })
     .notNull()
     .default(false),
+  placesMapVisibility: text("places_map_visibility").notNull().default("none"),
   logTailLength: integer("log_tail_length").notNull().default(100),
   onboardingWelcomeMessage: text("onboarding_welcome_message"),
   /** Hours in proposed before auto-expire; 0 = expire only when event start passes (PC-46). */
@@ -173,6 +174,8 @@ export const proposals = sqliteTable("proposals", {
   intentionalSolo: integer("intentional_solo", { mode: "boolean" }).notNull().default(false),
   eventPrivacy: text("event_privacy", { enum: eventPrivacyLevels }).notNull().default("open"),
   isPoll: integer("is_poll", { mode: "boolean" }).notNull().default(false),
+  /** All-day event — start/end represent whole calendar days, no clock time (PC). */
+  isAllDay: integer("is_all_day", { mode: "boolean" }).notNull().default(false),
   atRisk: integer("at_risk", { mode: "boolean" }).notNull().default(false),
   atRiskExpiresAt: text("at_risk_expires_at"),
   /** When set on resolved proposals, calendar hold until invitees/solo are restored (PC-53). */
@@ -234,6 +237,8 @@ export const proposalTimeSlots = sqliteTable("proposal_time_slots", {
   endAt: text("end_at"),
   label: text("label"),
   sortOrder: integer("sort_order").notNull().default(0),
+  /** All-day slot — start/end represent whole calendar days, no clock time (PC). */
+  isAllDay: integer("is_all_day", { mode: "boolean" }).notNull().default(false),
   createdAt: text("created_at").notNull(),
 });
 
