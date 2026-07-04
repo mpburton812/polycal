@@ -28,9 +28,9 @@ test.describe("Admin", () => {
     await expect(page.getByRole("heading", { name: "Test data", level: 2 })).toBeVisible();
 
     await expandAdminSection(page, "Code Status");
-    await expect(page.getByText("Build number")).toBeVisible();
+    await expect(page.getByText("Build number", { exact: true })).toBeVisible();
     await expect(
-      page.getByText("Made live in this environment"),
+      page.getByText("Made live in this environment", { exact: true }),
     ).toBeVisible();
     await expect(
       page.getByRole("button", { name: "Check for Update" }),
