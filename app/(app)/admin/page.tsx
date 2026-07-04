@@ -5,13 +5,14 @@ import { listActivityLogAction } from "@/actions/admin";
 import { getPolyGroupSettingsAction } from "@/actions/poly-group";
 import { listAdminUsersAction } from "@/actions/users";
 import { AdminActivityLogPanel } from "@/components/admin/AdminActivityLogPanel";
-import { AdminForceReloadPanel } from "@/components/admin/AdminForceReloadPanel";
+import { AdminCodeStatusPanel } from "@/components/admin/AdminCodeStatusPanel";
 import { AdminPolyGroupSettingsPanel } from "@/components/admin/AdminPolyGroupSettingsPanel";
 import { AdminTestDataPanel } from "@/components/admin/AdminTestDataPanel";
 import { AdminUserManagementPanel } from "@/components/admin/AdminUserManagementPanel";
 import { auth } from "@/lib/auth";
 import { userHasAdminAccess } from "@/lib/admin-access";
-import { isNonProductionEnvironment } from "@/lib/env";
+import { CHANGELOG, getLatestChangelogEntry } from "@/lib/changelog/entries";
+import { getBuildInfo, isNonProductionEnvironment } from "@/lib/env";
 import { brutalPageTitleSx } from "@/theme/brutalUi";
 import { GARDEN_TOKENS } from "@/theme/tokens";
 
@@ -40,7 +41,11 @@ export default async function AdminPage() {
         Group settings, members, and environment controls.
       </Typography>
       <Stack spacing={3}>
-        <AdminForceReloadPanel />
+        <AdminCodeStatusPanel
+          buildInfo={getBuildInfo()}
+          changelog={CHANGELOG}
+          latestEntry={getLatestChangelogEntry()}
+        />
         <AdminPolyGroupSettingsPanel initialSettings={settings} />
         <AdminUserManagementPanel users={adminUsers} currentUserId={session.user.id} />
         <AdminActivityLogPanel entries={logEntries} />

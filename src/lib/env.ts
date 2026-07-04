@@ -76,3 +76,29 @@ export function getBuildSha(): string {
 export function getBuildBranch(): string {
   return process.env.NEXT_PUBLIC_BUILD_BRANCH ?? "local";
 }
+
+/**
+ * ISO timestamp captured when this build was produced (deploy time on Vercel).
+ * Surfaced in the admin Code Status panel as when the build went live.
+ */
+export function getBuildTime(): string | null {
+  return process.env.NEXT_PUBLIC_BUILD_TIME ?? null;
+}
+
+/** Consolidated build/deploy descriptor for the Code Status panel + build-info API. */
+export interface BuildInfo {
+  sha: string;
+  branch: string;
+  time: string | null;
+  environment: AppEnvironment;
+}
+
+/** Returns the current deployment's build descriptor. */
+export function getBuildInfo(): BuildInfo {
+  return {
+    sha: getBuildSha(),
+    branch: getBuildBranch(),
+    time: getBuildTime(),
+    environment: getAppEnvironment(),
+  };
+}
