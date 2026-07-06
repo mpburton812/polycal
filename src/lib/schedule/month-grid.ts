@@ -39,6 +39,16 @@ export function dayIndexInGrid(grid: Date[], iso: string, timeZone: string): num
   return grid.findIndex((day) => localDateKey(day.toISOString(), timeZone) === key);
 }
 
+/** Visible fetch range for the 42-cell month grid (includes leading/trailing padding days). */
+export function monthGridRange(monthAnchor: Date): { rangeStart: Date; rangeEnd: Date } {
+  const grid = buildMonthGrid(monthAnchor);
+  const rangeStart = new Date(grid[0]!);
+  rangeStart.setHours(0, 0, 0, 0);
+  const rangeEnd = new Date(grid[grid.length - 1]!);
+  rangeEnd.setHours(23, 59, 59, 999);
+  return { rangeStart, rangeEnd };
+}
+
 /** Inclusive [startIndex, endIndex] span for a schedule block within the grid. */
 export function eventSpanInGrid(
   grid: Date[],

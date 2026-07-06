@@ -21,13 +21,14 @@ export type ScheduleBlockVariant = ScheduleSemanticVariant;
  * Picks block colors from proposal state, type, and conflict flags.
  */
 export function scheduleBlockVariant(event: {
-  state: "proposed" | "resolved";
+  state: "proposed" | "resolved" | "archived";
   proposalType: "event" | "sleeping";
   isContentMasked: boolean;
   hasOverlap: boolean;
   atRisk: boolean;
 }): ScheduleBlockVariant {
   if (event.isContentMasked) return "masked";
+  if (event.state === "archived") return "archived";
   if (event.hasOverlap) return "conflict";
   if (event.atRisk) return "at_risk";
   if (event.state === "proposed") return "proposed";
