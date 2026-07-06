@@ -57,7 +57,7 @@ test.describe("Schedule calendar", () => {
   test("switches to month view and drills into week from overflow", async ({ page }) => {
     await page.getByRole("button", { name: "Month" }).click();
     await expect(page.getByRole("button", { name: "Month" })).toHaveAttribute("aria-pressed", "true");
-    await expect(page.getByText("Mon")).toBeVisible();
+    await expect(page.getByText("Mon", { exact: true })).toBeVisible();
 
     const moreLink = page.getByRole("button", { name: /\+\d+ more/i }).first();
     if (await moreLink.isVisible().catch(() => false)) {
