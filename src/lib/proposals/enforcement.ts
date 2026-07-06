@@ -5,6 +5,7 @@ import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import { getDb } from "@/lib/db/client";
 import { notifyUser } from "@/lib/notifications";
 import { expirePendingRecoveryProposals } from "@/lib/proposals/pending-recovery";
+import { sleepingCalendarDayEnd } from "@/lib/proposals/sleeping-schedule";
 import {
   polyGroup,
   proposalInvitees,
@@ -125,25 +126,51 @@ async function expireAtRiskProposals(db: Db): Promise<void> {
   }
 }
 
+type ProposalScheduleRow = {
+  id: string;
+  proposalType: string;
+  isBatchSleeping: boolean;
+  scheduledStartAt: string | null;
+  scheduledEndAt: string | null;
+};
+
 /**
- * Resolves the scheduling instant used for proposed expiration (slot start or scheduled start).
+ * Resolves when a proposed item is treated as "past start" for expiry (PC-46).
+ * Batch sleeping uses the latest night so earlier nights can still be voted on.
  */
-async function getProposalEffectiveStart(db: Db, proposalId: string): Promise<string | null> {
-  const [proposal] = await db
-    .select({ scheduledStartAt: proposals.scheduledStartAt })
-    .from(proposals)
-    .where(eq(proposals.id, proposalId))
-    .limit(1);
-
-  if (proposal?.scheduledStartAt) return proposal.scheduledStartAt;
-
+async function getProposedExpirationInstant(
+  db: Db,
+  proposal: ProposalScheduleRow,
+): Promise<string | null> {
   const slots = await db
     .select({ startAt: proposalTimeSlots.startAt })
     .from(proposalTimeSlots)
-    .where(eq(proposalTimeSlots.proposalId, proposalId))
+    .where(eq(proposalTimeSlots.proposalId, proposal.id))
     .orderBy(asc(proposalTimeSlots.startAt));
 
+  if (proposal.isBatchSleeping) {
+    const lastSlot = slots[slots.length - 1]?.startAt;
+    return lastSlot ?? proposal.scheduledEndAt ?? proposal.scheduledStartAt;
+  }
+
+  if (proposal.scheduledStartAt) return proposal.scheduledStartAt;
   return slots[0]?.startAt ?? null;
+}
+
+/**
+ * Resolved archive grace runs after the scheduled window ends.
+ * Single-night sleeping uses end-of-calendar-day because scheduledEndAt is null.
+ */
+export function resolveResolvedArchiveEndAt(proposal: ProposalScheduleRow): Date | null {
+  const { scheduledStartAt, scheduledEndAt, proposalType } = proposal;
+  if (!scheduledStartAt) return null;
+
+  if (proposalType === "sleeping") {
+    const anchor = scheduledEndAt ?? scheduledStartAt;
+    return sleepingCalendarDayEnd(anchor);
+  }
+
+  return new Date(scheduledEndAt ?? scheduledStartAt);
 }
 
 /**
@@ -155,8 +182,8 @@ async function expireProposedProposals(db: Db, settings: EnforcementSettings): P
   const proposedRows = await db.select().from(proposals).where(eq(proposals.state, "proposed"));
 
   for (const proposal of proposedRows) {
-    const effectiveStart = await getProposalEffectiveStart(db, proposal.id);
-    const startPassed = Boolean(effectiveStart && effectiveStart <= nowIso);
+    const expirationInstant = await getProposedExpirationInstant(db, proposal);
+    const startPassed = Boolean(expirationInstant && expirationInstant <= nowIso);
 
     const maxHoursExpired =
       settings.proposedMaxHours > 0 &&
@@ -199,9 +226,9 @@ async function archivePastResolvedProposals(db: Db, settings: EnforcementSetting
     .where(and(eq(proposals.state, "resolved"), eq(proposals.isRecurrenceParent, false)));
 
   for (const proposal of resolvedRows) {
-    const endAt = proposal.scheduledEndAt ?? proposal.scheduledStartAt;
-    if (!endAt) continue;
-    if (now.getTime() < new Date(endAt).getTime() + graceMs) continue;
+    const archiveEndAt = resolveResolvedArchiveEndAt(proposal);
+    if (!archiveEndAt) continue;
+    if (now.getTime() < archiveEndAt.getTime() + graceMs) continue;
 
     const nowIso = now.toISOString();
     await db

@@ -30,7 +30,8 @@ export type ScheduleSemanticVariant =
   | "resolved_sleeping"
   | "at_risk"
   | "conflict"
-  | "masked";
+  | "masked"
+  | "archived";
 
 /** Pastel fills and ink text for calendar / proposal blocks. */
 export const SCHEDULE_SEMANTIC_COLORS: Record<
@@ -43,4 +44,5 @@ export const SCHEDULE_SEMANTIC_COLORS: Record<
   at_risk: { fill: "#F0C878", text: "#4A3800", borderStyle: "dashed" },
   conflict: { fill: "#E8A598", text: "#4A1F18", borderStyle: "solid" },
   masked: { fill: "#E8E2D8", text: "#6B6560", borderStyle: "dashed" },
+  archived: { fill: "#D8D4CE", text: "#6B6560", borderStyle: "solid" },
 };

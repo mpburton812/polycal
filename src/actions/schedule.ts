@@ -45,7 +45,7 @@ export interface ScheduleEvent {
   startAt: string;
   endAt: string | null;
   proposalType: ProposalType;
-  state: "proposed" | "resolved";
+  state: "proposed" | "resolved" | "archived";
   proposerId: string;
   proposerName: string;
   locationName: string | null;
@@ -190,7 +190,7 @@ function markOverlaps(events: ScheduleEvent[]): ScheduleEvent[] {
 }
 
 /**
- * Loads calendar blocks for proposed and resolved proposals in a date range (PC-42).
+ * Loads calendar blocks for proposed, resolved, and archived proposals in a date range (PC-42).
  */
 export async function listScheduleEventsAction(
   input: z.infer<typeof rangeSchema>,
@@ -239,7 +239,7 @@ export async function listScheduleEventsAction(
     .from(proposals)
     .innerJoin(users, eq(proposals.proposerId, users.id))
     .leftJoin(locations, eq(proposals.locationId, locations.id))
-    .where(inArray(proposals.state, ["proposed", "resolved"]))
+    .where(inArray(proposals.state, ["proposed", "resolved", "archived"]))
     .orderBy(asc(proposals.scheduledStartAt));
 
   const inviteeRows = await db
@@ -366,7 +366,7 @@ export async function listScheduleEventsAction(
     const windows: { startAt: string; endAt: string | null; slotLabel: string | null; key: string }[] =
       [];
 
-    if (row.state === "resolved") {
+    if (row.state === "resolved" || row.state === "archived") {
       const slots = slotsByProposal.get(row.id) ?? [];
       if (row.isBatchSleeping && slots.length > 0) {
         for (const slot of slots) {
@@ -451,7 +451,7 @@ export async function listScheduleEventsAction(
             : windowParticipantNames.slice(1),
           intentionalSolo: windowIntentionalSolo,
           locationName: windowLocationName,
-          state: row.state as "proposed" | "resolved",
+          state: row.state === "archived" ? "resolved" : (row.state as "proposed" | "resolved"),
           atRisk: row.atRisk,
         });
       }
@@ -460,10 +460,10 @@ export async function listScheduleEventsAction(
         id: window.key,
         proposalId: row.id,
         title: isContentMasked ? maskedTitle : windowTitle,
-        startAt: isContentMasked ? window.startAt : window.startAt,
-        endAt: isContentMasked ? window.endAt : window.endAt,
+        startAt: window.startAt,
+        endAt: window.endAt,
         proposalType: row.proposalType,
-        state: row.state as "proposed" | "resolved",
+        state: row.state as "proposed" | "resolved" | "archived",
         proposerId: row.proposerId,
         proposerName: row.proposerName,
         locationName: isContentMasked ? null : windowLocationName,
