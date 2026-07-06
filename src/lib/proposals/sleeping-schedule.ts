@@ -39,6 +39,15 @@ export function isoToSleepingDateInput(iso: string | null | undefined): string {
 }
 
 /**
+ * Sleeping nights are whole calendar days; archive/grace should run after the day ends,
+ * not at local midnight when the night "starts".
+ */
+export function sleepingCalendarDayEnd(iso: string): Date {
+  const date = new Date(iso);
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate(), 23, 59, 59, 999);
+}
+
+/**
  * Normalizes resolved sleeping proposal schedule from slot rows.
  */
 export function sleepingScheduleFromSlotRows(

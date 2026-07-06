@@ -129,3 +129,5 @@
 2026-06-30 | 6f6a95a | PC-40 | extend Playful Collective theme to all app pages | src/actions/onboarding.ts
 2026-07-01 | 743e1e3 | PC-40 | Garden Brutalism and Playful Collective theme across app | src/actions/onboarding.ts
 2026-07-01 | a4be87b | PC-40 | raise toast z-index above bottom nav for E2E visibility | src/components/providers/ToastProvider.tsx
+2026-07-06 | 5817a2b | PC-55 | Outlook-style month view, batch vote, and archive fixes | src/actions/schedule.ts
+2026-07-06 | d06faaa | PC-55 | use exact Mon match to avoid Month button collision | e2e/schedule.spec.ts

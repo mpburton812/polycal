@@ -1,8 +1,6 @@
 "use client";
 
-import EventIcon from "@mui/icons-material/Event";
-import NightsStayIcon from "@mui/icons-material/NightsStay";
-import { Box, Typography } from "@mui/material";
+import { Box, Typography, useMediaQuery, useTheme } from "@mui/material";
 import { useMemo } from "react";
 
 import type { ScheduleEvent } from "@/actions/schedule";
@@ -11,8 +9,14 @@ import {
   busynessLevelForDay,
 } from "@/components/schedule/ScheduleHeatmap";
 import {
+  MonthEventChip,
+  MonthMoreLink,
+  MonthSpanBar,
+  StateDotStrip,
+} from "@/components/schedule/MonthEventChip";
+import { buildMonthLayout } from "@/lib/schedule/month-layout";
+import {
   buildMonthGrid,
-  eventSpanInGrid,
   startOfMonth,
 } from "@/lib/schedule/month-grid";
 import { localDateKey, scheduleDayCellSx, isTodayDate } from "@/lib/schedule/dates";
@@ -26,21 +30,13 @@ interface ScheduleMonthViewProps {
   onDayClick?: (day: Date) => void;
 }
 
-interface SpanBar {
-  key: string;
-  proposalId: string;
-  title: string;
-  proposalType: ScheduleEvent["proposalType"];
-  weekRow: number;
-  startCol: number;
-  endCol: number;
-  isContentMasked: boolean;
-}
-
 const WEEKDAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+const DATE_HEADER_HEIGHT = 22;
+const LANE_HEIGHT = 18;
+const CHIP_HEIGHT = 17;
 
 /**
- * Month calendar with day icons and multi-day span bars (PC-55).
+ * Outlook-style month calendar with week-split span lanes and per-day chips (PC-55).
  */
 export function ScheduleMonthView({
   monthAnchor,
@@ -49,62 +45,18 @@ export function ScheduleMonthView({
   onEventClick,
   onDayClick,
 }: ScheduleMonthViewProps) {
+  const theme = useTheme();
+  const isSmall = useMediaQuery(theme.breakpoints.down("sm"));
+  const maxSpanLanes = isSmall ? 2 : 3;
+
   const grid = useMemo(() => buildMonthGrid(monthAnchor), [monthAnchor]);
   const monthStart = startOfMonth(monthAnchor);
   const monthKey = `${monthStart.getFullYear()}-${monthStart.getMonth()}`;
 
-  const eventsByDay = useMemo(() => {
-    const map = new Map<string, { hasEvent: boolean; hasSleeping: boolean }>();
-    for (const day of grid) {
-      map.set(localDateKey(day.toISOString(), timeZone), { hasEvent: false, hasSleeping: false });
-    }
-    for (const event of events) {
-      const span = eventSpanInGrid(grid, event.startAt, event.endAt, timeZone);
-      if (!span) continue;
-      for (let index = span.startIndex; index <= span.endIndex; index += 1) {
-        const key = localDateKey(grid[index]!.toISOString(), timeZone);
-        const entry = map.get(key);
-        if (!entry) continue;
-        if (event.proposalType === "sleeping") entry.hasSleeping = true;
-        else entry.hasEvent = true;
-      }
-    }
-    return map;
-  }, [grid, events, timeZone]);
-
-  const spanBars = useMemo(() => {
-    const bars: SpanBar[] = [];
-    const seen = new Set<string>();
-
-    for (const event of events) {
-      const span = eventSpanInGrid(grid, event.startAt, event.endAt, timeZone);
-      if (!span) continue;
-      const dedupeKey = `${event.proposalId}:${span.startIndex}:${span.endIndex}`;
-      if (seen.has(dedupeKey)) continue;
-      seen.add(dedupeKey);
-
-      const weekRow = Math.floor(span.startIndex / 7);
-      bars.push({
-        key: dedupeKey,
-        proposalId: event.proposalId,
-        title: event.title,
-        proposalType: event.proposalType,
-        weekRow,
-        startCol: (span.startIndex % 7) + 1,
-        endCol: (span.endIndex % 7) + 2,
-        isContentMasked: event.isContentMasked,
-      });
-    }
-    return bars;
-  }, [events, grid, timeZone]);
-
-  const weeks = useMemo(() => {
-    const rows: Date[][] = [];
-    for (let index = 0; index < grid.length; index += 7) {
-      rows.push(grid.slice(index, index + 7));
-    }
-    return rows;
-  }, [grid]);
+  const layout = useMemo(
+    () => buildMonthLayout(grid, events, timeZone, maxSpanLanes),
+    [grid, events, timeZone, maxSpanLanes],
+  );
 
   return (
     <Box sx={{ mt: 1 }}>
@@ -129,133 +81,146 @@ export function ScheduleMonthView({
         ))}
       </Box>
 
-      {weeks.map((week, weekIndex) => (
-        <Box key={`week-${monthKey}-${weekIndex}`} sx={{ position: "relative", mb: 0.5 }}>
-          <Box
-            sx={{
-              display: "grid",
-              gridTemplateColumns: "repeat(7, 1fr)",
-              gap: 0.5,
-              minHeight: 72,
-            }}
-          >
-            {week.map((day) => {
-              const key = localDateKey(day.toISOString(), timeZone);
-              const markers = eventsByDay.get(key);
-              const inMonth = day.getMonth() === monthStart.getMonth();
-              const busynessLevel = busynessLevelForDay(events, day);
-              const busynessLabel =
-                busynessLevel === 0 ? "open" : busynessLevel === 3 ? "very busy" : "busy";
-              const daySx = scheduleDayCellSx(day, timeZone);
-              const isToday = isTodayDate(day, timeZone);
+      {layout.weeks.map((week) => {
+        const spanAreaHeight = Math.max(week.laneCount, 1) * LANE_HEIGHT;
+        const minCellHeight =
+          DATE_HEADER_HEIGHT + spanAreaHeight + layout.maxChipsPerDay * CHIP_HEIGHT + 16;
 
-              return (
-                <Box
-                  key={key}
-                  component={onDayClick ? "button" : "div"}
-                  type={onDayClick ? "button" : undefined}
-                  onClick={onDayClick ? () => onDayClick(day) : undefined}
-                  sx={{
-                    border: 1,
-                    borderColor: daySx.borderColor,
-                    borderRadius: 1,
-                    p: 0.5,
-                    bgcolor: inMonth ? daySx.bgcolor : "action.hover",
-                    opacity: inMonth ? daySx.opacity : 0.45,
-                    minHeight: 72,
-                    position: "relative",
-                    textAlign: "left",
-                    cursor: onDayClick ? "pointer" : "default",
-                    width: "100%",
-                  }}
-                >
+        return (
+          <Box key={`week-${monthKey}-${week.weekIndex}`} sx={{ position: "relative", mb: 0.5 }}>
+            <Box
+              sx={{
+                display: "grid",
+                gridTemplateColumns: "repeat(7, 1fr)",
+                gap: 0.5,
+                minHeight: minCellHeight,
+              }}
+            >
+              {week.days.map((dayLayout) => {
+                const day = grid[dayLayout.dayIndex]!;
+                const key = localDateKey(day.toISOString(), timeZone);
+                const inMonth = day.getMonth() === monthStart.getMonth();
+                const busynessLevel = busynessLevelForDay(events, day);
+                const busynessLabel =
+                  busynessLevel === 0 ? "open" : busynessLevel === 3 ? "very busy" : "busy";
+                const daySx = scheduleDayCellSx(day, timeZone);
+                const isToday = isTodayDate(day, timeZone);
+
+                return (
                   <Box
+                    key={key}
+                    component={onDayClick ? "button" : "div"}
+                    type={onDayClick ? "button" : undefined}
+                    onClick={onDayClick ? () => onDayClick(day) : undefined}
                     sx={{
-                      position: "absolute",
-                      top: 4,
-                      right: 4,
-                      width: 14,
-                      height: 14,
-                      borderRadius: 0.5,
-                      bgcolor: LEVEL_COLORS[busynessLevel],
-                      border: "1px solid",
-                      borderColor: "divider",
+                      border: 1,
+                      borderColor: daySx.borderColor,
+                      borderRadius: 1,
+                      p: 0.5,
+                      bgcolor: inMonth ? daySx.bgcolor : "action.hover",
+                      opacity: inMonth ? daySx.opacity : 0.45,
+                      minHeight: minCellHeight,
+                      position: "relative",
+                      textAlign: "left",
+                      cursor: onDayClick ? "pointer" : "default",
+                      width: "100%",
                       display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      fontSize: "0.45rem",
-                      fontWeight: 600,
-                      color: "text.secondary",
-                      lineHeight: 1,
+                      flexDirection: "column",
                     }}
-                    aria-label={`Network busyness: ${busynessLabel}`}
-                  />
-                  <Typography
-                    variant="caption"
-                    fontWeight={isToday ? 800 : 600}
-                    color={isToday ? "primary.main" : "text.primary"}
-                    display="block"
                   >
-                    {day.getDate()}
-                  </Typography>
-                  <Box sx={{ display: "flex", gap: 0.25, mt: 0.25 }}>
-                    {markers?.hasEvent && (
-                      <EventIcon sx={{ fontSize: 14, color: "#2e7d32" }} aria-label="Event" />
-                    )}
-                    {markers?.hasSleeping && (
-                      <NightsStayIcon sx={{ fontSize: 14, color: "#1565c0" }} aria-label="Sleeping" />
-                    )}
-                  </Box>
-                </Box>
-              );
-            })}
-          </Box>
+                    <Box
+                      sx={{
+                        display: "flex",
+                        alignItems: "flex-start",
+                        justifyContent: "space-between",
+                        minHeight: DATE_HEADER_HEIGHT - 4,
+                      }}
+                    >
+                      <Typography
+                        variant="caption"
+                        fontWeight={isToday ? 800 : 600}
+                        color={isToday ? "primary.main" : "text.primary"}
+                      >
+                        {day.getDate()}
+                      </Typography>
+                      <StateDotStrip variants={dayLayout.stateDots} />
+                    </Box>
 
-          <Box
-            sx={{
-              position: "absolute",
-              left: 0,
-              right: 0,
-              top: 22,
-              display: "grid",
-              gridTemplateColumns: "repeat(7, 1fr)",
-              gap: 0.5,
-              pointerEvents: "none",
-            }}
-          >
-            {spanBars
-              .filter((bar) => bar.weekRow === weekIndex)
-              .map((bar) => (
+                    <Box sx={{ flex: 1, minHeight: spanAreaHeight }} aria-hidden />
+
+                    <Box sx={{ display: "flex", flexDirection: "column", gap: 0.25 }}>
+                      {dayLayout.chips.map((chip) => (
+                        <MonthEventChip
+                          key={chip.key}
+                          event={chip.event}
+                          variant={chip.variant}
+                          onClick={() => onEventClick(chip.event.proposalId)}
+                        />
+                      ))}
+                      <MonthMoreLink
+                        count={dayLayout.hiddenCount}
+                        onClick={() => onDayClick?.(day)}
+                      />
+                    </Box>
+
+                    <Box
+                      sx={{
+                        position: "absolute",
+                        bottom: 4,
+                        left: 4,
+                        width: 10,
+                        height: 10,
+                        borderRadius: 0.5,
+                        bgcolor: LEVEL_COLORS[busynessLevel],
+                        border: "1px solid",
+                        borderColor: "divider",
+                      }}
+                      aria-label={`Network busyness: ${busynessLabel}`}
+                    />
+                  </Box>
+                );
+              })}
+            </Box>
+
+            <Box
+              sx={{
+                position: "absolute",
+                left: 0,
+                right: 0,
+                top: DATE_HEADER_HEIGHT,
+                display: "grid",
+                gridTemplateColumns: "repeat(7, 1fr)",
+                gridTemplateRows: `repeat(${Math.max(week.laneCount, 1)}, ${LANE_HEIGHT}px)`,
+                gap: 0.5,
+                pointerEvents: "none",
+                px: 0,
+              }}
+            >
+              {week.spanSegments.map((segment) => (
                 <Box
-                  key={bar.key}
-                  component="button"
-                  type="button"
-                  onClick={() => onEventClick(bar.proposalId)}
+                  key={segment.key}
                   sx={{
-                    gridColumn: `${bar.startCol} / ${bar.endCol}`,
+                    gridColumn: `${segment.startCol} / ${segment.endCol}`,
+                    gridRow: segment.lane + 1,
                     pointerEvents: "auto",
-                    border: "none",
-                    cursor: "pointer",
-                    borderRadius: 1,
-                    px: 0.5,
-                    py: 0.25,
-                    fontSize: "0.65rem",
-                    textAlign: "left",
-                    color: "#fff",
-                    bgcolor: bar.proposalType === "sleeping" ? "#1565c0" : "#2e7d32",
-                    opacity: bar.isContentMasked ? 0.7 : 1,
-                    overflow: "hidden",
-                    whiteSpace: "nowrap",
-                    textOverflow: "ellipsis",
+                    minWidth: 0,
                   }}
-                  title={bar.title}
                 >
-                  {bar.isContentMasked ? "Busy" : bar.title}
+                  <MonthSpanBar
+                    title={segment.event.isContentMasked ? "Busy" : segment.event.title}
+                    variant={segment.variant}
+                    showTitle={segment.showTitle}
+                    isStartSegment={segment.isStartSegment}
+                    isEndSegment={segment.isEndSegment}
+                    isArchived={segment.event.state === "archived"}
+                    onClick={() => onEventClick(segment.event.proposalId)}
+                  />
                 </Box>
               ))}
+            </Box>
           </Box>
-        </Box>
-      ))}
+        );
+      })}
     </Box>
   );
 }

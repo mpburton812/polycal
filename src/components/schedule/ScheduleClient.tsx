@@ -44,7 +44,7 @@ import {
   endOfWeekSunday,
   startOfWeekMonday,
 } from "@/lib/schedule/dates";
-import { endOfMonth, startOfMonth } from "@/lib/schedule/month-grid";
+import { monthGridRange, startOfMonth } from "@/lib/schedule/month-grid";
 import { GARDEN_TOKENS, SCHEDULE_SEMANTIC_COLORS } from "@/theme/tokens";
 
 interface ScheduleClientProps {
@@ -97,7 +97,7 @@ export function ScheduleClient({
   const isMonthLayout = viewState.calendarLayout === "month";
   const rangeEnd = useMemo(() => {
     if (isMonthLayout) {
-      return endOfMonth(monthAnchor);
+      return monthGridRange(monthAnchor).rangeEnd;
     }
     if (viewState.compact) {
       const end = addDays(weekStart, 13);
@@ -109,7 +109,7 @@ export function ScheduleClient({
 
   const rangeStart = useMemo(() => {
     if (isMonthLayout) {
-      return startOfWeekMonday(startOfMonth(monthAnchor));
+      return monthGridRange(monthAnchor).rangeStart;
     }
     return weekStart;
   }, [isMonthLayout, monthAnchor, weekStart]);
@@ -125,14 +125,13 @@ export function ScheduleClient({
 
   const refreshSchedule = useCallback(
     (anchorDate: Date) => {
-      const monday = isMonthLayout
-        ? startOfWeekMonday(startOfMonth(anchorDate))
-        : startOfWeekMonday(anchorDate);
+      const monthRange = monthGridRange(startOfMonth(anchorDate));
+      const monday = isMonthLayout ? monthRange.rangeStart : startOfWeekMonday(anchorDate);
       const end = isMonthLayout
-        ? endOfMonth(anchorDate)
+        ? monthRange.rangeEnd
         : viewState.compact
-          ? addDays(monday, 13)
-          : endOfWeekSunday(monday);
+          ? addDays(startOfWeekMonday(anchorDate), 13)
+          : endOfWeekSunday(startOfWeekMonday(anchorDate));
       if (!isMonthLayout && viewState.compact) end.setHours(23, 59, 59, 999);
 
       startTransition(async () => {
@@ -405,6 +404,9 @@ export function ScheduleClient({
         </Typography>
         <Typography variant="caption" sx={{ color: SCHEDULE_SEMANTIC_COLORS.at_risk.text }}>
           ■ At risk / tentative
+        </Typography>
+        <Typography variant="caption" sx={{ color: SCHEDULE_SEMANTIC_COLORS.archived.text }}>
+          ■ Archived
         </Typography>
       </Stack>
       </Box>

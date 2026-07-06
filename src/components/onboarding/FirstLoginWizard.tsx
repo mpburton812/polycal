@@ -172,7 +172,22 @@ export function FirstLoginWizard({
       <Typography sx={{ mb: 3, color: GARDEN_TOKENS.inkMuted }}>
         Complete these steps before using the app.
       </Typography>
-      <Stepper activeStep={activeStep} sx={{ mb: 3 }}>
+      <Stepper
+        activeStep={activeStep}
+        alternativeLabel
+        sx={{
+          mb: 3,
+          px: 0.5,
+          "& .MuiStepLabel-label": {
+            fontSize: { xs: "0.65rem", sm: "0.75rem" },
+            mt: 0.5,
+            lineHeight: 1.2,
+            whiteSpace: "normal",
+            textAlign: "center",
+          },
+          "& .MuiStepConnector-root": { top: 10 },
+        }}
+      >
         {STEPS.map((label) => (
           <Step key={label}>
             <StepLabel>{label}</StepLabel>
