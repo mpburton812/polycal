@@ -139,3 +139,5 @@
 2026-07-07 | 9a6ac5a | PC-75 | harden slice auth, E2E navigation, and schedule stability | src/actions/proposals/_core.ts
 2026-07-07 | 561d3f7 | PC-75 | clear schedule localStorage after navigation, not on about:blank | e2e/batch-sleeping-journey.spec.ts
 2026-07-07 | 5b8c873 | PC-76 | track invitee viewed_at separate from vote status | src/actions/proposals/_core.ts
+2026-07-07 | f4e60d5 | PC-77 | month view fetch range, icons, and legend swatches | src/components/schedule/MonthEventChip.tsx
+2026-07-07 | ce7fe31 | PC-77 | use first month icon locator for duplicate event buttons | e2e/schedule.spec.ts

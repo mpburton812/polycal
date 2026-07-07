@@ -8,16 +8,22 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- PC-77: `computeScheduleFetchRange` helper for explicit week/month API windows.
 - PC-76: `viewed_at` on `proposal_invitees` to track when an invitee first opens proposal detail (separate from vote status).
 - PC-76: Shared invitee display helpers (`invitee-display-status.ts`, `invitee-view.ts`) and unit tests.
 
 ### Changed
 
+- PC-77: Month view single-day events render as compact status icons; multi-day spans unchanged.
 - PC-76: Invitee chips show **Not yet viewed**, **Pending response**, or vote outcome based on `viewed_at` + `vote_status`.
 - PC-76: `getProposalDetailAction` idempotently stamps `viewed_at` for unmasked invitees on proposed/resolved proposals.
 - PC-76: Board `needsViewerAction` aligned with detail `canVote` for resolved required invitees.
 
 ### Fixed
+
+- PC-77: Month view no longer fetches only the current week after toggling from week view (stale layout closure).
+- PC-77: Month day cells use uniform height with status-colored calendar icons for single-day events.
+- PC-77: Schedule legend swatches use semantic fill colors instead of near-black text ink.
 
 - PC-76: Invitee status no longer stays on "Not yet viewed" after the invitee opens the proposal.
 

@@ -1,5 +1,6 @@
 "use client";
 
+import EventIcon from "@mui/icons-material/Event";
 import { Box, Typography } from "@mui/material";
 
 import type { ScheduleEvent } from "@/actions/schedule";
@@ -9,6 +10,47 @@ interface MonthEventChipProps {
   event: ScheduleEvent;
   variant: ScheduleBlockVariant;
   onClick: () => void;
+}
+
+/**
+ * Compact status-colored calendar icon for single-day month cells (PC-77).
+ */
+export function MonthEventIcon({ event, variant, onClick }: MonthEventChipProps) {
+  const colors = scheduleBlockSx(variant, 0);
+  const label = event.isContentMasked ? "Busy" : event.title;
+
+  return (
+    <Box
+      component="button"
+      type="button"
+      onClick={(eventClick) => {
+        eventClick.stopPropagation();
+        onClick();
+      }}
+      aria-label={label}
+      title={label}
+      sx={{
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        border: "none",
+        p: 0,
+        m: 0,
+        bgcolor: "transparent",
+        cursor: "pointer",
+        lineHeight: 0,
+        opacity: event.state === "archived" ? 0.85 : 1,
+      }}
+    >
+      <EventIcon
+        sx={{
+          fontSize: 16,
+          color: colors.bgcolor,
+          filter: `drop-shadow(0 0 0.75px ${colors.color})`,
+        }}
+      />
+    </Box>
+  );
 }
 
 /**
