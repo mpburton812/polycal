@@ -137,3 +137,4 @@
 2026-07-06 | f225e22 | PC-74 | match recurring child card titles flexibly | e2e/recurrence-slice-journey.spec.ts
 2026-07-07 | c811a18 | PC-74 | stabilize CI — keep recurrence slice journey, revert flaky schedule nav tests | e2e/batch-sleeping-journey.spec.ts
 2026-07-07 | 9a6ac5a | PC-75 | harden slice auth, E2E navigation, and schedule stability | src/actions/proposals/_core.ts
+2026-07-07 | 561d3f7 | PC-75 | clear schedule localStorage after navigation, not on about:blank | e2e/batch-sleeping-journey.spec.ts
