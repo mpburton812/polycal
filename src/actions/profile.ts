@@ -139,12 +139,16 @@ const preferencesSchema = z.object({
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
 
+export type PasswordActionResult =
+  | { ok: true; sessionVersion: number }
+  | { ok: false; error: string };
+
 /**
  * Changes the signed-in user's password and clears must-change flag (PC-33).
  */
 export async function changePasswordAction(
   formData: FormData,
-): Promise<ActionResult> {
+): Promise<PasswordActionResult> {
   const session = await auth();
   if (!session?.user?.id) {
     return { ok: false, error: "Not signed in." };
@@ -177,12 +181,13 @@ export async function changePasswordAction(
 
   const passwordHash = await hash(parsed.data.newPassword, 12);
   const now = new Date().toISOString();
+  const nextSessionVersion = row.sessionVersion + 1;
   await db
     .update(users)
     .set({
       passwordHash,
       mustChangePassword: false,
-      sessionVersion: row.sessionVersion + 1,
+      sessionVersion: nextSessionVersion,
       updatedAt: now,
     })
     .where(eq(users.id, session.user.id));
@@ -190,7 +195,7 @@ export async function changePasswordAction(
   await logUserActivity(session.user.id, "profile.password_change");
 
   revalidatePath("/profile");
-  return { ok: true };
+  return { ok: true, sessionVersion: nextSessionVersion };
 }
 
 /**
@@ -483,7 +488,7 @@ export async function getNotificationEmailAction(): Promise<{
  */
 export async function setInitialPasswordAction(
   formData: FormData,
-): Promise<ActionResult> {
+): Promise<PasswordActionResult> {
   const session = await auth();
   if (!session?.user?.id) {
     return { ok: false, error: "Not signed in." };
@@ -526,17 +531,18 @@ export async function setInitialPasswordAction(
 
   const passwordHash = await hash(parsed.data.newPassword, 12);
   const now = new Date().toISOString();
+  const nextSessionVersion = row.sessionVersion + 1;
   await db
     .update(users)
     .set({
       passwordHash,
       mustChangePassword: false,
-      sessionVersion: row.sessionVersion + 1,
+      sessionVersion: nextSessionVersion,
       updatedAt: now,
     })
     .where(eq(users.id, session.user.id));
 
   await logUserActivity(session.user.id, "profile.password_change", "first-login");
   revalidatePath("/profile");
-  return { ok: true };
+  return { ok: true, sessionVersion: nextSessionVersion };
 }
