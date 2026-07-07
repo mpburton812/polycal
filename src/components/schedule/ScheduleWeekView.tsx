@@ -23,7 +23,7 @@ interface ScheduleWeekViewProps {
   events: ScheduleEvent[];
   compact: boolean;
   timeZone?: string;
-  onEventClick: (proposalId: string) => void;
+  onEventClick: (event: ScheduleEvent) => void;
 }
 
 /**
@@ -47,11 +47,21 @@ export function ScheduleWeekView({
     for (const day of days) {
       map.set(localDateKey(day.toISOString(), timeZone), []);
     }
+
+    const dayKeys = Array.from(map.keys());
+
     for (const event of events) {
-      const key = localDateKey(event.startAt, timeZone);
-      const list = map.get(key);
-      if (list) list.push(event);
+      const startKey = localDateKey(event.startAt, timeZone);
+      const endKey = localDateKey(event.endAt ?? event.startAt, timeZone);
+      const keysToPlace = dayKeys.filter((key) => key >= startKey && key <= endKey);
+      const targets = keysToPlace.length > 0 ? keysToPlace : [startKey];
+
+      for (const key of targets) {
+        const list = map.get(key);
+        if (list) list.push(event);
+      }
     }
+
     for (const list of map.values()) {
       list.sort((a, b) => a.startAt.localeCompare(b.startAt));
     }
@@ -116,7 +126,7 @@ export function ScheduleWeekView({
                         compact
                         timeZone={timeZone}
                         rotationIndex={index}
-                        onClick={() => onEventClick(event.proposalId)}
+                        onClick={() => onEventClick(event)}
                       />
                     </Box>
                   ))
@@ -189,7 +199,7 @@ export function ScheduleWeekView({
                   event={event}
                   timeZone={timeZone}
                   rotationIndex={index}
-                  onClick={() => onEventClick(event.proposalId)}
+                  onClick={() => onEventClick(event)}
                 />
               ))
             )}

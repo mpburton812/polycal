@@ -8,6 +8,7 @@ import { z } from "zod";
 
 import { auth } from "@/lib/auth";
 import { logUserActivity } from "@/lib/audit";
+import { requireSession, withDb } from "@/lib/actions/context";
 import { sendEmail } from "@/lib/email/send";
 import { isUserThemeId, normalizeUserThemeId, type UserThemeId } from "@/lib/constants/themes";
 import { resolveTimezone } from "@/lib/schedule/timezone";
@@ -15,6 +16,7 @@ import { AVATAR_OPTIONS, isCustomAvatarKey, type AvatarKey } from "@/lib/constan
 import { getDb } from "@/lib/db/client";
 import { ensureDbReady } from "@/lib/db/ensure-ready";
 import { storedImages, users } from "@/lib/db/schema";
+import { checkRateLimit } from "@/lib/rate-limit";
 import {
   DEFAULT_NOTIFICATION_PREFS,
   parseNotificationPrefs,
@@ -138,12 +140,16 @@ const preferencesSchema = z.object({
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
 
+export type PasswordActionResult =
+  | { ok: true; sessionVersion: number }
+  | { ok: false; error: string };
+
 /**
  * Changes the signed-in user's password and clears must-change flag (PC-33).
  */
 export async function changePasswordAction(
   formData: FormData,
-): Promise<ActionResult> {
+): Promise<PasswordActionResult> {
   const session = await auth();
   if (!session?.user?.id) {
     return { ok: false, error: "Not signed in." };
@@ -176,11 +182,13 @@ export async function changePasswordAction(
 
   const passwordHash = await hash(parsed.data.newPassword, 12);
   const now = new Date().toISOString();
+  const nextSessionVersion = row.sessionVersion + 1;
   await db
     .update(users)
     .set({
       passwordHash,
       mustChangePassword: false,
+      sessionVersion: nextSessionVersion,
       updatedAt: now,
     })
     .where(eq(users.id, session.user.id));
@@ -188,7 +196,7 @@ export async function changePasswordAction(
   await logUserActivity(session.user.id, "profile.password_change");
 
   revalidatePath("/profile");
-  return { ok: true };
+  return { ok: true, sessionVersion: nextSessionVersion };
 }
 
 /**
@@ -304,9 +312,9 @@ const displayNameSchema = z
  * Updates the signed-in user's display name (PC-9).
  */
 export async function updateDisplayNameAction(displayName: string): Promise<ActionResult> {
-  const session = await auth();
-  if (!session?.user?.id) {
-    return { ok: false, error: "Not signed in." };
+  const sessionResult = await requireSession();
+  if (!sessionResult.ok) {
+    return { ok: false, error: sessionResult.message };
   }
 
   const parsed = displayNameSchema.safeParse(displayName);
@@ -314,15 +322,15 @@ export async function updateDisplayNameAction(displayName: string): Promise<Acti
     return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid display name." };
   }
 
-  await ensureDbReady();
-  const db = getDb();
-  const now = new Date().toISOString();
-  await db
-    .update(users)
-    .set({ displayName: parsed.data, updatedAt: now })
-    .where(eq(users.id, session.user.id));
+  await withDb(async (db) => {
+    const now = new Date().toISOString();
+    await db
+      .update(users)
+      .set({ displayName: parsed.data, updatedAt: now })
+      .where(eq(users.id, sessionResult.user.id));
+  });
 
-  await logUserActivity(session.user.id, "profile.display_name_update", parsed.data);
+  await logUserActivity(sessionResult.user.id, "profile.display_name_update", parsed.data);
   revalidatePath("/profile");
   return { ok: true };
 }
@@ -390,6 +398,10 @@ export async function updateNotificationEmailAction(
     return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid email." };
   }
 
+  if (!checkRateLimit(`notification-email:${session.user.id}`, 5, 60_000)) {
+    return { ok: false, error: "Too many verification requests. Try again in a minute." };
+  }
+
   await ensureDbReady();
   const db = getDb();
   const token = `ev-${randomUUID()}`;
@@ -413,7 +425,7 @@ export async function updateNotificationEmailAction(
   await logUserActivity(
     session.user.id,
     "profile.notification_email_pending",
-    JSON.stringify({ email: parsed.data, verificationUrl }),
+    JSON.stringify({ email: parsed.data }),
   );
 
   try {
@@ -426,7 +438,7 @@ export async function updateNotificationEmailAction(
       await logUserActivity(
         session.user.id,
         "profile.notification_email_dev_link",
-        JSON.stringify({ verificationUrl }),
+        JSON.stringify({ email: parsed.data, verificationPending: true }),
       );
     }
   } catch (error) {
@@ -435,7 +447,7 @@ export async function updateNotificationEmailAction(
       "profile.notification_email_send_failed",
       JSON.stringify({
         error: error instanceof Error ? error.message : "send failed",
-        verificationUrl,
+        email: parsed.data,
       }),
       "error",
     );
@@ -477,7 +489,7 @@ export async function getNotificationEmailAction(): Promise<{
  */
 export async function setInitialPasswordAction(
   formData: FormData,
-): Promise<ActionResult> {
+): Promise<PasswordActionResult> {
   const session = await auth();
   if (!session?.user?.id) {
     return { ok: false, error: "Not signed in." };
@@ -520,16 +532,18 @@ export async function setInitialPasswordAction(
 
   const passwordHash = await hash(parsed.data.newPassword, 12);
   const now = new Date().toISOString();
+  const nextSessionVersion = row.sessionVersion + 1;
   await db
     .update(users)
     .set({
       passwordHash,
       mustChangePassword: false,
+      sessionVersion: nextSessionVersion,
       updatedAt: now,
     })
     .where(eq(users.id, session.user.id));
 
   await logUserActivity(session.user.id, "profile.password_change", "first-login");
   revalidatePath("/profile");
-  return { ok: true };
+  return { ok: true, sessionVersion: nextSessionVersion };
 }

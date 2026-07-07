@@ -1,7 +1,8 @@
 "use server";
 
-import { userHasAdminAccess } from "@/lib/admin-access";
-import { signIn, auth } from "@/lib/auth";
+import { signIn } from "@/lib/auth";
+import { getImpersonationSecret } from "@/lib/auth/impersonation";
+import { requireAdminAccess } from "@/lib/actions/context";
 import { isNonProductionEnvironment } from "@/lib/env";
 
 /**
@@ -12,12 +13,12 @@ export async function impersonateUser(userId: string): Promise<void> {
     throw new Error("Impersonation is disabled in production.");
   }
 
-  const session = await auth();
-  if (!session?.user || !(await userHasAdminAccess(session.user.role))) {
-    throw new Error("Admin access required for impersonation.");
+  const adminResult = await requireAdminAccess();
+  if (!adminResult.ok) {
+    throw new Error(adminResult.message);
   }
 
-  const secret = process.env.AUTH_IMPERSONATION_SECRET ?? process.env.AUTH_SECRET;
+  const secret = getImpersonationSecret();
   if (!secret) {
     throw new Error("Impersonation is not configured on this server.");
   }

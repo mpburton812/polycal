@@ -5,6 +5,7 @@ import { eq } from "drizzle-orm";
 import { z } from "zod";
 
 import { recordSuccessfulLogin } from "@/lib/audit";
+import { getImpersonationSecret } from "@/lib/auth/impersonation";
 import { authConfig } from "../../auth.config";
 import { getDb } from "@/lib/db/client";
 import { ensureDbReady } from "@/lib/db/ensure-ready";
@@ -34,8 +35,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         await ensureDbReady();
 
         if (raw?.impersonateUserId) {
-          const impersonationSecret =
-            process.env.AUTH_IMPERSONATION_SECRET ?? process.env.AUTH_SECRET;
+          const impersonationSecret = getImpersonationSecret();
           const secretOk =
             impersonationSecret &&
             typeof raw.impersonateSecret === "string" &&

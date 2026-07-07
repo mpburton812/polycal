@@ -37,7 +37,10 @@ import {
   loadEnforcementSettings,
   runProposalEnforcement,
 } from "@/lib/proposals/enforcement";
-import { PARTNERSHIP_CARD_PREFIX } from "@/lib/proposals/constants";
+import {
+  recordProposalInviteeView,
+  shouldRecordProposalInviteeView,
+} from "@/lib/proposals/invitee-view";
 import {
   getProposalSpecialKind,
   isNonScheduleProposal,
@@ -67,6 +70,9 @@ import {
   applyPassiveInviteeAutoAccept,
   canManageSleepingAttendees,
 } from "@/lib/proposals/passive-auto-accept";
+import { enterAtRiskProposedState } from "@/lib/proposals/services/at-risk";
+import { logProposalTransition } from "@/lib/proposals/services/state-log";
+import { resetInviteeVotes, wipeProposalVotes } from "@/lib/proposals/services/votes";
 import { formatSleepingDisplayTitle } from "@/lib/proposals/sleeping-display";
 import {
   applyProposalMask,
@@ -361,26 +367,6 @@ function aggregateVoteFromSlotVotes(
   if (votes.some((v) => v === "accept")) return "accept";
   if (votes.some((v) => v === "accept_suboptimal")) return "accept_suboptimal";
   return "abstain";
-}
-
-/**
- * Appends an immutable state transition entry for proposal audit (PC-40).
- */
-async function logProposalTransition(
-  db: ReturnType<typeof getDb>,
-  proposalId: string,
-  actorUserId: string | null,
-  action: string,
-  details?: string,
-): Promise<void> {
-  await db.insert(proposalStateLog).values({
-    id: `psl-${randomUUID()}`,
-    proposalId,
-    actorUserId,
-    action,
-    details,
-    createdAt: new Date().toISOString(),
-  });
 }
 
 /** Notifies proposer and all invitees on a proposal (PC-40). */
@@ -772,73 +758,6 @@ function scheduleFromSlots(
   if (slots.length === 0) return { start: null, end: null };
   const sorted = [...slots].sort((a, b) => a.startAt.localeCompare(b.startAt));
   return { start: sorted[0].startAt, end: sorted[0].endAt };
-}
-
-async function resetInviteeVotes(db: ReturnType<typeof getDb>, proposalId: string): Promise<void> {
-  await wipeProposalVotes(db, proposalId);
-}
-
-/**
- * Flags a resolved proposal at-risk and returns it to proposed for re-approval (PC-48 / spec §9).
- */
-async function enterAtRiskProposedState(
-  db: ReturnType<typeof getDb>,
-  proposal: typeof proposals.$inferSelect,
-  actorUserId: string,
-  reason: string,
-): Promise<void> {
-  const enforcement = await loadEnforcementSettings(db);
-  const expiresAt = computeAtRiskExpiresAt(enforcement, proposal.scheduledStartAt);
-  const now = new Date().toISOString();
-
-  await db
-    .update(proposals)
-    .set({
-      state: "proposed",
-      atRisk: true,
-      atRiskExpiresAt: expiresAt,
-      updatedAt: now,
-    })
-    .where(eq(proposals.id, proposal.id));
-
-  await resetInviteeVotes(db, proposal.id);
-  await logProposalTransition(db, proposal.id, actorUserId, "proposal.at_risk", reason);
-
-  await notifyUser(
-    proposal.proposerId,
-    "proposal_at_risk",
-    `Proposal "${proposal.title}" is at risk. Cancel, re-draft, or update attendees.`,
-    { proposalId: proposal.id, action: "at_risk_options", proposalType: proposal.proposalType },
-  );
-
-  const invitees = await db
-    .select({ userId: proposalInvitees.userId })
-    .from(proposalInvitees)
-    .where(eq(proposalInvitees.proposalId, proposal.id));
-
-  for (const row of invitees) {
-    if (row.userId === proposal.proposerId) continue;
-    await notifyUser(
-      row.userId,
-      "proposal_at_risk",
-      `Proposal "${proposal.title}" is tentative/at risk on the calendar until re-approved.`,
-      { proposalId: proposal.id, action: "vote", proposalType: proposal.proposalType },
-    );
-  }
-}
-
-/** Clears invitee votes, slot matrix votes, and winning slot (PC-40). */
-async function wipeProposalVotes(db: ReturnType<typeof getDb>, proposalId: string): Promise<void> {
-  const now = new Date().toISOString();
-  await db
-    .update(proposalInvitees)
-    .set({ voteStatus: "not_seen", respondedAt: null, overlapAcknowledgedAt: null })
-    .where(eq(proposalInvitees.proposalId, proposalId));
-  await db.delete(proposalSlotVotes).where(eq(proposalSlotVotes.proposalId, proposalId));
-  await db
-    .update(proposals)
-    .set({ winningSlotId: null, updatedAt: now })
-    .where(eq(proposals.id, proposalId));
 }
 
 /**
@@ -2261,6 +2180,7 @@ export async function getProposalDetailAction(
       displayName: users.displayName,
       role: proposalInvitees.role,
       voteStatus: proposalInvitees.voteStatus,
+      viewedAt: proposalInvitees.viewedAt,
       overlapAcknowledgedAt: proposalInvitees.overlapAcknowledgedAt,
     })
     .from(proposalInvitees)
@@ -2314,6 +2234,23 @@ export async function getProposalDetailAction(
     .where(eq(proposalSlotVotes.proposalId, proposalId));
 
   const viewerInvitee = inviteeRows.find((invitee) => invitee.userId === session.user.id);
+  if (
+    viewerInvitee &&
+    shouldRecordProposalInviteeView({
+      proposalState: row.state,
+      masked,
+      isInvitee: true,
+      viewedAt: viewerInvitee.viewedAt,
+    })
+  ) {
+    const viewedAt = await recordProposalInviteeView(db, proposalId, session.user.id);
+    viewerInvitee.viewedAt = viewedAt;
+    const inviteeIndex = inviteeRows.findIndex((invitee) => invitee.userId === session.user.id);
+    if (inviteeIndex >= 0) {
+      inviteeRows[inviteeIndex].viewedAt = viewedAt;
+    }
+  }
+
   const viewerSlotVotes: Record<string, InviteeVoteStatus> = {};
   for (const vote of slotVoteRows.filter((v) => v.userId === session.user.id)) {
     viewerSlotVotes[vote.timeSlotId] = vote.voteStatus;
@@ -2330,6 +2267,7 @@ export async function getProposalDetailAction(
       body: proposalComments.body,
       createdAt: proposalComments.createdAt,
       authorName: users.displayName,
+      sliceTag: proposalComments.sliceTag,
     })
     .from(proposalComments)
     .innerJoin(users, eq(proposalComments.authorId, users.id))
@@ -2456,6 +2394,7 @@ export async function getProposalDetailAction(
             displayName: invitee.displayName,
             role: invitee.role,
             voteStatus: invitee.voteStatus,
+            viewedAt: invitee.viewedAt ?? null,
           }))
         : [],
       timeSlots: masked
@@ -2482,6 +2421,7 @@ export async function getProposalDetailAction(
             authorName: comment.authorName,
             body: comment.body,
             createdAt: comment.createdAt,
+            sliceTag: comment.sliceTag ?? null,
           }))
         : [],
       stateLog: stateLogEntries,
@@ -3408,16 +3348,60 @@ export async function addProposalCommentAction(
     return { ok: false, message: "You cannot comment on this proposal." };
   }
 
+  if (parsed.data.sliceTag) {
+    const { validateSliceTagForProposal } = await import("@/lib/schedule/slice-auth");
+    const [row] = await db
+      .select({
+        id: proposals.id,
+        isBatchSleeping: proposals.isBatchSleeping,
+        isAllDay: proposals.isAllDay,
+        scheduledStartAt: proposals.scheduledStartAt,
+        scheduledEndAt: proposals.scheduledEndAt,
+      })
+      .from(proposals)
+      .where(eq(proposals.id, parsed.data.proposalId))
+      .limit(1);
+    if (!row) {
+      return { ok: false, message: "Proposal not found." };
+    }
+    const slotRows = await db
+      .select({
+        id: proposalTimeSlots.id,
+        startAt: proposalTimeSlots.startAt,
+        endAt: proposalTimeSlots.endAt,
+        isDetached: proposalTimeSlots.isDetached,
+      })
+      .from(proposalTimeSlots)
+      .where(eq(proposalTimeSlots.proposalId, parsed.data.proposalId));
+    const tagCheck = validateSliceTagForProposal(
+      row,
+      slotRows,
+      null,
+      null,
+      parsed.data.sliceTag,
+    );
+    if (!tagCheck.ok) {
+      return { ok: false, message: tagCheck.message };
+    }
+  }
+
   const now = new Date().toISOString();
   await db.insert(proposalComments).values({
     id: `pc-${randomUUID()}`,
     proposalId: parsed.data.proposalId,
     authorId: session.user.id,
     body: parsed.data.body,
+    sliceTag: parsed.data.sliceTag ?? null,
     createdAt: now,
   });
 
-  await logProposalTransition(db, parsed.data.proposalId, session.user.id, "proposal.comment_added");
+  await logProposalTransition(
+    db,
+    parsed.data.proposalId,
+    session.user.id,
+    "proposal.comment_added",
+    parsed.data.sliceTag ? JSON.stringify({ sliceTag: parsed.data.sliceTag }) : undefined,
+  );
   revalidatePath("/proposals");
 
   return { ok: true, message: "Comment added." };

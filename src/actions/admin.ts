@@ -7,6 +7,8 @@ import { auth } from "@/lib/auth";
 import { logUserActivity } from "@/lib/audit";
 import { formatActivityLogDetails } from "@/lib/audit/activity-log-display";
 import { userHasAdminAccess } from "@/lib/admin-access";
+import { requireAdminAccess, withDb } from "@/lib/actions/context";
+import { getImpersonationSecret } from "@/lib/auth/impersonation";
 import { ensureDbReady } from "@/lib/db/ensure-ready";
 import { getAppEnvironment, isNonProductionEnvironment } from "@/lib/env";
 import { getDb } from "@/lib/db/client";
@@ -81,30 +83,31 @@ export async function logForceReloadAction(): Promise<AdminActionResult> {
  * Admin impersonation — signs in as another active user (audit logged).
  */
 export async function adminImpersonateUserAction(userId: string): Promise<AdminActionResult> {
-  const session = await auth();
-  if (!session?.user || !(await userHasAdminAccess(session.user.role))) {
-    return { ok: false, message: "Admin access required." };
+  const adminResult = await requireAdminAccess();
+  if (!adminResult.ok) {
+    return { ok: false, message: adminResult.message };
   }
 
-  if (userId === session.user.id) {
+  if (userId === adminResult.user.id) {
     return { ok: false, message: "You are already signed in as this user." };
   }
 
-  const secret = process.env.AUTH_IMPERSONATION_SECRET ?? process.env.AUTH_SECRET;
+  const secret = getImpersonationSecret();
   if (!secret) {
     return { ok: false, message: "Impersonation is not configured on this server." };
   }
 
-  await ensureDbReady();
-  const db = getDb();
-  const [target] = await db
-    .select({ displayName: users.displayName })
-    .from(users)
-    .where(eq(users.id, userId))
-    .limit(1);
+  const target = await withDb(async (db) => {
+    const [row] = await db
+      .select({ displayName: users.displayName })
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1);
+    return row;
+  });
 
   await logUserActivity(
-    session.user.id,
+    adminResult.user.id,
     "admin.impersonate",
     JSON.stringify({
       targetUserId: userId,

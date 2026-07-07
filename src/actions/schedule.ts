@@ -1,12 +1,12 @@
 "use server";
 
-import { and, asc, eq, inArray, or } from "drizzle-orm";
+import { and, asc, eq, gte, inArray, isNotNull, isNull, lte, or } from "drizzle-orm";
 import { z } from "zod";
 
 import { auth } from "@/lib/auth";
 import { userHasAdminAccess } from "@/lib/admin-access";
+import { requireSession, withDb } from "@/lib/actions/context";
 import { getDb } from "@/lib/db/client";
-import { ensureDbReady } from "@/lib/db/ensure-ready";
 import {
   locations,
   polyGroup,
@@ -20,14 +20,16 @@ import {
   type ProposalType,
 } from "@/lib/db/schema";
 import { eventInRange, intervalsOverlap } from "@/lib/schedule/dates";
+import { buildScheduleWindows } from "@/lib/schedule/schedule-slices";
+import type { ScheduleSliceKind } from "@/lib/schedule/slice-types";
 import { parseBatchSlotMeta } from "@/lib/proposals/batch-sleeping";
 import { formatSleepingDisplayTitle } from "@/lib/proposals/sleeping-display";
 import {
   getPrivacyAdminFlags,
   MASKED_TITLE,
-  shouldMaskProposalContent,
   viewerCanSeeProposal,
 } from "@/lib/proposals/access";
+import { applyScheduleMasking } from "@/lib/schedule/slice-auth";
 
 const HIDDEN_SLEEPING_TITLE = "Sleeping arrangement";
 
@@ -45,7 +47,7 @@ export interface ScheduleEvent {
   startAt: string;
   endAt: string | null;
   proposalType: ProposalType;
-  state: "proposed" | "resolved";
+  state: "proposed" | "resolved" | "archived";
   proposerId: string;
   proposerName: string;
   locationName: string | null;
@@ -59,6 +61,11 @@ export interface ScheduleEvent {
   isPoll: boolean;
   isAllDay: boolean;
   slotLabel: string | null;
+  sliceKind: ScheduleSliceKind;
+  rootProposalId: string;
+  sliceKey: string;
+  slotId: string | null;
+  occurrenceProposalId: string | null;
 }
 
 export interface SchedulePlanningItem {
@@ -89,58 +96,19 @@ async function getSchedulePrivacyFlags(
   };
 }
 
-function shouldMaskSleepingForViewer(
-  viewerId: string,
-  proposerId: string,
-  inviteeUserIds: string[],
-  hideSleeping: boolean,
-  acceptedPartnerIds: Set<string>,
-): boolean {
-  if (!hideSleeping) return false;
-  if (proposerId === viewerId || inviteeUserIds.includes(viewerId)) return false;
-  const participants = new Set([proposerId, ...inviteeUserIds]);
-  for (const participantId of participants) {
-    if (participantId !== viewerId && acceptedPartnerIds.has(participantId)) {
-      return false;
-    }
-  }
-  return true;
-}
-
-function shouldMaskScheduleProposalContent(
-  viewerId: string,
-  isAdmin: boolean,
-  proposerId: string,
-  inviteeUserIds: string[],
-  eventPrivacy: EventPrivacyLevel,
-  adminCanSeePrivate: boolean,
-  adminCanSeeSuperPrivate: boolean,
-): boolean {
-  return shouldMaskProposalContent(
-    viewerId,
-    isAdmin,
-    proposerId,
-    inviteeUserIds,
-    eventPrivacy,
-    adminCanSeePrivate,
-    adminCanSeeSuperPrivate,
-    "resolved",
+function proposalScheduledOverlapsRange(rangeStart: string, rangeEnd: string) {
+  return and(
+    isNotNull(proposals.scheduledStartAt),
+    lte(proposals.scheduledStartAt, rangeEnd),
+    or(isNull(proposals.scheduledEndAt), gte(proposals.scheduledEndAt, rangeStart)),
   );
 }
 
-function viewerCanSeeScheduleProposal(
-  viewerId: string,
-  isAdmin: boolean,
-  proposerId: string,
-  inviteeUserIds: string[],
-  context?: { state?: string; eventPrivacy?: EventPrivacyLevel },
-): boolean {
-  if (isAdmin) return true;
-  if (proposerId === viewerId) return true;
-  if (inviteeUserIds.includes(viewerId)) return true;
-  if (context?.state === "resolved" && context.eventPrivacy === "open") return true;
-  if (context?.state === "archived" && context.eventPrivacy === "open") return true;
-  return false;
+function slotOverlapsRange(rangeStart: string, rangeEnd: string) {
+  return and(
+    lte(proposalTimeSlots.startAt, rangeEnd),
+    or(isNull(proposalTimeSlots.endAt), gte(proposalTimeSlots.endAt, rangeStart)),
+  );
 }
 
 async function acceptedSleepingPartnerIds(
@@ -190,14 +158,18 @@ function markOverlaps(events: ScheduleEvent[]): ScheduleEvent[] {
 }
 
 /**
- * Loads calendar blocks for proposed and resolved proposals in a date range (PC-42).
+ * Loads calendar blocks for proposed, resolved, and archived proposals in a date range (PC-42).
  */
 export async function listScheduleEventsAction(
   input: z.infer<typeof rangeSchema>,
 ): Promise<{ ok: boolean; message: string; payload: SchedulePayload }> {
-  const session = await auth();
-  if (!session?.user) {
-    return { ok: false, message: "Sign in required.", payload: { events: [], planningItems: [] } };
+  const sessionResult = await requireSession();
+  if (!sessionResult.ok) {
+    return {
+      ok: false,
+      message: sessionResult.message,
+      payload: { events: [], planningItems: [] },
+    };
   }
 
   const parsed = rangeSchema.safeParse(input);
@@ -209,13 +181,39 @@ export async function listScheduleEventsAction(
     };
   }
 
-  await ensureDbReady();
-  const db = getDb();
-  const viewerId = session.user.id;
-  const isAdmin = await userHasAdminAccess(session.user.role);
+  return withDb(async (db) => {
+  const viewerId = sessionResult.user.id;
+  const isAdmin = await userHasAdminAccess(sessionResult.user.role);
   const privacyFlags = await getSchedulePrivacyFlags(db);
   const partnerIds = await acceptedSleepingPartnerIds(db, viewerId);
   const { rangeStart, rangeEnd } = parsed.data;
+
+  const overlappingSlotRows = await db
+    .select({
+      id: proposalTimeSlots.id,
+      proposalId: proposalTimeSlots.proposalId,
+      startAt: proposalTimeSlots.startAt,
+      endAt: proposalTimeSlots.endAt,
+      label: proposalTimeSlots.label,
+      sortOrder: proposalTimeSlots.sortOrder,
+      isDetached: proposalTimeSlots.isDetached,
+    })
+    .from(proposalTimeSlots)
+    .where(slotOverlapsRange(rangeStart, rangeEnd))
+    .orderBy(asc(proposalTimeSlots.sortOrder));
+
+  const slotProposalIds = [...new Set(overlappingSlotRows.map((slot) => slot.proposalId))];
+
+  const rangeFilters = [
+    eq(proposals.state, "proposed"),
+    eq(proposals.isBatchSleeping, true),
+    eq(proposals.isRecurrenceParent, true),
+    isNotNull(proposals.parentProposalId),
+    proposalScheduledOverlapsRange(rangeStart, rangeEnd),
+  ];
+  if (slotProposalIds.length > 0) {
+    rangeFilters.push(inArray(proposals.id, slotProposalIds));
+  }
 
   const rows = await db
     .select({
@@ -235,12 +233,21 @@ export async function listScheduleEventsAction(
       isAllDay: proposals.isAllDay,
       eventPrivacy: proposals.eventPrivacy,
       isBatchSleeping: proposals.isBatchSleeping,
+      parentProposalId: proposals.parentProposalId,
+      isRecurrenceParent: proposals.isRecurrenceParent,
     })
     .from(proposals)
     .innerJoin(users, eq(proposals.proposerId, users.id))
     .leftJoin(locations, eq(proposals.locationId, locations.id))
-    .where(inArray(proposals.state, ["proposed", "resolved"]))
+    .where(
+      and(
+        inArray(proposals.state, ["proposed", "resolved", "archived"]),
+        or(...rangeFilters),
+      ),
+    )
     .orderBy(asc(proposals.scheduledStartAt));
+
+  const proposalIds = new Set(rows.map((row) => row.id));
 
   const inviteeRows = await db
     .select({
@@ -249,7 +256,8 @@ export async function listScheduleEventsAction(
       displayName: users.displayName,
     })
     .from(proposalInvitees)
-    .innerJoin(users, eq(proposalInvitees.userId, users.id));
+    .innerJoin(users, eq(proposalInvitees.userId, users.id))
+    .where(proposalIds.size > 0 ? inArray(proposalInvitees.proposalId, [...proposalIds]) : eq(proposalInvitees.proposalId, ""));
 
   const inviteesByProposal = new Map<string, { userId: string; displayName: string }[]>();
   for (const row of inviteeRows) {
@@ -258,17 +266,22 @@ export async function listScheduleEventsAction(
     inviteesByProposal.set(row.proposalId, list);
   }
 
-  const slotRows = await db
-    .select({
-      id: proposalTimeSlots.id,
-      proposalId: proposalTimeSlots.proposalId,
-      startAt: proposalTimeSlots.startAt,
-      endAt: proposalTimeSlots.endAt,
-      label: proposalTimeSlots.label,
-      sortOrder: proposalTimeSlots.sortOrder,
-    })
-    .from(proposalTimeSlots)
-    .orderBy(asc(proposalTimeSlots.sortOrder));
+  const slotRows =
+    proposalIds.size > 0
+      ? await db
+          .select({
+            id: proposalTimeSlots.id,
+            proposalId: proposalTimeSlots.proposalId,
+            startAt: proposalTimeSlots.startAt,
+            endAt: proposalTimeSlots.endAt,
+            label: proposalTimeSlots.label,
+            sortOrder: proposalTimeSlots.sortOrder,
+            isDetached: proposalTimeSlots.isDetached,
+          })
+          .from(proposalTimeSlots)
+          .where(inArray(proposalTimeSlots.proposalId, [...proposalIds]))
+          .orderBy(asc(proposalTimeSlots.sortOrder))
+      : [];
 
   const slotsByProposal = new Map<string, typeof slotRows>();
   for (const slot of slotRows) {
@@ -301,25 +314,17 @@ export async function listScheduleEventsAction(
       }
     }
 
-    const privacyMasked = shouldMaskScheduleProposalContent(
+    const { privacyMasked, sleepingMasked, isContentMasked } = applyScheduleMasking({
       viewerId,
       isAdmin,
-      row.proposerId,
+      proposerId: row.proposerId,
       inviteeUserIds,
-      row.eventPrivacy,
-      privacyFlags.adminCanSeePrivate,
-      privacyFlags.adminCanSeeSuperPrivate,
-    );
-    const sleepingMasked =
-      row.proposalType === "sleeping" &&
-      shouldMaskSleepingForViewer(
-        viewerId,
-        row.proposerId,
-        inviteeUserIds,
-        privacyFlags.hideSleeping,
-        partnerIds,
-      );
-    const isContentMasked = privacyMasked || sleepingMasked;
+      eventPrivacy: row.eventPrivacy,
+      proposalState: row.state,
+      proposalType: row.proposalType,
+      privacyFlags,
+      acceptedPartnerIds: partnerIds,
+    });
 
     if (row.state === "proposed") {
       const proposedTitle =
@@ -363,45 +368,59 @@ export async function listScheduleEventsAction(
       });
     }
 
-    const windows: { startAt: string; endAt: string | null; slotLabel: string | null; key: string }[] =
-      [];
+    const windows: {
+      startAt: string;
+      endAt: string | null;
+      slotLabel: string | null;
+      key: string;
+      slotId: string | null;
+      sliceKind: ScheduleSliceKind;
+      rootProposalId: string;
+      sliceKey: string;
+      occurrenceProposalId: string | null;
+    }[] = [];
 
-    if (row.state === "resolved") {
-      const slots = slotsByProposal.get(row.id) ?? [];
-      if (row.isBatchSleeping && slots.length > 0) {
-        for (const slot of slots) {
-          windows.push({
-            startAt: slot.startAt,
-            endAt: slot.endAt,
-            slotLabel: slot.label,
-            key: `${row.id}:${slot.id}`,
-          });
-        }
-      } else if (row.scheduledStartAt) {
-        windows.push({
-          startAt: row.scheduledStartAt,
-          endAt: row.scheduledEndAt,
-          slotLabel: null,
-          key: row.id,
-        });
+    const sliceContext = {
+      id: row.id,
+      isAllDay: row.isAllDay,
+      isBatchSleeping: row.isBatchSleeping,
+      parentProposalId: row.parentProposalId,
+      isRecurrenceParent: row.isRecurrenceParent,
+    };
+
+    const slots = slotsByProposal.get(row.id) ?? [];
+    let scheduled: { startAt: string; endAt: string | null } | null = null;
+    let slotsForWindows = slots;
+
+    if (row.state === "resolved" || row.state === "archived") {
+      if (!(row.isBatchSleeping && slots.length > 0) && row.scheduledStartAt) {
+        scheduled = { startAt: row.scheduledStartAt, endAt: row.scheduledEndAt };
+      }
+      if (!row.isBatchSleeping) {
+        slotsForWindows = [];
       }
     } else if (row.state === "proposed") {
-      const slots = slotsByProposal.get(row.id) ?? [];
-      if (slots.length > 0) {
-        for (const slot of slots) {
-          windows.push({
-            startAt: slot.startAt,
-            endAt: slot.endAt,
-            slotLabel: slot.label,
-            key: `${row.id}:${slot.id}`,
-          });
-        }
-      } else if (row.scheduledStartAt) {
+      if (slots.length === 0 && row.scheduledStartAt) {
+        scheduled = { startAt: row.scheduledStartAt, endAt: row.scheduledEndAt };
+      }
+    }
+
+    if (
+      row.state === "resolved" ||
+      row.state === "archived" ||
+      row.state === "proposed"
+    ) {
+      for (const raw of buildScheduleWindows(sliceContext, slotsForWindows, scheduled)) {
         windows.push({
-          startAt: row.scheduledStartAt,
-          endAt: row.scheduledEndAt,
-          slotLabel: null,
-          key: row.id,
+          startAt: raw.startAt,
+          endAt: raw.endAt,
+          slotLabel: raw.slotLabel,
+          key: raw.key,
+          slotId: raw.slotId,
+          sliceKind: raw.slice.sliceKind,
+          rootProposalId: raw.slice.rootProposalId,
+          sliceKey: raw.slice.sliceKey,
+          occurrenceProposalId: raw.slice.occurrenceProposalId,
         });
       }
     }
@@ -451,7 +470,7 @@ export async function listScheduleEventsAction(
             : windowParticipantNames.slice(1),
           intentionalSolo: windowIntentionalSolo,
           locationName: windowLocationName,
-          state: row.state as "proposed" | "resolved",
+          state: row.state === "archived" ? "resolved" : (row.state as "proposed" | "resolved"),
           atRisk: row.atRisk,
         });
       }
@@ -460,10 +479,10 @@ export async function listScheduleEventsAction(
         id: window.key,
         proposalId: row.id,
         title: isContentMasked ? maskedTitle : windowTitle,
-        startAt: isContentMasked ? window.startAt : window.startAt,
-        endAt: isContentMasked ? window.endAt : window.endAt,
+        startAt: window.startAt,
+        endAt: window.endAt,
         proposalType: row.proposalType,
-        state: row.state as "proposed" | "resolved",
+        state: row.state as "proposed" | "resolved" | "archived",
         proposerId: row.proposerId,
         proposerName: row.proposerName,
         locationName: isContentMasked ? null : windowLocationName,
@@ -477,6 +496,11 @@ export async function listScheduleEventsAction(
         isPoll: row.isPoll,
         isAllDay: row.isAllDay,
         slotLabel: isContentMasked ? null : window.slotLabel,
+        sliceKind: window.sliceKind,
+        rootProposalId: window.rootProposalId,
+        sliceKey: window.sliceKey,
+        slotId: window.slotId,
+        occurrenceProposalId: window.occurrenceProposalId,
       });
     }
   }
@@ -511,4 +535,5 @@ export async function listScheduleEventsAction(
       planningItems,
     },
   };
+  });
 }

@@ -1,4 +1,5 @@
 import { formatActivityLogDetails } from "@/lib/audit/activity-log-display";
+import { inviteeVoteLabel } from "@/lib/proposals/invitee-display-status";
 
 export interface ProposalLogEntry {
   action: string;
@@ -6,14 +7,6 @@ export interface ProposalLogEntry {
   details: string | null;
   createdAt: string;
 }
-
-const VOTE_LABELS: Record<string, string> = {
-  accept: "Accepted",
-  accept_suboptimal: "Accepted sub-optimal",
-  abstain: "Abstained",
-  decline: "Declined",
-  not_seen: "Not seen",
-};
 
 /**
  * Human-readable activity log line for proposal detail (PC-53, PC-59).
@@ -35,12 +28,14 @@ function formatActionLabel(action: string): string {
     "proposal.redrafted": "Returned to draft",
     "proposal.attendees_updated": "Attendees updated",
     "proposal.comment_added": "Comment added",
+    "proposal.child_detached": "Child detached",
+    "proposal.detached_from_parent": "Detached from parent",
   };
   return labels[action] ?? action.replaceAll(".", " · ").replaceAll("_", " ");
 }
 
 function formatVoteLabel(vote: string): string {
-  return VOTE_LABELS[vote] ?? vote.replaceAll("_", " ");
+  return inviteeVoteLabel(vote);
 }
 
 function formatProposalLogDetails(entry: ProposalLogEntry): string {
@@ -73,6 +68,18 @@ function formatProposalLogDetails(entry: ProposalLogEntry): string {
 
     if (entry.action === "proposal.submitted" && typeof parsed.nextState === "string") {
       return ` · moved to ${parsed.nextState}`;
+    }
+
+    if (entry.action === "proposal.comment_added" && typeof parsed.sliceTag === "string") {
+      return ` · tagged ${parsed.sliceTag}`;
+    }
+
+    if (
+      (entry.action === "proposal.child_detached" ||
+        entry.action === "proposal.detached_from_parent") &&
+      typeof parsed.sliceKey === "string"
+    ) {
+      return ` · ${parsed.sliceKey}`;
     }
   } catch {
     return ` · ${formatActivityLogDetails(entry.action, entry.details)}`;

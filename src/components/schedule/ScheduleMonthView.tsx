@@ -1,8 +1,6 @@
 "use client";
 
-import EventIcon from "@mui/icons-material/Event";
-import NightsStayIcon from "@mui/icons-material/NightsStay";
-import { Box, Typography } from "@mui/material";
+import { Box, Typography, useMediaQuery, useTheme } from "@mui/material";
 import { useMemo } from "react";
 
 import type { ScheduleEvent } from "@/actions/schedule";
@@ -11,8 +9,14 @@ import {
   busynessLevelForDay,
 } from "@/components/schedule/ScheduleHeatmap";
 import {
+  MonthEventIcon,
+  MonthMoreLink,
+  MonthSpanBar,
+  StateDotStrip,
+} from "@/components/schedule/MonthEventChip";
+import { buildMonthLayout } from "@/lib/schedule/month-layout";
+import {
   buildMonthGrid,
-  eventSpanInGrid,
   startOfMonth,
 } from "@/lib/schedule/month-grid";
 import { localDateKey, scheduleDayCellSx, isTodayDate } from "@/lib/schedule/dates";
@@ -21,26 +25,19 @@ interface ScheduleMonthViewProps {
   monthAnchor: Date;
   events: ScheduleEvent[];
   timeZone?: string;
-  onEventClick: (proposalId: string) => void;
+  onEventClick: (event: ScheduleEvent) => void;
   /** Switches to week view anchored on the clicked day (PC-56). */
   onDayClick?: (day: Date) => void;
 }
 
-interface SpanBar {
-  key: string;
-  proposalId: string;
-  title: string;
-  proposalType: ScheduleEvent["proposalType"];
-  weekRow: number;
-  startCol: number;
-  endCol: number;
-  isContentMasked: boolean;
-}
-
 const WEEKDAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+const DATE_HEADER_HEIGHT = 22;
+const LANE_HEIGHT = 18;
+const ICON_ROW_HEIGHT = 22;
+const CELL_PADDING = 16;
 
 /**
- * Month calendar with day icons and multi-day span bars (PC-55).
+ * Outlook-style month calendar with week-split span lanes and per-day icons (PC-55 / PC-77).
  */
 export function ScheduleMonthView({
   monthAnchor,
@@ -49,62 +46,22 @@ export function ScheduleMonthView({
   onEventClick,
   onDayClick,
 }: ScheduleMonthViewProps) {
+  const theme = useTheme();
+  const isSmall = useMediaQuery(theme.breakpoints.down("sm"));
+  const maxSpanLanes = isSmall ? 2 : 3;
+
   const grid = useMemo(() => buildMonthGrid(monthAnchor), [monthAnchor]);
   const monthStart = startOfMonth(monthAnchor);
   const monthKey = `${monthStart.getFullYear()}-${monthStart.getMonth()}`;
 
-  const eventsByDay = useMemo(() => {
-    const map = new Map<string, { hasEvent: boolean; hasSleeping: boolean }>();
-    for (const day of grid) {
-      map.set(localDateKey(day.toISOString(), timeZone), { hasEvent: false, hasSleeping: false });
-    }
-    for (const event of events) {
-      const span = eventSpanInGrid(grid, event.startAt, event.endAt, timeZone);
-      if (!span) continue;
-      for (let index = span.startIndex; index <= span.endIndex; index += 1) {
-        const key = localDateKey(grid[index]!.toISOString(), timeZone);
-        const entry = map.get(key);
-        if (!entry) continue;
-        if (event.proposalType === "sleeping") entry.hasSleeping = true;
-        else entry.hasEvent = true;
-      }
-    }
-    return map;
-  }, [grid, events, timeZone]);
+  const layout = useMemo(
+    () => buildMonthLayout(grid, events, timeZone, maxSpanLanes),
+    [grid, events, timeZone, maxSpanLanes],
+  );
 
-  const spanBars = useMemo(() => {
-    const bars: SpanBar[] = [];
-    const seen = new Set<string>();
-
-    for (const event of events) {
-      const span = eventSpanInGrid(grid, event.startAt, event.endAt, timeZone);
-      if (!span) continue;
-      const dedupeKey = `${event.proposalId}:${span.startIndex}:${span.endIndex}`;
-      if (seen.has(dedupeKey)) continue;
-      seen.add(dedupeKey);
-
-      const weekRow = Math.floor(span.startIndex / 7);
-      bars.push({
-        key: dedupeKey,
-        proposalId: event.proposalId,
-        title: event.title,
-        proposalType: event.proposalType,
-        weekRow,
-        startCol: (span.startIndex % 7) + 1,
-        endCol: (span.endIndex % 7) + 2,
-        isContentMasked: event.isContentMasked,
-      });
-    }
-    return bars;
-  }, [events, grid, timeZone]);
-
-  const weeks = useMemo(() => {
-    const rows: Date[][] = [];
-    for (let index = 0; index < grid.length; index += 7) {
-      rows.push(grid.slice(index, index + 7));
-    }
-    return rows;
-  }, [grid]);
+  const spanAreaHeight = maxSpanLanes * LANE_HEIGHT;
+  const cellHeight =
+    DATE_HEADER_HEIGHT + spanAreaHeight + ICON_ROW_HEIGHT + CELL_PADDING;
 
   return (
     <Box sx={{ mt: 1 }}>
@@ -129,19 +86,19 @@ export function ScheduleMonthView({
         ))}
       </Box>
 
-      {weeks.map((week, weekIndex) => (
-        <Box key={`week-${monthKey}-${weekIndex}`} sx={{ position: "relative", mb: 0.5 }}>
+      {layout.weeks.map((week) => (
+        <Box key={`week-${monthKey}-${week.weekIndex}`} sx={{ position: "relative", mb: 0.5 }}>
           <Box
             sx={{
               display: "grid",
               gridTemplateColumns: "repeat(7, 1fr)",
               gap: 0.5,
-              minHeight: 72,
+              minHeight: cellHeight,
             }}
           >
-            {week.map((day) => {
+            {week.days.map((dayLayout) => {
+              const day = grid[dayLayout.dayIndex]!;
               const key = localDateKey(day.toISOString(), timeZone);
-              const markers = eventsByDay.get(key);
               const inMonth = day.getMonth() === monthStart.getMonth();
               const busynessLevel = busynessLevelForDay(events, day);
               const busynessLabel =
@@ -162,50 +119,80 @@ export function ScheduleMonthView({
                     p: 0.5,
                     bgcolor: inMonth ? daySx.bgcolor : "action.hover",
                     opacity: inMonth ? daySx.opacity : 0.45,
-                    minHeight: 72,
+                    height: cellHeight,
+                    minHeight: cellHeight,
+                    maxHeight: cellHeight,
                     position: "relative",
                     textAlign: "left",
                     cursor: onDayClick ? "pointer" : "default",
                     width: "100%",
+                    display: "flex",
+                    flexDirection: "column",
+                    overflow: "hidden",
                   }}
                 >
                   <Box
                     sx={{
+                      display: "flex",
+                      alignItems: "flex-start",
+                      justifyContent: "space-between",
+                      minHeight: DATE_HEADER_HEIGHT - 4,
+                      flexShrink: 0,
+                    }}
+                  >
+                    <Typography
+                      variant="caption"
+                      fontWeight={isToday ? 800 : 600}
+                      color={isToday ? "primary.main" : "text.primary"}
+                    >
+                      {day.getDate()}
+                    </Typography>
+                    <StateDotStrip variants={dayLayout.stateDots} />
+                  </Box>
+
+                  <Box sx={{ flex: 1, minHeight: spanAreaHeight, flexShrink: 0 }} aria-hidden />
+
+                  <Box
+                    sx={{
+                      display: "flex",
+                      flexWrap: "wrap",
+                      alignContent: "flex-start",
+                      gap: 0.25,
+                      height: ICON_ROW_HEIGHT,
+                      minHeight: ICON_ROW_HEIGHT,
+                      maxHeight: ICON_ROW_HEIGHT,
+                      overflow: "hidden",
+                      flexShrink: 0,
+                    }}
+                  >
+                    {dayLayout.chips.map((chip) => (
+                      <MonthEventIcon
+                        key={chip.key}
+                        event={chip.event}
+                        variant={chip.variant}
+                        onClick={() => onEventClick(chip.event)}
+                      />
+                    ))}
+                    <MonthMoreLink
+                      count={dayLayout.hiddenCount}
+                      onClick={() => onDayClick?.(day)}
+                    />
+                  </Box>
+
+                  <Box
+                    sx={{
                       position: "absolute",
-                      top: 4,
-                      right: 4,
-                      width: 14,
-                      height: 14,
+                      bottom: 4,
+                      left: 4,
+                      width: 10,
+                      height: 10,
                       borderRadius: 0.5,
                       bgcolor: LEVEL_COLORS[busynessLevel],
                       border: "1px solid",
                       borderColor: "divider",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      fontSize: "0.45rem",
-                      fontWeight: 600,
-                      color: "text.secondary",
-                      lineHeight: 1,
                     }}
                     aria-label={`Network busyness: ${busynessLabel}`}
                   />
-                  <Typography
-                    variant="caption"
-                    fontWeight={isToday ? 800 : 600}
-                    color={isToday ? "primary.main" : "text.primary"}
-                    display="block"
-                  >
-                    {day.getDate()}
-                  </Typography>
-                  <Box sx={{ display: "flex", gap: 0.25, mt: 0.25 }}>
-                    {markers?.hasEvent && (
-                      <EventIcon sx={{ fontSize: 14, color: "#2e7d32" }} aria-label="Event" />
-                    )}
-                    {markers?.hasSleeping && (
-                      <NightsStayIcon sx={{ fontSize: 14, color: "#1565c0" }} aria-label="Sleeping" />
-                    )}
-                  </Box>
                 </Box>
               );
             })}
@@ -216,43 +203,36 @@ export function ScheduleMonthView({
               position: "absolute",
               left: 0,
               right: 0,
-              top: 22,
+              top: DATE_HEADER_HEIGHT,
               display: "grid",
               gridTemplateColumns: "repeat(7, 1fr)",
+              gridTemplateRows: `repeat(${maxSpanLanes}, ${LANE_HEIGHT}px)`,
               gap: 0.5,
               pointerEvents: "none",
+              px: 0,
             }}
           >
-            {spanBars
-              .filter((bar) => bar.weekRow === weekIndex)
-              .map((bar) => (
-                <Box
-                  key={bar.key}
-                  component="button"
-                  type="button"
-                  onClick={() => onEventClick(bar.proposalId)}
-                  sx={{
-                    gridColumn: `${bar.startCol} / ${bar.endCol}`,
-                    pointerEvents: "auto",
-                    border: "none",
-                    cursor: "pointer",
-                    borderRadius: 1,
-                    px: 0.5,
-                    py: 0.25,
-                    fontSize: "0.65rem",
-                    textAlign: "left",
-                    color: "#fff",
-                    bgcolor: bar.proposalType === "sleeping" ? "#1565c0" : "#2e7d32",
-                    opacity: bar.isContentMasked ? 0.7 : 1,
-                    overflow: "hidden",
-                    whiteSpace: "nowrap",
-                    textOverflow: "ellipsis",
-                  }}
-                  title={bar.title}
-                >
-                  {bar.isContentMasked ? "Busy" : bar.title}
-                </Box>
-              ))}
+            {week.spanSegments.map((segment) => (
+              <Box
+                key={segment.key}
+                sx={{
+                  gridColumn: `${segment.startCol} / ${segment.endCol}`,
+                  gridRow: segment.lane + 1,
+                  pointerEvents: "auto",
+                  minWidth: 0,
+                }}
+              >
+                <MonthSpanBar
+                  title={segment.event.isContentMasked ? "Busy" : segment.event.title}
+                  variant={segment.variant}
+                  showTitle={segment.showTitle}
+                  isStartSegment={segment.isStartSegment}
+                  isEndSegment={segment.isEndSegment}
+                  isArchived={segment.event.state === "archived"}
+                  onClick={() => onEventClick(segment.event)}
+                />
+              </Box>
+            ))}
           </Box>
         </Box>
       ))}

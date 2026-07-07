@@ -15,10 +15,9 @@ import {
   ToggleButtonGroup,
   Typography,
 } from "@mui/material";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 
-import { getProposalDetailAction } from "@/actions/proposals";
 import type { ProposalPlaceOption } from "@/actions/proposals";
 import {
   listScheduleEventsAction,
@@ -30,22 +29,55 @@ import { PlanningModeDrawer } from "@/components/schedule/PlanningModeDrawer";
 import { ScheduleHeatmap } from "@/components/schedule/ScheduleHeatmap";
 import { ScheduleMonthView } from "@/components/schedule/ScheduleMonthView";
 import { ScheduleWeekView } from "@/components/schedule/ScheduleWeekView";
+import { SeriesOccurrenceChooserDialog } from "@/components/schedule/SeriesOccurrenceChooserDialog";
+import { SliceDetailDialog } from "@/components/schedule/SliceDetailDialog";
 import {
   loadScheduleViewState,
   saveScheduleViewState,
+  type ScheduleCalendarLayout,
   type ScheduleViewState,
 } from "@/components/schedule/scheduleViewState";
+import { useScheduleTapRouter } from "@/components/schedule/useScheduleTapRouter";
 import { ProposalDetailDialog } from "@/components/proposals/ProposalDetailDialog";
 import { ProposalDraftDialog } from "@/components/proposals/ProposalDraftDialog";
-import type { ProposalDetail } from "@/actions/proposals";
 import { filterScheduleEvents } from "@/lib/schedule/filters";
 import {
   addDays,
-  endOfWeekSunday,
   startOfWeekMonday,
 } from "@/lib/schedule/dates";
-import { endOfMonth, startOfMonth } from "@/lib/schedule/month-grid";
-import { GARDEN_TOKENS, SCHEDULE_SEMANTIC_COLORS } from "@/theme/tokens";
+import { startOfMonth } from "@/lib/schedule/month-grid";
+import { computeScheduleFetchRange } from "@/lib/schedule/fetch-range";
+import { SCHEDULE_SEMANTIC_COLORS } from "@/theme/tokens";
+
+interface ScheduleLegendItemProps {
+  label: string;
+  fill: string;
+  borderStyle?: "solid" | "dashed";
+}
+
+/** Semantic fill swatch for the schedule status legend (PC-77). */
+function ScheduleLegendItem({ label, fill, borderStyle = "solid" }: ScheduleLegendItemProps) {
+  return (
+    <Stack direction="row" alignItems="center" spacing={0.5}>
+      <Box
+        sx={{
+          width: 10,
+          height: 10,
+          bgcolor: fill,
+          border: 1,
+          borderColor: "divider",
+          borderStyle,
+          borderRadius: 0.25,
+          flexShrink: 0,
+        }}
+        aria-hidden
+      />
+      <Typography variant="caption" color="text.secondary">
+        {label}
+      </Typography>
+    </Stack>
+  );
+}
 
 interface ScheduleClientProps {
   initialPayload: SchedulePayload;
@@ -69,10 +101,10 @@ export function ScheduleClient({
   acceptedPartnerIds,
   timeZone,
 }: ScheduleClientProps) {
-  const router = useRouter();
   const pathname = usePathname();
   const previousPathRef = useRef<string | null>(null);
   const initialPayloadHydratedRef = useRef(false);
+  const refreshSeqRef = useRef(0);
   const [viewState, setViewState] = useState<ScheduleViewState>(() => ({
     ...loadScheduleViewState(),
     weekStartIso: initialWeekStartIso,
@@ -80,10 +112,17 @@ export function ScheduleClient({
   }));
   const [payload, setPayload] = useState<SchedulePayload>(initialPayload);
   const [pending, startTransition] = useTransition();
-  const [selectedProposalId, setSelectedProposalId] = useState<string | null>(null);
-  const [detailOpen, setDetailOpen] = useState(false);
-  const [editDetail, setEditDetail] = useState<ProposalDetail | null>(null);
-  const [draftOpen, setDraftOpen] = useState(false);
+  const {
+    state: dialogState,
+    openScheduleEvent,
+    closeDetail,
+    closeSlice,
+    closeChooser,
+    closeDraft,
+    handleEditFromDetail,
+    openRelatedProposal,
+    openDetachedProposal,
+  } = useScheduleTapRouter();
 
   const weekStart = useMemo(
     () => startOfWeekMonday(new Date(viewState.weekStartIso)),
@@ -96,23 +135,20 @@ export function ScheduleClient({
   const dayCount = viewState.compact ? 14 : 7;
   const isMonthLayout = viewState.calendarLayout === "month";
   const rangeEnd = useMemo(() => {
-    if (isMonthLayout) {
-      return endOfMonth(monthAnchor);
-    }
-    if (viewState.compact) {
-      const end = addDays(weekStart, 13);
-      end.setHours(23, 59, 59, 999);
-      return end;
-    }
-    return endOfWeekSunday(weekStart);
+    return computeScheduleFetchRange(
+      isMonthLayout ? monthAnchor : weekStart,
+      isMonthLayout ? "month" : "week",
+      viewState.compact,
+    ).rangeEnd;
   }, [isMonthLayout, monthAnchor, viewState.compact, weekStart]);
 
   const rangeStart = useMemo(() => {
-    if (isMonthLayout) {
-      return startOfWeekMonday(startOfMonth(monthAnchor));
-    }
-    return weekStart;
-  }, [isMonthLayout, monthAnchor, weekStart]);
+    return computeScheduleFetchRange(
+      isMonthLayout ? monthAnchor : weekStart,
+      isMonthLayout ? "month" : "week",
+      viewState.compact,
+    ).rangeStart;
+  }, [isMonthLayout, monthAnchor, viewState.compact, weekStart]);
 
   const rangeLabel = useMemo(() => {
     if (isMonthLayout) {
@@ -124,27 +160,44 @@ export function ScheduleClient({
   }, [dayCount, isMonthLayout, monthAnchor, weekStart]);
 
   const refreshSchedule = useCallback(
-    (anchorDate: Date) => {
-      const monday = isMonthLayout
-        ? startOfWeekMonday(startOfMonth(anchorDate))
-        : startOfWeekMonday(anchorDate);
-      const end = isMonthLayout
-        ? endOfMonth(anchorDate)
-        : viewState.compact
-          ? addDays(monday, 13)
-          : endOfWeekSunday(monday);
-      if (!isMonthLayout && viewState.compact) end.setHours(23, 59, 59, 999);
+    (
+      anchorDate: Date,
+      opts?: { layout?: ScheduleCalendarLayout; compact?: boolean },
+    ) => {
+      const layout = opts?.layout ?? viewState.calendarLayout;
+      const compact = opts?.compact ?? viewState.compact;
+      const { rangeStart: start, rangeEnd: end } = computeScheduleFetchRange(
+        anchorDate,
+        layout,
+        compact,
+      );
 
+      const seq = ++refreshSeqRef.current;
       startTransition(async () => {
         const result = await listScheduleEventsAction({
-          rangeStart: monday.toISOString(),
+          rangeStart: start.toISOString(),
           rangeEnd: end.toISOString(),
         });
+        if (seq !== refreshSeqRef.current) return;
         if (result.ok) setPayload(result.payload);
       });
     },
-    [isMonthLayout, viewState.compact],
+    [viewState.calendarLayout, viewState.compact],
   );
+
+  const refreshCurrentView = useCallback(() => {
+    refreshSchedule(isMonthLayout ? monthAnchor : weekStart, {
+      layout: viewState.calendarLayout,
+      compact: viewState.compact,
+    });
+  }, [
+    isMonthLayout,
+    monthAnchor,
+    refreshSchedule,
+    viewState.calendarLayout,
+    viewState.compact,
+    weekStart,
+  ]);
 
   useEffect(() => {
     saveScheduleViewState(viewState);
@@ -174,11 +227,11 @@ export function ScheduleClient({
         weekStartIso: monday.toISOString(),
         monthAnchorIso: monday.toISOString(),
       }));
-      refreshSchedule(monday);
+      refreshSchedule(monday, { layout: viewState.calendarLayout });
     }
 
     previousPathRef.current = pathname;
-  }, [pathname, refreshSchedule]);
+  }, [pathname, refreshSchedule, viewState.calendarLayout]);
 
   const filteredEvents = useMemo(
     () =>
@@ -198,34 +251,24 @@ export function ScheduleClient({
     ],
   );
 
+  const eventIdsOnCalendar = useMemo(
+    () => new Set(filteredEvents.map((event) => event.proposalId)),
+    [filteredEvents],
+  );
+
   function shiftPeriod(delta: number) {
     if (isMonthLayout) {
       const next = new Date(monthAnchor);
       next.setMonth(next.getMonth() + delta);
       setViewState((current) => ({ ...current, monthAnchorIso: next.toISOString() }));
-      refreshSchedule(next);
+      refreshSchedule(next, { layout: "month" });
       return;
     }
 
     const step = viewState.compact ? 14 : 7;
     const next = addDays(weekStart, delta * step);
     setViewState((current) => ({ ...current, weekStartIso: next.toISOString() }));
-    refreshSchedule(next);
-  }
-
-  function goToToday() {
-    const today = startOfWeekMonday(new Date());
-    setViewState((current) => ({
-      ...current,
-      weekStartIso: today.toISOString(),
-      monthAnchorIso: today.toISOString(),
-    }));
-    refreshSchedule(today);
-  }
-
-  function openProposal(proposalId: string) {
-    setSelectedProposalId(proposalId);
-    setDetailOpen(true);
+    refreshSchedule(next, { layout: "week", compact: viewState.compact });
   }
 
   function handleMonthDayClick(day: Date) {
@@ -236,17 +279,27 @@ export function ScheduleClient({
       weekStartIso: monday.toISOString(),
       monthAnchorIso: day.toISOString(),
     }));
-    refreshSchedule(monday);
-  }
-
-  function handleEditFromDetail(detail: ProposalDetail) {
-    setDetailOpen(false);
-    setEditDetail(detail);
-    setDraftOpen(true);
+    refreshSchedule(monday, { layout: "week", compact: viewState.compact });
   }
 
   return (
-    <Box sx={{ pb: 2 }}>
+    <Box
+      sx={{ pb: 2 }}
+      data-testid="schedule-ready"
+      data-ready={pending ? "false" : "true"}
+      data-range-start={rangeStart.toISOString()}
+      data-range-end={rangeEnd.toISOString()}
+    >
+      <Box
+        sx={{ display: "none" }}
+        data-testid="schedule-range-start"
+        data-value={rangeStart.toISOString()}
+      />
+      <Box
+        sx={{ display: "none" }}
+        data-testid="schedule-range-end"
+        data-value={rangeEnd.toISOString()}
+      />
       <Box
         sx={{
           position: "sticky",
@@ -287,7 +340,10 @@ export function ScheduleClient({
             onChange={(_, value: "week" | "month" | null) => {
               if (!value) return;
               setViewState((current) => ({ ...current, calendarLayout: value }));
-              refreshSchedule(value === "month" ? monthAnchor : weekStart);
+              refreshSchedule(value === "month" ? monthAnchor : weekStart, {
+                layout: value,
+                compact: viewState.compact,
+              });
             }}
             aria-label="Calendar layout"
           >
@@ -304,16 +360,7 @@ export function ScheduleClient({
                 if (!value) return;
                 const compact = value === "compact";
                 setViewState((current) => ({ ...current, compact }));
-                const monday = startOfWeekMonday(weekStart);
-                const end = compact ? addDays(monday, 13) : endOfWeekSunday(monday);
-                if (compact) end.setHours(23, 59, 59, 999);
-                startTransition(async () => {
-                  const result = await listScheduleEventsAction({
-                    rangeStart: monday.toISOString(),
-                    rangeEnd: end.toISOString(),
-                  });
-                  if (result.ok) setPayload(result.payload);
-                });
+                refreshSchedule(weekStart, { layout: "week", compact });
               }}
               aria-label="View density"
             >
@@ -391,21 +438,22 @@ export function ScheduleClient({
       </Stack>
 
       <Stack direction="row" spacing={2} sx={{ mb: 1 }} flexWrap="wrap" useFlexGap>
-        <Typography variant="caption" sx={{ color: SCHEDULE_SEMANTIC_COLORS.proposed.text }}>
-          ■ Proposed
-        </Typography>
-        <Typography variant="caption" sx={{ color: SCHEDULE_SEMANTIC_COLORS.resolved_event.text }}>
-          ■ Approved events
-        </Typography>
-        <Typography variant="caption" sx={{ color: SCHEDULE_SEMANTIC_COLORS.resolved_sleeping.text }}>
-          ■ Sleeping
-        </Typography>
-        <Typography variant="caption" sx={{ color: SCHEDULE_SEMANTIC_COLORS.conflict.text }}>
-          ■ Conflict
-        </Typography>
-        <Typography variant="caption" sx={{ color: SCHEDULE_SEMANTIC_COLORS.at_risk.text }}>
-          ■ At risk / tentative
-        </Typography>
+        <ScheduleLegendItem
+          label="Proposed"
+          fill={SCHEDULE_SEMANTIC_COLORS.proposed.fill}
+          borderStyle="dashed"
+        />
+        <ScheduleLegendItem
+          label="Approved events"
+          fill={SCHEDULE_SEMANTIC_COLORS.resolved_event.fill}
+        />
+        <ScheduleLegendItem
+          label="Sleeping"
+          fill={SCHEDULE_SEMANTIC_COLORS.resolved_sleeping.fill}
+        />
+        <ScheduleLegendItem label="Conflict" fill={SCHEDULE_SEMANTIC_COLORS.conflict.fill} />
+        <ScheduleLegendItem label="At risk / tentative" fill={SCHEDULE_SEMANTIC_COLORS.at_risk.fill} />
+        <ScheduleLegendItem label="Archived" fill={SCHEDULE_SEMANTIC_COLORS.archived.fill} />
       </Stack>
       </Box>
 
@@ -424,7 +472,7 @@ export function ScheduleClient({
           monthAnchor={monthAnchor}
           events={filteredEvents}
           timeZone={timeZone}
-          onEventClick={openProposal}
+          onEventClick={openScheduleEvent}
           onDayClick={handleMonthDayClick}
         />
       ) : (
@@ -434,43 +482,79 @@ export function ScheduleClient({
           events={filteredEvents}
           compact={viewState.compact}
           timeZone={timeZone}
-          onEventClick={openProposal}
+          onEventClick={openScheduleEvent}
         />
       )}
 
       <PlanningModeDrawer
         open={viewState.planningOpen}
         items={payload.planningItems}
+        eventIdsOnCalendar={eventIdsOnCalendar}
         onClose={() => setViewState((current) => ({ ...current, planningOpen: false }))}
         onSelect={(id) => {
-          openProposal(id);
+          openRelatedProposal(id);
           setViewState((current) => ({ ...current, planningOpen: false }));
         }}
       />
 
-      <ProposalDetailDialog
-        proposalId={selectedProposalId}
-        open={detailOpen}
+      <SeriesOccurrenceChooserDialog
+        open={dialogState.chooserOpen}
+        title={dialogState.chooserEvent?.title ?? "Recurring event"}
+        onClose={closeChooser}
+        onViewOccurrence={() => {
+          const occurrenceId =
+            dialogState.chooserEvent?.occurrenceProposalId ?? dialogState.chooserEvent?.proposalId;
+          closeChooser();
+          if (occurrenceId) openRelatedProposal(occurrenceId);
+        }}
+        onViewSeries={() => {
+          const seriesId = dialogState.chooserEvent?.rootProposalId;
+          closeChooser();
+          if (seriesId) openRelatedProposal(seriesId);
+        }}
+      />
+
+      <SliceDetailDialog
+        open={dialogState.sliceOpen}
+        rootProposalId={dialogState.sliceContext?.rootProposalId ?? null}
+        sliceKind={dialogState.sliceContext?.sliceKind ?? null}
+        sliceKey={dialogState.sliceContext?.sliceKey ?? null}
+        timeZone={timeZone}
         onClose={() => {
-          setDetailOpen(false);
-          setSelectedProposalId(null);
-          refreshSchedule(isMonthLayout ? monthAnchor : weekStart);
+          closeSlice();
+          refreshCurrentView();
+        }}
+        onViewParent={(parentId) => {
+          closeSlice();
+          openRelatedProposal(parentId);
+        }}
+        onDetached={(newProposalId) => {
+          openDetachedProposal(newProposalId);
+        }}
+      />
+
+      <ProposalDetailDialog
+        proposalId={dialogState.selectedProposalId}
+        open={dialogState.detailOpen}
+        onClose={() => {
+          closeDetail();
+          refreshCurrentView();
         }}
         onEdit={handleEditFromDetail}
         people={people}
+        onOpenRelatedProposal={openRelatedProposal}
       />
 
       <ProposalDraftDialog
-        open={draftOpen}
+        open={dialogState.draftOpen}
         onClose={() => {
-          setDraftOpen(false);
-          setEditDetail(null);
-          refreshSchedule(isMonthLayout ? monthAnchor : weekStart);
+          closeDraft();
+          refreshCurrentView();
         }}
         people={people}
         places={places}
         currentUserId={currentUserId}
-        initialDetail={editDetail}
+        initialDetail={dialogState.editDetail}
       />
     </Box>
   );

@@ -30,6 +30,8 @@ export interface ProposalCard {
   inviteeCount: number;
   respondedCount: number;
   isPastSchedule: boolean;
+  /** Resolved proposal with no schedulable calendar windows in any range. */
+  notOnCalendar?: boolean;
   cardKind?: ProposalCardKind;
   partnershipId?: string;
   partnerName?: string;
@@ -69,6 +71,7 @@ export interface ProposalInviteeView {
   displayName: string;
   role: InviteeRole;
   voteStatus: InviteeVoteStatus;
+  viewedAt: string | null;
 }
 
 export interface ProposalTimeSlotView {
@@ -162,6 +165,7 @@ export interface ProposalCommentView {
   authorName: string;
   body: string;
   createdAt: string;
+  sliceTag?: string | null;
 }
 
 export interface ProposalStateLogView {

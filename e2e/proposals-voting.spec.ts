@@ -40,6 +40,13 @@ test.describe("Proposal voting", () => {
     await expect(dialog.getByRole("button", { name: "Decline" })).toBeVisible();
     await expect(dialog.getByPlaceholder("Add a comment…")).toBeVisible();
   });
+
+  test("opening detail marks invitee as viewed with pending response status", async ({ page }) => {
+    const dialog = page.getByRole("dialog");
+    await openProposalCard(page, DEMO.proposedDeathStar);
+    await expect(dialog.getByText("Pending response", { exact: true })).toBeVisible();
+    await expect(dialog.getByText("Not yet viewed", { exact: true })).toHaveCount(0);
+  });
 });
 
 test.describe("Proposal comments", () => {

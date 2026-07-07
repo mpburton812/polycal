@@ -66,23 +66,12 @@ import {
   typeChipSx,
 } from "./proposalCardTheme";
 import { formatProposalLogLine } from "@/lib/proposals/state-log-format";
+import {
+  inviteeDisplayLabel,
+  inviteeVoteLabel,
+} from "@/lib/proposals/invitee-display-status";
 import { isoToSleepingDateInput, sleepingDateToStartIso } from "@/lib/proposals/sleeping-schedule";
 import { GARDEN_TOKENS } from "@/theme/tokens";
-
-const VOTE_STATUS_LABELS: Record<InviteeVoteStatus, string> = {
-  not_seen: "Not yet viewed",
-  accept: "Accepted",
-  abstain: "Abstained",
-  decline: "Declined",
-  accept_suboptimal: "Accepted sub-optimal",
-};
-
-function voteLabel(status: InviteeVoteStatus | string): string {
-  if (status in VOTE_STATUS_LABELS) {
-    return VOTE_STATUS_LABELS[status as InviteeVoteStatus];
-  }
-  return status.replaceAll("_", " ");
-}
 
 /** Readable poll slot label + time on separate lines (PC-49). */
 function PollSlotTimeCell({
@@ -125,6 +114,7 @@ interface ProposalDetailDialogProps {
   onClose: () => void;
   onEdit: (detail: ProposalDetail) => void;
   people?: PersonSummary[];
+  onOpenRelatedProposal?: (proposalId: string) => void;
 }
 
 /**
@@ -136,6 +126,7 @@ export function ProposalDetailDialog({
   onClose,
   onEdit,
   people = [],
+  onOpenRelatedProposal,
 }: ProposalDetailDialogProps) {
   const router = useRouter();
   const { showToast } = useToast();
@@ -537,6 +528,30 @@ export function ProposalDetailDialog({
             </Alert>
           )}
 
+          {detail?.parentProposalId && (
+            <Alert
+              severity="info"
+              sx={{ mb: 2 }}
+              action={
+                onOpenRelatedProposal ? (
+                  <Button
+                    color="inherit"
+                    size="small"
+                    onClick={() => onOpenRelatedProposal(detail.parentProposalId!)}
+                  >
+                    View series
+                  </Button>
+                ) : undefined
+              }
+            >
+              This occurrence is part of a recurring series.
+            </Alert>
+          )}
+          {detail?.isRecurrenceParent && (
+            <Alert severity="info" sx={{ mb: 2 }}>
+              Recurring series parent — open individual occurrences on the schedule to vote per date.
+            </Alert>
+          )}
           {detail && (
             <>
               <Stack direction="row" justifyContent="space-between" alignItems="flex-start" sx={{ mb: 1 }}>
@@ -676,7 +691,7 @@ export function ProposalDetailDialog({
                               <TableCell sx={{ verticalAlign: "top" }}>
                                 <Chip
                                   size="small"
-                                  label={viewerVote ? voteLabel(viewerVote) : "—"}
+                                  label={viewerVote ? inviteeVoteLabel(viewerVote) : "—"}
                                   variant="outlined"
                                 />
                               </TableCell>
@@ -716,7 +731,7 @@ export function ProposalDetailDialog({
                                 );
                                 return (
                                   <TableCell key={slot.id}>
-                                    {vote ? voteLabel(vote.voteStatus) : "—"}
+                                    {vote ? inviteeVoteLabel(vote.voteStatus) : "—"}
                                   </TableCell>
                                 );
                               })}
@@ -740,7 +755,10 @@ export function ProposalDetailDialog({
                     <Stack key={invitee.userId} direction="row" spacing={1} alignItems="center">
                       <Typography variant="body2">{invitee.displayName}</Typography>
                       <Chip size="small" label={invitee.role} variant="outlined" />
-                      <Chip size="small" label={voteLabel(invitee.voteStatus)} />
+                      <Chip
+                        size="small"
+                        label={inviteeDisplayLabel(invitee.voteStatus, invitee.viewedAt)}
+                      />
                       {detail.canManageAttendees && (
                         <Button
                           size="small"
@@ -1005,12 +1023,13 @@ export function ProposalDetailDialog({
 function BoxComment({
   comment,
 }: {
-  comment: { authorName: string; body: string; createdAt: string };
+  comment: { authorName: string; body: string; createdAt: string; sliceTag?: string | null };
 }) {
   return (
     <Stack spacing={0.25}>
       <Typography variant="caption" color="text.secondary">
         {comment.authorName} · {new Date(comment.createdAt).toLocaleString()}
+        {comment.sliceTag ? ` · ${comment.sliceTag}` : ""}
       </Typography>
       <Typography variant="body2">{comment.body}</Typography>
     </Stack>

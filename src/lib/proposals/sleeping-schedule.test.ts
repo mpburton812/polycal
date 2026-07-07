@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   isoToSleepingDateInput,
+  sleepingCalendarDayEnd,
   sleepingDateToStartIso,
   sleepingScheduleFromDates,
   sleepingScheduleFromSlotRows,
@@ -37,6 +38,17 @@ describe("sleepingScheduleFromDates", () => {
     expect(start).toBeTruthy();
     expect(end).toBeTruthy();
     expect(isoToSleepingDateInput(end!)).toBe("2099-07-12");
+  });
+});
+
+describe("sleepingCalendarDayEnd", () => {
+  it("returns local end of the calendar day for a sleeping night", () => {
+    const start = sleepingDateToStartIso("2099-08-01")!;
+    const end = sleepingCalendarDayEnd(start);
+    expect(end.getHours()).toBe(23);
+    expect(end.getMinutes()).toBe(59);
+    expect(end.getDate()).toBe(1);
+    expect(end.getMonth()).toBe(7);
   });
 });
 

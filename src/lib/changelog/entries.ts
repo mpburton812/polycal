@@ -26,6 +26,80 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "2026.07.09",
+    date: "2026-07-09",
+    summary:
+      "Production release: Sprint A/B E2E coverage, security hardening, and proposal services refactor.",
+    changes: [
+      {
+        type: "added",
+        description:
+          "Impersonation, overlap/revoke, passive-user, and notification inbox user journey E2E specs (PC-86/88/87/91).",
+      },
+      {
+        type: "changed",
+        description:
+          "Shared action context helpers adopted across schedule, impersonation, profile, and user provisioning (PC-97).",
+      },
+      {
+        type: "changed",
+        description:
+          "Proposal at-risk and vote-reset logic extracted to lib services (PC-98).",
+      },
+      {
+        type: "fixed",
+        description:
+          "Security hardening from assessment remediation: avatar IDOR, E2E API secret, impersonation secret, session invalidation on password change.",
+      },
+    ],
+  },
+  {
+    version: "2026.07.08",
+    date: "2026-07-08",
+    summary:
+      "Sprint B: proposal services split, passive-user and notification inbox E2E journeys.",
+    changes: [
+      {
+        type: "changed",
+        description:
+          "Extracted at-risk, vote reset, and state-log services from proposals _core (PC-98).",
+      },
+      {
+        type: "added",
+        description:
+          "E2E passive-user journey: create passive profile, admin activate, first login (PC-87).",
+      },
+      {
+        type: "added",
+        description:
+          "E2E notification inbox journey with Accept, Dismiss, and Clear all helpers (PC-91).",
+      },
+    ],
+  },
+  {
+    version: "2026.07.07",
+    date: "2026-07-07",
+    summary:
+      "Sprint A: impersonation and overlap E2E journeys; shared action context adoption.",
+    changes: [
+      {
+        type: "added",
+        description:
+          "E2E impersonation journey covering dev bar and admin-panel impersonation with audit log verification (PC-86).",
+      },
+      {
+        type: "added",
+        description:
+          "E2E overlap/revoke journey: in-flight overlap warning, acknowledge, and revoke acceptance (PC-88).",
+      },
+      {
+        type: "changed",
+        description:
+          "Adopted requireSession/withDb helpers in schedule, admin impersonation, dev impersonation, profile, and user provisioning actions (PC-97).",
+      },
+    ],
+  },
+  {
     version: "2026.07.04",
     date: "2026-07-04",
     summary:

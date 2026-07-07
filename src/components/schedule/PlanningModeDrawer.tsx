@@ -17,6 +17,7 @@ import type { SchedulePlanningItem } from "@/actions/schedule";
 interface PlanningModeDrawerProps {
   open: boolean;
   items: SchedulePlanningItem[];
+  eventIdsOnCalendar?: Set<string>;
   onClose: () => void;
   onSelect: (proposalId: string) => void;
 }
@@ -33,6 +34,7 @@ const STATE_LABEL: Record<string, string> = {
 export function PlanningModeDrawer({
   open,
   items,
+  eventIdsOnCalendar,
   onClose,
   onSelect,
 }: PlanningModeDrawerProps) {
@@ -55,17 +57,32 @@ export function PlanningModeDrawer({
             No proposals in planning view.
           </Typography>
         ) : (
-          items.map((item) => (
-            <ListItemButton key={item.id} onClick={() => onSelect(item.id)}>
-              <ListItemText
-                primary={item.title}
-                secondary={`${STATE_LABEL[item.state] ?? item.state} · ${item.proposalType}`}
-              />
-              <Chip size="small" label={STATE_LABEL[item.state] ?? item.state} />
-            </ListItemButton>
-          ))
+          items.map((item) => {
+            const onCalendar = eventIdsOnCalendar?.has(item.id) ?? true;
+            const secondary =
+              `${STATE_LABEL[item.state] ?? item.state} · ${item.proposalType}` +
+              (!onCalendar && item.state === "resolved" ? " · Not on calendar" : "");
+
+            return (
+              <ListItemButton key={item.id} onClick={() => onSelect(item.id)}>
+                <ListItemText primary={item.title} secondary={secondary} />
+                <StackedChips state={item.state} onCalendar={onCalendar} />
+              </ListItemButton>
+            );
+          })
         )}
       </List>
     </Drawer>
+  );
+}
+
+function StackedChips({ state, onCalendar }: { state: string; onCalendar: boolean }) {
+  return (
+    <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5, alignItems: "flex-end" }}>
+      <Chip size="small" label={STATE_LABEL[state] ?? state} />
+      {!onCalendar && state === "resolved" ? (
+        <Chip size="small" color="warning" variant="outlined" label="Not on calendar" />
+      ) : null}
+    </Box>
   );
 }

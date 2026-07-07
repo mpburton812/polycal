@@ -1,6 +1,7 @@
 /**
  * Simple in-memory sliding-window rate limiter for auth-sensitive endpoints.
  * Resets on process restart; sufficient for single-instance dev/test deployments.
+ * Serverless/Vercel: each instance has its own bucket — document until Redis/KV (PC-81).
  */
 
 interface Bucket {

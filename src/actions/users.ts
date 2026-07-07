@@ -8,6 +8,7 @@ import { z } from "zod";
 
 import { auth } from "@/lib/auth";
 import { logUserActivity } from "@/lib/audit";
+import { requireSession, withDb } from "@/lib/actions/context";
 import { getDb } from "@/lib/db/client";
 import { ensureDbReady } from "@/lib/db/ensure-ready";
 import { checkRateLimit } from "@/lib/rate-limit";
@@ -566,14 +567,17 @@ export async function createPassiveUserAction(
     return { ok: false, message: "You do not have permission to create users." };
   }
 
-  const session = await auth();
+  const sessionResult = await requireSession();
+  if (!sessionResult.ok) {
+    return { ok: false, message: sessionResult.message };
+  }
+
   const parsed = passiveUserSchema.safeParse(input);
   if (!parsed.success) {
     return { ok: false, message: formatZodError(parsed.error) };
   }
 
-  await ensureDbReady();
-  const db = getDb();
+  return withDb(async (db) => {
   const now = new Date().toISOString();
   const userId = `passive-${randomUUID()}`;
   const username = `passive-${slugify(parsed.data.displayName)}-${userId.slice(-6)}`;
@@ -595,7 +599,7 @@ export async function createPassiveUserAction(
   });
 
   await logUserActivity(
-    session?.user?.id ?? null,
+    sessionResult.user.id,
     "users.create_passive",
     JSON.stringify({ userId, displayName: parsed.data.displayName }),
   );
@@ -608,6 +612,7 @@ export async function createPassiveUserAction(
     message: `Created passive profile ${parsed.data.displayName}.`,
     userId,
   };
+  });
 }
 
 const adminUpdateUserSchema = z.object({
@@ -944,14 +949,17 @@ export async function activatePassiveUserAction(
     return { ok: false, message: "You do not have permission to activate users." };
   }
 
-  const session = await auth();
+  const sessionResult = await requireSession();
+  if (!sessionResult.ok) {
+    return { ok: false, message: sessionResult.message };
+  }
+
   const parsed = activatePassiveSchema.safeParse(input);
   if (!parsed.success) {
     return { ok: false, message: formatZodError(parsed.error) };
   }
 
-  await ensureDbReady();
-  const db = getDb();
+  return withDb(async (db) => {
   const [user] = await db
     .select()
     .from(users)
@@ -986,7 +994,7 @@ export async function activatePassiveUserAction(
     .where(eq(users.id, user.id));
 
   await logUserActivity(
-    session?.user?.id ?? null,
+    sessionResult.user.id,
     "users.activate_passive",
     JSON.stringify({ userId: user.id, username }),
   );
@@ -1002,6 +1010,7 @@ export async function activatePassiveUserAction(
     temporaryPassword: tempPassword,
     loginInstructions: buildLoginInstructions({ username, password: tempPassword }),
   };
+  });
 }
 
 export async function getProvisioningPolicyAction(): Promise<{

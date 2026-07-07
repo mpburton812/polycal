@@ -25,6 +25,9 @@ export async function applyProposalsMigrations(sql: Client): Promise<void> {
   await ensureColumn(sql, "proposals", "reminder_offset_minutes", "INTEGER");
   await ensureColumn(sql, "proposals", "reminder_sent_at", "TEXT");
   await ensureColumn(sql, "proposals", "is_all_day", "INTEGER NOT NULL DEFAULT 0");
+  await ensureColumn(sql, "proposals", "detached_from_parent_id", "TEXT REFERENCES proposals(id)");
+  await ensureColumn(sql, "proposals", "detached_from_slot_id", "TEXT");
+  await ensureColumn(sql, "proposals", "detached_at", "TEXT");
   await ensureColumn(sql, "poly_group", "recovery_max_hours", "INTEGER NOT NULL DEFAULT 48");
 
   await sql.execute(`
@@ -42,6 +45,7 @@ export async function applyProposalsMigrations(sql: Client): Promise<void> {
 
   await ensureColumn(sql, "proposal_invitees", "vote_status", "TEXT NOT NULL DEFAULT 'not_seen'");
   await ensureColumn(sql, "proposal_invitees", "overlap_acknowledged_at", "TEXT");
+  await ensureColumn(sql, "proposal_invitees", "viewed_at", "TEXT");
 
   await ensureColumn(sql, "poly_group", "proposed_max_hours", "INTEGER NOT NULL DEFAULT 0");
   await ensureColumn(sql, "poly_group", "at_risk_ttl_hours", "INTEGER NOT NULL DEFAULT 168");
@@ -61,6 +65,7 @@ export async function applyProposalsMigrations(sql: Client): Promise<void> {
   `);
 
   await ensureColumn(sql, "proposal_time_slots", "is_all_day", "INTEGER NOT NULL DEFAULT 0");
+  await ensureColumn(sql, "proposal_time_slots", "is_detached", "INTEGER NOT NULL DEFAULT 0");
 
   await sql.execute(`
     CREATE TABLE IF NOT EXISTS proposal_slot_votes (
@@ -95,6 +100,8 @@ export async function applyProposalsMigrations(sql: Client): Promise<void> {
       created_at TEXT NOT NULL
     );
   `);
+
+  await ensureColumn(sql, "proposal_comments", "slice_tag", "TEXT");
 
   await sql.execute(`
     CREATE TABLE IF NOT EXISTS notification_dismissals (
