@@ -11,11 +11,13 @@ import { getDb } from "@/lib/db/client";
 import { ensureDbReady } from "@/lib/db/ensure-ready";
 import {
   locations,
+  polyGroup,
   proposalComments,
   proposalInvitees,
   proposalStateLog,
   proposalTimeSlots,
   proposals,
+  sleepingPartnerships,
   users,
 } from "@/lib/db/schema";
 import { notifyUser } from "@/lib/notifications";
@@ -26,7 +28,6 @@ import {
 import {
   applyProposalMask,
   getPrivacyAdminFlags,
-  shouldMaskProposalContent,
   viewerCanSeeProposal,
 } from "@/lib/proposals/access";
 import { formatSleepingDisplayTitle } from "@/lib/proposals/sleeping-display";
@@ -34,22 +35,134 @@ import { proposalDescriptionForDisplay } from "@/lib/proposals/special-proposals
 import {
   allDayBoundsForDateKey,
   expandAllDayDateKeys,
-  isMultiDayAllDaySpan,
+  proposalHasSchedulableWindows,
 } from "@/lib/schedule/schedule-slices";
 import { formatSliceTag } from "@/lib/schedule/slice-types";
+import {
+  applyScheduleMasking,
+  canCommentOnProposal,
+  validateSliceMembership,
+} from "@/lib/schedule/slice-auth";
 import { localDateKey } from "@/lib/schedule/dates";
 import type { ProposalSliceDetail } from "./slice-types";
+
+type DbExecutor = ReturnType<typeof getDb> | Parameters<Parameters<ReturnType<typeof getDb>["transaction"]>[0]>[0];
 
 const sliceDetailSchema = z.object({
   rootProposalId: z.string().min(1),
   sliceKind: z.enum(["batch_night", "virtual_span_day"]),
-  sliceKey: z.string().min(1),
+  sliceKey: z
+    .string()
+    .min(1)
+    .max(80)
+    .refine(
+      (value) => value.length > 0,
+      "Slice key is required.",
+    ),
 });
 
 const detachSliceSchema = sliceDetailSchema;
 
-async function logProposalTransition(
+async function getSlicePrivacyFlags(db: ReturnType<typeof getDb>) {
+  const privacyFlags = await getPrivacyAdminFlags(db);
+  const [group] = await db
+    .select({ hideSleepingArrangements: polyGroup.hideSleepingArrangements })
+    .from(polyGroup)
+    .where(eq(polyGroup.id, 1))
+    .limit(1);
+  return {
+    ...privacyFlags,
+    hideSleeping: group?.hideSleepingArrangements ?? false,
+  };
+}
+
+async function acceptedSleepingPartnerIds(
   db: ReturnType<typeof getDb>,
+  viewerId: string,
+): Promise<Set<string>> {
+  const rows = await db
+    .select({
+      userLowId: sleepingPartnerships.userLowId,
+      userHighId: sleepingPartnerships.userHighId,
+    })
+    .from(sleepingPartnerships)
+    .where(
+      and(
+        eq(sleepingPartnerships.status, "accepted"),
+        eq(sleepingPartnerships.userLowId, viewerId),
+      ),
+    );
+
+  const partnerIds = new Set<string>();
+  for (const row of rows) {
+    partnerIds.add(row.userLowId === viewerId ? row.userHighId : row.userLowId);
+  }
+
+  const rowsHigh = await db
+    .select({
+      userLowId: sleepingPartnerships.userLowId,
+      userHighId: sleepingPartnerships.userHighId,
+    })
+    .from(sleepingPartnerships)
+    .where(
+      and(
+        eq(sleepingPartnerships.status, "accepted"),
+        eq(sleepingPartnerships.userHighId, viewerId),
+      ),
+    );
+
+  for (const row of rowsHigh) {
+    partnerIds.add(row.userLowId === viewerId ? row.userHighId : row.userLowId);
+  }
+
+  return partnerIds;
+}
+
+async function archiveParentIfScheduleEmpty(
+  tx: DbExecutor,
+  parentId: string,
+  actorUserId: string,
+): Promise<void> {
+  const [parent] = await tx.select().from(proposals).where(eq(proposals.id, parentId)).limit(1);
+  if (!parent || parent.state !== "resolved") return;
+
+  const slotRows = await tx
+    .select()
+    .from(proposalTimeSlots)
+    .where(eq(proposalTimeSlots.proposalId, parentId));
+
+  const hasWindows = proposalHasSchedulableWindows(
+    {
+      id: parent.id,
+      isAllDay: parent.isAllDay,
+      isBatchSleeping: parent.isBatchSleeping,
+      parentProposalId: parent.parentProposalId,
+      isRecurrenceParent: parent.isRecurrenceParent,
+      state: parent.state,
+      scheduledStartAt: parent.scheduledStartAt,
+      scheduledEndAt: parent.scheduledEndAt,
+    },
+    slotRows.map((slot) => ({
+      id: slot.id,
+      startAt: slot.startAt,
+      endAt: slot.endAt,
+      label: slot.label,
+      isDetached: slot.isDetached,
+    })),
+  );
+
+  if (hasWindows) return;
+
+  const now = new Date().toISOString();
+  await tx
+    .update(proposals)
+    .set({ state: "archived", updatedAt: now })
+    .where(eq(proposals.id, parentId));
+  await logProposalTransition(tx, parentId, actorUserId, "proposal.archived", "All slices detached.");
+}
+
+async function logProposalTransition(
+  db: DbExecutor,
   proposalId: string,
   actorUserId: string,
   action: string,
@@ -66,7 +179,7 @@ async function logProposalTransition(
 }
 
 async function notifyStakeholders(
-  db: ReturnType<typeof getDb>,
+  db: DbExecutor,
   proposalId: string,
   proposerId: string,
   title: string,
@@ -121,7 +234,8 @@ export async function getProposalSliceDetailAction(
   await ensureDbReady();
   const db = getDb();
   const isAdmin = await userHasAdminAccess(session.user.role);
-  const privacyFlags = await getPrivacyAdminFlags(db);
+  const privacyFlags = await getSlicePrivacyFlags(db);
+  const partnerIds = await acceptedSleepingPartnerIds(db, session.user.id);
   const { rootProposalId, sliceKind, sliceKey } = parsed.data;
   const sliceTag = formatSliceTag(sliceKind, sliceKey);
   if (!sliceTag) {
@@ -178,17 +292,45 @@ export async function getProposalSliceDetailAction(
     return { ok: false, message: "Proposal not found." };
   }
 
-  const masked = shouldMaskProposalContent(
-    session.user.id,
-    isAdmin,
-    row.proposerId,
-    inviteeUserIds,
-    row.eventPrivacy,
-    privacyFlags.adminCanSeePrivate,
-    privacyFlags.adminCanSeeSuperPrivate,
-    row.state,
+  const slotRows = await db
+    .select({
+      id: proposalTimeSlots.id,
+      startAt: proposalTimeSlots.startAt,
+      endAt: proposalTimeSlots.endAt,
+      label: proposalTimeSlots.label,
+      isDetached: proposalTimeSlots.isDetached,
+    })
+    .from(proposalTimeSlots)
+    .where(eq(proposalTimeSlots.proposalId, rootProposalId));
+
+  const membership = validateSliceMembership(
+    {
+      id: row.id,
+      isBatchSleeping: row.isBatchSleeping,
+      isAllDay: row.isAllDay,
+      scheduledStartAt: row.scheduledStartAt,
+      scheduledEndAt: row.scheduledEndAt,
+    },
+    slotRows,
+    sliceKind,
+    sliceKey,
   );
-  const display = applyProposalMask(row, masked);
+  if (!membership.ok) {
+    return { ok: false, message: membership.message };
+  }
+
+  const { isContentMasked } = applyScheduleMasking({
+    viewerId: session.user.id,
+    isAdmin,
+    proposerId: row.proposerId,
+    inviteeUserIds,
+    eventPrivacy: row.eventPrivacy,
+    proposalState: row.state,
+    proposalType: row.proposalType,
+    privacyFlags,
+    acceptedPartnerIds: partnerIds,
+  });
+  const display = applyProposalMask(row, isContentMasked);
 
   let startAt = row.scheduledStartAt ?? "";
   let endAt = row.scheduledEndAt;
@@ -197,11 +339,7 @@ export async function getProposalSliceDetailAction(
   let participantNames = [row.proposerName, ...inviteeRows.map((invitee) => invitee.displayName)];
 
   if (sliceKind === "batch_night") {
-    const [slot] = await db
-      .select()
-      .from(proposalTimeSlots)
-      .where(and(eq(proposalTimeSlots.proposalId, rootProposalId), eq(proposalTimeSlots.id, sliceKey)))
-      .limit(1);
+    const slot = slotRows.find((entry) => entry.id === sliceKey);
     if (!slot || slot.isDetached) {
       return { ok: false, message: "Night not found." };
     }
@@ -237,7 +375,7 @@ export async function getProposalSliceDetailAction(
   }
 
   let sliceTitle = display.title;
-  if (!masked && row.proposalType === "sleeping") {
+  if (!isContentMasked && row.proposalType === "sleeping") {
     sliceTitle = formatSleepingDisplayTitle({
       proposerName: row.proposerName,
       inviteeNames: intentionalSolo ? [] : participantNames.slice(1),
@@ -261,7 +399,7 @@ export async function getProposalSliceDetailAction(
     .where(eq(proposalComments.proposalId, rootProposalId))
     .orderBy(asc(proposalComments.createdAt));
 
-  const visibleComments = masked
+  const visibleComments = isContentMasked
     ? []
     : commentRows
         .filter((comment) => !comment.sliceTag || comment.sliceTag === sliceTag)
@@ -274,14 +412,17 @@ export async function getProposalSliceDetailAction(
         }));
 
   const viewerInvitee = inviteeRows.find((invitee) => invitee.userId === session.user.id);
-  const canComment =
-    !masked &&
-    (row.proposerId === session.user.id ||
-      isAdmin ||
-      inviteeUserIds.includes(session.user.id) ||
-      row.eventPrivacy === "open");
+  const canComment = canCommentOnProposal({
+    viewerId: session.user.id,
+    isAdmin,
+    proposerId: row.proposerId,
+    inviteeUserIds,
+    eventPrivacy: row.eventPrivacy,
+    state: row.state,
+    isContentMasked,
+  });
   const canVoteOnParent =
-    !masked &&
+    !isContentMasked &&
     row.state === "proposed" &&
     viewerInvitee !== undefined &&
     viewerInvitee.voteStatus === "not_seen";
@@ -295,19 +436,19 @@ export async function getProposalSliceDetailAction(
       sliceKey,
       sliceTag,
       title: sliceTitle,
-      description: masked ? null : proposalDescriptionForDisplay(row.description),
-      locationName: masked ? null : locationName,
+      description: isContentMasked ? null : proposalDescriptionForDisplay(row.description),
+      locationName: isContentMasked ? null : locationName,
       startAt,
       endAt,
       isAllDay: sliceKind === "virtual_span_day" ? true : row.isAllDay,
       proposalType: row.proposalType,
       parentState: row.state,
       parentTitle: display.title,
-      participantNames: masked ? [] : participantNames,
+      participantNames: isContentMasked ? [] : participantNames,
       intentionalSolo,
-      isContentMasked: masked,
+      isContentMasked,
       canComment,
-      canDetach: !masked && row.state === "resolved",
+      canDetach: !isContentMasked && row.state === "resolved",
       canVoteOnParent,
       comments: visibleComments,
     },
@@ -350,269 +491,311 @@ export async function detachProposalSliceAction(
     return { ok: false, message: "You cannot detach this slice." };
   }
 
-  const now = new Date().toISOString();
-  const newId = `prop-${randomUUID()}`;
+  const parentSlots = await db
+    .select({
+      id: proposalTimeSlots.id,
+      startAt: proposalTimeSlots.startAt,
+      endAt: proposalTimeSlots.endAt,
+      isDetached: proposalTimeSlots.isDetached,
+    })
+    .from(proposalTimeSlots)
+    .where(eq(proposalTimeSlots.proposalId, rootProposalId));
 
-  if (sliceKind === "batch_night") {
-    if (!parent.isBatchSleeping) {
-      return { ok: false, message: "Not a batch sleeping proposal." };
-    }
-
-    const [slot] = await db
-      .select()
-      .from(proposalTimeSlots)
-      .where(and(eq(proposalTimeSlots.proposalId, rootProposalId), eq(proposalTimeSlots.id, sliceKey)))
-      .limit(1);
-
-    if (!slot || slot.isDetached) {
-      return { ok: false, message: "Night not found." };
-    }
-
-    const meta = parseBatchSlotMeta(slot.label);
-    const batchEntries = parseBatchEntriesJson(parent.batchEntriesJson);
-    const entry = meta
-      ? batchEntries.find((item) => item.id === meta.batchEntryId)
-      : undefined;
-
-    await db.insert(proposals).values({
-      id: newId,
-      title: parent.title,
-      description: parent.description,
-      proposalType: "sleeping",
-      state: "resolved",
-      proposerId: parent.proposerId,
-      locationId: entry?.locationId ?? parent.locationId,
-      locationText: entry?.locationText ?? parent.locationText,
-      scheduledStartAt: slot.startAt,
-      scheduledEndAt: slot.endAt,
-      intentionalSolo: entry?.intentionalSolo ?? meta?.intentionalSolo ?? parent.intentionalSolo,
-      eventPrivacy: parent.eventPrivacy,
-      isPoll: false,
+  const membership = validateSliceMembership(
+    {
+      id: parent.id,
+      isBatchSleeping: parent.isBatchSleeping,
       isAllDay: parent.isAllDay,
-      bedroomIndex: entry?.bedroomIndex ?? meta?.bedroomIndex ?? parent.bedroomIndex,
-      notes: entry?.comment ?? parent.notes,
-      detachedFromParentId: rootProposalId,
-      detachedFromSlotId: sliceKey,
-      detachedAt: now,
-      createdAt: now,
-      updatedAt: now,
-    });
+      scheduledStartAt: parent.scheduledStartAt,
+      scheduledEndAt: parent.scheduledEndAt,
+    },
+    parentSlots,
+    sliceKind,
+    sliceKey,
+  );
+  if (!membership.ok) {
+    return { ok: false, message: membership.message };
+  }
 
-    await db.insert(proposalTimeSlots).values({
-      id: `pts-${randomUUID()}`,
-      proposalId: newId,
-      startAt: slot.startAt,
-      endAt: slot.endAt,
-      label: slot.label,
-      sortOrder: 0,
-      isAllDay: slot.isAllDay,
-      createdAt: now,
-    });
+  const [existingChild] = await db
+    .select({ id: proposals.id })
+    .from(proposals)
+    .where(
+      and(
+        eq(proposals.detachedFromParentId, rootProposalId),
+        eq(proposals.detachedFromSlotId, sliceKey),
+      ),
+    )
+    .limit(1);
 
-    const invitees =
-      entry && !entry.intentionalSolo
-        ? entry.invitees
-        : meta && !meta.intentionalSolo
-          ? meta.inviteeUserIds.map((userId) => ({ userId, role: "required" as const }))
-          : [];
+  if (existingChild) {
+    return { ok: true, message: "Slice detached.", newProposalId: existingChild.id };
+  }
 
-    for (const invitee of invitees) {
-      if (invitee.userId === parent.proposerId) continue;
-      await db.insert(proposalInvitees).values({
-        id: `pi-${randomUUID()}`,
-        proposalId: newId,
-        userId: invitee.userId,
-        role: invitee.role,
-        voteStatus: "accept",
-        respondedAt: now,
+  if (sliceKind === "batch_night" && !parent.isBatchSleeping) {
+    return { ok: false, message: "Not a batch sleeping proposal." };
+  }
+  if (sliceKind === "virtual_span_day" && parent.isBatchSleeping) {
+    return { ok: false, message: "Use batch night detach for sleeping batches." };
+  }
+
+  let newId: string;
+  try {
+    newId = await db.transaction(async (tx) => {
+    const now = new Date().toISOString();
+    const childId = `prop-${randomUUID()}`;
+
+    if (sliceKind === "batch_night") {
+      const [slot] = await tx
+        .select()
+        .from(proposalTimeSlots)
+        .where(and(eq(proposalTimeSlots.proposalId, rootProposalId), eq(proposalTimeSlots.id, sliceKey)))
+        .limit(1);
+
+      if (!slot || slot.isDetached) {
+        throw new Error("Night not found.");
+      }
+
+      const meta = parseBatchSlotMeta(slot.label);
+      const batchEntries = parseBatchEntriesJson(parent.batchEntriesJson);
+      const entry = meta
+        ? batchEntries.find((item) => item.id === meta.batchEntryId)
+        : undefined;
+
+      await tx.insert(proposals).values({
+        id: childId,
+        title: parent.title,
+        description: parent.description,
+        proposalType: "sleeping",
+        state: "resolved",
+        proposerId: parent.proposerId,
+        locationId: entry?.locationId ?? parent.locationId,
+        locationText: entry?.locationText ?? parent.locationText,
+        scheduledStartAt: slot.startAt,
+        scheduledEndAt: slot.endAt,
+        intentionalSolo: entry?.intentionalSolo ?? meta?.intentionalSolo ?? parent.intentionalSolo,
+        eventPrivacy: parent.eventPrivacy,
+        isPoll: false,
+        isAllDay: parent.isAllDay,
+        bedroomIndex: entry?.bedroomIndex ?? meta?.bedroomIndex ?? parent.bedroomIndex,
+        notes: entry?.comment ?? parent.notes,
+        detachedFromParentId: rootProposalId,
+        detachedFromSlotId: sliceKey,
+        detachedAt: now,
         createdAt: now,
+        updatedAt: now,
       });
-    }
 
-    await db
-      .update(proposalTimeSlots)
-      .set({ isDetached: true })
-      .where(eq(proposalTimeSlots.id, sliceKey));
-
-    const nextEntries = meta
-      ? batchEntries.filter((item) => item.id !== meta.batchEntryId)
-      : batchEntries;
-    await db
-      .update(proposals)
-      .set({ batchEntriesJson: JSON.stringify(nextEntries), updatedAt: now })
-      .where(eq(proposals.id, rootProposalId));
-
-    await logProposalTransition(
-      db,
-      rootProposalId,
-      session.user.id,
-      "proposal.child_detached",
-      JSON.stringify({ childId: newId, sliceKind, sliceKey }),
-    );
-    await logProposalTransition(
-      db,
-      newId,
-      session.user.id,
-      "proposal.detached_from_parent",
-      JSON.stringify({ parentId: rootProposalId, sliceKind, sliceKey }),
-    );
-    await notifyStakeholders(
-      db,
-      rootProposalId,
-      parent.proposerId,
-      parent.title,
-      "proposal_child_detached",
-      `A night was detached from "${parent.title}".`,
-    );
-  } else {
-    if (parent.isBatchSleeping) {
-      return { ok: false, message: "Use batch night detach for sleeping batches." };
-    }
-
-    const slotRows = await db
-      .select()
-      .from(proposalTimeSlots)
-      .where(eq(proposalTimeSlots.proposalId, rootProposalId))
-      .orderBy(asc(proposalTimeSlots.sortOrder));
-
-    const activeSlots = slotRows.filter((slot) => !slot.isDetached);
-    let sourceStart = parent.scheduledStartAt;
-    let sourceEnd = parent.scheduledEndAt;
-    let sourceSlotId: string | null = null;
-
-    if (activeSlots.length > 0) {
-      const spanSlot =
-        activeSlots.find((slot) =>
-          expandAllDayDateKeys(slot.startAt, slot.endAt).includes(sliceKey),
-        ) ?? activeSlots[0]!;
-      sourceStart = spanSlot.startAt;
-      sourceEnd = spanSlot.endAt;
-      sourceSlotId = spanSlot.id;
-    }
-
-    if (
-      !sourceStart ||
-      !isMultiDayAllDaySpan(sourceStart, sourceEnd ?? sourceStart, parent.isAllDay)
-    ) {
-      return { ok: false, message: "Day not part of a multi-day span." };
-    }
-
-    const allKeys = expandAllDayDateKeys(sourceStart, sourceEnd);
-    if (!allKeys.includes(sliceKey)) {
-      return { ok: false, message: "Day not found in span." };
-    }
-
-    const bounds = allDayBoundsForDateKey(sliceKey);
-    await db.insert(proposals).values({
-      id: newId,
-      title: parent.title,
-      description: parent.description,
-      proposalType: parent.proposalType,
-      state: "resolved",
-      proposerId: parent.proposerId,
-      locationId: parent.locationId,
-      locationText: parent.locationText,
-      scheduledStartAt: bounds.startAt,
-      scheduledEndAt: bounds.endAt,
-      intentionalSolo: parent.intentionalSolo,
-      eventPrivacy: parent.eventPrivacy,
-      isPoll: false,
-      isAllDay: true,
-      bedroomIndex: parent.bedroomIndex,
-      notes: parent.notes,
-      detachedFromParentId: rootProposalId,
-      detachedFromSlotId: sourceSlotId,
-      detachedAt: now,
-      createdAt: now,
-      updatedAt: now,
-    });
-
-    await db.insert(proposalTimeSlots).values({
-      id: `pts-${randomUUID()}`,
-      proposalId: newId,
-      startAt: bounds.startAt,
-      endAt: bounds.endAt,
-      sortOrder: 0,
-      isAllDay: true,
-      createdAt: now,
-    });
-
-    const parentInvitees = await db
-      .select({ userId: proposalInvitees.userId, role: proposalInvitees.role })
-      .from(proposalInvitees)
-      .where(eq(proposalInvitees.proposalId, rootProposalId));
-
-    for (const invitee of parentInvitees) {
-      await db.insert(proposalInvitees).values({
-        id: `pi-${randomUUID()}`,
-        proposalId: newId,
-        userId: invitee.userId,
-        role: invitee.role,
-        voteStatus: "accept",
-        respondedAt: now,
-        createdAt: now,
-      });
-    }
-
-    const remainingKeys = allKeys.filter((key) => key !== sliceKey);
-    const ranges = splitContiguousDateKeys(remainingKeys);
-
-    if (sourceSlotId) {
-      await db.delete(proposalTimeSlots).where(eq(proposalTimeSlots.id, sourceSlotId));
-    }
-
-    let sortOrder = 0;
-    for (const [rangeStart, rangeEnd] of ranges) {
-      const startBounds = allDayBoundsForDateKey(rangeStart);
-      const endBounds = allDayBoundsForDateKey(rangeEnd);
-      await db.insert(proposalTimeSlots).values({
+      await tx.insert(proposalTimeSlots).values({
         id: `pts-${randomUUID()}`,
-        proposalId: rootProposalId,
-        startAt: startBounds.startAt,
-        endAt: endBounds.endAt,
-        sortOrder,
+        proposalId: childId,
+        startAt: slot.startAt,
+        endAt: slot.endAt,
+        label: slot.label,
+        sortOrder: 0,
+        isAllDay: slot.isAllDay,
+        createdAt: now,
+      });
+
+      const invitees =
+        entry && !entry.intentionalSolo
+          ? entry.invitees
+          : meta && !meta.intentionalSolo
+            ? meta.inviteeUserIds.map((userId) => ({ userId, role: "required" as const }))
+            : [];
+
+      for (const invitee of invitees) {
+        if (invitee.userId === parent.proposerId) continue;
+        await tx.insert(proposalInvitees).values({
+          id: `pi-${randomUUID()}`,
+          proposalId: childId,
+          userId: invitee.userId,
+          role: invitee.role,
+          voteStatus: "accept",
+          respondedAt: now,
+          createdAt: now,
+        });
+      }
+
+      await tx
+        .update(proposalTimeSlots)
+        .set({ isDetached: true })
+        .where(eq(proposalTimeSlots.id, sliceKey));
+
+      const nextEntries = meta
+        ? batchEntries.filter((item) => item.id !== meta.batchEntryId)
+        : batchEntries;
+      await tx
+        .update(proposals)
+        .set({ batchEntriesJson: JSON.stringify(nextEntries), updatedAt: now })
+        .where(eq(proposals.id, rootProposalId));
+
+      await logProposalTransition(
+        tx,
+        rootProposalId,
+        session.user.id,
+        "proposal.child_detached",
+        JSON.stringify({ childId, sliceKind, sliceKey }),
+      );
+      await logProposalTransition(
+        tx,
+        childId,
+        session.user.id,
+        "proposal.detached_from_parent",
+        JSON.stringify({ parentId: rootProposalId, sliceKind, sliceKey }),
+      );
+      await notifyStakeholders(
+        tx,
+        rootProposalId,
+        parent.proposerId,
+        parent.title,
+        "proposal_child_detached",
+        `A night was detached from "${parent.title}".`,
+      );
+    } else {
+      const slotRows = await tx
+        .select()
+        .from(proposalTimeSlots)
+        .where(eq(proposalTimeSlots.proposalId, rootProposalId))
+        .orderBy(asc(proposalTimeSlots.sortOrder));
+
+      const activeSlots = slotRows.filter((slot) => !slot.isDetached);
+      let sourceStart = parent.scheduledStartAt;
+      let sourceEnd = parent.scheduledEndAt;
+      let sourceSlotId: string | null = null;
+
+      if (activeSlots.length > 0) {
+        const spanSlot =
+          activeSlots.find((slot) =>
+            expandAllDayDateKeys(slot.startAt, slot.endAt).includes(sliceKey),
+          ) ?? activeSlots[0]!;
+        sourceStart = spanSlot.startAt;
+        sourceEnd = spanSlot.endAt;
+        sourceSlotId = spanSlot.id;
+      }
+
+      const bounds = allDayBoundsForDateKey(sliceKey);
+      await tx.insert(proposals).values({
+        id: childId,
+        title: parent.title,
+        description: parent.description,
+        proposalType: parent.proposalType,
+        state: "resolved",
+        proposerId: parent.proposerId,
+        locationId: parent.locationId,
+        locationText: parent.locationText,
+        scheduledStartAt: bounds.startAt,
+        scheduledEndAt: bounds.endAt,
+        intentionalSolo: parent.intentionalSolo,
+        eventPrivacy: parent.eventPrivacy,
+        isPoll: false,
+        isAllDay: true,
+        bedroomIndex: parent.bedroomIndex,
+        notes: parent.notes,
+        detachedFromParentId: rootProposalId,
+        detachedFromSlotId: sourceSlotId,
+        detachedAt: now,
+        createdAt: now,
+        updatedAt: now,
+      });
+
+      await tx.insert(proposalTimeSlots).values({
+        id: `pts-${randomUUID()}`,
+        proposalId: childId,
+        startAt: bounds.startAt,
+        endAt: bounds.endAt,
+        sortOrder: 0,
         isAllDay: true,
         createdAt: now,
       });
-      sortOrder += 1;
+
+      const parentInvitees = await tx
+        .select({ userId: proposalInvitees.userId, role: proposalInvitees.role })
+        .from(proposalInvitees)
+        .where(eq(proposalInvitees.proposalId, rootProposalId));
+
+      for (const invitee of parentInvitees) {
+        await tx.insert(proposalInvitees).values({
+          id: `pi-${randomUUID()}`,
+          proposalId: childId,
+          userId: invitee.userId,
+          role: invitee.role,
+          voteStatus: "accept",
+          respondedAt: now,
+          createdAt: now,
+        });
+      }
+
+      const allKeys = expandAllDayDateKeys(sourceStart!, sourceEnd);
+      const remainingKeys = allKeys.filter((key) => key !== sliceKey);
+      const ranges = splitContiguousDateKeys(remainingKeys);
+
+      if (sourceSlotId) {
+        await tx.delete(proposalTimeSlots).where(eq(proposalTimeSlots.id, sourceSlotId));
+      }
+
+      let sortOrder = 0;
+      for (const [rangeStart, rangeEnd] of ranges) {
+        const startBounds = allDayBoundsForDateKey(rangeStart);
+        const endBounds = allDayBoundsForDateKey(rangeEnd);
+        await tx.insert(proposalTimeSlots).values({
+          id: `pts-${randomUUID()}`,
+          proposalId: rootProposalId,
+          startAt: startBounds.startAt,
+          endAt: endBounds.endAt,
+          sortOrder,
+          isAllDay: true,
+          createdAt: now,
+        });
+        sortOrder += 1;
+      }
+
+      const parentStart = ranges[0]?.[0] ? allDayBoundsForDateKey(ranges[0][0]).startAt : null;
+      const parentEnd = ranges.at(-1)?.[1]
+        ? allDayBoundsForDateKey(ranges.at(-1)![1]).endAt
+        : null;
+
+      await tx
+        .update(proposals)
+        .set({
+          scheduledStartAt: parentStart,
+          scheduledEndAt: parentEnd,
+          updatedAt: now,
+        })
+        .where(eq(proposals.id, rootProposalId));
+
+      await logProposalTransition(
+        tx,
+        rootProposalId,
+        session.user.id,
+        "proposal.child_detached",
+        JSON.stringify({ childId, sliceKind, sliceKey }),
+      );
+      await logProposalTransition(
+        tx,
+        childId,
+        session.user.id,
+        "proposal.detached_from_parent",
+        JSON.stringify({ parentId: rootProposalId, sliceKind, sliceKey }),
+      );
+      await notifyStakeholders(
+        tx,
+        rootProposalId,
+        parent.proposerId,
+        parent.title,
+        "proposal_child_detached",
+        `A day was detached from "${parent.title}".`,
+      );
     }
 
-    const parentStart = ranges[0]?.[0] ? allDayBoundsForDateKey(ranges[0][0]).startAt : null;
-    const parentEnd = ranges.at(-1)?.[1]
-      ? allDayBoundsForDateKey(ranges.at(-1)![1]).endAt
-      : null;
-
-    await db
-      .update(proposals)
-      .set({
-        scheduledStartAt: parentStart,
-        scheduledEndAt: parentEnd,
-        updatedAt: now,
-      })
-      .where(eq(proposals.id, rootProposalId));
-
-    await logProposalTransition(
-      db,
-      rootProposalId,
-      session.user.id,
-      "proposal.child_detached",
-      JSON.stringify({ childId: newId, sliceKind, sliceKey }),
-    );
-    await logProposalTransition(
-      db,
-      newId,
-      session.user.id,
-      "proposal.detached_from_parent",
-      JSON.stringify({ parentId: rootProposalId, sliceKind, sliceKey }),
-    );
-    await notifyStakeholders(
-      db,
-      rootProposalId,
-      parent.proposerId,
-      parent.title,
-      "proposal_child_detached",
-      `A day was detached from "${parent.title}".`,
-    );
+    await archiveParentIfScheduleEmpty(tx, rootProposalId, session.user.id);
+    return childId;
+    });
+  } catch (error) {
+    return {
+      ok: false,
+      message: error instanceof Error ? error.message : "Detach failed.",
+    };
   }
 
   revalidatePath("/proposals");

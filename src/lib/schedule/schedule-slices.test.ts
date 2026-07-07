@@ -11,13 +11,18 @@ const baseRow = {
 };
 
 describe("schedule-slices", () => {
-  it("skips recurrence parent rows", () => {
+  it("emits occurrence 0 windows for recurrence parent rows", () => {
     const windows = buildScheduleWindows(
       { ...baseRow, isRecurrenceParent: true },
-      [{ id: "s1", startAt: "2026-07-01T00:00:00.000Z", endAt: null, label: null }],
+      [{ id: "s1", startAt: "2026-07-01T00:00:00.000Z", endAt: "2026-07-01T01:00:00.000Z", label: null }],
       null,
     );
-    expect(windows).toHaveLength(0);
+    expect(windows).toHaveLength(1);
+    expect(windows[0]?.slice).toMatchObject({
+      sliceKind: "recurrence_occurrence",
+      rootProposalId: "prop-parent",
+      occurrenceProposalId: "prop-parent",
+    });
   });
 
   it("tags batch sleeping slots as batch_night", () => {

@@ -135,15 +135,38 @@ function pushWindow(
  * Builds calendar windows with slice metadata from proposal rows and slots.
  * Recurrence parents emit no calendar windows — children are the tap targets.
  */
+function pushRecurrenceParentOccurrence(
+  target: RawScheduleWindow[],
+  row: ScheduleRowSliceContext,
+  input: {
+    startAt: string;
+    endAt: string | null;
+    slotLabel: string | null;
+    key: string;
+    slotId: string | null;
+  },
+): void {
+  target.push({
+    startAt: input.startAt,
+    endAt: input.endAt,
+    slotLabel: input.slotLabel,
+    key: input.key,
+    slotId: input.slotId,
+    slice: {
+      rootProposalId: row.id,
+      sliceKind: "recurrence_occurrence",
+      sliceKey: row.id,
+      occurrenceProposalId: row.id,
+      slotId: input.slotId,
+    },
+  });
+}
+
 export function buildScheduleWindows(
   row: ScheduleRowSliceContext,
   slots: ScheduleSlotRow[],
   scheduled: { startAt: string; endAt: string | null } | null,
 ): RawScheduleWindow[] {
-  if (row.isRecurrenceParent) {
-    return [];
-  }
-
   const activeSlots = slots.filter((slot) => !slot.isDetached);
   const windows: RawScheduleWindow[] = [];
 
@@ -154,6 +177,17 @@ export function buildScheduleWindows(
     slotId: string | null,
     keyPrefix: string,
   ) => {
+    if (row.isRecurrenceParent) {
+      pushRecurrenceParentOccurrence(windows, row, {
+        startAt,
+        endAt,
+        slotLabel,
+        key: slotId ? `${keyPrefix}:${slotId}` : `${keyPrefix}:occurrence-0`,
+        slotId,
+      });
+      return;
+    }
+
     if (
       row.isBatchSleeping ||
       row.parentProposalId ||
@@ -195,4 +229,34 @@ export function buildScheduleWindows(
 
 export function isSliceGroupKind(kind: ScheduleSliceKind): boolean {
   return kind === "batch_night" || kind === "virtual_span_day";
+}
+
+/**
+ * True when a proposal row can emit at least one calendar window.
+ */
+export function proposalHasSchedulableWindows(
+  row: ScheduleRowSliceContext & {
+    state: string;
+    scheduledStartAt?: string | null;
+    scheduledEndAt?: string | null;
+  },
+  slots: ScheduleSlotRow[],
+): boolean {
+  let scheduled: { startAt: string; endAt: string | null } | null = null;
+  let slotsForWindows = slots;
+
+  if (row.state === "resolved" || row.state === "archived") {
+    if (!(row.isBatchSleeping && slots.length > 0) && row.scheduledStartAt) {
+      scheduled = { startAt: row.scheduledStartAt, endAt: row.scheduledEndAt ?? null };
+    }
+    if (!row.isBatchSleeping) {
+      slotsForWindows = [];
+    }
+  } else if (row.state === "proposed") {
+    if (slots.length === 0 && row.scheduledStartAt) {
+      scheduled = { startAt: row.scheduledStartAt, endAt: row.scheduledEndAt ?? null };
+    }
+  }
+
+  return buildScheduleWindows(row, slotsForWindows, scheduled).length > 0;
 }
