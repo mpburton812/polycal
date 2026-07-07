@@ -31,6 +31,11 @@ function makeEvent(overrides: Partial<ScheduleEvent> = {}): ScheduleEvent {
     isPoll: false,
     isAllDay: false,
     slotLabel: null,
+    sliceKind: "standalone",
+    rootProposalId: "prop-1",
+    sliceKey: "prop-1",
+    slotId: null,
+    occurrenceProposalId: null,
     ...overrides,
   };
 }

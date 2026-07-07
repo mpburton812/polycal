@@ -2330,6 +2330,7 @@ export async function getProposalDetailAction(
       body: proposalComments.body,
       createdAt: proposalComments.createdAt,
       authorName: users.displayName,
+      sliceTag: proposalComments.sliceTag,
     })
     .from(proposalComments)
     .innerJoin(users, eq(proposalComments.authorId, users.id))
@@ -2482,6 +2483,7 @@ export async function getProposalDetailAction(
             authorName: comment.authorName,
             body: comment.body,
             createdAt: comment.createdAt,
+            sliceTag: comment.sliceTag ?? null,
           }))
         : [],
       stateLog: stateLogEntries,
@@ -3414,10 +3416,17 @@ export async function addProposalCommentAction(
     proposalId: parsed.data.proposalId,
     authorId: session.user.id,
     body: parsed.data.body,
+    sliceTag: parsed.data.sliceTag ?? null,
     createdAt: now,
   });
 
-  await logProposalTransition(db, parsed.data.proposalId, session.user.id, "proposal.comment_added");
+  await logProposalTransition(
+    db,
+    parsed.data.proposalId,
+    session.user.id,
+    "proposal.comment_added",
+    parsed.data.sliceTag ? JSON.stringify({ sliceTag: parsed.data.sliceTag }) : undefined,
+  );
   revalidatePath("/proposals");
 
   return { ok: true, message: "Comment added." };
