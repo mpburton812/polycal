@@ -8,6 +8,9 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- PC-98: Extracted proposal at-risk, vote reset, and state-log services from `_core.ts`.
+- PC-87: E2E passive-user journey (create passive, admin activate, first login).
+- PC-91: E2E notification inbox journey; extended `e2e/helpers/notifications.ts` with Accept/Dismiss/Clear helpers.
 - PC-86: E2E impersonation journey (dev bar + admin panel + audit log).
 - PC-88: E2E overlap/revoke acceptance journey (in-flight overlap warning, acknowledge, revoke).
 - PC-97: Adopted `requireSession` / `withDb` in schedule, impersonation, profile, and user provisioning actions.

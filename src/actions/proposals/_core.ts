@@ -70,6 +70,9 @@ import {
   applyPassiveInviteeAutoAccept,
   canManageSleepingAttendees,
 } from "@/lib/proposals/passive-auto-accept";
+import { enterAtRiskProposedState } from "@/lib/proposals/services/at-risk";
+import { logProposalTransition } from "@/lib/proposals/services/state-log";
+import { resetInviteeVotes, wipeProposalVotes } from "@/lib/proposals/services/votes";
 import { formatSleepingDisplayTitle } from "@/lib/proposals/sleeping-display";
 import {
   applyProposalMask,
@@ -364,26 +367,6 @@ function aggregateVoteFromSlotVotes(
   if (votes.some((v) => v === "accept")) return "accept";
   if (votes.some((v) => v === "accept_suboptimal")) return "accept_suboptimal";
   return "abstain";
-}
-
-/**
- * Appends an immutable state transition entry for proposal audit (PC-40).
- */
-async function logProposalTransition(
-  db: ReturnType<typeof getDb>,
-  proposalId: string,
-  actorUserId: string | null,
-  action: string,
-  details?: string,
-): Promise<void> {
-  await db.insert(proposalStateLog).values({
-    id: `psl-${randomUUID()}`,
-    proposalId,
-    actorUserId,
-    action,
-    details,
-    createdAt: new Date().toISOString(),
-  });
 }
 
 /** Notifies proposer and all invitees on a proposal (PC-40). */
@@ -775,73 +758,6 @@ function scheduleFromSlots(
   if (slots.length === 0) return { start: null, end: null };
   const sorted = [...slots].sort((a, b) => a.startAt.localeCompare(b.startAt));
   return { start: sorted[0].startAt, end: sorted[0].endAt };
-}
-
-async function resetInviteeVotes(db: ReturnType<typeof getDb>, proposalId: string): Promise<void> {
-  await wipeProposalVotes(db, proposalId);
-}
-
-/**
- * Flags a resolved proposal at-risk and returns it to proposed for re-approval (PC-48 / spec §9).
- */
-async function enterAtRiskProposedState(
-  db: ReturnType<typeof getDb>,
-  proposal: typeof proposals.$inferSelect,
-  actorUserId: string,
-  reason: string,
-): Promise<void> {
-  const enforcement = await loadEnforcementSettings(db);
-  const expiresAt = computeAtRiskExpiresAt(enforcement, proposal.scheduledStartAt);
-  const now = new Date().toISOString();
-
-  await db
-    .update(proposals)
-    .set({
-      state: "proposed",
-      atRisk: true,
-      atRiskExpiresAt: expiresAt,
-      updatedAt: now,
-    })
-    .where(eq(proposals.id, proposal.id));
-
-  await resetInviteeVotes(db, proposal.id);
-  await logProposalTransition(db, proposal.id, actorUserId, "proposal.at_risk", reason);
-
-  await notifyUser(
-    proposal.proposerId,
-    "proposal_at_risk",
-    `Proposal "${proposal.title}" is at risk. Cancel, re-draft, or update attendees.`,
-    { proposalId: proposal.id, action: "at_risk_options", proposalType: proposal.proposalType },
-  );
-
-  const invitees = await db
-    .select({ userId: proposalInvitees.userId })
-    .from(proposalInvitees)
-    .where(eq(proposalInvitees.proposalId, proposal.id));
-
-  for (const row of invitees) {
-    if (row.userId === proposal.proposerId) continue;
-    await notifyUser(
-      row.userId,
-      "proposal_at_risk",
-      `Proposal "${proposal.title}" is tentative/at risk on the calendar until re-approved.`,
-      { proposalId: proposal.id, action: "vote", proposalType: proposal.proposalType },
-    );
-  }
-}
-
-/** Clears invitee votes, slot matrix votes, and winning slot (PC-40). */
-async function wipeProposalVotes(db: ReturnType<typeof getDb>, proposalId: string): Promise<void> {
-  const now = new Date().toISOString();
-  await db
-    .update(proposalInvitees)
-    .set({ voteStatus: "not_seen", respondedAt: null, overlapAcknowledgedAt: null })
-    .where(eq(proposalInvitees.proposalId, proposalId));
-  await db.delete(proposalSlotVotes).where(eq(proposalSlotVotes.proposalId, proposalId));
-  await db
-    .update(proposals)
-    .set({ winningSlotId: null, updatedAt: now })
-    .where(eq(proposals.id, proposalId));
 }
 
 /**
