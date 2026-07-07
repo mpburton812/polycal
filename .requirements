@@ -144,3 +144,4 @@
 2026-07-07 | 3c3149e | PC-104 | week-1 remediation deliverables and backlog tooling | src/actions/profile.ts
 2026-07-07 | cb98e23 | PC-97 | UserRole typing for context helpers and exclude test files from build | src/actions/server-actions.auth.test.ts
 2026-07-07 | dac6836 | PC-75 | harden E2E routes, impersonation, avatars, headers | src/actions/admin.ts
+2026-07-07 | a8ba1c9 | PC-77 | refresh JWT sessionVersion after self-service password change | src/actions/profile.ts
