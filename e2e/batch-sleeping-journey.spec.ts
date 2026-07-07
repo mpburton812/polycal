@@ -28,7 +28,7 @@ test.describe("Batch sleeping journey", () => {
     await selectProposalTab(page, "Resolved");
     await expect(page.getByText(/Sleeping:/i).first()).toBeVisible({ timeout: 15_000 });
 
-    await advanceScheduleUntilEventVisible(page, /Sleeping:/i);
+    await advanceScheduleUntilEventVisible(page, /Sleeping:/i, { targetDateIso: rangeStart });
     await page.getByRole("button", { name: /Sleeping:/i }).first().click();
 
     await expect(page.getByRole("dialog").getByText("This night")).toBeVisible();

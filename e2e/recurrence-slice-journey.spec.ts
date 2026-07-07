@@ -24,12 +24,14 @@ test.describe("Recurrence slice chooser journey", () => {
       occurrenceCount: 3,
     });
 
-    await selectProposalTab(page, "Resolved");
+    await selectProposalTab(page, "Proposed");
     await expect(page.getByRole("heading", { name: new RegExp(`^${title}`), level: 2 }).first()).toBeVisible({
       timeout: 20_000,
     });
 
-    await advanceScheduleUntilEventVisible(page, new RegExp(title, "i"));
+    await advanceScheduleUntilEventVisible(page, new RegExp(title, "i"), {
+      targetDateIso: dateOffsetIso(35),
+    });
     await page.getByRole("button", { name: new RegExp(title, "i") }).first().click();
 
     await expect(page.getByRole("dialog").getByText("Recurring event")).toBeVisible();

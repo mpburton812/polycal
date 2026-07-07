@@ -27,7 +27,9 @@ test.describe("Multi-day event slice journey", () => {
       timeout: 15_000,
     });
 
-    await advanceScheduleUntilEventVisible(page, new RegExp(title, "i"));
+    await advanceScheduleUntilEventVisible(page, new RegExp(title, "i"), {
+      targetDateIso: startDate,
+    });
     await page.getByRole("button", { name: new RegExp(title, "i") }).first().click();
 
     await expect(page.getByRole("dialog").getByText("This day")).toBeVisible();
