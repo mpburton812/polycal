@@ -102,6 +102,8 @@ This enforces PR-only promotion at the platform level.
 | `dev` → `test` | Green CI on promotion PR | **Optional** — only when the request includes **`user test`** |
 | `test` → `production` | Full CI chain | **Mandatory** — run before opening or merging the production PR |
 
+Before production promotion, complete [SECURITY-CHECKLIST.md](./SECURITY-CHECKLIST.md) and document user journey pass status in the PR test plan.
+
 Examples:
 
 ```text

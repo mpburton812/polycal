@@ -1,29 +1,88 @@
 # Architecture — PolyCal
 
-High-level structure for the PolyCal monorepo (PWA on Vercel, TypeScript, Turso).
+High-level structure for the PolyCal PWA (Next.js on Vercel, TypeScript, Turso/libSQL).
 
-## Repository layout (target)
+## Repository layout
 
 ```
 polycal/
-├── app/                    # Next.js App Router (PWA)
-├── src/                    # Shared UI, lib, types
+├── app/                    # Next.js App Router (pages, API routes, layouts)
+├── src/
+│   ├── actions/            # Server actions (default mutation/read entry point)
+│   ├── components/         # React UI
+│   ├── lib/                # Domain logic, DB, auth, schedule, proposals
+│   └── types/              # Shared TypeScript types
+├── e2e/                    # Playwright specs (journey + regression)
 ├── scripts/                # Tooling (requirements, Jira sync, CI helpers)
-├── docs/                   # Architecture, workflow, ADRs
+├── docs/                   # Architecture, workflow, ADRs, security
 ├── .requirements           # Requirement delivery log (append-only)
-├── .gitlab-ci.yml          # Primary CI (GitLab-style workflow)
-└── .github/workflows/      # GitHub Actions (current remote)
+└── .github/workflows/      # Primary CI (GitHub Actions)
 ```
+
+GitLab CI (`.gitlab-ci.yml`) mirrors the same gates for alternate remotes; **GitHub Actions is the primary promotion path** for this project.
+
+## Layer model
+
+```
+app/  →  src/actions/  →  src/lib/  →  src/lib/db/
+         (thin facades)    (domain)     (Drizzle ORM)
+```
+
+| Layer | Responsibility |
+|-------|----------------|
+| `app/` | Routing, layouts, server components that call actions |
+| `src/actions/` | Auth/session checks, input validation (Zod), `revalidatePath` |
+| `src/lib/` | Business rules, proposal state machine, schedule slices, RBAC |
+| `src/lib/db/` | Schema, migrations, `getDb()` |
+
+### Server action vs API route
+
+Use an **API route** when the caller is external, binary streaming is required, or Auth.js/cron/SW callbacks need HTTP semantics. Otherwise use a **server action**.
+
+| Use API route | Use server action |
+|---------------|-------------------|
+| Auth.js (`/api/auth/*`) | Form mutations, reads from React |
+| Cron (`/api/cron/*`) | Proposal vote, schedule list, profile |
+| Avatar binary stream | Admin user CRUD |
+| E2E harness (`/api/e2e/*`, non-prod) | Notification inbox actions |
+| Build info (`/api/build-info`) | |
+
+Shared helpers: `src/lib/actions/context.ts` (`requireSession`, `requireAdminAccess`, `withDb`).
 
 ## Core systems
 
 | Layer | Technology |
 |-------|------------|
-| Frontend | Next.js PWA, Material UI, WCAG 2.1 AA |
-| Auth | Auth.js (NextAuth) credentials provider, HttpOnly JWT cookies |
+| Frontend | Next.js PWA, Material UI (Garden Brutalism tokens), WCAG 2.1 AA |
+| Auth | Auth.js credentials provider, HttpOnly JWT cookies, `sessionVersion` invalidation |
 | Database | libSQL — `file:local.db` (local), Turso (`polycal-dev` / `polycal-test` / `polycal-prod`) |
-| Hosting | Vercel |
+| Hosting | Vercel (+ Render cron for dev/test enforcement) |
 | Identity roles | Admin, User (active), Passive (schedulable, upgrade path to User) |
+
+## Admin capability matrix
+
+| Capability | `role === "admin"` | `userHasAdminAccess()` |
+|------------|-------------------|------------------------|
+| Admin tab / panel | Yes | Yes (includes delegated power-management) |
+| Pause/delete users | Yes | Yes |
+| Impersonation (non-prod) | Yes | Yes |
+| View masked proposal content as admin | Configurable via privacy flags | Same |
+
+Server actions that gate on admin use `userHasAdminAccess` so power-management delegates match UI visibility.
+
+## Proposal state machine (summary)
+
+```
+draft → proposed → resolved → archived
+         ↓           ↓
+      expired    at_risk / pending_recovery
+```
+
+Votes, overlap warnings, collision auto-decline, and enforcement TTLs are implemented in `src/lib/proposals/` and `src/actions/proposals/`. See `src/lib/proposals/enforcement.ts` for cron-driven transitions.
+
+## Schedule slice model (summary)
+
+Calendar events are **slices** derived from proposals (single-day, multi-day span, virtual span day, recurrence occurrence, sleeping batch). Authorization and masking live in `src/lib/schedule/slice-auth.ts`. Fetch windows: `src/lib/schedule/fetch-range.ts`.
 
 ## Requirements traceability
 
@@ -40,15 +99,30 @@ All planned work lives in **Jira (PC)**. Delivered work is logged in **`.require
 | Test | `test` | Turso `polycal-test` |
 | Production | `production` | Turso `polycal-prod` |
 
-Non-production seeding scripts must never run in production.
+Non-production seeding scripts must never run in production. Startup validation should reject `file:` URLs when `NEXT_PUBLIC_APP_ENV=production` (see [SECURITY-CHECKLIST.md](./SECURITY-CHECKLIST.md)).
 
 ## Security baseline
 
-- Deny-by-default authorization (RBAC: Admin, User, Passive)
+- Deny-by-default authorization (RBAC + proposal-level `viewerCanSeeProposal`)
 - Secrets via environment variables only
 - No session tokens in `localStorage` / `sessionStorage`
-- OWASP-aligned input validation
+- OWASP-aligned input validation (Zod on actions)
+- Production promotion checklist: [SECURITY-CHECKLIST.md](./SECURITY-CHECKLIST.md)
 
 ## ADRs
 
-Architecture Decision Records will be added under `docs/adr/` as significant decisions are made.
+| ADR | Topic |
+|-----|-------|
+| [ADR-001](./ADR-001-inline-migrations.md) | Inline migrations at startup |
+| `docs/adr/` | Future ADRs (next-auth beta, action vs API) |
+
+## Testing model
+
+| Layer | Tool | Location |
+|-------|------|----------|
+| Domain lib | Vitest | `src/lib/**/*.test.ts` |
+| Server actions | Vitest + mocked `auth()` | `src/actions/*.test.ts`, `src/lib/actions/test-harness.ts` |
+| User journeys | Playwright | `e2e/*journey*.spec.ts`, `e2e/mobile-smoke.spec.ts` |
+| CI E2E | Playwright (4 shards) | `.github/workflows/e2e.yml` |
+
+Journey inventory and gaps: [E2E-PARALLEL-JOURNEYS.md](./E2E-PARALLEL-JOURNEYS.md).

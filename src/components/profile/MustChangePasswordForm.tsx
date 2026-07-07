@@ -35,7 +35,12 @@ export function MustChangePasswordForm() {
         setError(result.error);
         return;
       }
-      await update({ user: { mustChangePassword: false } });
+      await update({
+        user: {
+          mustChangePassword: false,
+          sessionVersion: result.sessionVersion,
+        },
+      });
       router.refresh();
     });
   }

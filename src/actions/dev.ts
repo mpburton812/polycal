@@ -2,6 +2,7 @@
 
 import { userHasAdminAccess } from "@/lib/admin-access";
 import { signIn, auth } from "@/lib/auth";
+import { getImpersonationSecret } from "@/lib/auth/impersonation";
 import { isNonProductionEnvironment } from "@/lib/env";
 
 /**
@@ -17,7 +18,7 @@ export async function impersonateUser(userId: string): Promise<void> {
     throw new Error("Admin access required for impersonation.");
   }
 
-  const secret = process.env.AUTH_IMPERSONATION_SECRET ?? process.env.AUTH_SECRET;
+  const secret = getImpersonationSecret();
   if (!secret) {
     throw new Error("Impersonation is not configured on this server.");
   }

@@ -1,12 +1,13 @@
 import { NextResponse } from "next/server";
 
+import { isE2eApiAuthorized } from "@/lib/e2e-api";
 import { resetTestDatabase } from "@/lib/seed/reset-test-database";
 
 /**
  * Resets the isolated E2E database — only enabled when E2E_TEST_MODE=1 (Playwright).
  */
-export async function POST(): Promise<NextResponse> {
-  if (process.env.E2E_TEST_MODE !== "1") {
+export async function POST(request: Request): Promise<NextResponse> {
+  if (!isE2eApiAuthorized(request)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 

@@ -12,6 +12,7 @@ declare module "next-auth" {
       displayName: string;
       avatarKey?: string;
       theme?: string;
+      sessionVersion?: number;
     } & DefaultSession["user"];
   }
 

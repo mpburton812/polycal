@@ -116,7 +116,12 @@ export function ProfileSettings({
       setPasswordMessage("Password updated.");
       event.currentTarget.reset();
       if (mustChangePassword) {
-        await update({ user: { mustChangePassword: false } });
+        await update({
+          user: {
+            mustChangePassword: false,
+            sessionVersion: result.sessionVersion,
+          },
+        });
       }
       router.refresh();
     });

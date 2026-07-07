@@ -1,6 +1,7 @@
 /// <reference lib="webworker" />
 
 import { defaultCache } from "@serwist/next/worker";
+import { NetworkOnly } from "serwist";
 
 import type { PrecacheEntry, SerwistGlobalConfig } from "serwist";
 
@@ -34,7 +35,13 @@ const serwist = new Serwist({
 
   navigationPreload: true,
 
-  runtimeCaching: defaultCache,
+  runtimeCaching: [
+    {
+      matcher: ({ url }) => url.pathname.startsWith("/api/"),
+      handler: new NetworkOnly(),
+    },
+    ...defaultCache,
+  ],
 
 });
 
