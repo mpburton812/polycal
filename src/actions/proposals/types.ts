@@ -71,6 +71,7 @@ export interface ProposalInviteeView {
   displayName: string;
   role: InviteeRole;
   voteStatus: InviteeVoteStatus;
+  viewedAt: string | null;
 }
 
 export interface ProposalTimeSlotView {

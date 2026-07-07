@@ -66,23 +66,12 @@ import {
   typeChipSx,
 } from "./proposalCardTheme";
 import { formatProposalLogLine } from "@/lib/proposals/state-log-format";
+import {
+  inviteeDisplayLabel,
+  inviteeVoteLabel,
+} from "@/lib/proposals/invitee-display-status";
 import { isoToSleepingDateInput, sleepingDateToStartIso } from "@/lib/proposals/sleeping-schedule";
 import { GARDEN_TOKENS } from "@/theme/tokens";
-
-const VOTE_STATUS_LABELS: Record<InviteeVoteStatus, string> = {
-  not_seen: "Not yet viewed",
-  accept: "Accepted",
-  abstain: "Abstained",
-  decline: "Declined",
-  accept_suboptimal: "Accepted sub-optimal",
-};
-
-function voteLabel(status: InviteeVoteStatus | string): string {
-  if (status in VOTE_STATUS_LABELS) {
-    return VOTE_STATUS_LABELS[status as InviteeVoteStatus];
-  }
-  return status.replaceAll("_", " ");
-}
 
 /** Readable poll slot label + time on separate lines (PC-49). */
 function PollSlotTimeCell({
@@ -702,7 +691,7 @@ export function ProposalDetailDialog({
                               <TableCell sx={{ verticalAlign: "top" }}>
                                 <Chip
                                   size="small"
-                                  label={viewerVote ? voteLabel(viewerVote) : "—"}
+                                  label={viewerVote ? inviteeVoteLabel(viewerVote) : "—"}
                                   variant="outlined"
                                 />
                               </TableCell>
@@ -742,7 +731,7 @@ export function ProposalDetailDialog({
                                 );
                                 return (
                                   <TableCell key={slot.id}>
-                                    {vote ? voteLabel(vote.voteStatus) : "—"}
+                                    {vote ? inviteeVoteLabel(vote.voteStatus) : "—"}
                                   </TableCell>
                                 );
                               })}
@@ -766,7 +755,10 @@ export function ProposalDetailDialog({
                     <Stack key={invitee.userId} direction="row" spacing={1} alignItems="center">
                       <Typography variant="body2">{invitee.displayName}</Typography>
                       <Chip size="small" label={invitee.role} variant="outlined" />
-                      <Chip size="small" label={voteLabel(invitee.voteStatus)} />
+                      <Chip
+                        size="small"
+                        label={inviteeDisplayLabel(invitee.voteStatus, invitee.viewedAt)}
+                      />
                       {detail.canManageAttendees && (
                         <Button
                           size="small"
