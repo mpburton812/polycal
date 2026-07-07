@@ -181,6 +181,7 @@ export async function changePasswordAction(
     .set({
       passwordHash,
       mustChangePassword: false,
+      sessionVersion: row.sessionVersion + 1,
       updatedAt: now,
     })
     .where(eq(users.id, session.user.id));
@@ -525,6 +526,7 @@ export async function setInitialPasswordAction(
     .set({
       passwordHash,
       mustChangePassword: false,
+      sessionVersion: row.sessionVersion + 1,
       updatedAt: now,
     })
     .where(eq(users.id, session.user.id));
