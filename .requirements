@@ -146,3 +146,4 @@
 2026-07-07 | dac6836 | PC-75 | harden E2E routes, impersonation, avatars, headers | src/actions/admin.ts
 2026-07-07 | a8ba1c9 | PC-77 | refresh JWT sessionVersion after self-service password change | src/actions/profile.ts
 2026-07-07 | 2b0b585 | PC-86 | Sprint A E2E journeys and action context adoption | src/actions/admin.ts
+2026-07-07 | 8884a63 | PC-98 | Sprint B services split and E2E journeys | src/actions/proposals/_core.ts
