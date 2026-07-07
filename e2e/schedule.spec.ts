@@ -59,6 +59,18 @@ test.describe("Schedule calendar", () => {
     await expect(page.getByRole("button", { name: "Month" })).toHaveAttribute("aria-pressed", "true");
     await expect(page.getByText("Mon", { exact: true })).toBeVisible();
 
+    const rangeStart = await page.getByTestId("schedule-range-start").getAttribute("data-value");
+    const rangeEnd = await page.getByTestId("schedule-range-end").getAttribute("data-value");
+    expect(rangeStart).toBeTruthy();
+    expect(rangeEnd).toBeTruthy();
+    const daySpan =
+      (new Date(rangeEnd!).getTime() - new Date(rangeStart!).getTime()) / (24 * 60 * 60 * 1000);
+    expect(daySpan).toBeGreaterThanOrEqual(34);
+
+    await expect(
+      page.getByRole("button", { name: /Yavin 4 victory celebration/i }).first(),
+    ).toBeVisible({ timeout: 15_000 });
+
     const moreLink = page.getByRole("button", { name: /\+\d+ more/i }).first();
     if (await moreLink.isVisible().catch(() => false)) {
       await moreLink.click();

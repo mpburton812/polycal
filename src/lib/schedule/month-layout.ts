@@ -53,7 +53,7 @@ export interface MonthViewLayout {
   maxChipsPerDay: number;
 }
 
-const MAX_CHIPS_PER_DAY = 2;
+const MAX_ICONS_PER_DAY = 5;
 
 /**
  * Lower priority number = shown first when space is limited.
@@ -283,7 +283,7 @@ export function buildMonthLayout(
       const sortedSingles = [...singleDayEvents].sort(
         (a, b) => eventDisplayPriority(a) - eventDisplayPriority(b),
       );
-      const visibleSingles = sortedSingles.slice(0, MAX_CHIPS_PER_DAY);
+      const visibleSingles = sortedSingles.slice(0, MAX_ICONS_PER_DAY);
       const hiddenSingles = sortedSingles.length - visibleSingles.length;
       const spanHidden = spanOverflowByDay.get(dayIndex) ?? 0;
 
@@ -320,6 +320,6 @@ export function buildMonthLayout(
   return {
     weeks,
     maxSpanLanes: maxSpanLanes,
-    maxChipsPerDay: MAX_CHIPS_PER_DAY,
+    maxChipsPerDay: MAX_ICONS_PER_DAY,
   };
 }
