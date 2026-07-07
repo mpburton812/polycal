@@ -15,6 +15,7 @@ import { AVATAR_OPTIONS, isCustomAvatarKey, type AvatarKey } from "@/lib/constan
 import { getDb } from "@/lib/db/client";
 import { ensureDbReady } from "@/lib/db/ensure-ready";
 import { storedImages, users } from "@/lib/db/schema";
+import { checkRateLimit } from "@/lib/rate-limit";
 import {
   DEFAULT_NOTIFICATION_PREFS,
   parseNotificationPrefs,
@@ -391,6 +392,10 @@ export async function updateNotificationEmailAction(
     return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid email." };
   }
 
+  if (!checkRateLimit(`notification-email:${session.user.id}`, 5, 60_000)) {
+    return { ok: false, error: "Too many verification requests. Try again in a minute." };
+  }
+
   await ensureDbReady();
   const db = getDb();
   const token = `ev-${randomUUID()}`;
@@ -414,7 +419,7 @@ export async function updateNotificationEmailAction(
   await logUserActivity(
     session.user.id,
     "profile.notification_email_pending",
-    JSON.stringify({ email: parsed.data, verificationUrl }),
+    JSON.stringify({ email: parsed.data }),
   );
 
   try {
@@ -427,7 +432,7 @@ export async function updateNotificationEmailAction(
       await logUserActivity(
         session.user.id,
         "profile.notification_email_dev_link",
-        JSON.stringify({ verificationUrl }),
+        JSON.stringify({ email: parsed.data, verificationPending: true }),
       );
     }
   } catch (error) {
@@ -436,7 +441,7 @@ export async function updateNotificationEmailAction(
       "profile.notification_email_send_failed",
       JSON.stringify({
         error: error instanceof Error ? error.message : "send failed",
-        verificationUrl,
+        email: parsed.data,
       }),
       "error",
     );

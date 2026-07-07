@@ -102,3 +102,26 @@ export function getBuildInfo(): BuildInfo {
     environment: getAppEnvironment(),
   };
 }
+
+/**
+ * Validates database URL against deployment tier at startup (PC-82).
+ * Production must never use a local `file:` database.
+ */
+export function validateDeploymentDatabaseConfig(): void {
+  const environment = getAppEnvironment();
+  const databaseUrl = process.env.TURSO_DATABASE_URL?.trim() ?? "";
+
+  if (environment === "production" && databaseUrl.startsWith("file:")) {
+    throw new Error("Production deployments must not use a file: database URL.");
+  }
+
+  if (databaseUrl.includes("polycal-prod") || environment === "production") {
+    console.info("[polycal] Database tier: production");
+  } else if (databaseUrl.includes("polycal-test") || environment === "test") {
+    console.info("[polycal] Database tier: test");
+  } else if (databaseUrl.includes("polycal-dev") || environment === "dev") {
+    console.info("[polycal] Database tier: dev");
+  } else if (databaseUrl.startsWith("file:")) {
+    console.info("[polycal] Database tier: local file");
+  }
+}
