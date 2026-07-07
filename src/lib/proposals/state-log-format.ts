@@ -1,4 +1,5 @@
 import { formatActivityLogDetails } from "@/lib/audit/activity-log-display";
+import { inviteeVoteLabel } from "@/lib/proposals/invitee-display-status";
 
 export interface ProposalLogEntry {
   action: string;
@@ -6,14 +7,6 @@ export interface ProposalLogEntry {
   details: string | null;
   createdAt: string;
 }
-
-const VOTE_LABELS: Record<string, string> = {
-  accept: "Accepted",
-  accept_suboptimal: "Accepted sub-optimal",
-  abstain: "Abstained",
-  decline: "Declined",
-  not_seen: "Not seen",
-};
 
 /**
  * Human-readable activity log line for proposal detail (PC-53, PC-59).
@@ -42,7 +35,7 @@ function formatActionLabel(action: string): string {
 }
 
 function formatVoteLabel(vote: string): string {
-  return VOTE_LABELS[vote] ?? vote.replaceAll("_", " ");
+  return inviteeVoteLabel(vote);
 }
 
 function formatProposalLogDetails(entry: ProposalLogEntry): string {

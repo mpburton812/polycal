@@ -225,6 +225,8 @@ export const proposalInvitees = sqliteTable(
       .notNull()
       .default("not_seen"),
     respondedAt: text("responded_at"),
+    /** ISO timestamp when invitee first opened proposal detail (PC-76). */
+    viewedAt: text("viewed_at"),
     overlapAcknowledgedAt: text("overlap_acknowledged_at"),
     createdAt: text("created_at").notNull(),
   },
