@@ -49,6 +49,18 @@ coverage/
 playwright-report/
 test-results/
 
+# Agent / CI scratch logs (never commit)
+e2e-*.txt
+pr*-*.txt
+created_requirements.md
+working requirements*.md
+working requirements*.txt
+user stories.txt
+final dev launch requirements.txt
+
+# Workflow template export (optional local copy; use separate repo for distribution)
+template/
+
 # Template bootstrap scratch / export zip
 _template-test-out/
 workflow-starter-template.zip

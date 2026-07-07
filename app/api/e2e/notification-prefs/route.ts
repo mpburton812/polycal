@@ -4,12 +4,13 @@ import { NextResponse } from "next/server";
 import { getDb } from "@/lib/db/client";
 import { ensureDbReady } from "@/lib/db/ensure-ready";
 import { users } from "@/lib/db/schema";
+import { isE2eApiAuthorized } from "@/lib/e2e-api";
 
 /**
  * Sets notification_prefs_json for a user by username — E2E only (legacy migration journeys).
  */
 export async function POST(request: Request): Promise<NextResponse> {
-  if (process.env.E2E_TEST_MODE !== "1") {
+  if (!isE2eApiAuthorized(request)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 

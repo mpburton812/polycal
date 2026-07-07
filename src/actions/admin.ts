@@ -7,6 +7,7 @@ import { auth } from "@/lib/auth";
 import { logUserActivity } from "@/lib/audit";
 import { formatActivityLogDetails } from "@/lib/audit/activity-log-display";
 import { userHasAdminAccess } from "@/lib/admin-access";
+import { getImpersonationSecret } from "@/lib/auth/impersonation";
 import { ensureDbReady } from "@/lib/db/ensure-ready";
 import { getAppEnvironment, isNonProductionEnvironment } from "@/lib/env";
 import { getDb } from "@/lib/db/client";
@@ -90,7 +91,7 @@ export async function adminImpersonateUserAction(userId: string): Promise<AdminA
     return { ok: false, message: "You are already signed in as this user." };
   }
 
-  const secret = process.env.AUTH_IMPERSONATION_SECRET ?? process.env.AUTH_SECRET;
+  const secret = getImpersonationSecret();
   if (!secret) {
     return { ok: false, message: "Impersonation is not configured on this server." };
   }

@@ -1,4 +1,5 @@
 import { edgeAuth } from "@/lib/auth-edge";
+import { isE2eApiAuthorized } from "@/lib/e2e-api";
 
 /**
  * Edge middleware — redirects unauthenticated users and paused accounts (PC-59 security).
@@ -7,7 +8,14 @@ export default edgeAuth((request) => {
   const { pathname } = request.nextUrl;
   const session = request.auth;
 
-  const publicPaths = ["/login", "/paused", "/offline", "/api/auth", "/api/e2e", "/api/cron"];
+  if (pathname === "/api/e2e" || pathname.startsWith("/api/e2e/")) {
+    if (!isE2eApiAuthorized(request)) {
+      return Response.json({ error: "Forbidden" }, { status: 403 });
+    }
+    return undefined;
+  }
+
+  const publicPaths = ["/login", "/paused", "/offline", "/api/auth", "/api/cron"];
   const isPublic =
     publicPaths.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)) ||
     pathname.startsWith("/api/verify-email");

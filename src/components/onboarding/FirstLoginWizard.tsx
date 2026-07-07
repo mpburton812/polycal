@@ -86,7 +86,12 @@ export function FirstLoginWizard({
         setError(result.error);
         return;
       }
-      await update({ user: { mustChangePassword: false } });
+      await update({
+        user: {
+          mustChangePassword: false,
+          sessionVersion: result.sessionVersion,
+        },
+      });
       setActiveStep(1);
       router.refresh();
     });

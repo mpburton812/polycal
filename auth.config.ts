@@ -37,6 +37,9 @@ export const authConfig = {
         token.displayName = session.user.displayName ?? token.displayName;
         if (session.user.avatarKey) token.avatarKey = session.user.avatarKey;
         if (session.user.theme) token.theme = session.user.theme;
+        if (typeof session.user.sessionVersion === "number") {
+          token.sessionVersion = session.user.sessionVersion;
+        }
       }
 
       if (token.id) {

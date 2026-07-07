@@ -5,6 +5,7 @@ import { logUserActivity } from "@/lib/audit";
 import { getDb } from "@/lib/db/client";
 import { ensureDbReady } from "@/lib/db/ensure-ready";
 import { users } from "@/lib/db/schema";
+import { checkRateLimit } from "@/lib/rate-limit";
 
 /**
  * Verifies a notification email address from the link sent on profile update (PC-43).
@@ -16,6 +17,13 @@ export async function GET(request: Request) {
     return NextResponse.json({ ok: false, message: "Missing token." }, { status: 400 });
   }
 
+  const clientIp =
+    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
+    request.headers.get("x-real-ip") ??
+    "unknown";
+  if (!checkRateLimit(`verify-email:${clientIp}`, 20, 60_000)) {
+    return NextResponse.json({ ok: false, message: "Too many requests." }, { status: 429 });
+  }
   await ensureDbReady();
   const db = getDb();
   const [row] = await db
