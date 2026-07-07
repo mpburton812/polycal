@@ -2,14 +2,11 @@ import { expect, test } from "./helpers/test";
 
 import { loginWithOnboardingIfNeeded } from "./helpers/auth";
 import { USERS } from "./helpers/constants";
-import { advanceScheduleUntilEventVisible, clearScheduleViewState, dateOffsetIso } from "./helpers/schedule";
+import { advanceScheduleUntilEventVisible, dateOffsetIso } from "./helpers/schedule";
 import { createAndSubmitRecurringEventForEveryone } from "./helpers/proposals";
 import { goToProposals, selectProposalTab } from "./helpers/navigation";
 
 test.describe("Recurrence slice chooser journey", () => {
-  test.beforeEach(async ({ page }) => {
-    await clearScheduleViewState(page);
-  });
   test("schedule tap offers occurrence vs series chooser", async ({ page }) => {
     test.setTimeout(240_000);
 

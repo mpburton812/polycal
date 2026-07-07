@@ -4,17 +4,12 @@ import { loginWithOnboardingIfNeeded } from "./helpers/auth";
 import { USERS } from "./helpers/constants";
 import {
   advanceScheduleUntilEventVisible,
-  clearScheduleViewState,
   dateOffsetIso,
 } from "./helpers/schedule";
 import { createAndSubmitSoloSleepingWeek } from "./helpers/proposals";
 import { goToProposals, selectProposalTab } from "./helpers/navigation";
 
 test.describe("Batch sleeping slice journey", () => {
-  test.beforeEach(async ({ page }) => {
-    await clearScheduleViewState(page);
-  });
-
   test("resolved batch night opens slice detail on schedule", async ({ page }) => {
     test.setTimeout(240_000);
 

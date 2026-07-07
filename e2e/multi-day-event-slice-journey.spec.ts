@@ -4,17 +4,12 @@ import { loginWithOnboardingIfNeeded } from "./helpers/auth";
 import { USERS } from "./helpers/constants";
 import {
   advanceScheduleUntilEventVisible,
-  clearScheduleViewState,
   createAndSubmitAllDaySpan,
   dateOffsetIso,
 } from "./helpers/schedule";
 import { goToProposals, selectProposalTab } from "./helpers/navigation";
 
 test.describe("Multi-day event slice journey", () => {
-  test.beforeEach(async ({ page }) => {
-    await clearScheduleViewState(page);
-  });
-
   test("resolved all-day span day opens slice detail on schedule", async ({ page }) => {
     test.setTimeout(240_000);
 

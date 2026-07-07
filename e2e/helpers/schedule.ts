@@ -16,9 +16,13 @@ export function dateOffsetIso(daysFromToday: number): string {
 
 /** Resets persisted schedule layout/filter state so navigation tests start from week view. */
 export async function clearScheduleViewState(page: Page): Promise<void> {
-  await page.evaluate((storageKey) => {
-    window.localStorage.removeItem(storageKey);
-  }, SCHEDULE_VIEW_STORAGE_KEY);
+  try {
+    await page.evaluate((storageKey) => {
+      window.localStorage.removeItem(storageKey);
+    }, SCHEDULE_VIEW_STORAGE_KEY);
+  } catch {
+    // Ignore when the page has no storage access yet (e.g. about:blank before login).
+  }
 }
 
 function parseIsoDate(isoDate: string): Date {
@@ -110,6 +114,7 @@ export async function advanceScheduleUntilEventVisible(
   options?: { targetDateIso?: string },
 ): Promise<void> {
   await goToSchedule(page);
+  await clearScheduleViewState(page);
   await forceWeekLayout(page);
   await waitForScheduleReady(page);
 
