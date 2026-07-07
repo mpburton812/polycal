@@ -2,10 +2,11 @@ import { auth } from "@/lib/auth";
 import { userHasAdminAccess } from "@/lib/admin-access";
 import { getDb } from "@/lib/db/client";
 import { ensureDbReady } from "@/lib/db/ensure-ready";
+import type { UserRole } from "@/types/user";
 
 export interface SessionUser {
   id: string;
-  role: string;
+  role: UserRole;
 }
 
 export type ActionContextError = { ok: false; message: string };
@@ -21,7 +22,7 @@ export async function requireSession():
   }
   return {
     ok: true,
-    user: { id: session.user.id, role: session.user.role },
+    user: { id: session.user.id, role: session.user.role as UserRole },
   };
 }
 

@@ -12,17 +12,17 @@ vi.mock("@/lib/db/client", () => ({
   getDb: vi.fn(),
 }));
 
+import { auth } from "@/lib/auth";
 import { castProposalVoteAction } from "@/actions/proposals";
 import { listScheduleEventsAction } from "@/actions/schedule";
-import { mockAuthSession, resetAuthMock } from "@/lib/actions/test-harness";
 
 describe("server action auth guards", () => {
   beforeEach(() => {
-    resetAuthMock();
+    vi.mocked(auth).mockReset();
   });
 
   it("listScheduleEventsAction requires sign-in", async () => {
-    mockAuthSession(null);
+    vi.mocked(auth).mockResolvedValue(null);
     const result = await listScheduleEventsAction({
       rangeStart: "2099-01-01T00:00:00.000Z",
       rangeEnd: "2099-01-31T23:59:59.999Z",
@@ -33,7 +33,7 @@ describe("server action auth guards", () => {
   });
 
   it("castProposalVoteAction requires sign-in", async () => {
-    mockAuthSession(null);
+    vi.mocked(auth).mockResolvedValue(null);
     const result = await castProposalVoteAction({
       proposalId: "00000000-0000-0000-0000-000000000001",
       vote: "accept",
