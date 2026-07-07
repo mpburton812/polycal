@@ -15,14 +15,12 @@ import {
   ToggleButtonGroup,
   Typography,
 } from "@mui/material";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 
-import { getProposalDetailAction } from "@/actions/proposals";
 import type { ProposalPlaceOption } from "@/actions/proposals";
 import {
   listScheduleEventsAction,
-  type ScheduleEvent,
   type ScheduleFilterMode,
   type SchedulePayload,
 } from "@/actions/schedule";
@@ -38,9 +36,9 @@ import {
   saveScheduleViewState,
   type ScheduleViewState,
 } from "@/components/schedule/scheduleViewState";
+import { useScheduleTapRouter } from "@/components/schedule/useScheduleTapRouter";
 import { ProposalDetailDialog } from "@/components/proposals/ProposalDetailDialog";
 import { ProposalDraftDialog } from "@/components/proposals/ProposalDraftDialog";
-import type { ProposalDetail } from "@/actions/proposals";
 import { filterScheduleEvents } from "@/lib/schedule/filters";
 import {
   addDays,
@@ -72,10 +70,10 @@ export function ScheduleClient({
   acceptedPartnerIds,
   timeZone,
 }: ScheduleClientProps) {
-  const router = useRouter();
   const pathname = usePathname();
   const previousPathRef = useRef<string | null>(null);
   const initialPayloadHydratedRef = useRef(false);
+  const refreshSeqRef = useRef(0);
   const [viewState, setViewState] = useState<ScheduleViewState>(() => ({
     ...loadScheduleViewState(),
     weekStartIso: initialWeekStartIso,
@@ -83,18 +81,17 @@ export function ScheduleClient({
   }));
   const [payload, setPayload] = useState<SchedulePayload>(initialPayload);
   const [pending, startTransition] = useTransition();
-  const [selectedProposalId, setSelectedProposalId] = useState<string | null>(null);
-  const [detailOpen, setDetailOpen] = useState(false);
-  const [sliceOpen, setSliceOpen] = useState(false);
-  const [sliceContext, setSliceContext] = useState<{
-    rootProposalId: string;
-    sliceKind: "batch_night" | "virtual_span_day";
-    sliceKey: string;
-  } | null>(null);
-  const [chooserOpen, setChooserOpen] = useState(false);
-  const [chooserEvent, setChooserEvent] = useState<ScheduleEvent | null>(null);
-  const [editDetail, setEditDetail] = useState<ProposalDetail | null>(null);
-  const [draftOpen, setDraftOpen] = useState(false);
+  const {
+    state: dialogState,
+    openScheduleEvent,
+    closeDetail,
+    closeSlice,
+    closeChooser,
+    closeDraft,
+    handleEditFromDetail,
+    openRelatedProposal,
+    openDetachedProposal,
+  } = useScheduleTapRouter();
 
   const weekStart = useMemo(
     () => startOfWeekMonday(new Date(viewState.weekStartIso)),
@@ -145,16 +142,22 @@ export function ScheduleClient({
           : endOfWeekSunday(startOfWeekMonday(anchorDate));
       if (!isMonthLayout && viewState.compact) end.setHours(23, 59, 59, 999);
 
+      const seq = ++refreshSeqRef.current;
       startTransition(async () => {
         const result = await listScheduleEventsAction({
           rangeStart: monday.toISOString(),
           rangeEnd: end.toISOString(),
         });
+        if (seq !== refreshSeqRef.current) return;
         if (result.ok) setPayload(result.payload);
       });
     },
     [isMonthLayout, viewState.compact],
   );
+
+  const refreshCurrentView = useCallback(() => {
+    refreshSchedule(isMonthLayout ? monthAnchor : weekStart);
+  }, [isMonthLayout, monthAnchor, refreshSchedule, weekStart]);
 
   useEffect(() => {
     saveScheduleViewState(viewState);
@@ -208,6 +211,11 @@ export function ScheduleClient({
     ],
   );
 
+  const eventIdsOnCalendar = useMemo(
+    () => new Set(filteredEvents.map((event) => event.proposalId)),
+    [filteredEvents],
+  );
+
   function shiftPeriod(delta: number) {
     if (isMonthLayout) {
       const next = new Date(monthAnchor);
@@ -223,41 +231,6 @@ export function ScheduleClient({
     refreshSchedule(next);
   }
 
-  function goToToday() {
-    const today = startOfWeekMonday(new Date());
-    setViewState((current) => ({
-      ...current,
-      weekStartIso: today.toISOString(),
-      monthAnchorIso: today.toISOString(),
-    }));
-    refreshSchedule(today);
-  }
-
-  function openProposal(proposalId: string) {
-    setSelectedProposalId(proposalId);
-    setDetailOpen(true);
-  }
-
-  function openScheduleEvent(event: ScheduleEvent) {
-    if (event.sliceKind === "recurrence_occurrence" && event.occurrenceProposalId) {
-      setChooserEvent(event);
-      setChooserOpen(true);
-      return;
-    }
-
-    if (event.sliceKind === "batch_night" || event.sliceKind === "virtual_span_day") {
-      setSliceContext({
-        rootProposalId: event.rootProposalId,
-        sliceKind: event.sliceKind,
-        sliceKey: event.sliceKey,
-      });
-      setSliceOpen(true);
-      return;
-    }
-
-    openProposal(event.occurrenceProposalId ?? event.proposalId);
-  }
-
   function handleMonthDayClick(day: Date) {
     const monday = startOfWeekMonday(day);
     setViewState((current) => ({
@@ -269,14 +242,24 @@ export function ScheduleClient({
     refreshSchedule(monday);
   }
 
-  function handleEditFromDetail(detail: ProposalDetail) {
-    setDetailOpen(false);
-    setEditDetail(detail);
-    setDraftOpen(true);
-  }
-
   return (
-    <Box sx={{ pb: 2 }}>
+    <Box
+      sx={{ pb: 2 }}
+      data-testid="schedule-ready"
+      data-ready={pending ? "false" : "true"}
+      data-range-start={rangeStart.toISOString()}
+      data-range-end={rangeEnd.toISOString()}
+    >
+      <Box
+        sx={{ display: "none" }}
+        data-testid="schedule-range-start"
+        data-value={rangeStart.toISOString()}
+      />
+      <Box
+        sx={{ display: "none" }}
+        data-testid="schedule-range-end"
+        data-value={rangeEnd.toISOString()}
+      />
       <Box
         sx={{
           position: "sticky",
@@ -337,11 +320,13 @@ export function ScheduleClient({
                 const monday = startOfWeekMonday(weekStart);
                 const end = compact ? addDays(monday, 13) : endOfWeekSunday(monday);
                 if (compact) end.setHours(23, 59, 59, 999);
+                const seq = ++refreshSeqRef.current;
                 startTransition(async () => {
                   const result = await listScheduleEventsAction({
                     rangeStart: monday.toISOString(),
                     rangeEnd: end.toISOString(),
                   });
+                  if (seq !== refreshSeqRef.current) return;
                   if (result.ok) setPayload(result.payload);
                 });
               }}
@@ -474,81 +459,72 @@ export function ScheduleClient({
       <PlanningModeDrawer
         open={viewState.planningOpen}
         items={payload.planningItems}
+        eventIdsOnCalendar={eventIdsOnCalendar}
         onClose={() => setViewState((current) => ({ ...current, planningOpen: false }))}
         onSelect={(id) => {
-          openProposal(id);
+          openRelatedProposal(id);
           setViewState((current) => ({ ...current, planningOpen: false }));
         }}
       />
 
       <SeriesOccurrenceChooserDialog
-        open={chooserOpen}
-        title={chooserEvent?.title ?? "Recurring event"}
-        onClose={() => {
-          setChooserOpen(false);
-          setChooserEvent(null);
-        }}
+        open={dialogState.chooserOpen}
+        title={dialogState.chooserEvent?.title ?? "Recurring event"}
+        onClose={closeChooser}
         onViewOccurrence={() => {
-          const occurrenceId = chooserEvent?.occurrenceProposalId ?? chooserEvent?.proposalId;
-          setChooserOpen(false);
-          setChooserEvent(null);
-          if (occurrenceId) openProposal(occurrenceId);
+          const occurrenceId =
+            dialogState.chooserEvent?.occurrenceProposalId ?? dialogState.chooserEvent?.proposalId;
+          closeChooser();
+          if (occurrenceId) openRelatedProposal(occurrenceId);
         }}
         onViewSeries={() => {
-          const seriesId = chooserEvent?.rootProposalId;
-          setChooserOpen(false);
-          setChooserEvent(null);
-          if (seriesId) openProposal(seriesId);
+          const seriesId = dialogState.chooserEvent?.rootProposalId;
+          closeChooser();
+          if (seriesId) openRelatedProposal(seriesId);
         }}
       />
 
       <SliceDetailDialog
-        open={sliceOpen}
-        rootProposalId={sliceContext?.rootProposalId ?? null}
-        sliceKind={sliceContext?.sliceKind ?? null}
-        sliceKey={sliceContext?.sliceKey ?? null}
+        open={dialogState.sliceOpen}
+        rootProposalId={dialogState.sliceContext?.rootProposalId ?? null}
+        sliceKind={dialogState.sliceContext?.sliceKind ?? null}
+        sliceKey={dialogState.sliceContext?.sliceKey ?? null}
         timeZone={timeZone}
         onClose={() => {
-          setSliceOpen(false);
-          setSliceContext(null);
-          refreshSchedule(isMonthLayout ? monthAnchor : weekStart);
+          closeSlice();
+          refreshCurrentView();
         }}
         onViewParent={(parentId) => {
-          setSliceOpen(false);
-          setSliceContext(null);
-          openProposal(parentId);
+          closeSlice();
+          openRelatedProposal(parentId);
         }}
         onDetached={(newProposalId) => {
-          openProposal(newProposalId);
+          openDetachedProposal(newProposalId);
         }}
       />
 
       <ProposalDetailDialog
-        proposalId={selectedProposalId}
-        open={detailOpen}
+        proposalId={dialogState.selectedProposalId}
+        open={dialogState.detailOpen}
         onClose={() => {
-          setDetailOpen(false);
-          setSelectedProposalId(null);
-          refreshSchedule(isMonthLayout ? monthAnchor : weekStart);
+          closeDetail();
+          refreshCurrentView();
         }}
         onEdit={handleEditFromDetail}
         people={people}
-        onOpenRelatedProposal={(id) => {
-          setSelectedProposalId(id);
-        }}
+        onOpenRelatedProposal={openRelatedProposal}
       />
 
       <ProposalDraftDialog
-        open={draftOpen}
+        open={dialogState.draftOpen}
         onClose={() => {
-          setDraftOpen(false);
-          setEditDetail(null);
-          refreshSchedule(isMonthLayout ? monthAnchor : weekStart);
+          closeDraft();
+          refreshCurrentView();
         }}
         people={people}
         places={places}
         currentUserId={currentUserId}
-        initialDetail={editDetail}
+        initialDetail={dialogState.editDetail}
       />
     </Box>
   );
