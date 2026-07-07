@@ -133,3 +133,4 @@
 2026-07-06 | d06faaa | PC-55 | use exact Mon match to avoid Month button collision | e2e/schedule.spec.ts
 2026-07-06 | b18c8ee | PC-74 | schedule slices with sliceTag comments and detach | src/actions/proposals.ts
 2026-07-06 | 4a8f751 | PC-74 | fix schedule slice journey navigation and setup | e2e/batch-sleeping-journey.spec.ts
+2026-07-06 | 4e57e4a | PC-74 | use week navigation and title locators for slice journeys | e2e/helpers/schedule.ts
