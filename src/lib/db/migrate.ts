@@ -4,7 +4,7 @@ import { applyPeoplePlacesMigrations } from "./people-places-migrations";
 import { applyAdminMigrations } from "./admin-migrations";
 import { applyProposalsMigrations } from "./proposals-migrations";
 
-const SCHEMA_VERSION = "14";
+const SCHEMA_VERSION = "15";
 
 /**
  * Applies inline DDL on startup so Vercel previews and local dev share one path

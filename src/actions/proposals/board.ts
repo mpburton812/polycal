@@ -208,7 +208,8 @@ export async function listProposalBoardAction(): Promise<ProposalBoard> {
       viewerInvitee !== undefined &&
       viewerInvitee.voteStatus === "not_seen" &&
       (row.state === "proposed" ||
-        (row.state === "resolved" && row.atRisk) ||
+        (row.state === "resolved" && row.atRisk && viewerInvitee.role === "required") ||
+        (row.state === "resolved" && !row.atRisk && viewerInvitee.role === "required") ||
         optionalPollPending);
 
     const scheduleEnd = display.scheduledEndAt ?? display.scheduledStartAt;

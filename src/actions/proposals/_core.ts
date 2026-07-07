@@ -37,7 +37,10 @@ import {
   loadEnforcementSettings,
   runProposalEnforcement,
 } from "@/lib/proposals/enforcement";
-import { PARTNERSHIP_CARD_PREFIX } from "@/lib/proposals/constants";
+import {
+  recordProposalInviteeView,
+  shouldRecordProposalInviteeView,
+} from "@/lib/proposals/invitee-view";
 import {
   getProposalSpecialKind,
   isNonScheduleProposal,
@@ -2261,6 +2264,7 @@ export async function getProposalDetailAction(
       displayName: users.displayName,
       role: proposalInvitees.role,
       voteStatus: proposalInvitees.voteStatus,
+      viewedAt: proposalInvitees.viewedAt,
       overlapAcknowledgedAt: proposalInvitees.overlapAcknowledgedAt,
     })
     .from(proposalInvitees)
@@ -2314,6 +2318,23 @@ export async function getProposalDetailAction(
     .where(eq(proposalSlotVotes.proposalId, proposalId));
 
   const viewerInvitee = inviteeRows.find((invitee) => invitee.userId === session.user.id);
+  if (
+    viewerInvitee &&
+    shouldRecordProposalInviteeView({
+      proposalState: row.state,
+      masked,
+      isInvitee: true,
+      viewedAt: viewerInvitee.viewedAt,
+    })
+  ) {
+    const viewedAt = await recordProposalInviteeView(db, proposalId, session.user.id);
+    viewerInvitee.viewedAt = viewedAt;
+    const inviteeIndex = inviteeRows.findIndex((invitee) => invitee.userId === session.user.id);
+    if (inviteeIndex >= 0) {
+      inviteeRows[inviteeIndex].viewedAt = viewedAt;
+    }
+  }
+
   const viewerSlotVotes: Record<string, InviteeVoteStatus> = {};
   for (const vote of slotVoteRows.filter((v) => v.userId === session.user.id)) {
     viewerSlotVotes[vote.timeSlotId] = vote.voteStatus;
@@ -2457,6 +2478,7 @@ export async function getProposalDetailAction(
             displayName: invitee.displayName,
             role: invitee.role,
             voteStatus: invitee.voteStatus,
+            viewedAt: invitee.viewedAt ?? null,
           }))
         : [],
       timeSlots: masked
