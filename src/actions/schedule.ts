@@ -20,6 +20,8 @@ import {
   type ProposalType,
 } from "@/lib/db/schema";
 import { eventInRange, intervalsOverlap } from "@/lib/schedule/dates";
+import { buildScheduleWindows } from "@/lib/schedule/schedule-slices";
+import type { ScheduleSliceKind } from "@/lib/schedule/slice-types";
 import { parseBatchSlotMeta } from "@/lib/proposals/batch-sleeping";
 import { formatSleepingDisplayTitle } from "@/lib/proposals/sleeping-display";
 import {
@@ -59,6 +61,11 @@ export interface ScheduleEvent {
   isPoll: boolean;
   isAllDay: boolean;
   slotLabel: string | null;
+  sliceKind: ScheduleSliceKind;
+  rootProposalId: string;
+  sliceKey: string;
+  slotId: string | null;
+  occurrenceProposalId: string | null;
 }
 
 export interface SchedulePlanningItem {
@@ -235,6 +242,8 @@ export async function listScheduleEventsAction(
       isAllDay: proposals.isAllDay,
       eventPrivacy: proposals.eventPrivacy,
       isBatchSleeping: proposals.isBatchSleeping,
+      parentProposalId: proposals.parentProposalId,
+      isRecurrenceParent: proposals.isRecurrenceParent,
     })
     .from(proposals)
     .innerJoin(users, eq(proposals.proposerId, users.id))
@@ -266,6 +275,7 @@ export async function listScheduleEventsAction(
       endAt: proposalTimeSlots.endAt,
       label: proposalTimeSlots.label,
       sortOrder: proposalTimeSlots.sortOrder,
+      isDetached: proposalTimeSlots.isDetached,
     })
     .from(proposalTimeSlots)
     .orderBy(asc(proposalTimeSlots.sortOrder));
@@ -363,45 +373,59 @@ export async function listScheduleEventsAction(
       });
     }
 
-    const windows: { startAt: string; endAt: string | null; slotLabel: string | null; key: string }[] =
-      [];
+    const windows: {
+      startAt: string;
+      endAt: string | null;
+      slotLabel: string | null;
+      key: string;
+      slotId: string | null;
+      sliceKind: ScheduleSliceKind;
+      rootProposalId: string;
+      sliceKey: string;
+      occurrenceProposalId: string | null;
+    }[] = [];
+
+    const sliceContext = {
+      id: row.id,
+      isAllDay: row.isAllDay,
+      isBatchSleeping: row.isBatchSleeping,
+      parentProposalId: row.parentProposalId,
+      isRecurrenceParent: row.isRecurrenceParent,
+    };
+
+    const slots = slotsByProposal.get(row.id) ?? [];
+    let scheduled: { startAt: string; endAt: string | null } | null = null;
+    let slotsForWindows = slots;
 
     if (row.state === "resolved" || row.state === "archived") {
-      const slots = slotsByProposal.get(row.id) ?? [];
-      if (row.isBatchSleeping && slots.length > 0) {
-        for (const slot of slots) {
-          windows.push({
-            startAt: slot.startAt,
-            endAt: slot.endAt,
-            slotLabel: slot.label,
-            key: `${row.id}:${slot.id}`,
-          });
-        }
-      } else if (row.scheduledStartAt) {
-        windows.push({
-          startAt: row.scheduledStartAt,
-          endAt: row.scheduledEndAt,
-          slotLabel: null,
-          key: row.id,
-        });
+      if (!(row.isBatchSleeping && slots.length > 0) && row.scheduledStartAt) {
+        scheduled = { startAt: row.scheduledStartAt, endAt: row.scheduledEndAt };
+      }
+      if (!row.isBatchSleeping) {
+        slotsForWindows = [];
       }
     } else if (row.state === "proposed") {
-      const slots = slotsByProposal.get(row.id) ?? [];
-      if (slots.length > 0) {
-        for (const slot of slots) {
-          windows.push({
-            startAt: slot.startAt,
-            endAt: slot.endAt,
-            slotLabel: slot.label,
-            key: `${row.id}:${slot.id}`,
-          });
-        }
-      } else if (row.scheduledStartAt) {
+      if (slots.length === 0 && row.scheduledStartAt) {
+        scheduled = { startAt: row.scheduledStartAt, endAt: row.scheduledEndAt };
+      }
+    }
+
+    if (
+      row.state === "resolved" ||
+      row.state === "archived" ||
+      row.state === "proposed"
+    ) {
+      for (const raw of buildScheduleWindows(sliceContext, slotsForWindows, scheduled)) {
         windows.push({
-          startAt: row.scheduledStartAt,
-          endAt: row.scheduledEndAt,
-          slotLabel: null,
-          key: row.id,
+          startAt: raw.startAt,
+          endAt: raw.endAt,
+          slotLabel: raw.slotLabel,
+          key: raw.key,
+          slotId: raw.slotId,
+          sliceKind: raw.slice.sliceKind,
+          rootProposalId: raw.slice.rootProposalId,
+          sliceKey: raw.slice.sliceKey,
+          occurrenceProposalId: raw.slice.occurrenceProposalId,
         });
       }
     }
@@ -477,6 +501,11 @@ export async function listScheduleEventsAction(
         isPoll: row.isPoll,
         isAllDay: row.isAllDay,
         slotLabel: isContentMasked ? null : window.slotLabel,
+        sliceKind: window.sliceKind,
+        rootProposalId: window.rootProposalId,
+        sliceKey: window.sliceKey,
+        slotId: window.slotId,
+        occurrenceProposalId: window.occurrenceProposalId,
       });
     }
   }

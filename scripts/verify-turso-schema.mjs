@@ -9,7 +9,7 @@
 import { createClient } from "@libsql/client";
 import { readFileSync } from "node:fs";
 
-const EXPECTED_SCHEMA_VERSION = "13";
+const EXPECTED_SCHEMA_VERSION = "14";
 
 function loadEnvFile(envFile) {
   return Object.fromEntries(

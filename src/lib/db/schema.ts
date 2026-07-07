@@ -201,6 +201,10 @@ export const proposals = sqliteTable("proposals", {
   reminderOffsetMinutes: integer("reminder_offset_minutes"),
   /** ISO timestamp when reminder notifications were sent (PC-65). */
   reminderSentAt: text("reminder_sent_at"),
+  /** Parent proposal when this row was detached from a batch night or span day slice. */
+  detachedFromParentId: text("detached_from_parent_id"),
+  detachedFromSlotId: text("detached_from_slot_id"),
+  detachedAt: text("detached_at"),
   createdAt: text("created_at").notNull(),
   updatedAt: text("updated_at").notNull(),
 });
@@ -239,6 +243,8 @@ export const proposalTimeSlots = sqliteTable("proposal_time_slots", {
   sortOrder: integer("sort_order").notNull().default(0),
   /** All-day slot — start/end represent whole calendar days, no clock time (PC). */
   isAllDay: integer("is_all_day", { mode: "boolean" }).notNull().default(false),
+  /** Tombstoned when a batch night or span day was detached into its own proposal. */
+  isDetached: integer("is_detached", { mode: "boolean" }).notNull().default(false),
   createdAt: text("created_at").notNull(),
 });
 
@@ -287,6 +293,8 @@ export const proposalComments = sqliteTable("proposal_comments", {
     .notNull()
     .references(() => users.id),
   body: text("body").notNull(),
+  /** Optional slice tag for night/day-scoped comments on parent threads (e.g. slot:id, day:yyyy-MM-dd). */
+  sliceTag: text("slice_tag"),
   createdAt: text("created_at").notNull(),
 });
 

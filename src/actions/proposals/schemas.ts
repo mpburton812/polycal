@@ -44,6 +44,7 @@ export const draftProposalSchema = z.object({
 export const commentSchema = z.object({
   proposalId: z.string().min(1),
   body: z.string().trim().min(1, "Comment cannot be empty.").max(2000),
+  sliceTag: z.string().trim().max(120).optional().nullable(),
 });
 
 export const voteSchema = z.object({

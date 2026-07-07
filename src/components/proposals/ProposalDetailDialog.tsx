@@ -125,6 +125,7 @@ interface ProposalDetailDialogProps {
   onClose: () => void;
   onEdit: (detail: ProposalDetail) => void;
   people?: PersonSummary[];
+  onOpenRelatedProposal?: (proposalId: string) => void;
 }
 
 /**
@@ -136,6 +137,7 @@ export function ProposalDetailDialog({
   onClose,
   onEdit,
   people = [],
+  onOpenRelatedProposal,
 }: ProposalDetailDialogProps) {
   const router = useRouter();
   const { showToast } = useToast();
@@ -537,6 +539,30 @@ export function ProposalDetailDialog({
             </Alert>
           )}
 
+          {detail?.parentProposalId && (
+            <Alert
+              severity="info"
+              sx={{ mb: 2 }}
+              action={
+                onOpenRelatedProposal ? (
+                  <Button
+                    color="inherit"
+                    size="small"
+                    onClick={() => onOpenRelatedProposal(detail.parentProposalId!)}
+                  >
+                    View series
+                  </Button>
+                ) : undefined
+              }
+            >
+              This occurrence is part of a recurring series.
+            </Alert>
+          )}
+          {detail?.isRecurrenceParent && (
+            <Alert severity="info" sx={{ mb: 2 }}>
+              Recurring series parent — open individual occurrences on the schedule to vote per date.
+            </Alert>
+          )}
           {detail && (
             <>
               <Stack direction="row" justifyContent="space-between" alignItems="flex-start" sx={{ mb: 1 }}>
@@ -1005,12 +1031,13 @@ export function ProposalDetailDialog({
 function BoxComment({
   comment,
 }: {
-  comment: { authorName: string; body: string; createdAt: string };
+  comment: { authorName: string; body: string; createdAt: string; sliceTag?: string | null };
 }) {
   return (
     <Stack spacing={0.25}>
       <Typography variant="caption" color="text.secondary">
         {comment.authorName} · {new Date(comment.createdAt).toLocaleString()}
+        {comment.sliceTag ? ` · ${comment.sliceTag}` : ""}
       </Typography>
       <Typography variant="body2">{comment.body}</Typography>
     </Stack>

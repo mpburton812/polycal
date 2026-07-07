@@ -162,6 +162,7 @@ export interface ProposalCommentView {
   authorName: string;
   body: string;
   createdAt: string;
+  sliceTag?: string | null;
 }
 
 export interface ProposalStateLogView {
