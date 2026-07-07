@@ -8,6 +8,7 @@ import { z } from "zod";
 
 import { auth } from "@/lib/auth";
 import { logUserActivity } from "@/lib/audit";
+import { requireSession, withDb } from "@/lib/actions/context";
 import { sendEmail } from "@/lib/email/send";
 import { isUserThemeId, normalizeUserThemeId, type UserThemeId } from "@/lib/constants/themes";
 import { resolveTimezone } from "@/lib/schedule/timezone";
@@ -311,9 +312,9 @@ const displayNameSchema = z
  * Updates the signed-in user's display name (PC-9).
  */
 export async function updateDisplayNameAction(displayName: string): Promise<ActionResult> {
-  const session = await auth();
-  if (!session?.user?.id) {
-    return { ok: false, error: "Not signed in." };
+  const sessionResult = await requireSession();
+  if (!sessionResult.ok) {
+    return { ok: false, error: sessionResult.message };
   }
 
   const parsed = displayNameSchema.safeParse(displayName);
@@ -321,15 +322,15 @@ export async function updateDisplayNameAction(displayName: string): Promise<Acti
     return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid display name." };
   }
 
-  await ensureDbReady();
-  const db = getDb();
-  const now = new Date().toISOString();
-  await db
-    .update(users)
-    .set({ displayName: parsed.data, updatedAt: now })
-    .where(eq(users.id, session.user.id));
+  await withDb(async (db) => {
+    const now = new Date().toISOString();
+    await db
+      .update(users)
+      .set({ displayName: parsed.data, updatedAt: now })
+      .where(eq(users.id, sessionResult.user.id));
+  });
 
-  await logUserActivity(session.user.id, "profile.display_name_update", parsed.data);
+  await logUserActivity(sessionResult.user.id, "profile.display_name_update", parsed.data);
   revalidatePath("/profile");
   return { ok: true };
 }

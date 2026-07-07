@@ -5,8 +5,8 @@ import { z } from "zod";
 
 import { auth } from "@/lib/auth";
 import { userHasAdminAccess } from "@/lib/admin-access";
+import { requireSession, withDb } from "@/lib/actions/context";
 import { getDb } from "@/lib/db/client";
-import { ensureDbReady } from "@/lib/db/ensure-ready";
 import {
   locations,
   polyGroup,
@@ -163,9 +163,13 @@ function markOverlaps(events: ScheduleEvent[]): ScheduleEvent[] {
 export async function listScheduleEventsAction(
   input: z.infer<typeof rangeSchema>,
 ): Promise<{ ok: boolean; message: string; payload: SchedulePayload }> {
-  const session = await auth();
-  if (!session?.user) {
-    return { ok: false, message: "Sign in required.", payload: { events: [], planningItems: [] } };
+  const sessionResult = await requireSession();
+  if (!sessionResult.ok) {
+    return {
+      ok: false,
+      message: sessionResult.message,
+      payload: { events: [], planningItems: [] },
+    };
   }
 
   const parsed = rangeSchema.safeParse(input);
@@ -177,10 +181,9 @@ export async function listScheduleEventsAction(
     };
   }
 
-  await ensureDbReady();
-  const db = getDb();
-  const viewerId = session.user.id;
-  const isAdmin = await userHasAdminAccess(session.user.role);
+  return withDb(async (db) => {
+  const viewerId = sessionResult.user.id;
+  const isAdmin = await userHasAdminAccess(sessionResult.user.role);
   const privacyFlags = await getSchedulePrivacyFlags(db);
   const partnerIds = await acceptedSleepingPartnerIds(db, viewerId);
   const { rangeStart, rangeEnd } = parsed.data;
@@ -532,4 +535,5 @@ export async function listScheduleEventsAction(
       planningItems,
     },
   };
+  });
 }
