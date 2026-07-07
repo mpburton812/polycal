@@ -68,7 +68,7 @@ test.describe("Schedule calendar", () => {
     expect(daySpan).toBeGreaterThanOrEqual(34);
 
     await expect(
-      page.getByRole("button", { name: /Yavin 4 victory celebration/i }),
+      page.getByRole("button", { name: /Yavin 4 victory celebration/i }).first(),
     ).toBeVisible({ timeout: 15_000 });
 
     const moreLink = page.getByRole("button", { name: /\+\d+ more/i }).first();
