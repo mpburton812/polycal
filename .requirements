@@ -135,3 +135,4 @@
 2026-07-06 | 4a8f751 | PC-74 | fix schedule slice journey navigation and setup | e2e/batch-sleeping-journey.spec.ts
 2026-07-06 | 4e57e4a | PC-74 | use week navigation and title locators for slice journeys | e2e/helpers/schedule.ts
 2026-07-06 | f225e22 | PC-74 | match recurring child card titles flexibly | e2e/recurrence-slice-journey.spec.ts
+2026-07-07 | c811a18 | PC-74 | stabilize CI — keep recurrence slice journey, revert flaky schedule nav tests | e2e/batch-sleeping-journey.spec.ts
