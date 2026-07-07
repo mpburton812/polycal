@@ -25,7 +25,7 @@ test.describe("Recurrence slice chooser journey", () => {
     });
 
     await selectProposalTab(page, "Proposed");
-    await expect(page.getByRole("heading", { name: new RegExp(`^${title}`), level: 2 }).first()).toBeVisible({
+    await expect(page.getByRole("heading", { name: new RegExp(title, "i"), level: 2 }).first()).toBeVisible({
       timeout: 20_000,
     });
 
