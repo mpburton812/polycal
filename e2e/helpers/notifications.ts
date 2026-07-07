@@ -6,6 +6,34 @@ export async function openNotificationInbox(page: Page): Promise<void> {
   await expect(page.getByText("Notifications").first()).toBeVisible();
 }
 
+/** Clicks Accept on an inbox row that contains the given message text. */
+export async function acceptFromInbox(
+  page: Page,
+  message: string | RegExp,
+): Promise<void> {
+  const row = page.locator("li").filter({ hasText: message });
+  await row.getByRole("button", { name: "Accept" }).click();
+}
+
+/** Dismisses a single notification by message text. */
+export async function dismissNotification(
+  page: Page,
+  message: string | RegExp,
+): Promise<void> {
+  const row = page.locator("li").filter({ hasText: message });
+  await row.getByRole("button", { name: "Dismiss notification" }).click();
+}
+
+/** Clears every notification from the open inbox popover. */
+export async function clearAllNotifications(page: Page): Promise<void> {
+  const inboxOpen = await page.getByRole("button", { name: "Close notifications" }).isVisible();
+  if (!inboxOpen) {
+    await openNotificationInbox(page);
+  }
+  await page.getByRole("button", { name: "Clear all" }).click();
+  await expect(page.getByTestId("notifications-empty")).toBeVisible({ timeout: 15_000 });
+}
+
 /**
  * Reloads the shell (SSR notification props) and asserts a message appears in the inbox.
  */
