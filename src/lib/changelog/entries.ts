@@ -26,6 +26,29 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "2026.07.07",
+    date: "2026-07-07",
+    summary:
+      "Sprint A: impersonation and overlap E2E journeys; shared action context adoption.",
+    changes: [
+      {
+        type: "added",
+        description:
+          "E2E impersonation journey covering dev bar and admin-panel impersonation with audit log verification (PC-86).",
+      },
+      {
+        type: "added",
+        description:
+          "E2E overlap/revoke journey: in-flight overlap warning, acknowledge, and revoke acceptance (PC-88).",
+      },
+      {
+        type: "changed",
+        description:
+          "Adopted requireSession/withDb helpers in schedule, admin impersonation, dev impersonation, profile, and user provisioning actions (PC-97).",
+      },
+    ],
+  },
+  {
     version: "2026.07.04",
     date: "2026-07-04",
     summary:
