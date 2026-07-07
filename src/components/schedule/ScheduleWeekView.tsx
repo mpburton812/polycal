@@ -23,7 +23,7 @@ interface ScheduleWeekViewProps {
   events: ScheduleEvent[];
   compact: boolean;
   timeZone?: string;
-  onEventClick: (proposalId: string) => void;
+  onEventClick: (event: ScheduleEvent) => void;
 }
 
 /**
@@ -116,7 +116,7 @@ export function ScheduleWeekView({
                         compact
                         timeZone={timeZone}
                         rotationIndex={index}
-                        onClick={() => onEventClick(event.proposalId)}
+                        onClick={() => onEventClick(event)}
                       />
                     </Box>
                   ))
@@ -189,7 +189,7 @@ export function ScheduleWeekView({
                   event={event}
                   timeZone={timeZone}
                   rotationIndex={index}
-                  onClick={() => onEventClick(event.proposalId)}
+                  onClick={() => onEventClick(event)}
                 />
               ))
             )}

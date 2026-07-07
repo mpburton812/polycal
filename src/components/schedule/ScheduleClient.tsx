@@ -22,6 +22,7 @@ import { getProposalDetailAction } from "@/actions/proposals";
 import type { ProposalPlaceOption } from "@/actions/proposals";
 import {
   listScheduleEventsAction,
+  type ScheduleEvent,
   type ScheduleFilterMode,
   type SchedulePayload,
 } from "@/actions/schedule";
@@ -30,6 +31,8 @@ import { PlanningModeDrawer } from "@/components/schedule/PlanningModeDrawer";
 import { ScheduleHeatmap } from "@/components/schedule/ScheduleHeatmap";
 import { ScheduleMonthView } from "@/components/schedule/ScheduleMonthView";
 import { ScheduleWeekView } from "@/components/schedule/ScheduleWeekView";
+import { SeriesOccurrenceChooserDialog } from "@/components/schedule/SeriesOccurrenceChooserDialog";
+import { SliceDetailDialog } from "@/components/schedule/SliceDetailDialog";
 import {
   loadScheduleViewState,
   saveScheduleViewState,
@@ -82,6 +85,14 @@ export function ScheduleClient({
   const [pending, startTransition] = useTransition();
   const [selectedProposalId, setSelectedProposalId] = useState<string | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
+  const [sliceOpen, setSliceOpen] = useState(false);
+  const [sliceContext, setSliceContext] = useState<{
+    rootProposalId: string;
+    sliceKind: "batch_night" | "virtual_span_day";
+    sliceKey: string;
+  } | null>(null);
+  const [chooserOpen, setChooserOpen] = useState(false);
+  const [chooserEvent, setChooserEvent] = useState<ScheduleEvent | null>(null);
   const [editDetail, setEditDetail] = useState<ProposalDetail | null>(null);
   const [draftOpen, setDraftOpen] = useState(false);
 
@@ -225,6 +236,26 @@ export function ScheduleClient({
   function openProposal(proposalId: string) {
     setSelectedProposalId(proposalId);
     setDetailOpen(true);
+  }
+
+  function openScheduleEvent(event: ScheduleEvent) {
+    if (event.sliceKind === "recurrence_occurrence" && event.occurrenceProposalId) {
+      setChooserEvent(event);
+      setChooserOpen(true);
+      return;
+    }
+
+    if (event.sliceKind === "batch_night" || event.sliceKind === "virtual_span_day") {
+      setSliceContext({
+        rootProposalId: event.rootProposalId,
+        sliceKind: event.sliceKind,
+        sliceKey: event.sliceKey,
+      });
+      setSliceOpen(true);
+      return;
+    }
+
+    openProposal(event.occurrenceProposalId ?? event.proposalId);
   }
 
   function handleMonthDayClick(day: Date) {
@@ -426,7 +457,7 @@ export function ScheduleClient({
           monthAnchor={monthAnchor}
           events={filteredEvents}
           timeZone={timeZone}
-          onEventClick={openProposal}
+          onEventClick={openScheduleEvent}
           onDayClick={handleMonthDayClick}
         />
       ) : (
@@ -436,7 +467,7 @@ export function ScheduleClient({
           events={filteredEvents}
           compact={viewState.compact}
           timeZone={timeZone}
-          onEventClick={openProposal}
+          onEventClick={openScheduleEvent}
         />
       )}
 
@@ -450,6 +481,48 @@ export function ScheduleClient({
         }}
       />
 
+      <SeriesOccurrenceChooserDialog
+        open={chooserOpen}
+        title={chooserEvent?.title ?? "Recurring event"}
+        onClose={() => {
+          setChooserOpen(false);
+          setChooserEvent(null);
+        }}
+        onViewOccurrence={() => {
+          const occurrenceId = chooserEvent?.occurrenceProposalId ?? chooserEvent?.proposalId;
+          setChooserOpen(false);
+          setChooserEvent(null);
+          if (occurrenceId) openProposal(occurrenceId);
+        }}
+        onViewSeries={() => {
+          const seriesId = chooserEvent?.rootProposalId;
+          setChooserOpen(false);
+          setChooserEvent(null);
+          if (seriesId) openProposal(seriesId);
+        }}
+      />
+
+      <SliceDetailDialog
+        open={sliceOpen}
+        rootProposalId={sliceContext?.rootProposalId ?? null}
+        sliceKind={sliceContext?.sliceKind ?? null}
+        sliceKey={sliceContext?.sliceKey ?? null}
+        timeZone={timeZone}
+        onClose={() => {
+          setSliceOpen(false);
+          setSliceContext(null);
+          refreshSchedule(isMonthLayout ? monthAnchor : weekStart);
+        }}
+        onViewParent={(parentId) => {
+          setSliceOpen(false);
+          setSliceContext(null);
+          openProposal(parentId);
+        }}
+        onDetached={(newProposalId) => {
+          openProposal(newProposalId);
+        }}
+      />
+
       <ProposalDetailDialog
         proposalId={selectedProposalId}
         open={detailOpen}
@@ -460,6 +533,9 @@ export function ScheduleClient({
         }}
         onEdit={handleEditFromDetail}
         people={people}
+        onOpenRelatedProposal={(id) => {
+          setSelectedProposalId(id);
+        }}
       />
 
       <ProposalDraftDialog

@@ -25,7 +25,7 @@ interface ScheduleMonthViewProps {
   monthAnchor: Date;
   events: ScheduleEvent[];
   timeZone?: string;
-  onEventClick: (proposalId: string) => void;
+  onEventClick: (event: ScheduleEvent) => void;
   /** Switches to week view anchored on the clicked day (PC-56). */
   onDayClick?: (day: Date) => void;
 }
@@ -154,7 +154,7 @@ export function ScheduleMonthView({
                           key={chip.key}
                           event={chip.event}
                           variant={chip.variant}
-                          onClick={() => onEventClick(chip.event.proposalId)}
+                          onClick={() => onEventClick(chip.event)}
                         />
                       ))}
                       <MonthMoreLink
@@ -213,7 +213,7 @@ export function ScheduleMonthView({
                     isStartSegment={segment.isStartSegment}
                     isEndSegment={segment.isEndSegment}
                     isArchived={segment.event.state === "archived"}
-                    onClick={() => onEventClick(segment.event.proposalId)}
+                    onClick={() => onEventClick(segment.event)}
                   />
                 </Box>
               ))}

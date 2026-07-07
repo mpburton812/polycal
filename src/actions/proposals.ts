@@ -17,6 +17,8 @@ export type {
   RecurrenceRule,
 } from "./proposals/types";
 
+export type { ProposalSliceDetail } from "./proposals/slice-types";
+
 export {
   acknowledgeProposalOverlapAction,
   addProposalCommentAction,
@@ -38,6 +40,11 @@ export {
   updateDraftProposalAction,
   updateResolvedAttendeesAction,
 } from "./proposals/_core";
+
+export {
+  detachProposalSliceAction,
+  getProposalSliceDetailAction,
+} from "./proposals/slices";
 
 export { listProposalBoardAction } from "./proposals/board";
 export { deleteDraftProposalAction } from "./proposals/mutations";
