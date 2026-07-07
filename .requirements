@@ -141,3 +141,4 @@
 2026-07-07 | 5b8c873 | PC-76 | track invitee viewed_at separate from vote status | src/actions/proposals/_core.ts
 2026-07-07 | f4e60d5 | PC-77 | month view fetch range, icons, and legend swatches | src/components/schedule/MonthEventChip.tsx
 2026-07-07 | ce7fe31 | PC-77 | use first month icon locator for duplicate event buttons | e2e/schedule.spec.ts
+2026-07-07 | 3c3149e | PC-104 | week-1 remediation deliverables and backlog tooling | src/actions/profile.ts
