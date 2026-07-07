@@ -169,6 +169,15 @@ export function ProposalCard({
               }}
             />
           )}
+          {proposal.notOnCalendar && (
+            <Chip
+              size="small"
+              label="Not on calendar"
+              color="warning"
+              variant="outlined"
+              sx={{ borderColor: GARDEN_TOKENS.ink }}
+            />
+          )}
           {proposal.needsViewerAction && (
             <Chip
               size="small"

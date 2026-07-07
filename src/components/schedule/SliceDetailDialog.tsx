@@ -16,7 +16,7 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
-import { useCallback, useEffect, useState, useTransition } from "react";
+import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 
 import {
   addProposalCommentAction,
@@ -65,17 +65,22 @@ export function SliceDetailDialog({
   const [comment, setComment] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const [confirmDetachOpen, setConfirmDetachOpen] = useState(false);
+  const loadSeqRef = useRef(0);
 
   const loadDetail = useCallback(async () => {
     if (!open || !rootProposalId || !sliceKind || !sliceKey) return;
     if (sliceKind !== "batch_night" && sliceKind !== "virtual_span_day") return;
 
+    const seq = ++loadSeqRef.current;
     setError(null);
+    setDetail(null);
     const result = await getProposalSliceDetailAction({
       rootProposalId,
       sliceKind,
       sliceKey,
     });
+    if (seq !== loadSeqRef.current) return;
     if (!result.ok || !result.detail) {
       setError(result.message);
       setDetail(null);
@@ -108,6 +113,11 @@ export function SliceDetailDialog({
 
   function handleDetach() {
     if (!detail) return;
+    setConfirmDetachOpen(true);
+  }
+
+  function confirmDetach() {
+    if (!detail) return;
     startTransition(async () => {
       const result = await detachProposalSliceAction({
         rootProposalId: detail.rootProposalId,
@@ -118,6 +128,7 @@ export function SliceDetailDialog({
         showToast(result.message, "error");
         return;
       }
+      setConfirmDetachOpen(false);
       showToast(result.message, "success");
       onClose();
       if (result.newProposalId) {
@@ -137,6 +148,7 @@ export function SliceDetailDialog({
     : "";
 
   return (
+    <>
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
       <DialogTitle>{sliceKindLabel(sliceKind)}</DialogTitle>
       <DialogContent>
@@ -144,6 +156,12 @@ export function SliceDetailDialog({
           <Alert severity="error" sx={{ mb: 2 }}>
             {error}
           </Alert>
+        ) : null}
+
+        {!detail && !error ? (
+          <Typography variant="body2" color="text.secondary">
+            Loading slice…
+          </Typography>
         ) : null}
 
         {detail ? (
@@ -241,5 +259,21 @@ export function SliceDetailDialog({
         </Button>
       </DialogActions>
     </Dialog>
+
+      <Dialog open={confirmDetachOpen} onClose={() => setConfirmDetachOpen(false)}>
+        <DialogTitle>Detach this {sliceKind === "batch_night" ? "night" : "day"}?</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2">
+            This creates a separate resolved proposal for this slice and removes it from the parent series.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setConfirmDetachOpen(false)}>Cancel</Button>
+          <Button color="warning" onClick={confirmDetach} disabled={pending}>
+            Detach
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </>
   );
 }

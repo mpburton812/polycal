@@ -8,6 +8,28 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- PC-75: Shared schedule slice authorization module (`slice-auth.ts`) — unified masking, slice membership validation, comment permissions, and slice tag validation.
+- PC-75: `useScheduleTapRouter` hook for schedule tap routing and mutually exclusive dialog state.
+- PC-75: Hardened E2E schedule navigation helpers (`schedule-ready` wait, week layout force, range-based navigation, localStorage reset).
+- PC-75: Restored batch-sleeping and multi-day slice journey E2E specs with unique locators.
+- PC-75: Recurrence parent occurrence-0 windows on the schedule calendar.
+- PC-75: "Not on calendar" badge on resolved proposal cards and planning drawer when no schedulable windows exist.
+
+### Changed
+
+- PC-75: `listScheduleEventsAction` filters proposals and slots by date overlap at query time instead of full-table scan.
+- PC-75: Week view places span events on all spanned day columns (fixes silent drop for overlap-visible events).
+- PC-75: `detachProposalSliceAction` runs in a DB transaction with idempotency; archives parent when all slices are detached.
+- PC-75: `SliceDetailDialog` adds loading state, request-sequence guard, and detach confirmation.
+- PC-75: `ScheduleClient` adds stale-response guard on `refreshSchedule` and E2E range test attributes.
+
+### Fixed
+
+- PC-75: Sleeping-arrangement privacy (`hideSleepingArrangements`) now applied in slice detail reads.
+- PC-75: `virtual_span_day` slice detail validates day membership in parent span (read path aligned with detach).
+- PC-75: Comment `sliceTag` validated against proposal slice structure before insert.
+- PC-75: `canComment` rules aligned between slice UI and `addProposalCommentAction`.
+
 - Admin **Code Status** panel (replaces Force Reload): shows the live build number and when it went live in the current environment, the most recent change control entry, a **Check for Update** button that force-reloads when a newer build is available, and the full change control log behind the build-number link.
 - Structured change control log (`src/lib/changelog/entries.ts`) updated on every environment promotion, `/api/build-info` endpoint, and build-time stamp (`NEXT_PUBLIC_BUILD_TIME`).
 - All-day event proposals (no clock times) across schedule, cards, and detail.

@@ -28,6 +28,7 @@ import {
 } from "@/lib/proposals/access";
 import { buildPartnershipProposalCopy } from "@/lib/partnerships/copy";
 import { formatSleepingDisplayTitle } from "@/lib/proposals/sleeping-display";
+import { proposalHasSchedulableWindows } from "@/lib/schedule/schedule-slices";
 
 import type { ProposalBoard, ProposalCard } from "./types";
 
@@ -94,6 +95,9 @@ export async function listProposalBoardAction(): Promise<ProposalBoard> {
       isAllDay: proposals.isAllDay,
       eventPrivacy: proposals.eventPrivacy,
       intentionalSolo: proposals.intentionalSolo,
+      isBatchSleeping: proposals.isBatchSleeping,
+      isRecurrenceParent: proposals.isRecurrenceParent,
+      parentProposalId: proposals.parentProposalId,
     })
     .from(proposals)
     .innerJoin(users, eq(proposals.proposerId, users.id))
@@ -140,6 +144,28 @@ export async function listProposalBoardAction(): Promise<ProposalBoard> {
   const pollSlotCounts = new Map<string, number>();
   for (const slotRow of pollSlotCountRows) {
     pollSlotCounts.set(slotRow.proposalId, (pollSlotCounts.get(slotRow.proposalId) ?? 0) + 1);
+  }
+
+  const slotDetailRows =
+    visibleProposalIds.length > 0
+      ? await db
+          .select({
+            id: proposalTimeSlots.id,
+            proposalId: proposalTimeSlots.proposalId,
+            startAt: proposalTimeSlots.startAt,
+            endAt: proposalTimeSlots.endAt,
+            label: proposalTimeSlots.label,
+            isDetached: proposalTimeSlots.isDetached,
+          })
+          .from(proposalTimeSlots)
+          .where(inArray(proposalTimeSlots.proposalId, visibleProposalIds))
+      : [];
+
+  const slotsByProposal = new Map<string, typeof slotDetailRows>();
+  for (const slot of slotDetailRows) {
+    const list = slotsByProposal.get(slot.proposalId) ?? [];
+    list.push(slot);
+    slotsByProposal.set(slot.proposalId, list);
   }
 
   const empty: ProposalBoard = { draft: [], proposed: [], resolved: [], archived: [] };
@@ -220,6 +246,21 @@ export async function listProposalBoardAction(): Promise<ProposalBoard> {
       inviteeCount: invitees.length,
       respondedCount,
       isPastSchedule,
+      notOnCalendar:
+        row.state === "resolved" &&
+        !proposalHasSchedulableWindows(
+          {
+            id: row.id,
+            isAllDay: row.isAllDay,
+            isBatchSleeping: row.isBatchSleeping,
+            parentProposalId: row.parentProposalId,
+            isRecurrenceParent: row.isRecurrenceParent,
+            state: row.state,
+            scheduledStartAt: row.scheduledStartAt,
+            scheduledEndAt: row.scheduledEndAt,
+          },
+          slotsByProposal.get(row.id) ?? [],
+        ),
       specialKind: getProposalSpecialKind(row.description) ?? undefined,
     };
 

@@ -3410,6 +3410,43 @@ export async function addProposalCommentAction(
     return { ok: false, message: "You cannot comment on this proposal." };
   }
 
+  if (parsed.data.sliceTag) {
+    const { validateSliceTagForProposal } = await import("@/lib/schedule/slice-auth");
+    const [row] = await db
+      .select({
+        id: proposals.id,
+        isBatchSleeping: proposals.isBatchSleeping,
+        isAllDay: proposals.isAllDay,
+        scheduledStartAt: proposals.scheduledStartAt,
+        scheduledEndAt: proposals.scheduledEndAt,
+      })
+      .from(proposals)
+      .where(eq(proposals.id, parsed.data.proposalId))
+      .limit(1);
+    if (!row) {
+      return { ok: false, message: "Proposal not found." };
+    }
+    const slotRows = await db
+      .select({
+        id: proposalTimeSlots.id,
+        startAt: proposalTimeSlots.startAt,
+        endAt: proposalTimeSlots.endAt,
+        isDetached: proposalTimeSlots.isDetached,
+      })
+      .from(proposalTimeSlots)
+      .where(eq(proposalTimeSlots.proposalId, parsed.data.proposalId));
+    const tagCheck = validateSliceTagForProposal(
+      row,
+      slotRows,
+      null,
+      null,
+      parsed.data.sliceTag,
+    );
+    if (!tagCheck.ok) {
+      return { ok: false, message: tagCheck.message };
+    }
+  }
+
   const now = new Date().toISOString();
   await db.insert(proposalComments).values({
     id: `pc-${randomUUID()}`,

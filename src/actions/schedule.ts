@@ -1,6 +1,6 @@
 "use server";
 
-import { and, asc, eq, inArray, or } from "drizzle-orm";
+import { and, asc, eq, gte, inArray, isNotNull, isNull, lte, or } from "drizzle-orm";
 import { z } from "zod";
 
 import { auth } from "@/lib/auth";
@@ -27,9 +27,9 @@ import { formatSleepingDisplayTitle } from "@/lib/proposals/sleeping-display";
 import {
   getPrivacyAdminFlags,
   MASKED_TITLE,
-  shouldMaskProposalContent,
   viewerCanSeeProposal,
 } from "@/lib/proposals/access";
+import { applyScheduleMasking } from "@/lib/schedule/slice-auth";
 
 const HIDDEN_SLEEPING_TITLE = "Sleeping arrangement";
 
@@ -96,58 +96,19 @@ async function getSchedulePrivacyFlags(
   };
 }
 
-function shouldMaskSleepingForViewer(
-  viewerId: string,
-  proposerId: string,
-  inviteeUserIds: string[],
-  hideSleeping: boolean,
-  acceptedPartnerIds: Set<string>,
-): boolean {
-  if (!hideSleeping) return false;
-  if (proposerId === viewerId || inviteeUserIds.includes(viewerId)) return false;
-  const participants = new Set([proposerId, ...inviteeUserIds]);
-  for (const participantId of participants) {
-    if (participantId !== viewerId && acceptedPartnerIds.has(participantId)) {
-      return false;
-    }
-  }
-  return true;
-}
-
-function shouldMaskScheduleProposalContent(
-  viewerId: string,
-  isAdmin: boolean,
-  proposerId: string,
-  inviteeUserIds: string[],
-  eventPrivacy: EventPrivacyLevel,
-  adminCanSeePrivate: boolean,
-  adminCanSeeSuperPrivate: boolean,
-): boolean {
-  return shouldMaskProposalContent(
-    viewerId,
-    isAdmin,
-    proposerId,
-    inviteeUserIds,
-    eventPrivacy,
-    adminCanSeePrivate,
-    adminCanSeeSuperPrivate,
-    "resolved",
+function proposalScheduledOverlapsRange(rangeStart: string, rangeEnd: string) {
+  return and(
+    isNotNull(proposals.scheduledStartAt),
+    lte(proposals.scheduledStartAt, rangeEnd),
+    or(isNull(proposals.scheduledEndAt), gte(proposals.scheduledEndAt, rangeStart)),
   );
 }
 
-function viewerCanSeeScheduleProposal(
-  viewerId: string,
-  isAdmin: boolean,
-  proposerId: string,
-  inviteeUserIds: string[],
-  context?: { state?: string; eventPrivacy?: EventPrivacyLevel },
-): boolean {
-  if (isAdmin) return true;
-  if (proposerId === viewerId) return true;
-  if (inviteeUserIds.includes(viewerId)) return true;
-  if (context?.state === "resolved" && context.eventPrivacy === "open") return true;
-  if (context?.state === "archived" && context.eventPrivacy === "open") return true;
-  return false;
+function slotOverlapsRange(rangeStart: string, rangeEnd: string) {
+  return and(
+    lte(proposalTimeSlots.startAt, rangeEnd),
+    or(isNull(proposalTimeSlots.endAt), gte(proposalTimeSlots.endAt, rangeStart)),
+  );
 }
 
 async function acceptedSleepingPartnerIds(
@@ -224,6 +185,33 @@ export async function listScheduleEventsAction(
   const partnerIds = await acceptedSleepingPartnerIds(db, viewerId);
   const { rangeStart, rangeEnd } = parsed.data;
 
+  const overlappingSlotRows = await db
+    .select({
+      id: proposalTimeSlots.id,
+      proposalId: proposalTimeSlots.proposalId,
+      startAt: proposalTimeSlots.startAt,
+      endAt: proposalTimeSlots.endAt,
+      label: proposalTimeSlots.label,
+      sortOrder: proposalTimeSlots.sortOrder,
+      isDetached: proposalTimeSlots.isDetached,
+    })
+    .from(proposalTimeSlots)
+    .where(slotOverlapsRange(rangeStart, rangeEnd))
+    .orderBy(asc(proposalTimeSlots.sortOrder));
+
+  const slotProposalIds = [...new Set(overlappingSlotRows.map((slot) => slot.proposalId))];
+
+  const rangeFilters = [
+    eq(proposals.state, "proposed"),
+    eq(proposals.isBatchSleeping, true),
+    eq(proposals.isRecurrenceParent, true),
+    isNotNull(proposals.parentProposalId),
+    proposalScheduledOverlapsRange(rangeStart, rangeEnd),
+  ];
+  if (slotProposalIds.length > 0) {
+    rangeFilters.push(inArray(proposals.id, slotProposalIds));
+  }
+
   const rows = await db
     .select({
       id: proposals.id,
@@ -248,8 +236,15 @@ export async function listScheduleEventsAction(
     .from(proposals)
     .innerJoin(users, eq(proposals.proposerId, users.id))
     .leftJoin(locations, eq(proposals.locationId, locations.id))
-    .where(inArray(proposals.state, ["proposed", "resolved", "archived"]))
+    .where(
+      and(
+        inArray(proposals.state, ["proposed", "resolved", "archived"]),
+        or(...rangeFilters),
+      ),
+    )
     .orderBy(asc(proposals.scheduledStartAt));
+
+  const proposalIds = new Set(rows.map((row) => row.id));
 
   const inviteeRows = await db
     .select({
@@ -258,7 +253,8 @@ export async function listScheduleEventsAction(
       displayName: users.displayName,
     })
     .from(proposalInvitees)
-    .innerJoin(users, eq(proposalInvitees.userId, users.id));
+    .innerJoin(users, eq(proposalInvitees.userId, users.id))
+    .where(proposalIds.size > 0 ? inArray(proposalInvitees.proposalId, [...proposalIds]) : eq(proposalInvitees.proposalId, ""));
 
   const inviteesByProposal = new Map<string, { userId: string; displayName: string }[]>();
   for (const row of inviteeRows) {
@@ -267,18 +263,22 @@ export async function listScheduleEventsAction(
     inviteesByProposal.set(row.proposalId, list);
   }
 
-  const slotRows = await db
-    .select({
-      id: proposalTimeSlots.id,
-      proposalId: proposalTimeSlots.proposalId,
-      startAt: proposalTimeSlots.startAt,
-      endAt: proposalTimeSlots.endAt,
-      label: proposalTimeSlots.label,
-      sortOrder: proposalTimeSlots.sortOrder,
-      isDetached: proposalTimeSlots.isDetached,
-    })
-    .from(proposalTimeSlots)
-    .orderBy(asc(proposalTimeSlots.sortOrder));
+  const slotRows =
+    proposalIds.size > 0
+      ? await db
+          .select({
+            id: proposalTimeSlots.id,
+            proposalId: proposalTimeSlots.proposalId,
+            startAt: proposalTimeSlots.startAt,
+            endAt: proposalTimeSlots.endAt,
+            label: proposalTimeSlots.label,
+            sortOrder: proposalTimeSlots.sortOrder,
+            isDetached: proposalTimeSlots.isDetached,
+          })
+          .from(proposalTimeSlots)
+          .where(inArray(proposalTimeSlots.proposalId, [...proposalIds]))
+          .orderBy(asc(proposalTimeSlots.sortOrder))
+      : [];
 
   const slotsByProposal = new Map<string, typeof slotRows>();
   for (const slot of slotRows) {
@@ -311,25 +311,17 @@ export async function listScheduleEventsAction(
       }
     }
 
-    const privacyMasked = shouldMaskScheduleProposalContent(
+    const { privacyMasked, sleepingMasked, isContentMasked } = applyScheduleMasking({
       viewerId,
       isAdmin,
-      row.proposerId,
+      proposerId: row.proposerId,
       inviteeUserIds,
-      row.eventPrivacy,
-      privacyFlags.adminCanSeePrivate,
-      privacyFlags.adminCanSeeSuperPrivate,
-    );
-    const sleepingMasked =
-      row.proposalType === "sleeping" &&
-      shouldMaskSleepingForViewer(
-        viewerId,
-        row.proposerId,
-        inviteeUserIds,
-        privacyFlags.hideSleeping,
-        partnerIds,
-      );
-    const isContentMasked = privacyMasked || sleepingMasked;
+      eventPrivacy: row.eventPrivacy,
+      proposalState: row.state,
+      proposalType: row.proposalType,
+      privacyFlags,
+      acceptedPartnerIds: partnerIds,
+    });
 
     if (row.state === "proposed") {
       const proposedTitle =
