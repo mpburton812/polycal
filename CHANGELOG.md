@@ -8,6 +8,9 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- PC-86: E2E impersonation journey (dev bar + admin panel + audit log).
+- PC-88: E2E overlap/revoke acceptance journey (in-flight overlap warning, acknowledge, revoke).
+- PC-97: Adopted `requireSession` / `withDb` in schedule, impersonation, profile, and user provisioning actions.
 - PC-77: `computeScheduleFetchRange` helper for explicit week/month API windows.
 - PC-76: `viewed_at` on `proposal_invitees` to track when an invitee first opens proposal detail (separate from vote status).
 - PC-76: Shared invitee display helpers (`invitee-display-status.ts`, `invitee-view.ts`) and unit tests.
