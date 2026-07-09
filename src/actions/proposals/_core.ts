@@ -1375,29 +1375,13 @@ async function createRecurringChildProposals(
 }
 
 /**
- * Detects schedule overlaps for proposer and invitees before submit (PC-40).
+ * Gathers stakeholder schedule overlaps for a proposal (shared by submit and admin fast-add).
  */
-export async function checkProposalConflictsAction(
+async function gatherProposalConflictWarnings(
+  db: ReturnType<typeof getDb>,
+  proposal: typeof proposals.$inferSelect,
   proposalId: string,
-): Promise<{ ok: boolean; message: string; warnings: ProposalConflictWarning[] }> {
-  const session = await auth();
-  if (!session?.user) {
-    return { ok: false, message: "Sign in required.", warnings: [] };
-  }
-
-  await ensureDbReady();
-  const db = getDb();
-
-  const [proposal] = await db
-    .select()
-    .from(proposals)
-    .where(eq(proposals.id, proposalId))
-    .limit(1);
-
-  if (!proposal || proposal.proposerId !== session.user.id) {
-    return { ok: false, message: "Proposal not found.", warnings: [] };
-  }
-
+): Promise<ProposalConflictWarning[]> {
   const invitees = await db
     .select({ userId: proposalInvitees.userId })
     .from(proposalInvitees)
@@ -1416,7 +1400,7 @@ export async function checkProposalConflictsAction(
         : [];
 
   if (checkWindows.length === 0) {
-    return { ok: true, message: "No schedule to check.", warnings: [] };
+    return [];
   }
 
   const stakeholderIds = new Set([proposal.proposerId, ...invitees.map((i) => i.userId)]);
@@ -1492,11 +1476,100 @@ export async function checkProposalConflictsAction(
   const placeWarnings = await checkPlaceAssetConflicts(db, proposal, checkWindows, proposalId);
   warnings.push(...placeWarnings);
 
+  return warnings;
+}
+
+/**
+ * Detects schedule overlaps for proposer and invitees before submit (PC-40).
+ */
+export async function checkProposalConflictsAction(
+  proposalId: string,
+): Promise<{ ok: boolean; message: string; warnings: ProposalConflictWarning[] }> {
+  const session = await auth();
+  if (!session?.user) {
+    return { ok: false, message: "Sign in required.", warnings: [] };
+  }
+
+  await ensureDbReady();
+  const db = getDb();
+
+  const [proposal] = await db
+    .select()
+    .from(proposals)
+    .where(eq(proposals.id, proposalId))
+    .limit(1);
+
+  if (!proposal || proposal.proposerId !== session.user.id) {
+    return { ok: false, message: "Proposal not found.", warnings: [] };
+  }
+
+  const warnings = await gatherProposalConflictWarnings(db, proposal, proposalId);
+
   return {
     ok: true,
     message: warnings.length > 0 ? "Schedule conflicts detected." : "No conflicts.",
     warnings,
   };
+}
+
+/**
+ * Admin conflict check for proposals owned by another user (PC-118).
+ */
+export async function adminCheckProposalConflictsAction(
+  proposalId: string,
+): Promise<{ ok: boolean; message: string; warnings: ProposalConflictWarning[] }> {
+  const session = await auth();
+  if (!session?.user || !(await userHasAdminAccess(session.user.role))) {
+    return { ok: false, message: "Admin access required.", warnings: [] };
+  }
+
+  await ensureDbReady();
+  const db = getDb();
+
+  const [proposal] = await db
+    .select()
+    .from(proposals)
+    .where(eq(proposals.id, proposalId))
+    .limit(1);
+
+  if (!proposal) {
+    return { ok: false, message: "Proposal not found.", warnings: [] };
+  }
+
+  const warnings = await gatherProposalConflictWarnings(db, proposal, proposalId);
+
+  return {
+    ok: true,
+    message: warnings.length > 0 ? "Schedule conflicts detected." : "No conflicts.",
+    warnings,
+  };
+}
+
+/**
+ * Resolves a proposal as an admin actor (PC-118 admin fast sleeping add).
+ */
+export async function adminForceResolveProposalAction(
+  proposalId: string,
+  actorUserId: string,
+): Promise<{ ok: boolean; message: string }> {
+  await ensureDbReady();
+  const db = getDb();
+  await runProposalEnforcement(db);
+
+  const [proposal] = await db
+    .select()
+    .from(proposals)
+    .where(eq(proposals.id, proposalId))
+    .limit(1);
+
+  if (!proposal) {
+    return { ok: false, message: "Proposal not found." };
+  }
+
+  await applyPassiveInviteeAutoAccept(db, proposalId, actorUserId);
+  await resolveProposal(db, proposal, actorUserId);
+
+  return { ok: true, message: "Proposal resolved." };
 }
 
 /**
