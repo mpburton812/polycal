@@ -4,7 +4,8 @@ import BedIcon from "@mui/icons-material/Bed";
 import { Box, Typography } from "@mui/material";
 
 import type { ScheduleEvent } from "@/actions/schedule";
-import { EventSocialIcon } from "@/components/schedule/EventSocialIcon";
+import { EventCategoryIcon } from "@/lib/event-icons/EventCategoryIcon";
+import { isEventIconKey } from "@/lib/event-icons/registry";
 import { scheduleBlockSx, scheduleBlockVariant } from "@/lib/schedule/colors";
 import { formatEventTime } from "@/lib/schedule/dates";
 import { fontFamilies } from "@/theme/fonts";
@@ -142,17 +143,21 @@ export function ScheduleEventBlock({
           }}
         />
       ) : (
-        <EventSocialIcon
-          sx={{
-            position: "absolute",
-            right: compact ? 0 : 2,
-            bottom: compact ? -2 : 0,
-            fontSize: compact ? 44 : 56,
-            opacity: 0.2,
-            color: "currentColor",
-            pointerEvents: "none",
-          }}
-        />
+        !event.isContentMasked &&
+        isEventIconKey(event.eventIconKey) && (
+          <EventCategoryIcon
+            iconKey={event.eventIconKey}
+            sx={{
+              position: "absolute",
+              right: compact ? 0 : 2,
+              bottom: compact ? -2 : 0,
+              fontSize: compact ? 44 : 56,
+              opacity: 0.2,
+              color: "currentColor",
+              pointerEvents: "none",
+            }}
+          />
+        )
       )}
       <Box sx={{ position: "relative", zIndex: 1, minWidth: 0 }}>
         <Typography
