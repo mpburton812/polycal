@@ -159,3 +159,4 @@
 2026-07-09 | ed8af9a | PC-117 | retrigger CI after rebase | n/a
 2026-07-09 | db56edc | PC-118 | admin fast sleeping plan add | src/actions/admin-fast-sleeping.test.ts
 2026-07-09 | 96866d0 | PC-118 | merge origin/dev into feature branch | n/a
+2026-07-09 | c6a0e45 | PC-118 | default unset timezone to US Eastern | src/lib/schedule/timezone.test.ts
