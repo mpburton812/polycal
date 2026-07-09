@@ -156,3 +156,5 @@
 2026-07-09 | 48b4478 | PC-115 | event schedule views user journey E2E suite | src/actions/proposals/_core.ts
 2026-07-09 | 996cf0d | PC-115 | event schedule views user journey E2E suite | src/actions/proposals/_core.ts
 2026-07-09 | ba3b751 | PC-116 | event category icons phase 1 — registry, DB, picker, week view | src/actions/proposals/_core.ts
+2026-07-09 | ed8af9a | PC-117 | retrigger CI after rebase | n/a
+2026-07-09 | db56edc | PC-118 | admin fast sleeping plan add | src/actions/admin-fast-sleeping.test.ts
