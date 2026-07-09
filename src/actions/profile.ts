@@ -13,6 +13,7 @@ import { sendEmail } from "@/lib/email/send";
 import { isUserThemeId, normalizeUserThemeId, type UserThemeId } from "@/lib/constants/themes";
 import { resolveTimezone } from "@/lib/schedule/timezone";
 import { AVATAR_OPTIONS, isCustomAvatarKey, type AvatarKey } from "@/lib/constants/avatars";
+import { isCroppedAvatarLargeEnough } from "@/lib/avatars/crop";
 import { getDb } from "@/lib/db/client";
 import { ensureDbReady } from "@/lib/db/ensure-ready";
 import { storedImages, users } from "@/lib/db/schema";
@@ -71,6 +72,13 @@ async function readAvatarUpload(
   }
   if (file.size > MAX_AVATAR_BYTES) {
     return { ok: false, error: "Image must be 2 MB or smaller." };
+  }
+
+  if (!isCroppedAvatarLargeEnough(file.size)) {
+    return {
+      ok: false,
+      error: "Image is too small after crop. Zoom in or choose a larger photo.",
+    };
   }
 
   const mimeType = file.type || guessImageMime(file.name);
