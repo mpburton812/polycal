@@ -1345,6 +1345,7 @@ async function createRecurringChildProposals(
       isRecurrenceParent: false,
       bedroomIndex: parent.bedroomIndex,
       notes: parent.notes,
+      eventIconKey: parent.eventIconKey,
       createdAt: now,
       updatedAt: now,
     });
@@ -1633,6 +1634,8 @@ export async function createDraftProposalAction(
     reminderOffsetMinutes:
       parsed.data.proposalType === "event" ? (parsed.data.reminderOffsetMinutes ?? null) : null,
     reminderSentAt: null,
+    eventIconKey:
+      parsed.data.proposalType === "event" ? (parsed.data.eventIconKey ?? null) : null,
     createdAt: now,
     updatedAt: now,
   });
@@ -1837,6 +1840,10 @@ export async function updateDraftProposalAction(
         parsed.data.reminderOffsetMinutes !== proposal.reminderOffsetMinutes
           ? null
           : proposal.reminderSentAt,
+      eventIconKey:
+        parsed.data.proposalType === "event"
+          ? (parsed.data.eventIconKey ?? null)
+          : null,
       updatedAt: now,
     })
     .where(eq(proposals.id, proposal.id));
@@ -2168,6 +2175,7 @@ export async function getProposalDetailAction(
       isBatchSleeping: proposals.isBatchSleeping,
       batchEntriesJson: proposals.batchEntriesJson,
       reminderOffsetMinutes: proposals.reminderOffsetMinutes,
+      eventIconKey: proposals.eventIconKey,
     })
     .from(proposals)
     .innerJoin(users, eq(proposals.proposerId, users.id))
@@ -2493,6 +2501,8 @@ export async function getProposalDetailAction(
       optionalPollPending,
       displayState,
       reminderOffsetMinutes: row.reminderOffsetMinutes ?? null,
+      eventIconKey:
+        masked || row.proposalType !== "event" ? null : row.eventIconKey ?? null,
       specialKind: getProposalSpecialKind(row.description) ?? undefined,
     },
   };
@@ -3473,6 +3483,8 @@ export async function cloneProposalAction(
     isPoll: source.isPoll,
     bedroomIndex: source.bedroomIndex,
     notes: source.notes,
+    isAllDay: source.isAllDay,
+    eventIconKey: source.eventIconKey,
     createdAt: now,
     updatedAt: now,
   });

@@ -42,6 +42,8 @@ export interface ProposalCard {
   workflowStatus?: "proposed" | "declined";
   /** Residency or group name proposals using standard draft workflow (PC-60). */
   specialKind?: "residency" | "group_name";
+  /** Category icon key; null when masked or unset (PC-116). */
+  eventIconKey?: string | null;
 }
 
 export type RecurrencePattern = "daily" | "weekly" | "monthly" | "yearly";
@@ -157,6 +159,8 @@ export interface ProposalDetail {
   displayState: ProposalState;
   /** Minutes before event start to send reminder (PC-65). */
   reminderOffsetMinutes: number | null;
+  /** Optional category icon for social events (PC-116). */
+  eventIconKey: string | null;
   specialKind?: "residency" | "group_name";
 }
 

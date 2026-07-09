@@ -4,7 +4,8 @@ import BedIcon from "@mui/icons-material/Bed";
 import { Box, Typography } from "@mui/material";
 
 import type { ScheduleEvent } from "@/actions/schedule";
-import { EventSocialIcon } from "@/components/schedule/EventSocialIcon";
+import { EventCategoryIcon } from "@/lib/event-icons/EventCategoryIcon";
+import { isEventIconKey } from "@/lib/event-icons/registry";
 import { scheduleBlockSx, type ScheduleBlockVariant } from "@/lib/schedule/colors";
 
 interface MonthEventChipProps {
@@ -52,15 +53,16 @@ export function MonthEventIcon({ event, variant, onClick }: MonthEventChipProps)
             filter: `drop-shadow(0 0 0.75px ${colors.color})`,
           }}
         />
-      ) : (
-        <EventSocialIcon
+      ) : isEventIconKey(event.eventIconKey) ? (
+        <EventCategoryIcon
+          iconKey={event.eventIconKey}
           sx={{
             fontSize: 16,
             color: colors.bgcolor,
             filter: `drop-shadow(0 0 0.75px ${colors.color})`,
           }}
         />
-      )}
+      ) : null}
     </Box>
   );
 }

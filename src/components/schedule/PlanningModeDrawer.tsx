@@ -13,6 +13,8 @@ import {
 } from "@mui/material";
 
 import type { SchedulePlanningItem } from "@/actions/schedule";
+import { EventCategoryIcon } from "@/lib/event-icons/EventCategoryIcon";
+import { isEventIconKey } from "@/lib/event-icons/registry";
 
 interface PlanningModeDrawerProps {
   open: boolean;
@@ -65,7 +67,17 @@ export function PlanningModeDrawer({
 
             return (
               <ListItemButton key={item.id} onClick={() => onSelect(item.id)}>
-                <ListItemText primary={item.title} secondary={secondary} />
+                <ListItemText
+                  primary={
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
+                      {item.proposalType === "event" && isEventIconKey(item.eventIconKey) ? (
+                        <EventCategoryIcon iconKey={item.eventIconKey} labeled sx={{ fontSize: 18 }} />
+                      ) : null}
+                      <span>{item.title}</span>
+                    </Box>
+                  }
+                  secondary={secondary}
+                />
                 <StackedChips state={item.state} onCalendar={onCalendar} />
               </ListItemButton>
             );
