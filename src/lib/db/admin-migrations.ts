@@ -15,7 +15,22 @@ export async function applyAdminMigrations(sql: Client): Promise<void> {
   await ensureColumn(sql, "poly_group", "admin_can_see_super_private", "INTEGER NOT NULL DEFAULT 0");
   await ensureColumn(sql, "poly_group", "audit_log_visibility", "TEXT NOT NULL DEFAULT 'admin_only'");
   await ensureColumn(sql, "poly_group", "hide_sleeping_arrangements", "INTEGER NOT NULL DEFAULT 0");
-  await ensureColumn(sql, "poly_group", "places_map_visibility", "TEXT NOT NULL DEFAULT 'none'");
+  await ensureColumn(sql, "poly_group", "places_map_visibility", "TEXT NOT NULL DEFAULT 'all'");
+
+  const mapDefaultFlag = await sql.execute(
+    `SELECT value FROM schema_meta WHERE key = 'places_map_default_all_v1' LIMIT 1`,
+  );
+  if (mapDefaultFlag.rows.length === 0) {
+    await sql.execute(
+      `UPDATE poly_group SET places_map_visibility = 'all' WHERE places_map_visibility = 'none'`,
+    );
+    await sql.execute({
+      sql: `INSERT INTO schema_meta (key, value) VALUES ('places_map_default_all_v1', '1')
+            ON CONFLICT(key) DO NOTHING`,
+      args: [],
+    });
+  }
+
   await ensureColumn(sql, "poly_group", "log_tail_length", "INTEGER NOT NULL DEFAULT 100");
   await ensureColumn(sql, "poly_group", "onboarding_welcome_message", "TEXT");
 

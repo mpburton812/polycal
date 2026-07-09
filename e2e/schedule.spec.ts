@@ -18,7 +18,7 @@ test.describe("Schedule calendar", () => {
   });
 
   test("shows resolved and proposed seed events for invitee", async ({ page }) => {
-    await expect(page.getByRole("button", { name: /Yavin 4 victory celebration/i })).toBeVisible();
+    await expect(page.getByRole("button", { name: /Yavin 4 victory celebration/i }).first()).toBeVisible();
 
     /** Proposed items always appear in planning mode; calendar week scan is only for tentative blocks. */
     await page.getByRole("button", { name: "Planning", exact: true }).click();
@@ -27,7 +27,7 @@ test.describe("Schedule calendar", () => {
   });
 
   test("opens proposal detail from calendar block", async ({ page }) => {
-    await page.getByRole("button", { name: /Yavin 4 victory celebration/i }).click();
+    await page.getByRole("button", { name: /Yavin 4 victory celebration/i }).first().click();
     await expect(page.getByRole("dialog")).toBeVisible();
     await expect(page.getByRole("dialog").getByRole("heading", { name: "Yavin 4 victory celebration" })).toBeVisible();
   });

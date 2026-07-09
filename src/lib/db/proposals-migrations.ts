@@ -25,7 +25,7 @@ export async function applyProposalsMigrations(sql: Client): Promise<void> {
   await ensureColumn(sql, "proposals", "reminder_offset_minutes", "INTEGER");
   await ensureColumn(sql, "proposals", "reminder_sent_at", "TEXT");
   await ensureColumn(sql, "proposals", "is_all_day", "INTEGER NOT NULL DEFAULT 0");
-  await ensureColumn(sql, "proposals", "detached_from_parent_id", "TEXT REFERENCES proposals(id)");
+  await ensureColumn(sql, "proposals", "detached_from_parent_id", "TEXT");
   await ensureColumn(sql, "proposals", "detached_from_slot_id", "TEXT");
   await ensureColumn(sql, "proposals", "detached_at", "TEXT");
   await ensureColumn(sql, "poly_group", "recovery_max_hours", "INTEGER NOT NULL DEFAULT 48");

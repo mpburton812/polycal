@@ -4,6 +4,7 @@ import BedIcon from "@mui/icons-material/Bed";
 import { Box, Typography } from "@mui/material";
 
 import type { ScheduleEvent } from "@/actions/schedule";
+import { EventSocialIcon } from "@/components/schedule/EventSocialIcon";
 import { scheduleBlockSx, scheduleBlockVariant } from "@/lib/schedule/colors";
 import { formatEventTime } from "@/lib/schedule/dates";
 import { fontFamilies } from "@/theme/fonts";
@@ -127,7 +128,7 @@ export function ScheduleEventBlock({
         },
       }}
     >
-      {isSleeping && (
+      {isSleeping ? (
         <BedIcon
           aria-hidden
           sx={{
@@ -136,6 +137,18 @@ export function ScheduleEventBlock({
             bottom: compact ? 0 : 2,
             fontSize: compact ? 40 : 52,
             opacity: 0.18,
+            color: "currentColor",
+            pointerEvents: "none",
+          }}
+        />
+      ) : (
+        <EventSocialIcon
+          sx={{
+            position: "absolute",
+            right: compact ? 0 : 2,
+            bottom: compact ? -2 : 0,
+            fontSize: compact ? 44 : 56,
+            opacity: 0.2,
             color: "currentColor",
             pointerEvents: "none",
           }}
