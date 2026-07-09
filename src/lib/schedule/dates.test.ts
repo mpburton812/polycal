@@ -111,4 +111,16 @@ describe("formatEventTime", () => {
     expect(label).toMatch(/Jun/i);
     expect(label).toMatch(/26/);
   });
+
+  it("formats same-day evening events in the viewer timezone (PC-117)", () => {
+    const startAt = "2026-07-16T22:00:00.000Z";
+    const endAt = "2026-07-17T00:40:00.000Z";
+    const label = formatEventTime(startAt, endAt, "event", "America/New_York");
+    expect(label).toMatch(/6:00/);
+    expect(label).toMatch(/8:40/);
+    expect(label).not.toMatch(/Jul 17/);
+    expect(localDateKey(startAt, "America/New_York")).toBe(
+      localDateKey(endAt, "America/New_York"),
+    );
+  });
 });

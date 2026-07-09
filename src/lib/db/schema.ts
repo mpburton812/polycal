@@ -47,6 +47,8 @@ export const users = sqliteTable("users", {
   notificationPrefsJson: text("notification_prefs_json"),
   /** IANA timezone for schedule display normalization (PC-48 / spec §10). */
   timezone: text("timezone").notNull().default("UTC"),
+  /** Optional blurb shown under the user's name on People & Places (PC-117). */
+  profileBio: text("profile_bio"),
   onboardingComplete: integer("onboarding_complete", { mode: "boolean" }).notNull().default(true),
   sessionVersion: integer("session_version").notNull().default(0),
   activatedFromPassiveAt: text("activated_from_passive_at"),
