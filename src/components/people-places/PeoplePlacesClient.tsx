@@ -994,6 +994,11 @@ export function PeoplePlacesClient({
                     <Typography fontWeight={600}>{person.displayName}</Typography>
                     <Chip size="small" label={person.role} variant="outlined" />
                   </Stack>
+                  {person.profileBio ? (
+                    <Typography variant="body2" color="text.secondary" sx={{ mt: 0.25 }}>
+                      {person.profileBio}
+                    </Typography>
+                  ) : null}
                 </Box>
               </Stack>
               {canExpand && selectedPersonId === person.id && selectedPerson && (

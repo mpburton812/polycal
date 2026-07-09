@@ -24,9 +24,11 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - PC-114: Detach slice migration on remote DBs; MAP visibility defaults to Everyone; month heat-map ring on day numbers.
 - PC-112: Custom avatar crop — react-easy-crop, zoom out (0.5×–3×), load-gated confirm, JPEG background fill, server-side minimum crop size.
+- PC-117: Schedule time labels use viewer timezone for same-day evening events (unit test coverage).
 
 ### Added
 
+- PC-117: Optional profile bio on first login and settings; shown under names in People & Places.
 - PC-115: Event schedule views user journey E2E (10 serial flows: solo/recurring, invitee votes, week/2-week/month).
 - PC-116 (phase 1): Optional event category icons — registry, DB column, draft picker, week calendar watermark.
 - PC-116 (phase 2): Event icon on proposal cards and detail dialog.

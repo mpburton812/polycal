@@ -24,6 +24,7 @@ import { useState, useTransition } from "react";
 import {
   changePasswordAction,
   updateDisplayNameAction,
+  updateProfileBioAction,
   updateNotificationEmailAction,
   updateNotificationPrefsAction,
   updateProfilePreferencesAction,
@@ -38,6 +39,7 @@ import {
   resolveTimezone,
 } from "@/lib/schedule/timezone";
 import type { NotificationPrefs } from "@/types/notification-prefs";
+import { PROFILE_BIO_MAX_LENGTH } from "@/lib/users/profile-bio";
 import { subscribeToWebPush } from "@/lib/push-client";
 import { brutalPaperSx, brutalSectionTitleSx } from "@/theme/brutalUi";
 
@@ -50,6 +52,7 @@ const ALERT_TYPE_LABELS: Record<keyof NotificationPrefs["alertTypes"], string> =
 
 export function ProfileSettings({
   initialDisplayName,
+  initialProfileBio,
   initialAvatarKey,
   initialTheme,
   initialTimezone,
@@ -60,6 +63,7 @@ export function ProfileSettings({
   vapidPublicKey,
 }: {
   initialDisplayName: string;
+  initialProfileBio: string | null;
   initialAvatarKey: string | null;
   initialTheme: string;
   initialTimezone: string;
@@ -72,6 +76,7 @@ export function ProfileSettings({
   const router = useRouter();
   const { update } = useSession();
   const [displayName, setDisplayName] = useState(initialDisplayName);
+  const [profileBio, setProfileBio] = useState(initialProfileBio ?? "");
   const [avatarKey, setAvatarKey] = useState(initialAvatarKey ?? "bird_blue");
   const [theme, setTheme] = useState<UserThemeId>(normalizeUserThemeId(initialTheme));
   const [timezone, setTimezone] = useState(resolveTimezone(initialTimezone));
@@ -82,14 +87,17 @@ export function ProfileSettings({
   const [passwordMessage, setPasswordMessage] = useState<string | null>(null);
   const [prefsMessage, setPrefsMessage] = useState<string | null>(null);
   const [nameMessage, setNameMessage] = useState<string | null>(null);
+  const [bioMessage, setBioMessage] = useState<string | null>(null);
   const [notifMessage, setNotifMessage] = useState<string | null>(null);
   const [passwordError, setPasswordError] = useState<string | null>(null);
   const [prefsError, setPrefsError] = useState<string | null>(null);
   const [nameError, setNameError] = useState<string | null>(null);
+  const [bioError, setBioError] = useState<string | null>(null);
   const [notifError, setNotifError] = useState<string | null>(null);
   const [passwordPending, startPasswordTransition] = useTransition();
   const [prefsPending, startPrefsTransition] = useTransition();
   const [namePending, startNameTransition] = useTransition();
+  const [bioPending, startBioTransition] = useTransition();
   const [notifPending, startNotifTransition] = useTransition();
   const [avatarUploadPending, startAvatarUploadTransition] = useTransition();
   const [avatarUploadError, setAvatarUploadError] = useState<string | null>(null);
@@ -159,6 +167,20 @@ export function ProfileSettings({
       }
       setNameMessage("Display name updated.");
       await update({ user: { displayName } });
+      router.refresh();
+    });
+  }
+
+  function handleProfileBioSave() {
+    setBioError(null);
+    setBioMessage(null);
+    startBioTransition(async () => {
+      const result = await updateProfileBioAction(profileBio);
+      if (!result.ok) {
+        setBioError(result.error);
+        return;
+      }
+      setBioMessage("Bio updated.");
       router.refresh();
     });
   }
@@ -284,6 +306,34 @@ export function ProfileSettings({
           <Button variant="contained" onClick={handleDisplayNameSave} disabled={namePending}>
             Save
           </Button>
+        </Stack>
+      </Paper>
+
+      <Paper elevation={0} sx={brutalPaperSx}>
+        <Typography variant="h6" gutterBottom sx={brutalSectionTitleSx}>
+          About you
+        </Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+          Optional — shown under your name on People &amp; Places.
+        </Typography>
+        {bioError && <Alert severity="error" sx={{ mb: 2 }}>{bioError}</Alert>}
+        {bioMessage && <Alert severity="success" sx={{ mb: 2 }}>{bioMessage}</Alert>}
+        <Stack spacing={2}>
+          <TextField
+            label="About you"
+            value={profileBio}
+            onChange={(event) => setProfileBio(event.target.value)}
+            fullWidth
+            multiline
+            minRows={2}
+            inputProps={{ maxLength: PROFILE_BIO_MAX_LENGTH }}
+            helperText={`${profileBio.length}/${PROFILE_BIO_MAX_LENGTH} characters`}
+          />
+          <Box>
+            <Button variant="contained" onClick={handleProfileBioSave} disabled={bioPending}>
+              Save bio
+            </Button>
+          </Box>
         </Stack>
       </Paper>
 
