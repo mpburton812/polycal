@@ -6,6 +6,7 @@ import { getPolyGroupSettingsAction } from "@/actions/poly-group";
 import { listAdminUsersAction } from "@/actions/users";
 import { AdminActivityLogPanel } from "@/components/admin/AdminActivityLogPanel";
 import { AdminCodeStatusPanel } from "@/components/admin/AdminCodeStatusPanel";
+import { AdminFastSleepingPlanPanel } from "@/components/admin/AdminFastSleepingPlanPanel";
 import { AdminPolyGroupSettingsPanel } from "@/components/admin/AdminPolyGroupSettingsPanel";
 import { AdminTestDataPanel } from "@/components/admin/AdminTestDataPanel";
 import { AdminUserManagementPanel } from "@/components/admin/AdminUserManagementPanel";
@@ -47,6 +48,7 @@ export default async function AdminPage() {
           latestEntry={getLatestChangelogEntry()}
         />
         <AdminPolyGroupSettingsPanel initialSettings={settings} />
+        <AdminFastSleepingPlanPanel users={adminUsers} />
         <AdminUserManagementPanel users={adminUsers} currentUserId={session.user.id} />
         <AdminActivityLogPanel entries={logEntries} />
         {isNonProductionEnvironment() && <AdminTestDataPanel />}

@@ -26,6 +26,7 @@ function formatActionLabel(action: string): string {
     "proposal.submitted": "Submitted to network",
     "proposal.resolved": "Resolved",
     "proposal.redrafted": "Returned to draft",
+    "proposal.admin_fast_add": "Admin fast sleeping add",
     "proposal.attendees_updated": "Attendees updated",
     "proposal.comment_added": "Comment added",
     "proposal.child_detached": "Child detached",

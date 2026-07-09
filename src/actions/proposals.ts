@@ -22,6 +22,8 @@ export type { ProposalSliceDetail } from "./proposals/slice-types";
 export {
   acknowledgeProposalOverlapAction,
   addProposalCommentAction,
+  adminCheckProposalConflictsAction,
+  adminForceResolveProposalAction,
   cancelProposalAction,
   castProposalVoteAction,
   castSlotVoteAction,
