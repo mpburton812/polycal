@@ -37,6 +37,7 @@ test.describe("Admin Code Status journey", () => {
     await expect(dialog).toBeVisible();
     // Full log lists multiple promoted versions.
     await expect(dialog.getByText("2026.07.10").first()).toBeVisible();
+    await expect(dialog.getByText("2026.07.09").first()).toBeVisible();
     await expect(dialog.getByText("2026.07.08").first()).toBeVisible();
     await expect(dialog.getByText("2026.07.03").first()).toBeVisible();
 
