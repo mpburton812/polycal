@@ -692,6 +692,7 @@ export async function detachProposalSliceAction(
         isAllDay: true,
         bedroomIndex: parent.bedroomIndex,
         notes: parent.notes,
+        eventIconKey: parent.eventIconKey,
         detachedFromParentId: rootProposalId,
         detachedFromSlotId: sourceSlotId,
         detachedAt: now,
