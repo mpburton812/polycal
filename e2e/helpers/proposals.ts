@@ -123,6 +123,10 @@ export async function setAllInviteesRequired(dialog: Locator): Promise<void> {
   const count = await toggleButtons.count();
   for (let index = 0; index < count; index += 1) {
     const chip = toggleButtons.nth(index);
+    const inIconPicker = await chip.evaluate((el) =>
+      Boolean(el.closest('[data-testid="event-icon-picker"]')),
+    );
+    if (inIconPicker) continue;
     const text = (await chip.innerText()).trim();
     if (!text || /solo event|with invitees|solo/i.test(text)) {
       continue;
@@ -151,6 +155,11 @@ export async function saveProposalDraft(dialog: Locator): Promise<void> {
 export async function exitDraftDialog(dialog: Locator): Promise<void> {
   await dialog.getByRole("button", { name: "Exit" }).click();
   await expect(dialog).toBeHidden();
+}
+
+/** Selects an optional event category icon in the draft dialog (PC-116). */
+export async function selectEventIcon(dialog: Locator, a11yLabel: string): Promise<void> {
+  await dialog.getByRole("button", { name: a11yLabel }).click();
 }
 
 /** Submits a draft, confirming through schedule-conflict dialog when present. */

@@ -19,7 +19,7 @@ interface EventIconPickerProps {
  */
 export function EventIconPicker({ value, onChange }: EventIconPickerProps) {
   return (
-    <Box>
+    <Box data-testid="event-icon-picker">
       <ToggleButtonGroup
         exclusive
         value={value ?? ""}
