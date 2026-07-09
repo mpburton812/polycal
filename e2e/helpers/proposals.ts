@@ -1,7 +1,8 @@
 import { type Locator, type Page, expect } from "@playwright/test";
 
 import { fillProposalDateField, fillProposalDateTimeField } from "./datePickers";
-import { openProposalCard, selectProposalTab } from "./navigation";
+import { goToProposals, openProposalCard, selectProposalTab } from "./navigation";
+import { expectToast } from "./toast";
 
 /** Locates a proposal Kanban card by exact title heading. */
 export function proposalCard(page: Page, title: string | RegExp) {
@@ -459,6 +460,229 @@ export async function acceptProposalWithComment(page: Page, comment: string): Pr
   }
 
   await expect(dialog).toBeHidden({ timeout: 25_000 });
+}
+
+/** Creates and submits a solo timed event with description comment. */
+export async function createAndSubmitSoloTimedEvent(
+  page: Page,
+  options: {
+    title: string;
+    comment: string;
+    start: string;
+    end: string;
+  },
+): Promise<void> {
+  const dialog = await openEventProposalDraft(page);
+  await dialog.getByLabel("Title").fill(options.title);
+  await dialog.getByRole("button", { name: "Solo event (just me)" }).click();
+  await dialog.getByLabel(/Description/i).fill(options.comment);
+  await fillProposalDateTimeField(dialog.getByLabel("Start").first(), options.start);
+  await fillProposalDateTimeField(dialog.getByLabel("End (optional)").first(), options.end);
+  await dialog.getByRole("button", { name: "Save", exact: true }).click();
+  await submitProposalDraft(page, dialog);
+}
+
+/** Creates and submits a solo single-day all-day event with description comment. */
+export async function createAndSubmitSoloAllDayEvent(
+  page: Page,
+  options: {
+    title: string;
+    comment: string;
+    day: string;
+  },
+): Promise<void> {
+  const dialog = await openEventProposalDraft(page);
+  await dialog.getByLabel("Title").fill(options.title);
+  await dialog.getByRole("button", { name: "Solo event (just me)" }).click();
+  await dialog.getByLabel(/Description/i).fill(options.comment);
+  await dialog.getByRole("checkbox", { name: /All-day event/i }).check();
+  await fillProposalDateField(dialog.getByLabel(/^Day$/i).first(), options.day);
+  await dialog.getByRole("button", { name: "Save", exact: true }).click();
+  await submitProposalDraft(page, dialog);
+}
+
+/** Creates and submits a solo weekly recurring timed event with description comment. */
+export async function createAndSubmitSoloRecurringTimedEvent(
+  page: Page,
+  options: {
+    title: string;
+    comment: string;
+    start: string;
+    end: string;
+    occurrenceCount?: number;
+  },
+): Promise<void> {
+  const dialog = await openEventProposalDraft(page);
+  await dialog.getByLabel("Title").fill(options.title);
+  await dialog.getByRole("button", { name: "Solo event (just me)" }).click();
+  await dialog.getByLabel(/Description/i).fill(options.comment);
+  await dialog.getByRole("checkbox", { name: /Recurring series/i }).check();
+  await dialog.getByLabel("Occurrences").fill(String(options.occurrenceCount ?? 4));
+  await fillProposalDateTimeField(dialog.getByLabel("Start").first(), options.start);
+  await fillProposalDateTimeField(dialog.getByLabel("End (optional)").first(), options.end);
+  await dialog.getByRole("button", { name: "Save", exact: true }).click();
+  await submitProposalDraft(page, dialog);
+}
+
+/** Creates and submits a solo weekly recurring all-day event with description comment. */
+export async function createAndSubmitSoloRecurringAllDayEvent(
+  page: Page,
+  options: {
+    title: string;
+    comment: string;
+    day: string;
+    occurrenceCount?: number;
+  },
+): Promise<void> {
+  const dialog = await openEventProposalDraft(page);
+  await dialog.getByLabel("Title").fill(options.title);
+  await dialog.getByRole("button", { name: "Solo event (just me)" }).click();
+  await dialog.getByLabel(/Description/i).fill(options.comment);
+  await dialog.getByRole("checkbox", { name: /All-day event/i }).check();
+  await dialog.getByRole("checkbox", { name: /Recurring series/i }).check();
+  await dialog.getByLabel("Occurrences").fill(String(options.occurrenceCount ?? 4));
+  await fillProposalDateField(dialog.getByLabel(/^Day$/i).first(), options.day);
+  await dialog.getByRole("button", { name: "Save", exact: true }).click();
+  await submitProposalDraft(page, dialog);
+}
+
+/** Creates and submits a timed event with one invitee in the given role. */
+export async function createAndSubmitTimedEventWithInvitee(
+  page: Page,
+  options: {
+    title: string;
+    comment: string;
+    inviteeName: string;
+    inviteeRole: "required" | "optional";
+    start: string;
+    end: string;
+  },
+): Promise<void> {
+  const dialog = await openEventProposalDraft(page);
+  await dialog.getByLabel("Title").fill(options.title);
+  await dialog.getByLabel(/Description/i).fill(options.comment);
+  if (options.inviteeRole === "required") {
+    await setInviteeRequired(dialog, options.inviteeName);
+  } else {
+    await setInviteeOptional(dialog, options.inviteeName);
+  }
+  await fillProposalDateTimeField(dialog.getByLabel("Start").first(), options.start);
+  await fillProposalDateTimeField(dialog.getByLabel("End (optional)").first(), options.end);
+  await dialog.getByRole("button", { name: "Save", exact: true }).click();
+  await submitProposalDraft(page, dialog);
+}
+
+/** Re-drafts a resolved event, shifts schedule fields, and resubmits. */
+export async function moveResolvedEventByRedraft(
+  page: Page,
+  title: string,
+  options: {
+    start: string;
+    end?: string;
+    allDay?: boolean;
+  },
+): Promise<void> {
+  await goToProposals(page);
+  await selectProposalTab(page, "Resolved");
+  await openProposalCard(page, title);
+  const detailDialog = page.getByRole("dialog");
+  page.once("dialog", (dialog) => dialog.accept());
+  await detailDialog.getByRole("button", { name: "Re-draft" }).click();
+
+  const draftDialog = page.getByRole("dialog");
+  await expect(draftDialog.getByRole("heading", { name: /Edit draft/i })).toBeVisible({
+    timeout: 15_000,
+  });
+
+  if (options.allDay) {
+    await fillProposalDateField(draftDialog.getByLabel(/^Day$/i).first(), options.start);
+  } else {
+    await fillProposalDateTimeField(draftDialog.getByLabel("Start").first(), options.start);
+    if (options.end) {
+      await fillProposalDateTimeField(
+        draftDialog.getByLabel("End (optional)").first(),
+        options.end,
+      );
+    }
+  }
+
+  await draftDialog.getByRole("button", { name: "Save", exact: true }).click();
+  await submitProposalDraft(page, draftDialog);
+}
+
+/** Updates schedule fields on an existing draft and resubmits. */
+export async function moveDraftEventDates(
+  page: Page,
+  title: string,
+  options: {
+    start: string;
+    end?: string;
+    allDay?: boolean;
+  },
+): Promise<void> {
+  await goToProposals(page);
+  await selectProposalTab(page, "Drafts");
+  const draftDialog = await openDraftForEdit(page, title);
+
+  if (options.allDay) {
+    await fillProposalDateField(draftDialog.getByLabel(/^Day$/i).first(), options.start);
+  } else {
+    await fillProposalDateTimeField(draftDialog.getByLabel("Start").first(), options.start);
+    if (options.end) {
+      await fillProposalDateTimeField(
+        draftDialog.getByLabel("End (optional)").first(),
+        options.end,
+      );
+    }
+  }
+
+  await draftDialog.getByRole("button", { name: "Save", exact: true }).click();
+  await submitProposalDraft(page, draftDialog);
+}
+
+/** Invitee casts Accept, Abstain, or Decline on a proposal card. */
+export async function castInviteeVote(
+  page: Page,
+  options: {
+    title: string;
+    tab: "Proposed" | "Resolved";
+    vote: "Accept" | "Abstain" | "Decline";
+    comment?: string;
+  },
+): Promise<void> {
+  await selectProposalTab(page, options.tab);
+  await openProposalCard(page, options.title);
+  const dialog = page.getByRole("dialog");
+
+  if (options.comment) {
+    const optionalComment = dialog.getByPlaceholder("Add a comment (optional)…");
+    if (await optionalComment.isVisible().catch(() => false)) {
+      await optionalComment.fill(options.comment);
+    }
+  }
+
+  await dialog.getByRole("button", { name: options.vote, exact: true }).click();
+  await expectToast(page, /Vote recorded/i);
+
+  if (options.vote !== "Decline") {
+    await expect(dialog.getByText("RESOLVED", { exact: true }).first()).toBeVisible({
+      timeout: 20_000,
+    });
+  }
+
+  const closeButton = dialog.getByRole("button", { name: "Close" });
+  if (await closeButton.isVisible().catch(() => false)) {
+    await closeButton.click();
+  }
+  await expect(dialog).toBeHidden({ timeout: 15_000 }).catch(() => {});
+}
+
+/** Waits until a proposal title appears on the Resolved tab. */
+export async function expectResolvedProposal(page: Page, title: string): Promise<void> {
+  await selectProposalTab(page, "Resolved");
+  await expect(page.getByRole("heading", { name: title, level: 2 }).first()).toBeVisible({
+    timeout: 20_000,
+  });
 }
 
 /** Creates and submits a batch sleeping night with a required partner invitee. */
