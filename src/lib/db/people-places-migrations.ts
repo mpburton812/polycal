@@ -4,6 +4,7 @@ import type { Client } from "@libsql/client";
  * Phase 2 additive migrations — safe to run on databases created at schema v1/v2.
  */
 export async function applyPeoplePlacesMigrations(sql: Client): Promise<void> {
+  await ensureColumn(sql, "users", "profile_bio", "TEXT");
   await ensureColumn(sql, "poly_group", "allow_user_provisioning", "INTEGER NOT NULL DEFAULT 0");
   await ensureColumn(sql, "locations", "address", "TEXT");
   await ensureColumn(sql, "locations", "bedroom_count", "INTEGER NOT NULL DEFAULT 0");
