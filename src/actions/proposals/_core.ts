@@ -1345,6 +1345,7 @@ async function createRecurringChildProposals(
       isRecurrenceParent: false,
       bedroomIndex: parent.bedroomIndex,
       notes: parent.notes,
+      eventIconKey: parent.eventIconKey,
       createdAt: now,
       updatedAt: now,
     });
@@ -3482,6 +3483,8 @@ export async function cloneProposalAction(
     isPoll: source.isPoll,
     bedroomIndex: source.bedroomIndex,
     notes: source.notes,
+    isAllDay: source.isAllDay,
+    eventIconKey: source.eventIconKey,
     createdAt: now,
     updatedAt: now,
   });
