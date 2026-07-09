@@ -66,6 +66,8 @@ export interface ScheduleEvent {
   sliceKey: string;
   slotId: string | null;
   occurrenceProposalId: string | null;
+  /** Category icon key; omitted when content is masked (PC-116). */
+  eventIconKey: string | null;
 }
 
 export interface SchedulePlanningItem {
@@ -235,6 +237,7 @@ export async function listScheduleEventsAction(
       isBatchSleeping: proposals.isBatchSleeping,
       parentProposalId: proposals.parentProposalId,
       isRecurrenceParent: proposals.isRecurrenceParent,
+      eventIconKey: proposals.eventIconKey,
     })
     .from(proposals)
     .innerJoin(users, eq(proposals.proposerId, users.id))
@@ -501,6 +504,8 @@ export async function listScheduleEventsAction(
         sliceKey: window.sliceKey,
         slotId: window.slotId,
         occurrenceProposalId: window.occurrenceProposalId,
+        eventIconKey:
+          isContentMasked || row.proposalType !== "event" ? null : row.eventIconKey ?? null,
       });
     }
   }

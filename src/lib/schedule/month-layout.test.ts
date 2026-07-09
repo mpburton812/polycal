@@ -36,6 +36,7 @@ function makeEvent(overrides: Partial<ScheduleEvent> = {}): ScheduleEvent {
     sliceKey: "prop-1",
     slotId: null,
     occurrenceProposalId: null,
+    eventIconKey: null,
     ...overrides,
   };
 }

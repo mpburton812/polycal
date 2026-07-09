@@ -77,6 +77,8 @@ import {
   reminderOffsetToMinutes,
 } from "@/lib/proposals/event-reminder";
 import { ProposalScheduleField } from "./ProposalScheduleFields";
+import { EventIconPicker } from "./EventIconPicker";
+import { isEventIconKey, type EventIconKey } from "@/lib/event-icons/registry";
 
 type InviteeSelection = "none" | "required" | "optional";
 
@@ -222,6 +224,7 @@ export function ProposalDraftDialog({
     [],
   );
   const [eventPrivacy, setEventPrivacy] = useState<"open" | "private" | "super_private">("open");
+  const [eventIconKey, setEventIconKey] = useState<EventIconKey | null>(null);
   const [isRecurring, setIsRecurring] = useState(false);
   const [recurrencePattern, setRecurrencePattern] = useState<
     "daily" | "weekly" | "monthly" | "yearly"
@@ -368,6 +371,9 @@ export function ProposalDraftDialog({
       setIsPoll(initialDetail.isPoll);
       setAllDay(initialDetail.proposalType === "event" && initialDetail.isAllDay);
       setEventPrivacy(initialDetail.eventPrivacy);
+      setEventIconKey(
+        isEventIconKey(initialDetail.eventIconKey) ? initialDetail.eventIconKey : null,
+      );
       setIsRecurring(initialDetail.isRecurrenceParent);
       if (initialDetail.recurrenceRule) {
         setRecurrencePattern(initialDetail.recurrenceRule.pattern);
@@ -458,6 +464,7 @@ export function ProposalDraftDialog({
     setIsPoll(detail.isPoll);
     setAllDay(detail.proposalType === "event" && detail.isAllDay);
     setEventPrivacy(detail.eventPrivacy);
+    setEventIconKey(isEventIconKey(detail.eventIconKey) ? detail.eventIconKey : null);
     setIsRecurring(detail.isRecurrenceParent);
     if (detail.recurrenceRule) {
       setRecurrencePattern(detail.recurrenceRule.pattern);
@@ -576,6 +583,7 @@ export function ProposalDraftDialog({
       isPoll: proposalType === "event" ? isPoll : false,
       isAllDay: proposalType === "event" ? allDay : false,
       eventPrivacy,
+      eventIconKey: proposalType === "event" ? eventIconKey : null,
       isRecurring: !batchMode && isRecurring,
       recurrenceRule:
         !batchMode && isRecurring
@@ -848,6 +856,14 @@ export function ProposalDraftDialog({
                 <MenuItem value="super_private">Super private</MenuItem>
               </Select>
             </FormControl>
+            {proposalType === "event" && (
+              <Box>
+                <Typography variant="subtitle2" sx={{ fontWeight: 600, color: POLY_GREEN, mb: 1 }}>
+                  Event icon (optional)
+                </Typography>
+                <EventIconPicker value={eventIconKey} onChange={setEventIconKey} />
+              </Box>
+            )}
           </Stack>
 
           <Divider sx={{ my: 2 }} />

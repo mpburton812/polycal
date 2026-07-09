@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { EVENT_ICON_KEYS } from "@/lib/event-icons/registry";
 import { batchSleepingEntriesSchema } from "@/lib/proposals/batch-sleeping";
 
 export const inviteeInputSchema = z.object({
@@ -39,6 +40,7 @@ export const draftProposalSchema = z.object({
   isBatchSleeping: z.boolean().optional(),
   batchEntries: batchSleepingEntriesSchema.optional(),
   reminderOffsetMinutes: z.number().int().min(1).max(525600).nullable().optional(),
+  eventIconKey: z.enum(EVENT_ICON_KEYS).nullable().optional(),
 });
 
 export const commentSchema = z.object({
