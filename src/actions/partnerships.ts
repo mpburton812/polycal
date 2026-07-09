@@ -460,6 +460,8 @@ export interface SleepingPartnershipMapEdge {
   userHighId: string;
   lowName: string;
   highName: string;
+  lowAvatarKey: string | null;
+  highAvatarKey: string | null;
 }
 
 /**
@@ -478,7 +480,7 @@ export async function listSleepingPartnershipMapEdgesAction(): Promise<SleepingP
     .where(eq(polyGroup.id, 1))
     .limit(1);
 
-  const visibility = group?.placesMapVisibility ?? "none";
+  const visibility = group?.placesMapVisibility ?? "all";
   const isAdmin = await userHasAdminAccess(session.user.role);
   if (visibility === "none") return [];
   if (visibility === "admins" && !isAdmin) return [];
@@ -500,16 +502,19 @@ export async function listSleepingPartnershipMapEdgesAction(): Promise<SleepingP
   }
 
   const userRows = await db
-    .select({ id: users.id, displayName: users.displayName })
+    .select({ id: users.id, displayName: users.displayName, avatarKey: users.avatarKey })
     .from(users)
     .where(inArray(users.id, [...userIds]));
 
   const nameById = new Map(userRows.map((row) => [row.id, row.displayName]));
+  const avatarById = new Map(userRows.map((row) => [row.id, row.avatarKey]));
 
   return rows.map((row) => ({
     userLowId: row.userLowId,
     userHighId: row.userHighId,
     lowName: nameById.get(row.userLowId) ?? "Member",
     highName: nameById.get(row.userHighId) ?? "Member",
+    lowAvatarKey: avatarById.get(row.userLowId) ?? null,
+    highAvatarKey: avatarById.get(row.userHighId) ?? null,
   }));
 }

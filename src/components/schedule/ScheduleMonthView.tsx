@@ -140,13 +140,38 @@ export function ScheduleMonthView({
                       flexShrink: 0,
                     }}
                   >
-                    <Typography
-                      variant="caption"
-                      fontWeight={isToday ? 800 : 600}
-                      color={isToday ? "primary.main" : "text.primary"}
+                    <Box
+                      sx={{
+                        position: "relative",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        width: 22,
+                        height: 22,
+                      }}
+                      aria-label={`Network busyness: ${busynessLabel}`}
                     >
-                      {day.getDate()}
-                    </Typography>
+                      <Box
+                        component="span"
+                        sx={{
+                          position: "absolute",
+                          inset: 0,
+                          borderRadius: "50%",
+                          bgcolor: LEVEL_COLORS[busynessLevel],
+                          border: "1px solid",
+                          borderColor: "divider",
+                        }}
+                        aria-hidden
+                      />
+                      <Typography
+                        variant="caption"
+                        fontWeight={isToday ? 800 : 600}
+                        color={isToday ? "primary.main" : "text.primary"}
+                        sx={{ position: "relative", zIndex: 1, lineHeight: 1 }}
+                      >
+                        {day.getDate()}
+                      </Typography>
+                    </Box>
                     <StateDotStrip variants={dayLayout.stateDots} />
                   </Box>
 
@@ -178,21 +203,6 @@ export function ScheduleMonthView({
                       onClick={() => onDayClick?.(day)}
                     />
                   </Box>
-
-                  <Box
-                    sx={{
-                      position: "absolute",
-                      bottom: 4,
-                      left: 4,
-                      width: 10,
-                      height: 10,
-                      borderRadius: 0.5,
-                      bgcolor: LEVEL_COLORS[busynessLevel],
-                      border: "1px solid",
-                      borderColor: "divider",
-                    }}
-                    aria-label={`Network busyness: ${busynessLabel}`}
-                  />
                 </Box>
               );
             })}

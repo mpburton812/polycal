@@ -11,9 +11,17 @@ import {
   Stack,
   Typography,
 } from "@mui/material";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import Cropper, { type Area, type Point } from "react-easy-crop";
+import "react-easy-crop/react-easy-crop.css";
 
-const OUTPUT_SIZE = 256;
+import {
+  AVATAR_CROP_MAX_ZOOM,
+  AVATAR_CROP_MIN_ZOOM,
+  getCroppedAvatarFile,
+} from "@/lib/avatars/crop";
+
+const CROP_VIEW_HEIGHT = 280;
 
 interface AvatarCropDialogProps {
   open: boolean;
@@ -23,16 +31,16 @@ interface AvatarCropDialogProps {
 }
 
 /**
- * Circular avatar crop — pan and zoom before upload (PC-65).
+ * Circular avatar crop with react-easy-crop — pan, zoom out/in, WYSIWYG export (PC-65 / PC-112).
  */
 export function AvatarCropDialog({ open, file, onClose, onConfirm }: AvatarCropDialogProps) {
   const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [crop, setCrop] = useState<Point>({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
-  const [offset, setOffset] = useState({ x: 0, y: 0 });
-  const dragRef = useRef<{ startX: number; startY: number; baseX: number; baseY: number } | null>(
-    null,
-  );
-  const imageRef = useRef<HTMLImageElement | null>(null);
+  const [imageLoaded, setImageLoaded] = useState(false);
+  const [croppedAreaPixels, setCroppedAreaPixels] = useState<Area | null>(null);
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!file) {
@@ -41,145 +49,104 @@ export function AvatarCropDialog({ open, file, onClose, onConfirm }: AvatarCropD
     }
     const url = URL.createObjectURL(file);
     setImageUrl(url);
+    setCrop({ x: 0, y: 0 });
     setZoom(1);
-    setOffset({ x: 0, y: 0 });
+    setImageLoaded(false);
+    setCroppedAreaPixels(null);
+    setExportError(null);
     return () => URL.revokeObjectURL(url);
   }, [file]);
 
-  const handlePointerDown = useCallback(
-    (event: React.PointerEvent) => {
-      event.currentTarget.setPointerCapture(event.pointerId);
-      dragRef.current = {
-        startX: event.clientX,
-        startY: event.clientY,
-        baseX: offset.x,
-        baseY: offset.y,
-      };
-    },
-    [offset.x, offset.y],
-  );
-
-  const handlePointerMove = useCallback((event: React.PointerEvent) => {
-    if (!dragRef.current) return;
-    setOffset({
-      x: dragRef.current.baseX + (event.clientX - dragRef.current.startX),
-      y: dragRef.current.baseY + (event.clientY - dragRef.current.startY),
-    });
+  const onCropComplete = useCallback((_area: Area, areaPixels: Area) => {
+    setCroppedAreaPixels(areaPixels);
   }, []);
 
-  const handlePointerUp = useCallback(() => {
-    dragRef.current = null;
-  }, []);
-
-  function cropToFile(): File | null {
-    const img = imageRef.current;
-    if (!img || !file) return null;
-
-    const canvas = document.createElement("canvas");
-    canvas.width = OUTPUT_SIZE;
-    canvas.height = OUTPUT_SIZE;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return null;
-
-    const viewSize = 220;
-    const scale = (viewSize / Math.min(img.naturalWidth, img.naturalHeight)) * zoom;
-    const drawW = img.naturalWidth * scale;
-    const drawH = img.naturalHeight * scale;
-    const centerX = viewSize / 2 + offset.x;
-    const centerY = viewSize / 2 + offset.y;
-    const sx = centerX - drawW / 2;
-    const sy = centerY - drawH / 2;
-
-    ctx.beginPath();
-    ctx.arc(OUTPUT_SIZE / 2, OUTPUT_SIZE / 2, OUTPUT_SIZE / 2, 0, Math.PI * 2);
-    ctx.closePath();
-    ctx.clip();
-
-    const ratio = OUTPUT_SIZE / viewSize;
-    ctx.drawImage(img, sx * ratio, sy * ratio, drawW * ratio, drawH * ratio);
-
-    const mime = file.type === "image/png" ? "image/png" : "image/jpeg";
-    const dataUrl = canvas.toDataURL(mime, 0.92);
-    const binary = atob(dataUrl.split(",")[1] ?? "");
-    const bytes = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i += 1) {
-      bytes[i] = binary.charCodeAt(i);
+  async function handleConfirm() {
+    if (!imageUrl || !file || !croppedAreaPixels || !imageLoaded) {
+      return;
     }
-    const ext = mime === "image/png" ? "png" : "jpg";
-    return new File([bytes], `avatar.${ext}`, { type: mime });
+
+    setExporting(true);
+    setExportError(null);
+    try {
+      const cropped = await getCroppedAvatarFile(imageUrl, croppedAreaPixels, file.type);
+      if (!cropped) {
+        setExportError("Could not process this image. Wait for it to load or try another photo.");
+        return;
+      }
+      onConfirm(cropped);
+    } catch {
+      setExportError("Could not process this image. Try another photo.");
+    } finally {
+      setExporting(false);
+    }
   }
 
-  function handleConfirm() {
-    const cropped = cropToFile();
-    if (!cropped) return;
-    onConfirm(cropped);
-  }
+  const canConfirm = imageLoaded && croppedAreaPixels !== null && !exporting;
 
   return (
     <Dialog open={open} onClose={onClose} fullWidth maxWidth="xs">
       <DialogTitle>Adjust avatar</DialogTitle>
       <DialogContent>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-          Drag to reposition and use the slider to zoom. The circle is what others will see.
+          Drag to reposition. Slide left to fit more of the photo, right to crop in. The circle is
+          what others will see.
         </Typography>
         <Box
-          onPointerDown={handlePointerDown}
-          onPointerMove={handlePointerMove}
-          onPointerUp={handlePointerUp}
-          onPointerCancel={handlePointerUp}
           sx={{
             position: "relative",
-            width: 220,
-            height: 220,
-            mx: "auto",
-            borderRadius: "50%",
+            width: "100%",
+            height: CROP_VIEW_HEIGHT,
+            bgcolor: "grey.900",
+            borderRadius: 1,
             overflow: "hidden",
-            bgcolor: "grey.200",
-            cursor: "grab",
-            touchAction: "none",
-            border: "2px solid",
-            borderColor: "divider",
           }}
         >
           {imageUrl && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              ref={imageRef}
-              src={imageUrl}
-              alt="Avatar preview"
-              draggable={false}
-              style={{
-                position: "absolute",
-                left: "50%",
-                top: "50%",
-                transform: `translate(calc(-50% + ${offset.x}px), calc(-50% + ${offset.y}px)) scale(${zoom})`,
-                transformOrigin: "center center",
-                maxWidth: "none",
-                userSelect: "none",
-                pointerEvents: "none",
-              }}
-              onLoad={(event) => {
-                imageRef.current = event.currentTarget;
-              }}
+            <Cropper
+              image={imageUrl}
+              crop={crop}
+              zoom={zoom}
+              aspect={1}
+              cropShape="round"
+              showGrid={false}
+              objectFit="contain"
+              minZoom={AVATAR_CROP_MIN_ZOOM}
+              maxZoom={AVATAR_CROP_MAX_ZOOM}
+              onCropChange={setCrop}
+              onZoomChange={setZoom}
+              onCropComplete={onCropComplete}
+              onMediaLoaded={() => setImageLoaded(true)}
             />
           )}
         </Box>
-        <Stack spacing={1} sx={{ mt: 2 }}>
-          <Typography variant="caption">Zoom</Typography>
+        <Stack spacing={0.5} sx={{ mt: 2 }}>
+          <Stack direction="row" justifyContent="space-between">
+            <Typography variant="caption">Fit</Typography>
+            <Typography variant="caption">Crop in</Typography>
+          </Stack>
           <Slider
-            min={1}
-            max={3}
+            min={AVATAR_CROP_MIN_ZOOM}
+            max={AVATAR_CROP_MAX_ZOOM}
             step={0.05}
             value={zoom}
             onChange={(_, value) => setZoom(value as number)}
             aria-label="Avatar zoom"
+            disabled={!imageLoaded}
           />
         </Stack>
+        {exportError && (
+          <Typography variant="body2" color="error" sx={{ mt: 1 }}>
+            {exportError}
+          </Typography>
+        )}
       </DialogContent>
       <DialogActions>
-        <Button onClick={onClose}>Cancel</Button>
-        <Button variant="contained" onClick={handleConfirm} disabled={!imageUrl}>
-          Use photo
+        <Button onClick={onClose} disabled={exporting}>
+          Cancel
+        </Button>
+        <Button variant="contained" onClick={() => void handleConfirm()} disabled={!canConfirm}>
+          {exporting ? "Processing…" : imageLoaded ? "Use photo" : "Loading…"}
         </Button>
       </DialogActions>
     </Dialog>

@@ -148,3 +148,10 @@
 2026-07-07 | 2b0b585 | PC-86 | Sprint A E2E journeys and action context adoption | src/actions/admin.ts
 2026-07-07 | 8884a63 | PC-98 | Sprint B services split and E2E journeys | src/actions/proposals/_core.ts
 2026-07-07 | d840805 | PC-104 | production change log 2026.07.09 for Admin Code Status | src/lib/changelog/entries.ts
+2026-07-09 | fd699c7 | PC-112 | custom avatar crop zoom-out and black-image fix | src/actions/profile.ts
+2026-07-09 | cb8e303 | PC-112 | disambiguate This night slice dialog heading | e2e/batch-sleeping-journey.spec.ts
+2026-07-09 | bc8b43f | PC-112 | disambiguate This day slice dialog heading | e2e/multi-day-event-slice-journey.spec.ts
+2026-07-09 | d6ebe3b | PC-114 | MAP defaults, avatars, detach migration, schedule UI polish | src/actions/partnerships.ts
+2026-07-09 | f5c8a70 | PC-114 | MAP defaults, avatars, detach migration, schedule UI polish | src/actions/partnerships.ts
+2026-07-09 | 48b4478 | PC-115 | event schedule views user journey E2E suite | src/actions/proposals/_core.ts
+2026-07-09 | 996cf0d | PC-115 | event schedule views user journey E2E suite | src/actions/proposals/_core.ts

@@ -42,7 +42,9 @@ test.describe("Batch sleeping slice journey", () => {
       .first()
       .click();
 
-    await expect(page.getByRole("dialog").getByText("This night")).toBeVisible();
+    await expect(
+      page.getByRole("dialog").getByRole("heading", { name: "This night" }),
+    ).toBeVisible();
     await expect(page.getByRole("button", { name: "View full series / parent" })).toBeVisible();
   });
 });

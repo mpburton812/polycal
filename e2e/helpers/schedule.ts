@@ -43,6 +43,82 @@ function eventLocator(page: Page, namePattern: RegExp) {
     .first();
 }
 
+/** Shifts a yyyy-MM-dd date by a number of calendar days. */
+export function shiftIsoDate(isoDate: string, dayDelta: number): string {
+  const date = parseIsoDate(isoDate);
+  date.setDate(date.getDate() + dayDelta);
+  const pad = (value: number) => String(value).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
+/** Shifts a yyyy-MM-ddTHH:mm datetime by calendar days, preserving clock time. */
+export function shiftIsoDateTime(dateTime: string, dayDelta: number): string {
+  const match = /^(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2})$/.exec(dateTime);
+  if (!match) {
+    throw new Error(`Invalid datetime: ${dateTime}`);
+  }
+  const [, datePart, hour, minute] = match;
+  return `${shiftIsoDate(datePart!, dayDelta)}T${hour}:${minute}`;
+}
+
+/** Builds a one-hour timed event window on a day offset from today. */
+export function oneHourEventWindow(
+  daysFromToday: number,
+  startHour = 10,
+): { start: string; end: string; day: string } {
+  const day = dateOffsetIso(daysFromToday);
+  const pad = (value: number) => String(value).padStart(2, "0");
+  const endHour = startHour + 1;
+  return {
+    day,
+    start: `${day}T${pad(startHour)}:00`,
+    end: `${day}T${pad(endHour)}:00`,
+  };
+}
+
+/** Forces one-week layout (week calendar + single-week density). */
+export async function selectScheduleOneWeekView(page: Page): Promise<void> {
+  await page.getByLabel("Calendar layout").getByRole("button", { name: "Week" }).click();
+  await page.getByLabel("View density").getByRole("button", { name: "Week", exact: true }).click();
+  await waitForScheduleReady(page);
+}
+
+/** Forces two-week density within week layout. */
+export async function selectScheduleTwoWeekView(page: Page): Promise<void> {
+  await page.getByLabel("Calendar layout").getByRole("button", { name: "Week" }).click();
+  await page.getByLabel("View density").getByRole("button", { name: "2 weeks" }).click();
+  await waitForScheduleReady(page);
+}
+
+/** Switches to month layout. */
+export async function selectScheduleMonthView(page: Page): Promise<void> {
+  await page.getByLabel("Calendar layout").getByRole("button", { name: "Month" }).click();
+  await waitForScheduleReady(page);
+}
+
+/**
+ * Asserts a resolved event title is visible in one-week, two-week, and month schedule views.
+ */
+export async function assertEventVisibleInAllScheduleViews(
+  page: Page,
+  titlePattern: RegExp,
+  targetDateIso: string,
+): Promise<void> {
+  await goToSchedule(page);
+  await clearScheduleViewState(page);
+
+  for (const selectView of [
+    selectScheduleOneWeekView,
+    selectScheduleTwoWeekView,
+    selectScheduleMonthView,
+  ]) {
+    await selectView(page);
+    await navigateScheduleUntilDateInRange(page, targetDateIso);
+    await waitForScheduleReady(page);
+    await expect(eventLocator(page, titlePattern)).toBeVisible({ timeout: 20_000 });
+  }
+}
+
 /** Waits until schedule data has finished loading for the visible range. */
 export async function waitForScheduleReady(page: Page): Promise<void> {
   await expect(page.getByTestId("schedule-ready")).toHaveAttribute("data-ready", "true", {
