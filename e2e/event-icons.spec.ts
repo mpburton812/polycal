@@ -20,7 +20,7 @@ test.describe("Event category icons (PC-116)", () => {
 
   test("saves icon on solo event and shows on proposal detail", async ({ page }) => {
     const title = `Icon test ${Date.now()}`;
-    const { start } = oneHourEventWindow();
+    const { start } = oneHourEventWindow(40, 10);
 
     const dialog = await openEventProposalDraft(page);
     await dialog.getByLabel("Title").fill(title);
@@ -39,7 +39,7 @@ test.describe("Event category icons (PC-116)", () => {
 
   test("clone copies event icon into edit draft", async ({ page }) => {
     const title = `Clone icon ${Date.now()}`;
-    const { start } = oneHourEventWindow();
+    const { start } = oneHourEventWindow(41, 10);
 
     const dialog = await openEventProposalDraft(page);
     await dialog.getByLabel("Title").fill(title);
