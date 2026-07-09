@@ -26,6 +26,23 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "2026.07.10",
+    date: "2026-07-10",
+    summary: "Custom avatar crop: zoom out, WYSIWYG preview, and black-image fix.",
+    changes: [
+      {
+        type: "fixed",
+        description:
+          "Custom avatar crop uses react-easy-crop with zoom-out (0.5×–3×) and load-gated confirm (PC-112).",
+      },
+      {
+        type: "fixed",
+        description:
+          "Avatar export fills JPEG background and rejects empty crops server-side to prevent black avatars (PC-112).",
+      },
+    ],
+  },
+  {
     version: "2026.07.08",
     date: "2026-07-08",
     summary:
