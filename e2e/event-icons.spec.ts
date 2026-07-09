@@ -5,6 +5,7 @@ import { USERS } from "./helpers/constants";
 import { fillProposalDateTimeField } from "./helpers/datePickers";
 import { goToProposals } from "./helpers/navigation";
 import {
+  expectResolvedProposal,
   openEventProposalDraft,
   proposalCard,
   selectEventIcon,
@@ -20,17 +21,18 @@ test.describe("Event category icons (PC-116)", () => {
 
   test("saves icon on solo event and shows on proposal detail", async ({ page }) => {
     const title = `Icon test ${Date.now()}`;
-    const { start } = oneHourEventWindow(40, 10);
+    const { start, end } = oneHourEventWindow(40, 10);
 
     const dialog = await openEventProposalDraft(page);
     await dialog.getByLabel("Title").fill(title);
     await dialog.getByRole("button", { name: "Solo event (just me)" }).click();
     await selectEventIcon(dialog, "Food and pizza event");
     await fillProposalDateTimeField(dialog.getByLabel("Start").first(), start);
+    await fillProposalDateTimeField(dialog.getByLabel("End (optional)").first(), end);
     await dialog.getByRole("button", { name: "Save" }).click();
     await submitProposalDraft(page, dialog);
 
-    await expect(proposalCard(page, title)).toBeVisible({ timeout: 20_000 });
+    await expectResolvedProposal(page, title);
     await proposalCard(page, title).click();
 
     const detail = page.getByRole("dialog");
@@ -39,17 +41,18 @@ test.describe("Event category icons (PC-116)", () => {
 
   test("clone copies event icon into edit draft", async ({ page }) => {
     const title = `Clone icon ${Date.now()}`;
-    const { start } = oneHourEventWindow(41, 10);
+    const { start, end } = oneHourEventWindow(41, 10);
 
     const dialog = await openEventProposalDraft(page);
     await dialog.getByLabel("Title").fill(title);
     await dialog.getByRole("button", { name: "Solo event (just me)" }).click();
     await selectEventIcon(dialog, "Gaming event");
     await fillProposalDateTimeField(dialog.getByLabel("Start").first(), start);
+    await fillProposalDateTimeField(dialog.getByLabel("End (optional)").first(), end);
     await dialog.getByRole("button", { name: "Save" }).click();
     await submitProposalDraft(page, dialog);
 
-    await expect(proposalCard(page, title)).toBeVisible({ timeout: 20_000 });
+    await expectResolvedProposal(page, title);
     await proposalCard(page, title).click();
 
     const detail = page.getByRole("dialog");
