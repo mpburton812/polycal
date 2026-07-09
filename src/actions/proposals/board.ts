@@ -98,6 +98,7 @@ export async function listProposalBoardAction(): Promise<ProposalBoard> {
       isBatchSleeping: proposals.isBatchSleeping,
       isRecurrenceParent: proposals.isRecurrenceParent,
       parentProposalId: proposals.parentProposalId,
+      eventIconKey: proposals.eventIconKey,
     })
     .from(proposals)
     .innerJoin(users, eq(proposals.proposerId, users.id))
@@ -247,6 +248,8 @@ export async function listProposalBoardAction(): Promise<ProposalBoard> {
       inviteeCount: invitees.length,
       respondedCount,
       isPastSchedule,
+      eventIconKey:
+        masked || row.proposalType !== "event" ? null : row.eventIconKey ?? null,
       notOnCalendar:
         row.state === "resolved" &&
         !proposalHasSchedulableWindows(
