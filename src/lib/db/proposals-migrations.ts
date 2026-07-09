@@ -28,6 +28,7 @@ export async function applyProposalsMigrations(sql: Client): Promise<void> {
   await ensureColumn(sql, "proposals", "detached_from_parent_id", "TEXT");
   await ensureColumn(sql, "proposals", "detached_from_slot_id", "TEXT");
   await ensureColumn(sql, "proposals", "detached_at", "TEXT");
+  await ensureColumn(sql, "proposals", "event_icon_key", "TEXT");
   await ensureColumn(sql, "poly_group", "recovery_max_hours", "INTEGER NOT NULL DEFAULT 48");
 
   await sql.execute(`

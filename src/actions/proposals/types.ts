@@ -157,6 +157,8 @@ export interface ProposalDetail {
   displayState: ProposalState;
   /** Minutes before event start to send reminder (PC-65). */
   reminderOffsetMinutes: number | null;
+  /** Optional category icon for social events (PC-116). */
+  eventIconKey: string | null;
   specialKind?: "residency" | "group_name";
 }
 
