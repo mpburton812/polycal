@@ -68,6 +68,8 @@ export interface PersonSummary {
   role: UserRole;
   status: string;
   avatarKey: string | null;
+  /** Optional bio shown under the name on People & Places (PC-117). */
+  profileBio: string | null;
 }
 
 export interface AdminUserRow {
@@ -378,6 +380,7 @@ export async function listPeopleAction(): Promise<PersonSummary[]> {
       role: users.role,
       status: users.status,
       avatarKey: users.avatarKey,
+      profileBio: users.profileBio,
     })
     .from(users)
     .where(eq(users.status, "active"))
@@ -386,6 +389,7 @@ export async function listPeopleAction(): Promise<PersonSummary[]> {
   return rows.map((row) => ({
     ...row,
     avatarKey: row.avatarKey ?? null,
+    profileBio: row.profileBio?.trim() || null,
   }));
 }
 

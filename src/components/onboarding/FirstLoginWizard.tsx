@@ -32,6 +32,8 @@ import {
 import { AVATAR_OPTIONS } from "@/lib/constants/avatars";
 import { ThemeAccentPicker } from "@/components/ui/ThemeAccentPicker";
 import { normalizeUserThemeId, type UserThemeId } from "@/lib/constants/themes";
+import { defaultBrowserTimezone } from "@/lib/schedule/timezone";
+import { PROFILE_BIO_MAX_LENGTH } from "@/lib/users/profile-bio";
 import { brutalPaperSx } from "@/theme/brutalUi";
 import { fontFamilies } from "@/theme/fonts";
 import { GARDEN_TOKENS } from "@/theme/tokens";
@@ -68,6 +70,7 @@ export function FirstLoginWizard({
   const [error, setError] = useState<string | null>(null);
   const [avatarKey, setAvatarKey] = useState(initialAvatarKey ?? "bird_blue");
   const [theme, setTheme] = useState<UserThemeId>(normalizeUserThemeId(initialTheme));
+  const [profileBio, setProfileBio] = useState("");
   const [selectedPartners, setSelectedPartners] = useState<string[]>([]);
   const [prefs, setPrefs] = useState<NotificationPrefs>(DEFAULT_NOTIFICATION_PREFS);
   const [welcomeMessage, setWelcomeMessage] = useState<string | null>(null);
@@ -100,7 +103,12 @@ export function FirstLoginWizard({
   function saveAvatarAndTheme() {
     setError(null);
     startTransition(async () => {
-      const result = await saveOnboardingPreferencesAction({ avatarKey, theme });
+      const result = await saveOnboardingPreferencesAction({
+        avatarKey,
+        theme,
+        timezone: defaultBrowserTimezone(),
+        profileBio,
+      });
       if (!result.ok) {
         setError(result.error ?? "Could not save preferences.");
         return;
@@ -260,6 +268,16 @@ export function FirstLoginWizard({
             <FormLabel component="legend">Accent theme</FormLabel>
             <ThemeAccentPicker value={theme} onChange={setTheme} />
           </FormControl>
+          <TextField
+            label="About you (optional)"
+            value={profileBio}
+            onChange={(event) => setProfileBio(event.target.value)}
+            fullWidth
+            multiline
+            minRows={2}
+            inputProps={{ maxLength: PROFILE_BIO_MAX_LENGTH }}
+            helperText={`Shown under your name on People & Places. ${profileBio.length}/${PROFILE_BIO_MAX_LENGTH} characters.`}
+          />
           <Button variant="contained" onClick={saveAvatarAndTheme} disabled={pending}>
             Continue
           </Button>

@@ -12,6 +12,7 @@ import { ensureDbReady } from "@/lib/db/ensure-ready";
 import { polyGroup, users } from "@/lib/db/schema";
 import { resolveTimezone } from "@/lib/schedule/timezone";
 import { DEFAULT_ONBOARDING_WELCOME_MESSAGE } from "@/types/poly-group";
+import { profileBioSchema } from "@/lib/users/profile-bio";
 
 const AVATAR_KEYS = AVATAR_OPTIONS.map((option) => option.key);
 
@@ -57,6 +58,9 @@ export async function getOnboardingStatusAction(): Promise<OnboardingStatus | nu
 export async function saveOnboardingPreferencesAction(input: {
   avatarKey: string;
   theme: string;
+  /** Browser-detected IANA timezone; falls back to UTC when invalid (PC-48). */
+  timezone?: string;
+  profileBio?: string;
 }): Promise<{ ok: boolean; error?: string }> {
   const session = await auth();
   if (!session?.user?.id) {
@@ -67,6 +71,13 @@ export async function saveOnboardingPreferencesAction(input: {
     return { ok: false, error: "Invalid avatar or theme selection." };
   }
 
+  const bioParsed = profileBioSchema.safeParse(input.profileBio ?? "");
+  if (!bioParsed.success) {
+    return { ok: false, error: bioParsed.error.issues[0]?.message ?? "Invalid bio." };
+  }
+
+  const timezone = resolveTimezone(input.timezone);
+
   await ensureDbReady();
   const db = getDb();
   const now = new Date().toISOString();
@@ -75,7 +86,8 @@ export async function saveOnboardingPreferencesAction(input: {
     .set({
       avatarKey: input.avatarKey,
       theme: normalizeUserThemeId(input.theme),
-      timezone: resolveTimezone("UTC"),
+      timezone,
+      profileBio: bioParsed.data,
       updatedAt: now,
     })
     .where(eq(users.id, session.user.id));
@@ -83,10 +95,11 @@ export async function saveOnboardingPreferencesAction(input: {
   await logUserActivity(
     session.user.id,
     "onboarding.preferences",
-    `${input.avatarKey}, ${input.theme}, UTC`,
+    `${input.avatarKey}, ${input.theme}, ${timezone}`,
   );
 
   revalidatePath("/profile");
+  revalidatePath("/people-places");
   return { ok: true };
 }
 
