@@ -65,6 +65,7 @@ import {
   typeBadgeLabel,
   typeChipSx,
 } from "./proposalCardTheme";
+import { ProposalEventIcon } from "./ProposalEventIcon";
 import { formatProposalLogLine } from "@/lib/proposals/state-log-format";
 import {
   inviteeDisplayLabel,
@@ -562,6 +563,12 @@ export function ProposalDetailDialog({
               </Stack>
 
               <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" sx={{ mb: 1 }}>
+                <ProposalEventIcon
+                  eventIconKey={detail.eventIconKey}
+                  isContentMasked={detail.isContentMasked}
+                  proposalType={detail.proposalType}
+                  size={24}
+                />
                 <Typography variant="h6" component="h2" sx={{ fontSize: "1.1rem", fontWeight: 600 }}>
                   {detail.title}
                 </Typography>

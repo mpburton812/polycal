@@ -31,6 +31,7 @@ import {
   typeBadgeLabel,
   typeChipSxForProposal,
 } from "./proposalCardTheme";
+import { ProposalEventIcon } from "./ProposalEventIcon";
 
 function stateBadgeLabel(proposal: ProposalCardData): string {
   if (proposal.workflowStatus === "declined") return "DECLINED";
@@ -136,6 +137,11 @@ export function ProposalCard({
         </Stack>
 
         <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" sx={{ mb: 0.5 }}>
+          <ProposalEventIcon
+            eventIconKey={proposal.eventIconKey}
+            isContentMasked={proposal.isContentMasked}
+            proposalType={proposal.proposalType}
+          />
           <Typography
             variant="h6"
             component="h2"
