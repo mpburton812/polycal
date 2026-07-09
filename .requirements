@@ -158,3 +158,4 @@
 2026-07-09 | ba3b751 | PC-116 | event category icons phase 1 — registry, DB, picker, week view | src/actions/proposals/_core.ts
 2026-07-09 | ed8af9a | PC-117 | retrigger CI after rebase | n/a
 2026-07-09 | db56edc | PC-118 | admin fast sleeping plan add | src/actions/admin-fast-sleeping.test.ts
+2026-07-09 | 96866d0 | PC-118 | merge origin/dev into feature branch | n/a
