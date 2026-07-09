@@ -2,15 +2,85 @@
 
 import { Box, Typography } from "@mui/material";
 
+import { avatarSrcForKey } from "@/lib/constants/avatars";
+
 export interface SleepingMapEdge {
   userLowId: string;
   userHighId: string;
   lowName: string;
   highName: string;
+  lowAvatarKey: string | null;
+  highAvatarKey: string | null;
 }
 
 interface SleepingMapViewProps {
   edges: SleepingMapEdge[];
+}
+
+const NODE_RADIUS = 22;
+
+/**
+ * Renders one partnership node with a clipped avatar (or initial fallback).
+ */
+function MapNode({
+  id,
+  x,
+  y,
+  name,
+  avatarKey,
+}: {
+  id: string;
+  x: number;
+  y: number;
+  name: string;
+  avatarKey: string | null;
+}) {
+  const clipId = `map-avatar-${id}`;
+  const src = avatarSrcForKey(avatarKey);
+  const label = name.length > 14 ? `${name.slice(0, 12)}…` : name;
+
+  return (
+    <g>
+      <defs>
+        <clipPath id={clipId}>
+          <circle cx={x} cy={y} r={NODE_RADIUS} />
+        </clipPath>
+      </defs>
+      <circle
+        cx={x}
+        cy={y}
+        r={NODE_RADIUS}
+        fill="#e3f2fd"
+        stroke="#1565c0"
+        strokeWidth={2}
+      />
+      {src ? (
+        <image
+          href={src}
+          x={x - NODE_RADIUS}
+          y={y - NODE_RADIUS}
+          width={NODE_RADIUS * 2}
+          height={NODE_RADIUS * 2}
+          clipPath={`url(#${clipId})`}
+          preserveAspectRatio="xMidYMid slice"
+        />
+      ) : (
+        <text
+          x={x}
+          y={y + 5}
+          textAnchor="middle"
+          fontSize={14}
+          fontWeight={600}
+          fill="#1565c0"
+        >
+          {name.charAt(0).toUpperCase()}
+        </text>
+      )}
+      <text x={x} y={y + 36} textAnchor="middle" fontSize={11} fill="currentColor">
+        {label}
+      </text>
+    </g>
+  );
 }
 
 /**
@@ -25,10 +95,10 @@ export function SleepingMapView({ edges }: SleepingMapViewProps) {
     );
   }
 
-  const nodes = new Map<string, string>();
+  const nodes = new Map<string, { name: string; avatarKey: string | null }>();
   for (const edge of edges) {
-    nodes.set(edge.userLowId, edge.lowName);
-    nodes.set(edge.userHighId, edge.highName);
+    nodes.set(edge.userLowId, { name: edge.lowName, avatarKey: edge.lowAvatarKey });
+    nodes.set(edge.userHighId, { name: edge.highName, avatarKey: edge.highAvatarKey });
   }
 
   const nodeList = [...nodes.entries()];
@@ -71,22 +141,18 @@ export function SleepingMapView({ edges }: SleepingMapViewProps) {
             />
           );
         })}
-        {nodeList.map(([id, name]) => {
+        {nodeList.map(([id, node]) => {
           const pos = positions.get(id);
           if (!pos) return null;
           return (
-            <g key={id}>
-              <circle cx={pos.x} cy={pos.y} r={22} fill="#e3f2fd" stroke="#1565c0" strokeWidth={2} />
-              <text
-                x={pos.x}
-                y={pos.y + 36}
-                textAnchor="middle"
-                fontSize={11}
-                fill="currentColor"
-              >
-                {name.length > 14 ? `${name.slice(0, 12)}…` : name}
-              </text>
-            </g>
+            <MapNode
+              key={id}
+              id={id}
+              x={pos.x}
+              y={pos.y}
+              name={node.name}
+              avatarKey={node.avatarKey}
+            />
           );
         })}
       </Box>

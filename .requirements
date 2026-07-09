@@ -151,3 +151,4 @@
 2026-07-09 | fd699c7 | PC-112 | custom avatar crop zoom-out and black-image fix | src/actions/profile.ts
 2026-07-09 | cb8e303 | PC-112 | disambiguate This night slice dialog heading | e2e/batch-sleeping-journey.spec.ts
 2026-07-09 | bc8b43f | PC-112 | disambiguate This day slice dialog heading | e2e/multi-day-event-slice-journey.spec.ts
+2026-07-09 | d6ebe3b | PC-114 | MAP defaults, avatars, detach migration, schedule UI polish | src/actions/partnerships.ts

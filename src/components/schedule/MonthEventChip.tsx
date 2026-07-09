@@ -1,9 +1,10 @@
 "use client";
 
-import EventIcon from "@mui/icons-material/Event";
+import BedIcon from "@mui/icons-material/Bed";
 import { Box, Typography } from "@mui/material";
 
 import type { ScheduleEvent } from "@/actions/schedule";
+import { EventSocialIcon } from "@/components/schedule/EventSocialIcon";
 import { scheduleBlockSx, type ScheduleBlockVariant } from "@/lib/schedule/colors";
 
 interface MonthEventChipProps {
@@ -18,6 +19,7 @@ interface MonthEventChipProps {
 export function MonthEventIcon({ event, variant, onClick }: MonthEventChipProps) {
   const colors = scheduleBlockSx(variant, 0);
   const label = event.isContentMasked ? "Busy" : event.title;
+  const isSleeping = event.proposalType === "sleeping";
 
   return (
     <Box
@@ -42,13 +44,23 @@ export function MonthEventIcon({ event, variant, onClick }: MonthEventChipProps)
         opacity: event.state === "archived" ? 0.85 : 1,
       }}
     >
-      <EventIcon
-        sx={{
-          fontSize: 16,
-          color: colors.bgcolor,
-          filter: `drop-shadow(0 0 0.75px ${colors.color})`,
-        }}
-      />
+      {isSleeping ? (
+        <BedIcon
+          sx={{
+            fontSize: 16,
+            color: colors.bgcolor,
+            filter: `drop-shadow(0 0 0.75px ${colors.color})`,
+          }}
+        />
+      ) : (
+        <EventSocialIcon
+          sx={{
+            fontSize: 16,
+            color: colors.bgcolor,
+            filter: `drop-shadow(0 0 0.75px ${colors.color})`,
+          }}
+        />
+      )}
     </Box>
   );
 }
