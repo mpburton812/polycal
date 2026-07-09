@@ -43,6 +43,34 @@ export const CHANGELOG: ChangelogEntry[] = [
     ],
   },
   {
+    version: "2026.07.09",
+    date: "2026-07-09",
+    summary:
+      "Production release: Sprint A/B E2E coverage, security hardening, and proposal services refactor.",
+    changes: [
+      {
+        type: "added",
+        description:
+          "Impersonation, overlap/revoke, passive-user, and notification inbox user journey E2E specs (PC-86/88/87/91).",
+      },
+      {
+        type: "changed",
+        description:
+          "Shared action context helpers adopted across schedule, impersonation, profile, and user provisioning (PC-97).",
+      },
+      {
+        type: "changed",
+        description:
+          "Proposal at-risk and vote-reset logic extracted to lib services (PC-98).",
+      },
+      {
+        type: "fixed",
+        description:
+          "Security hardening from assessment remediation: avatar IDOR, E2E API secret, impersonation secret, session invalidation on password change.",
+      },
+    ],
+  },
+  {
     version: "2026.07.08",
     date: "2026-07-08",
     summary:

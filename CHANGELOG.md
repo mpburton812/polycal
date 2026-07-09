@@ -4,6 +4,20 @@ All notable changes to PolyCal are documented here.
 
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [2026.07.09] - 2026-07-09
+
+### Added
+
+- Production promotion: Sprint A/B user journey E2E (impersonation, overlap/revoke, passive user, notification inbox).
+
+### Changed
+
+- Proposal at-risk services extraction (PC-98); action context adoption (PC-97).
+
+### Fixed
+
+- Assessment security remediation (avatar IDOR, API secrets, session invalidation on password change).
+
 ## [Unreleased]
 
 ### Fixed
