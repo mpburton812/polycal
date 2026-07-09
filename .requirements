@@ -149,3 +149,4 @@
 2026-07-07 | 8884a63 | PC-98 | Sprint B services split and E2E journeys | src/actions/proposals/_core.ts
 2026-07-07 | d840805 | PC-104 | production change log 2026.07.09 for Admin Code Status | src/lib/changelog/entries.ts
 2026-07-09 | fd699c7 | PC-112 | custom avatar crop zoom-out and black-image fix | src/actions/profile.ts
+2026-07-09 | cb8e303 | PC-112 | disambiguate This night slice dialog heading | e2e/batch-sleeping-journey.spec.ts
