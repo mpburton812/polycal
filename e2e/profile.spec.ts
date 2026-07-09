@@ -1,8 +1,12 @@
+import path from "node:path";
+
 import { expect, test } from "./helpers/test";
 
 import { login } from "./helpers/auth";
 import { USERS } from "./helpers/constants";
 import { goToProfile } from "./helpers/navigation";
+
+const AVATAR_FIXTURE = path.join(process.cwd(), "public/avatars/bird_red.png");
 
 test.describe("Profile settings", () => {
   test.beforeEach(async ({ page }) => {
@@ -40,21 +44,25 @@ test.describe("Profile settings", () => {
     await expect(page.getByRole("button", { name: "Upload image" })).toBeVisible();
   });
 
-  test("uploads a custom avatar image", async ({ page }) => {
+  test("uploads a custom avatar image with crop and shows a non-empty preview", async ({ page }) => {
     const input = page.locator('input[type="file"][accept*="image"]');
-    await input.setInputFiles({
-      name: "avatar.png",
-      mimeType: "image/png",
-      buffer: Buffer.from(
-        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
-        "base64",
-      ),
-    });
+    await input.setInputFiles(AVATAR_FIXTURE);
+
     const cropDialog = page.getByRole("dialog", { name: /adjust avatar/i });
     await expect(cropDialog).toBeVisible({ timeout: 10_000 });
-    await cropDialog.getByRole("button", { name: "Use photo" }).click();
+
+    const usePhoto = cropDialog.getByRole("button", { name: "Use photo" });
+    await expect(usePhoto).toBeEnabled({ timeout: 15_000 });
+    await usePhoto.click();
+
     await expect(cropDialog).toBeHidden({ timeout: 15_000 });
     await expect(page.getByText(/Could not save avatar/i)).not.toBeVisible({ timeout: 15_000 });
     await expect(page.getByText("Custom avatar selected")).toBeVisible({ timeout: 15_000 });
+
+    const customAvatar = page.getByRole("img", { name: "Your custom avatar" });
+    await expect(customAvatar).toBeVisible({ timeout: 15_000 });
+    await expect
+      .poll(async () => customAvatar.evaluate((el: HTMLImageElement) => el.naturalWidth))
+      .toBeGreaterThan(10);
   });
 });
