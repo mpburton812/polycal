@@ -30,6 +30,7 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - PC-115: Event schedule views user journey E2E (10 serial flows: solo/recurring, invitee votes, week/2-week/month).
 - PC-116 (phase 1): Optional event category icons — registry, DB column, draft picker, week calendar watermark.
 - PC-116 (phase 2): Event icon on proposal cards and detail dialog.
+- PC-116 (phase 3): Event icon on month calendar icons and planning drawer.
 - PC-114: Event social watermark icon (microphone, pizza, pine tree); MAP tab shows member avatars in partnership graph.
 
 - PC-98: Extracted proposal at-risk, vote reset, and state-log services from `_core.ts`.
