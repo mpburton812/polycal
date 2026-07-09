@@ -34,6 +34,7 @@ import { ThemeAccentPicker } from "@/components/ui/ThemeAccentPicker";
 import { normalizeUserThemeId, type UserThemeId } from "@/lib/constants/themes";
 import { defaultBrowserTimezone } from "@/lib/schedule/timezone";
 import { PROFILE_BIO_MAX_LENGTH } from "@/lib/users/profile-bio";
+import { brutalPaperSx } from "@/theme/brutalUi";
 import { fontFamilies } from "@/theme/fonts";
 import { GARDEN_TOKENS } from "@/theme/tokens";
 import {
