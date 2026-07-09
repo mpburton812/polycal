@@ -66,7 +66,7 @@ function rowToSettings(row: typeof polyGroup.$inferSelect): PolyGroupSettings {
     allowUserProvisioning: row.allowUserProvisioning,
     hideSleepingArrangements: row.hideSleepingArrangements,
     placesMapVisibility:
-      (row.placesMapVisibility as PolyGroupSettings["placesMapVisibility"]) ?? "none",
+      (row.placesMapVisibility as PolyGroupSettings["placesMapVisibility"]) ?? "all",
     logTailLength: row.logTailLength,
     onboardingWelcomeMessage:
       row.onboardingWelcomeMessage?.trim() || DEFAULT_ONBOARDING_WELCOME_MESSAGE,
@@ -337,5 +337,5 @@ export async function getPlacesMapVisibilityAction(): Promise<PlacesMapVisibilit
     .from(polyGroup)
     .where(eq(polyGroup.id, 1))
     .limit(1);
-  return (row?.placesMapVisibility as PlacesMapVisibility) ?? "none";
+  return (row?.placesMapVisibility as PlacesMapVisibility) ?? "all";
 }

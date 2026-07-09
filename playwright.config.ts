@@ -33,7 +33,7 @@ export default defineConfig({
       ? `npx next start -p ${E2E_PORT}`
       : `npx next dev -p ${E2E_PORT}`,
     url: `${baseURL}/login`,
-    reuseExistingServer: false,
+    reuseExistingServer: !process.env.CI,
     timeout: 120_000,
     stdout: "pipe",
     stderr: "pipe",
