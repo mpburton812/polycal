@@ -249,6 +249,7 @@ export async function listSleepingPartnersForUserAction(
         role: users.role,
         status: users.status,
         avatarKey: users.avatarKey,
+        profileBio: users.profileBio,
       })
       .from(users)
       .where(inArray(users.id, partnerIds))
@@ -257,6 +258,7 @@ export async function listSleepingPartnersForUserAction(
     return rows.map((row) => ({
       ...row,
       avatarKey: row.avatarKey ?? null,
+      profileBio: row.profileBio ?? null,
     }));
   });
 }
