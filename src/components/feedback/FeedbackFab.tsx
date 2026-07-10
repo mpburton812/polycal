@@ -115,7 +115,7 @@ export function FeedbackFab() {
     <>
       <Fab
         color="secondary"
-        aria-label="Send feedback"
+        aria-label="Give feedback"
         onClick={() => void handleOpen()}
         disabled={capturing}
         sx={{
