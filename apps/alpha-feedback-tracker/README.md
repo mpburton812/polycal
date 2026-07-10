@@ -15,6 +15,13 @@ cd apps/alpha-feedback-tracker
 npm install
 ```
 
+**Dev/Test note:** those Vercel preview URLs use Deployment Protection (SSO). From the tracker, either:
+
+1. Use **Local** (`npm run dev` in the PolyCal repo root), or  
+2. Paste a **Protection Bypass for Automation** secret (Vercel → Project → Settings → Deployment Protection) into the tracker login form.
+
+The Vite dev server proxies remote API calls through `/__polycal` so the browser avoids CORS/SSO preflight failures.
+
 ## Develop (UI only)
 
 Runs the Vite UI in a browser against a PolyCal base URL (local/dev/test/prod):

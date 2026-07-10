@@ -4,10 +4,10 @@ import { NextResponse } from "next/server";
 export function alphaFeedbackCorsHeaders(request: Request): HeadersInit {
   const origin = request.headers.get("origin") ?? "*";
   return {
-    "Access-Control-Allow-Origin": origin,
+    "Access-Control-Allow-Origin": origin === "null" ? "*" : origin,
     "Access-Control-Allow-Methods": "GET, POST, PATCH, OPTIONS",
-    "Access-Control-Allow-Headers": "Authorization, Content-Type",
-    "Access-Control-Allow-Credentials": "true",
+    "Access-Control-Allow-Headers":
+      "Authorization, Content-Type, x-vercel-protection-bypass, x-vercel-set-bypass-cookie",
     Vary: "Origin",
   };
 }
