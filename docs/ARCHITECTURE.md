@@ -21,11 +21,11 @@ polycal/
 └── .github/workflows/      # Primary CI (GitHub Actions)
 ```
 
-GitLab CI (`.gitlab-ci.yml`) mirrors the same gates for alternate remotes; **GitHub Actions is the primary promotion path** for this project.
+GitLab CI (`.gitlab-ci.yml`) is a **secondary/legacy mirror** of a subset of gates for alternate remotes; **GitHub Actions is the primary promotion path** for this project.
 
 ### Companion app: alpha-feedback-tracker
 
-`apps/alpha-feedback-tracker` is intentionally **outside** the Next.js TypeScript project (`tsconfig.json` excludes `apps/`) and is **not** an npm workspace member. Root Next (Vite 8 for Vitest) and the tracker’s Vite 6 toolchain must not hoist together. Keep separate `package-lock.json` files; align React/MUI majors manually when bumping. The tracker talks only to PolyCal admin HTTP APIs — never to Turso directly.
+`apps/alpha-feedback-tracker` is intentionally **outside** the Next.js TypeScript project (`tsconfig.json` excludes `apps/`) and is **not** an npm workspace member. Root Next (Vite 8 for Vitest) and the tracker’s Vite 6 toolchain must not hoist together. Keep separate `package-lock.json` files; align React/MUI majors manually when bumping. Path-filtered CI (`.github/workflows/alpha-feedback-tracker.yml`) runs `npm run build` (tsc + Vite). Full Tauri installer builds remain local (Windows + Rust). The tracker talks only to PolyCal admin HTTP APIs — never to Turso directly.
 
 ## Layer model
 
