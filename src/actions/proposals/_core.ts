@@ -2224,6 +2224,8 @@ export async function getProposalDetailAction(
       batchEntriesJson: proposals.batchEntriesJson,
       reminderOffsetMinutes: proposals.reminderOffsetMinutes,
       eventIconKey: proposals.eventIconKey,
+      locationBedroomNames: locations.bedroomNames,
+      locationBedroomCount: locations.bedroomCount,
     })
     .from(proposals)
     .innerJoin(users, eq(proposals.proposerId, users.id))
@@ -2446,6 +2448,20 @@ export async function getProposalDetailAction(
       recurrenceRule,
       occurrenceIndex: row.occurrenceIndex ?? null,
       bedroomIndex: masked ? null : row.bedroomIndex ?? null,
+      bedroomLabel:
+        masked || row.proposalType !== "sleeping" || row.bedroomIndex === null
+          ? null
+          : (() => {
+              const names = parseBedroomNames(row.locationBedroomNames);
+              const labels =
+                names.length > 0
+                  ? names
+                  : Array.from(
+                      { length: row.locationBedroomCount ?? 0 },
+                      (_, index) => `Bedroom ${index + 1}`,
+                    );
+              return labels[row.bedroomIndex!] ?? `Bedroom ${row.bedroomIndex! + 1}`;
+            })(),
       isBatchSleeping: row.isBatchSleeping,
       batchEntries,
       batchPlaceNames,
