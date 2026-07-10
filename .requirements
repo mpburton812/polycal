@@ -179,3 +179,4 @@
 2026-07-10 | 10ad7c7 | PC-132 | extract ProposalDraftDialog section components | src/components/proposals/ProposalConflictConfirmDialog.tsx
 2026-07-10 | f6daafd | PC-130 | merge origin/dev and resolve changelog conflicts | n/a
 2026-07-10 | d1b36de | PC-134 | gate privacy options; feedback archive and delete | src/actions/poly-group.ts
+2026-07-10 | 1b35d4e | PC-138 | loading UX and faster tab/layout fetches | src/components/proposals/ProposalDetailDialog.tsx
