@@ -30,6 +30,12 @@ export interface ProposalDraftMoreOptionsProps {
   onDescriptionChange: (value: string) => void;
   eventPrivacy: "open" | "private" | "super_private";
   onEventPrivacyChange: (value: "open" | "private" | "super_private") => void;
+  /** Which privacy MenuItems to show (from poly group settings) (PC-134). */
+  privacyAvailability: {
+    open: boolean;
+    private: boolean;
+    superPrivate: boolean;
+  };
   notes: string;
   onNotesChange: (value: string) => void;
   eventIconKey: EventIconKey | null;
@@ -60,6 +66,7 @@ export function ProposalDraftMoreOptions({
   onDescriptionChange,
   eventPrivacy,
   onEventPrivacyChange,
+  privacyAvailability,
   notes,
   onNotesChange,
   eventIconKey,
@@ -122,9 +129,11 @@ export function ProposalDraftMoreOptions({
                 onEventPrivacyChange(event.target.value as "open" | "private" | "super_private")
               }
             >
-              <MenuItem value="open">Open</MenuItem>
-              <MenuItem value="private">Private</MenuItem>
-              <MenuItem value="super_private">Super private</MenuItem>
+              {privacyAvailability.open && <MenuItem value="open">Open</MenuItem>}
+              {privacyAvailability.private && <MenuItem value="private">Private</MenuItem>}
+              {privacyAvailability.superPrivate && (
+                <MenuItem value="super_private">Super private</MenuItem>
+              )}
             </Select>
             <FormHelperText>
               Open: network visibility rules. Private: proposer, invitees, sleeping partners, and

@@ -34,6 +34,10 @@ import {
   type ProposalDetail,
   type ProposalPlaceOption,
 } from "@/actions/proposals";
+import {
+  getEventPrivacyAvailabilityAction,
+  type EventPrivacyAvailability,
+} from "@/actions/poly-group";
 import type { PersonSummary } from "@/actions/users";
 import { useToast } from "@/components/providers/ToastProvider";
 import {
@@ -131,6 +135,11 @@ export function ProposalDraftDialog({
     [],
   );
   const [eventPrivacy, setEventPrivacy] = useState<"open" | "private" | "super_private">("open");
+  const [privacyAvailability, setPrivacyAvailability] = useState<EventPrivacyAvailability>({
+    open: true,
+    private: true,
+    superPrivate: true,
+  });
   const [eventIconKey, setEventIconKey] = useState<EventIconKey | null>(null);
   const [isRecurring, setIsRecurring] = useState(false);
   const [recurrencePattern, setRecurrencePattern] = useState<
@@ -229,6 +238,22 @@ export function ProposalDraftDialog({
   useEffect(() => {
     if (!open) return;
     void listAcceptedSleepingPartnerIdsAction().then(setAcceptedPartnerIds);
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    void getEventPrivacyAvailabilityAction().then((availability) => {
+      setPrivacyAvailability(availability);
+      setEventPrivacy((current) => {
+        if (current === "private" && !availability.private) return "open";
+        if (current === "super_private" && !availability.superPrivate) return "open";
+        if (current === "open" && !availability.open) {
+          if (availability.private) return "private";
+          if (availability.superPrivate) return "super_private";
+        }
+        return current;
+      });
+    });
   }, [open]);
 
   useEffect(() => {
@@ -836,6 +861,7 @@ export function ProposalDraftDialog({
             onDescriptionChange={setDescription}
             eventPrivacy={eventPrivacy}
             onEventPrivacyChange={setEventPrivacy}
+            privacyAvailability={privacyAvailability}
             notes={notes}
             onNotesChange={setNotes}
             eventIconKey={eventIconKey}

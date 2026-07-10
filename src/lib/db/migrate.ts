@@ -5,7 +5,7 @@ import { applyAdminMigrations } from "./admin-migrations";
 import { applyProposalsMigrations } from "./proposals-migrations";
 import { applyAlphaFeedbackMigrations } from "./alpha-feedback-migrations";
 
-const SCHEMA_VERSION = "19";
+const SCHEMA_VERSION = "20";
 
 /**
  * Applies inline DDL on startup so Vercel previews and local dev share one path

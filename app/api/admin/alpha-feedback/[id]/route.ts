@@ -70,7 +70,7 @@ export async function GET(
 }
 
 /**
- * Updates status and comments on a submission (PC-121).
+ * Updates status, comments, or archive flag on a submission (PC-121, PC-136).
  */
 export async function PATCH(
   request: Request,
@@ -111,7 +111,8 @@ export async function PATCH(
   if (
     parsed.data.status === undefined &&
     parsed.data.internalComment === undefined &&
-    parsed.data.submitterComment === undefined
+    parsed.data.submitterComment === undefined &&
+    parsed.data.archived === undefined
   ) {
     return withAlphaFeedbackCors(
       request,
@@ -145,6 +146,9 @@ export async function PATCH(
       ...(parsed.data.submitterComment !== undefined
         ? { submitterComment: parsed.data.submitterComment }
         : {}),
+      ...(parsed.data.archived !== undefined
+        ? { archivedAt: parsed.data.archived ? now : null }
+        : {}),
       updatedAt: now,
     })
     .where(eq(alphaFeedbackSubmissions.id, id));
@@ -155,6 +159,7 @@ export async function PATCH(
       status: alphaFeedbackSubmissions.status,
       internalComment: alphaFeedbackSubmissions.internalComment,
       submitterComment: alphaFeedbackSubmissions.submitterComment,
+      archivedAt: alphaFeedbackSubmissions.archivedAt,
       updatedAt: alphaFeedbackSubmissions.updatedAt,
     })
     .from(alphaFeedbackSubmissions)
@@ -164,5 +169,48 @@ export async function PATCH(
   return withAlphaFeedbackCors(
     request,
     NextResponse.json({ submission: updated }),
+  );
+}
+
+/**
+ * Permanently deletes a feedback submission (PC-135).
+ */
+export async function DELETE(
+  request: Request,
+  context: { params: Promise<{ id: string }> },
+): Promise<NextResponse> {
+  const access = await requireAdminApiAccess(request);
+  if (!access.ok) return withAlphaFeedbackCors(request, access.response);
+
+  const { id } = await context.params;
+  if (!id || id.length > 80) {
+    return withAlphaFeedbackCors(
+      request,
+      NextResponse.json({ error: "Not found" }, { status: 404 }),
+    );
+  }
+
+  await ensureDbReady();
+  const db = getDb();
+  const [existing] = await db
+    .select({ id: alphaFeedbackSubmissions.id })
+    .from(alphaFeedbackSubmissions)
+    .where(eq(alphaFeedbackSubmissions.id, id))
+    .limit(1);
+
+  if (!existing) {
+    return withAlphaFeedbackCors(
+      request,
+      NextResponse.json({ error: "Not found" }, { status: 404 }),
+    );
+  }
+
+  await db
+    .delete(alphaFeedbackSubmissions)
+    .where(eq(alphaFeedbackSubmissions.id, id));
+
+  return withAlphaFeedbackCors(
+    request,
+    NextResponse.json({ ok: true, deletedId: id }),
   );
 }

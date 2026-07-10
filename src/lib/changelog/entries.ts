@@ -26,6 +26,23 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "2026.07.10e",
+    date: "2026-07-10",
+    summary: "Privacy option gating; alpha feedback archive and delete.",
+    changes: [
+      {
+        type: "changed",
+        description:
+          "Hide disabled private/super-private options on new proposals; enforce in draft save (PC-134).",
+      },
+      {
+        type: "added",
+        description:
+          "Alpha feedback permanent DELETE and ARCHIVE list with toolbar navigation (PC-135, PC-136).",
+      },
+    ],
+  },
+  {
     version: "2026.07.10d",
     date: "2026-07-10",
     summary: "ESLint config, tracker React align, draft dialog split.",
