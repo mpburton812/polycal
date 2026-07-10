@@ -12,9 +12,9 @@ polycal/
 │   ├── components/         # React UI
 │   ├── lib/                # Domain logic, DB, auth, schedule, proposals
 │   └── types/              # Shared TypeScript types
-├── e2e/                    # Playwright specs (journey + regression)
 ├── apps/
 │   └── alpha-feedback-tracker/  # Tauri desktop triage UI (separate package)
+├── e2e/                    # Playwright specs (journey + regression)
 ├── scripts/                # Tooling (requirements, Jira sync, CI helpers)
 ├── docs/                   # Architecture, workflow, ADRs, security
 ├── .requirements           # Requirement delivery log (append-only)
@@ -25,7 +25,7 @@ GitLab CI (`.gitlab-ci.yml`) is a **secondary/legacy mirror** of a subset of gat
 
 ### Companion app: alpha-feedback-tracker
 
-`apps/alpha-feedback-tracker` is intentionally **outside** the Next.js TypeScript project (`tsconfig.json` excludes `apps/`). It has its own `package-lock.json` and CI workflow (`.github/workflows/alpha-feedback-tracker.yml`) that runs `npm run build` (tsc + Vite) on path changes. Full Tauri installer builds remain local (Windows + Rust). The tracker talks only to PolyCal admin HTTP APIs — never to Turso directly.
+`apps/alpha-feedback-tracker` is intentionally **outside** the Next.js TypeScript project (`tsconfig.json` excludes `apps/`) and is **not** an npm workspace member. Root Next (Vite 8 for Vitest) and the tracker’s Vite 6 toolchain must not hoist together. Keep separate `package-lock.json` files; align React/MUI majors manually when bumping. Path-filtered CI (`.github/workflows/alpha-feedback-tracker.yml`) runs `npm run build` (tsc + Vite). Full Tauri installer builds remain local (Windows + Rust). The tracker talks only to PolyCal admin HTTP APIs — never to Turso directly.
 
 ## Layer model
 

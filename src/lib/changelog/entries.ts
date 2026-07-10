@@ -26,6 +26,28 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "2026.07.10d",
+    date: "2026-07-10",
+    summary: "ESLint config, tracker React align, draft dialog split.",
+    changes: [
+      {
+        type: "added",
+        description:
+          "Committed ESLint flat config; pin eslint-config-next to Next 15; lint is non-interactive (PC-130).",
+      },
+      {
+        type: "changed",
+        description:
+          "Align tracker React/types with root; document separate package (no workspaces) in ARCHITECTURE (PC-131).",
+      },
+      {
+        type: "changed",
+        description:
+          "Extract ProposalDraftDialog event/sleeping/more-options and conflict confirm sections (PC-132).",
+      },
+    ],
+  },
+  {
     version: "2026.07.10c",
     date: "2026-07-10",
     summary: "CI for alpha-feedback tracker web build; GitLab CI marked secondary.",
