@@ -170,3 +170,4 @@
 2026-07-10 | 863baa6 | PC-120 | avoid Send feedback aria-label colliding with End fields | src/components/feedback/FeedbackFab.tsx
 2026-07-10 | ecf00fd | PC-122 | proxy Vercel protection bypass for alpha feedback tracker | src/lib/alpha-feedback/cors.ts
 2026-07-10 | eae0d8c | PC-119 | run migrations before test DB wipe | src/lib/seed/reset-test-database.ts
+2026-07-10 | f9f4c8d | PC-124 | redesign card and draft UX for events and sleeping | src/actions/proposals/_core.ts
