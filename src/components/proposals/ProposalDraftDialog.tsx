@@ -52,6 +52,7 @@ import { useToast } from "@/components/providers/ToastProvider";
 import {
   buildBatchEntriesFromRows,
   buildEmptyGridRows,
+  FAST_SLEEPING_GRID_DAYS,
   rowsFromBatchEntries,
   type FastSleepingRow,
 } from "@/lib/proposals/fast-sleeping-plan";
@@ -329,7 +330,6 @@ export function ProposalDraftDialog({
 
   useEffect(() => {
     if (!open || proposalType !== "sleeping" || batchMode) {
-      if (!batchMode) setSleepingLocationOptions([]);
       return;
     }
     const inviteeIds = isSoloProposal
@@ -342,7 +342,6 @@ export function ProposalDraftDialog({
 
   useEffect(() => {
     if (!open || !batchMode || proposalType !== "sleeping") {
-      setBatchLocationOptions([]);
       return;
     }
     const inviteeIds = [
@@ -355,7 +354,7 @@ export function ProposalDraftDialog({
 
   useEffect(() => {
     if (!batchMode) return;
-    setFastPlanRows((current) => (current.length > 0 ? current : buildEmptyGridRows()));
+    setFastPlanRows((current) => (current.length === FAST_SLEEPING_GRID_DAYS ? current : buildEmptyGridRows()));
   }, [batchMode]);
 
   const timePreview = formatTimeRange(

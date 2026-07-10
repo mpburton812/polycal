@@ -602,7 +602,11 @@ export async function moveResolvedEventByRedraft(
   });
 
   if (options.allDay) {
-    await fillProposalDateField(draftDialog.getByLabel(/^Day$/i).first(), options.start);
+    const dayField = draftDialog.getByLabel(/^Day$/i).first();
+    await fillProposalDateField(dayField, options.start);
+    await expect(dayField).toHaveValue(
+      `${options.start.slice(5, 7)}/${options.start.slice(8, 10)}/${options.start.slice(0, 4)}`,
+    );
   } else {
     await fillProposalDateTimeField(draftDialog.getByLabel("Start").first(), options.start);
     if (options.end) {

@@ -1904,7 +1904,7 @@ export async function updateDraftProposalAction(
     await replaceInvitees(db, proposal.id, session.user.id, parsed.data.invitees);
   }
 
-  if (parsed.data.timeSlots) {
+  if (parsed.data.timeSlots && parsed.data.timeSlots.length > 0) {
     await replaceTimeSlots(db, proposal.id, parsed.data.timeSlots);
   }
 
