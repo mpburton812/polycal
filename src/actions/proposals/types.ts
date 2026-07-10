@@ -44,6 +44,12 @@ export interface ProposalCard {
   specialKind?: "residency" | "group_name";
   /** Category icon key; null when masked or unset (PC-116). */
   eventIconKey?: string | null;
+  /** Sleeping batch proposal (PC-124). */
+  isBatchSleeping?: boolean;
+  /** Recurring series parent or child (PC-124). */
+  isRecurring?: boolean;
+  /** Resolved bedroom label when sleeping + bedroomIndex set (PC-124). */
+  bedroomLabel?: string | null;
 }
 
 export type RecurrencePattern = "daily" | "weekly" | "monthly" | "yearly";
@@ -128,6 +134,8 @@ export interface ProposalDetail {
   recurrenceRule: RecurrenceRule | null;
   occurrenceIndex: number | null;
   bedroomIndex: number | null;
+  /** Resolved bedroom name when index is set (PC-124). */
+  bedroomLabel: string | null;
   isBatchSleeping: boolean;
   batchEntries: BatchSleepingEntry[];
   /** Resolved place names for batch entry locationId values (PC-69). */

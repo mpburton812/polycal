@@ -26,6 +26,33 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "2026.07.10b",
+    date: "2026-07-10",
+    summary: "Proposal card & draft form UX for events and sleeping.",
+    changes: [
+      {
+        type: "changed",
+        description:
+          "Board cards use what→when→where→act hierarchy with sparse badges and type accent (PC-124).",
+      },
+      {
+        type: "changed",
+        description:
+          "Event schedule pickers use digital time; Reschedule uses ProposalScheduleField (PC-125).",
+      },
+      {
+        type: "changed",
+        description:
+          "Type-aware progressive draft dialog with More options, Required/Optional invitees, Save vs Submit (PC-126).",
+      },
+      {
+        type: "changed",
+        description:
+          "Privacy/notes helper copy and E2E updates for event and sleeping journeys (PC-127).",
+      },
+    ],
+  },
+  {
     version: "2026.07.10",
     date: "2026-07-10",
     summary: "Custom avatar crop: zoom out, WYSIWYG preview, and black-image fix.",

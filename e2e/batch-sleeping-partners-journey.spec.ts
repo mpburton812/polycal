@@ -37,7 +37,7 @@ test.describe("Batch sleeping partners journey", () => {
     await goToProposals(page);
 
     const dialog = await openSleepingProposalDraft(page);
-    await dialog.getByRole("checkbox", { name: "Batch (multiple nights in one proposal)" }).click();
+    await dialog.getByRole("checkbox", { name: /Batch nights/i }).click();
     await expect(dialog.getByTestId("fast-sleeping-plan-grid")).toBeVisible({ timeout: 15_000 });
 
     await configureBatchNight(dialog, page, night0, {

@@ -104,40 +104,46 @@ function inclusiveNightDates(rangeStart: string, rangeEnd: string): string[] {
 
 /** Cycles an invitee chip to required (none → required). */
 export async function setInviteeRequired(dialog: Locator, displayName: string) {
-  const chip = dialog.getByRole("button", { name: new RegExp(displayName, "i") });
-  await chip.click();
-  await expect(chip).toHaveText(new RegExp(`${displayName} \\(required\\)`, "i"));
+  const button = dialog.getByRole("button", {
+    name: new RegExp(`^${escapeRegex(displayName)} required$`, "i"),
+  });
+  await button.click();
+  await expect(button).toHaveAttribute("aria-pressed", "true");
 }
 
-/** Cycles an invitee chip to optional (none → required → optional). */
+/** Selects optional invitee role via explicit Optional control (PC-126). */
 export async function setInviteeOptional(dialog: Locator, displayName: string) {
-  const chip = dialog.getByRole("button", { name: new RegExp(displayName, "i") });
-  await chip.click();
-  await chip.click();
-  await expect(chip).toHaveText(new RegExp(`${displayName} \\(optional\\)`, "i"));
+  const button = dialog.getByRole("button", {
+    name: new RegExp(`^${escapeRegex(displayName)} optional$`, "i"),
+  });
+  await button.click();
+  await expect(button).toHaveAttribute("aria-pressed", "true");
 }
 
-/** Marks every visible invitee chip as required. */
+/** Marks every visible person as a required invitee via Required toggles (PC-126). */
 export async function setAllInviteesRequired(dialog: Locator): Promise<void> {
-  const toggleButtons = dialog.locator("button.MuiToggleButton-root");
-  const count = await toggleButtons.count();
+  const requiredButtons = dialog.getByRole("button", { name: / required$/i });
+  const count = await requiredButtons.count();
   for (let index = 0; index < count; index += 1) {
-    const chip = toggleButtons.nth(index);
-    const inIconPicker = await chip.evaluate((el) =>
+    const button = requiredButtons.nth(index);
+    const inIconPicker = await button.evaluate((el) =>
       Boolean(el.closest('[data-testid="event-icon-picker"]')),
     );
     if (inIconPicker) continue;
-    const text = (await chip.innerText()).trim();
-    if (!text || /solo event|with invitees|solo/i.test(text)) {
-      continue;
-    }
-    let attempts = 0;
-    while (!(await chip.innerText()).includes("(required)") && attempts < 3) {
-      await chip.click();
-      attempts += 1;
-    }
-    await expect(chip).toHaveText(/\(required\)/i);
+    await button.click();
+    await expect(button).toHaveAttribute("aria-pressed", "true");
   }
+}
+
+/** Expands the draft dialog More options accordion when collapsed (PC-126). */
+export async function expandDraftMoreOptions(dialog: Locator): Promise<void> {
+  const summary = dialog.getByRole("button", { name: /More options/i });
+  await expect(summary).toBeVisible();
+  const expanded = await summary.getAttribute("aria-expanded");
+  if (expanded !== "true") {
+    await summary.click();
+  }
+  await expect(dialog.getByLabel(/Description/i)).toBeVisible();
 }
 
 /** Selects Sleeping or Event type on a new proposal draft. */
@@ -159,6 +165,7 @@ export async function exitDraftDialog(dialog: Locator): Promise<void> {
 
 /** Selects an optional event category icon in the draft dialog (PC-116). */
 export async function selectEventIcon(dialog: Locator, a11yLabel: string): Promise<void> {
+  await expandDraftMoreOptions(dialog);
   await dialog.getByRole("button", { name: a11yLabel }).click();
 }
 
@@ -197,6 +204,7 @@ export async function createAndSubmitEvent(
   const dialog = await openEventOrSleepingProposalDraft(page);
   await dialog.getByLabel("Title").fill(options.title);
   if (options.description) {
+    await expandDraftMoreOptions(dialog);
     await dialog.getByLabel(/Description/i).fill(options.description);
   }
   await setInviteeRequired(dialog, options.requiredName);
@@ -220,6 +228,7 @@ export async function createAndSubmitSoloEvent(
   await dialog.getByLabel("Title").fill(options.title);
   await dialog.getByRole("button", { name: "Solo event (just me)" }).click();
   if (options.notes) {
+    await expandDraftMoreOptions(dialog);
     await dialog.getByLabel(/Notes/i).fill(options.notes);
   }
   await fillProposalDateTimeField(dialog.getByLabel("Start").first(), options.start);
@@ -242,6 +251,7 @@ export async function createAndSubmitSoloEventWithReminder(
   const dialog = await openEventProposalDraft(page);
   await dialog.getByLabel("Title").fill(options.title);
   await dialog.getByRole("button", { name: "Solo event (just me)" }).click();
+  await expandDraftMoreOptions(dialog);
   await dialog.getByRole("checkbox", { name: "Reminder before event" }).check();
   await dialog.getByLabel("Amount").fill(String(options.reminderAmount));
   await dialog.getByLabel("Unit").click();
@@ -273,6 +283,7 @@ export async function createAndSubmitRecurringEventForEveryone(
 ): Promise<void> {
   const dialog = await openEventOrSleepingProposalDraft(page);
   await dialog.getByLabel("Title").fill(options.title);
+  await expandDraftMoreOptions(dialog);
   await dialog.getByRole("checkbox", { name: /Recurring series/i }).check();
   await dialog.getByLabel("Occurrences").fill(String(options.occurrenceCount ?? 4));
   await setAllInviteesRequired(dialog);
@@ -297,7 +308,7 @@ export async function createAndSubmitSoloSleepingWeek(
   const nightDates = inclusiveNightDates(options.rangeStart, options.rangeEnd);
   const dialog = await openSleepingProposalDraft(page);
   await dialog
-    .getByRole("checkbox", { name: "Batch (multiple nights in one proposal)" })
+    .getByRole("checkbox", { name: /Batch nights/i })
     .check();
 
   await expect(dialog.getByTestId("fast-sleeping-plan-grid")).toBeVisible({ timeout: 15_000 });
@@ -358,6 +369,7 @@ export async function createAndSubmitPoll(
 ): Promise<void> {
   const dialog = await openEventOrSleepingProposalDraft(page);
   await dialog.getByLabel("Title").fill(options.title);
+  await expandDraftMoreOptions(dialog);
   if (options.description) {
     await dialog.getByLabel(/Description/i).fill(options.description);
   }
@@ -482,6 +494,7 @@ export async function createAndSubmitSoloTimedEvent(
   const dialog = await openEventProposalDraft(page);
   await dialog.getByLabel("Title").fill(options.title);
   await dialog.getByRole("button", { name: "Solo event (just me)" }).click();
+  await expandDraftMoreOptions(dialog);
   await dialog.getByLabel(/Description/i).fill(options.comment);
   await fillProposalDateTimeField(dialog.getByLabel("Start").first(), options.start);
   await fillProposalDateTimeField(dialog.getByLabel("End (optional)").first(), options.end);
@@ -501,6 +514,7 @@ export async function createAndSubmitSoloAllDayEvent(
   const dialog = await openEventProposalDraft(page);
   await dialog.getByLabel("Title").fill(options.title);
   await dialog.getByRole("button", { name: "Solo event (just me)" }).click();
+  await expandDraftMoreOptions(dialog);
   await dialog.getByLabel(/Description/i).fill(options.comment);
   await dialog.getByRole("checkbox", { name: /All-day event/i }).check();
   await fillProposalDateField(dialog.getByLabel(/^Day$/i).first(), options.day);
@@ -522,6 +536,7 @@ export async function createAndSubmitSoloRecurringTimedEvent(
   const dialog = await openEventProposalDraft(page);
   await dialog.getByLabel("Title").fill(options.title);
   await dialog.getByRole("button", { name: "Solo event (just me)" }).click();
+  await expandDraftMoreOptions(dialog);
   await dialog.getByLabel(/Description/i).fill(options.comment);
   await dialog.getByRole("checkbox", { name: /Recurring series/i }).check();
   await dialog.getByLabel("Occurrences").fill(String(options.occurrenceCount ?? 4));
@@ -544,6 +559,7 @@ export async function createAndSubmitSoloRecurringAllDayEvent(
   const dialog = await openEventProposalDraft(page);
   await dialog.getByLabel("Title").fill(options.title);
   await dialog.getByRole("button", { name: "Solo event (just me)" }).click();
+  await expandDraftMoreOptions(dialog);
   await dialog.getByLabel(/Description/i).fill(options.comment);
   await dialog.getByRole("checkbox", { name: /All-day event/i }).check();
   await dialog.getByRole("checkbox", { name: /Recurring series/i }).check();
@@ -567,6 +583,7 @@ export async function createAndSubmitTimedEventWithInvitee(
 ): Promise<void> {
   const dialog = await openEventProposalDraft(page);
   await dialog.getByLabel("Title").fill(options.title);
+  await expandDraftMoreOptions(dialog);
   await dialog.getByLabel(/Description/i).fill(options.comment);
   if (options.inviteeRole === "required") {
     await setInviteeRequired(dialog, options.inviteeName);

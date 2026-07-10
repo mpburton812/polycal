@@ -63,9 +63,10 @@ import {
   primaryButtonSx,
   proposalCardSx,
   typeBadgeLabel,
-  typeChipSx,
+  typeChipSxForProposal,
 } from "./proposalCardTheme";
 import { ProposalEventIcon } from "./ProposalEventIcon";
+import { ProposalScheduleField } from "./ProposalScheduleFields";
 import { formatProposalLogLine } from "@/lib/proposals/state-log-format";
 import {
   inviteeDisplayLabel,
@@ -555,34 +556,57 @@ export function ProposalDetailDialog({
           )}
           {detail && (
             <>
-              <Stack direction="row" justifyContent="space-between" alignItems="flex-start" sx={{ mb: 1 }}>
-                <Chip label={typeBadgeLabel(detail.proposalType)} size="small" sx={typeChipSx} />
-                <Typography variant="caption" color="text.secondary" sx={{ textAlign: "right" }}>
-                  PROPOSED BY {detail.proposerName.toUpperCase()}
-                </Typography>
-              </Stack>
-
-              <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" sx={{ mb: 1 }}>
+              <Stack direction="row" spacing={1} alignItems="flex-start" sx={{ mb: 1 }}>
                 <ProposalEventIcon
                   eventIconKey={detail.eventIconKey}
                   isContentMasked={detail.isContentMasked}
                   proposalType={detail.proposalType}
                   size={24}
                 />
-                <Typography variant="h6" component="h2" sx={{ fontSize: "1.1rem", fontWeight: 600 }}>
-                  {detail.title}
-                </Typography>
+                <Box sx={{ flex: 1, minWidth: 0 }}>
+                  <Typography variant="h6" component="h2" sx={{ fontSize: "1.1rem", fontWeight: 600 }}>
+                    {detail.title}
+                  </Typography>
+                  <Stack direction="row" spacing={0.75} alignItems="center" flexWrap="wrap" sx={{ mt: 0.5 }}>
+                    <Chip
+                      label={typeBadgeLabel(detail.proposalType)}
+                      size="small"
+                      sx={{
+                        ...typeChipSxForProposal(detail.proposalType),
+                        height: 20,
+                        fontSize: "0.6rem",
+                      }}
+                    />
+                    <Typography variant="caption" color="text.secondary">
+                      by {detail.proposerName}
+                    </Typography>
+                  </Stack>
+                </Box>
+              </Stack>
+
+              <Stack direction="row" spacing={0.75} alignItems="center" flexWrap="wrap" sx={{ mb: 1 }}>
                 <Chip
                   label={detail.displayState.toUpperCase()}
                   size="small"
                   variant="outlined"
                   sx={{ fontWeight: 600, fontSize: "0.65rem" }}
                 />
-                {detail.isPoll && (
-                  <Chip icon={<PollOutlinedIcon sx={{ fontSize: "14px !important" }} />} label="Poll" size="small" sx={{ bgcolor: POLY_GREEN, color: "#fff", fontSize: "0.65rem" }} />
-                )}
                 {detail.atRisk && <Chip size="small" label="At risk" color="warning" />}
+                {detail.isPoll && (
+                  <Chip
+                    icon={<PollOutlinedIcon sx={{ fontSize: "14px !important" }} />}
+                    label="Poll"
+                    size="small"
+                    variant="outlined"
+                  />
+                )}
+                {detail.isBatchSleeping && (
+                  <Chip size="small" label="Batch" variant="outlined" />
+                )}
                 {detail.isRecurring && <Chip size="small" label="Recurring" variant="outlined" />}
+                {(detail.eventPrivacy === "private" || detail.eventPrivacy === "super_private") && (
+                  <Chip size="small" label="Private" variant="outlined" />
+                )}
                 {detail.isPoll && detail.winningSlotId && (
                   <Chip size="small" label="Winning slot" sx={{ bgcolor: POLY_GREEN, color: "#fff" }} />
                 )}
@@ -604,10 +628,12 @@ export function ProposalDetailDialog({
                 </Stack>
               )}
 
-              {detail.locationName && (
+              {(detail.locationName || detail.bedroomLabel) && (
                 <Stack direction="row" spacing={0.5} alignItems="center" sx={{ mt: 0.5 }}>
                   <LocationOnOutlinedIcon sx={{ fontSize: 16, color: "text.secondary" }} />
-                  <Typography variant="body2" color="text.secondary">{detail.locationName}</Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    {[detail.locationName, detail.bedroomLabel].filter(Boolean).join(" · ")}
+                  </Typography>
                 </Stack>
               )}
 
@@ -998,21 +1024,25 @@ export function ProposalDetailDialog({
       </DialogTitle>
       <DialogContent>
         <Stack spacing={2} sx={{ mt: 1 }}>
-          <TextField
-            label={detail?.proposalType === "sleeping" ? "Start date" : "Start"}
-            type={detail?.proposalType === "sleeping" ? "date" : "datetime-local"}
+          <ProposalScheduleField
+            label={detail?.proposalType === "sleeping" ? "Night of" : "Start"}
+            mode={detail?.proposalType === "sleeping" ? "date" : "datetime"}
+            splitDateTime={detail?.proposalType === "event"}
             value={rescheduleStart}
-            onChange={(event) => setRescheduleStart(event.target.value)}
-            fullWidth
-            InputLabelProps={{ shrink: true }}
+            onChange={setRescheduleStart}
+            timeHelperText={
+              detail?.proposalType === "event" ? "End defaults to one hour after start when empty" : undefined
+            }
           />
-          <TextField
-            label={detail?.proposalType === "sleeping" ? "End date (optional)" : "End"}
-            type={detail?.proposalType === "sleeping" ? "date" : "datetime-local"}
+          <ProposalScheduleField
+            label={
+              detail?.proposalType === "sleeping" ? "Last night (optional)" : "End (optional)"
+            }
+            mode={detail?.proposalType === "sleeping" ? "date" : "datetime"}
+            splitDateTime={detail?.proposalType === "event"}
             value={rescheduleEnd}
-            onChange={(event) => setRescheduleEnd(event.target.value)}
-            fullWidth
-            InputLabelProps={{ shrink: true }}
+            onChange={setRescheduleEnd}
+            disabled={!rescheduleStart}
           />
         </Stack>
       </DialogContent>

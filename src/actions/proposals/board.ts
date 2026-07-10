@@ -32,6 +32,31 @@ import { proposalHasSchedulableWindows } from "@/lib/schedule/schedule-slices";
 
 import type { ProposalBoard, ProposalCard } from "./types";
 
+/** Parses bedroom label JSON stored on locations for card display (PC-124). */
+function bedroomLabelFromPlace(
+  bedroomIndex: number | null,
+  bedroomNamesJson: string | null,
+  bedroomCount: number | null,
+): string | null {
+  if (bedroomIndex === null || bedroomIndex < 0) return null;
+  let names: string[] = [];
+  if (bedroomNamesJson) {
+    try {
+      const parsed = JSON.parse(bedroomNamesJson) as unknown;
+      if (Array.isArray(parsed)) {
+        names = parsed.filter((value): value is string => typeof value === "string");
+      }
+    } catch {
+      names = [];
+    }
+  }
+  const count = bedroomCount ?? 0;
+  if (names.length === 0 && count > 0) {
+    names = Array.from({ length: count }, (_, index) => `Bedroom ${index + 1}`);
+  }
+  return names[bedroomIndex] ?? `Bedroom ${bedroomIndex + 1}`;
+}
+
 /**
  * Lists Kanban columns scoped to the signed-in user (PC-40 / PC-66).
  */
@@ -99,6 +124,9 @@ export async function listProposalBoardAction(): Promise<ProposalBoard> {
       isRecurrenceParent: proposals.isRecurrenceParent,
       parentProposalId: proposals.parentProposalId,
       eventIconKey: proposals.eventIconKey,
+      bedroomIndex: proposals.bedroomIndex,
+      locationBedroomNames: locations.bedroomNames,
+      locationBedroomCount: locations.bedroomCount,
     })
     .from(proposals)
     .innerJoin(users, eq(proposals.proposerId, users.id))
@@ -248,6 +276,16 @@ export async function listProposalBoardAction(): Promise<ProposalBoard> {
       inviteeCount: invitees.length,
       respondedCount,
       isPastSchedule,
+      isBatchSleeping: row.isBatchSleeping,
+      isRecurring: Boolean(row.isRecurrenceParent || row.parentProposalId),
+      bedroomLabel:
+        masked || row.proposalType !== "sleeping"
+          ? null
+          : bedroomLabelFromPlace(
+              row.bedroomIndex,
+              row.locationBedroomNames,
+              row.locationBedroomCount,
+            ),
       eventIconKey:
         masked || row.proposalType !== "event" ? null : row.eventIconKey ?? null,
       notOnCalendar:

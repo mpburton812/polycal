@@ -4,7 +4,7 @@ import { login, logout } from "./helpers/auth";
 import { fillProposalDateTimeField } from "./helpers/datePickers";
 import { USERS } from "./helpers/constants";
 import { goToProposals, openProposalCard, selectProposalTab } from "./helpers/navigation";
-import { openEventOrSleepingProposalDraft } from "./helpers/proposals";
+import { expandDraftMoreOptions, openEventOrSleepingProposalDraft, setInviteeRequired } from "./helpers/proposals";
 import { expectToast } from "./helpers/toast";
 
 function proposalCard(page: import("@playwright/test").Page, title: string) {
@@ -23,8 +23,9 @@ test.describe("Proposal invitee journey", () => {
     await goToProposals(page);
     const draftDialog = await openEventOrSleepingProposalDraft(page);
     await draftDialog.getByLabel("Title").fill(title);
+    await expandDraftMoreOptions(draftDialog);
     await draftDialog.getByLabel(/Description/i).fill("Single invitee then attendee add.");
-    await draftDialog.getByRole("button", { name: /Leia Organa/i }).click();
+    await setInviteeRequired(draftDialog, USERS.leia.displayName);
     await fillProposalDateTimeField(draftDialog.getByLabel("Start").first(), "2099-07-10T18:00");
     await draftDialog.getByRole("button", { name: "Save", exact: true }).click();
 
