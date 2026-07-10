@@ -1,5 +1,6 @@
 import { Box, Container } from "@mui/material";
 
+import { FeedbackFab } from "@/components/feedback/FeedbackFab";
 import { AppHeader } from "@/components/layout/AppHeader";
 import { AppTabs } from "@/components/layout/AppTabs";
 import { DevBar } from "@/components/layout/DevBar";
@@ -65,6 +66,7 @@ export function AppShell({
         {children}
       </Container>
       <AppTabs isAdmin={isAdmin} />
+      <FeedbackFab />
       <Box sx={{ height: 56 }} aria-hidden />
     </>
   );

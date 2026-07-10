@@ -15,7 +15,15 @@ export default edgeAuth((request) => {
     return undefined;
   }
 
-  const publicPaths = ["/login", "/paused", "/offline", "/api/auth", "/api/cron"];
+  // Alpha-feedback admin APIs authenticate via Bearer token (Tauri tracker) or session.
+  const publicPaths = [
+    "/login",
+    "/paused",
+    "/offline",
+    "/api/auth",
+    "/api/cron",
+    "/api/admin/alpha-feedback",
+  ];
   const isPublic =
     publicPaths.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)) ||
     pathname.startsWith("/api/verify-email");
