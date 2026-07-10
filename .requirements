@@ -162,3 +162,4 @@
 2026-07-09 | c6a0e45 | PC-118 | default unset timezone to US Eastern | src/lib/schedule/timezone.test.ts
 2026-07-09 | 148c39f | PC-118 | include profileBio in partner list action | src/actions/admin-fast-sleeping.ts
 2026-07-10 | 1addee1 | PC-114 | share fast sleeping plan core and responsive grid | src/actions/admin-fast-sleeping.test.ts
+2026-07-10 | 855aef8 | PC-116 | update batch sleeping E2E for shared fast plan grid | src/components/proposals/FastSleepingPlanGrid.tsx
