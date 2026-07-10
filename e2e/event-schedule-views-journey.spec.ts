@@ -56,7 +56,7 @@ test.describe("Event schedule views journey", () => {
     test.setTimeout(300_000);
 
     const title = `E2E Solo All-day ${Date.now()}`;
-    const initialDay = dateOffsetIso(16);
+    const initialDay = dateOffsetIso(3);
     const movedDay = shiftIsoDate(initialDay, 1);
 
     await login(page, USERS.luke.username);

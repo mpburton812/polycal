@@ -28,6 +28,7 @@ export default async function ProfilePage() {
       timezone: users.timezone,
       mustChangePassword: users.mustChangePassword,
       displayName: users.displayName,
+      profileBio: users.profileBio,
     })
     .from(users)
     .where(eq(users.id, session.user.id))
@@ -46,6 +47,7 @@ export default async function ProfilePage() {
       </Typography>
       <ProfileSettings
         initialDisplayName={row?.displayName ?? session.user.displayName}
+        initialProfileBio={row?.profileBio?.trim() || null}
         initialAvatarKey={row?.avatarKey ?? null}
         initialTheme={row?.theme ?? "mint"}
         initialTimezone={resolveTimezone(row?.timezone)}

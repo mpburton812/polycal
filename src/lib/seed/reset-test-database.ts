@@ -21,6 +21,10 @@ export async function resetTestDatabase(): Promise<{
 
   const seedProfile = resolveSeedProfile();
   const client = getSqlClient();
+  // Ensure schema exists before wipe (e.g. alpha_feedback_submissions on v19+).
+  const { runMigrations } = await import("@/lib/db/migrate");
+  await runMigrations();
+  await client.execute("DELETE FROM alpha_feedback_submissions");
   await client.execute("DELETE FROM proposal_slot_votes");
   await client.execute("DELETE FROM proposal_comments");
   await client.execute("DELETE FROM proposal_state_log");

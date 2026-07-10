@@ -156,3 +156,17 @@
 2026-07-09 | 48b4478 | PC-115 | event schedule views user journey E2E suite | src/actions/proposals/_core.ts
 2026-07-09 | 996cf0d | PC-115 | event schedule views user journey E2E suite | src/actions/proposals/_core.ts
 2026-07-09 | ba3b751 | PC-116 | event category icons phase 1 — registry, DB, picker, week view | src/actions/proposals/_core.ts
+2026-07-09 | ed8af9a | PC-117 | retrigger CI after rebase | n/a
+2026-07-09 | db56edc | PC-118 | admin fast sleeping plan add | src/actions/admin-fast-sleeping.test.ts
+2026-07-09 | 96866d0 | PC-118 | merge origin/dev into feature branch | n/a
+2026-07-09 | c6a0e45 | PC-118 | default unset timezone to US Eastern | src/lib/schedule/timezone.test.ts
+2026-07-09 | 148c39f | PC-118 | include profileBio in partner list action | src/actions/admin-fast-sleeping.ts
+2026-07-10 | 1addee1 | PC-114 | share fast sleeping plan core and responsive grid | src/actions/admin-fast-sleeping.test.ts
+2026-07-10 | 855aef8 | PC-116 | update batch sleeping E2E for shared fast plan grid | src/components/proposals/FastSleepingPlanGrid.tsx
+2026-07-10 | 225201e | PC-114 | harden draft update and all-day move E2E | src/actions/proposals/_core.ts
+2026-07-10 | db22e02 | PC-114 | stabilize all-day event move in schedule journey E2E | e2e/event-schedule-views-journey.spec.ts
+2026-07-10 | 6488786 | PC-118 | add alpha tester feedback system | src/actions/alpha-feedback.ts
+2026-07-10 | 463bb93 | PC-122 | exclude apps/ from Next.js TypeScript project | tsconfig.json
+2026-07-10 | 863baa6 | PC-120 | avoid Send feedback aria-label colliding with End fields | src/components/feedback/FeedbackFab.tsx
+2026-07-10 | ecf00fd | PC-122 | proxy Vercel protection bypass for alpha feedback tracker | src/lib/alpha-feedback/cors.ts
+2026-07-10 | eae0d8c | PC-119 | run migrations before test DB wipe | src/lib/seed/reset-test-database.ts

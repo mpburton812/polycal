@@ -1,6 +1,7 @@
 /** Human-readable labels for admin activity-log action codes (PC-63). */
 export function formatActivityLogAction(action: string): string {
   if (action === "admin.impersonate") return "Impersonation";
+  if (action === "admin.fast_sleeping_plan_add") return "Fast sleeping plan add";
   return action;
 }
 
@@ -73,6 +74,17 @@ export function formatActivityLogDetails(action: string, details: string | null)
         typeof parsed.targetUserId === "string" ? parsed.targetUserId : null;
       if (targetName) return `Target: ${targetName}`;
       if (targetId) return `Target user id: ${targetId}`;
+    }
+
+    if (action === "admin.fast_sleeping_plan_add") {
+      const targetName =
+        typeof parsed.targetDisplayName === "string" ? parsed.targetDisplayName : null;
+      const nightCount = typeof parsed.nightCount === "number" ? parsed.nightCount : null;
+      const parts = [
+        targetName ? `Target: ${targetName}` : null,
+        nightCount !== null ? `${nightCount} night${nightCount === 1 ? "" : "s"}` : null,
+      ].filter(Boolean);
+      if (parts.length > 0) return parts.join(" · ");
     }
 
     if (typeof parsed.message === "string") {

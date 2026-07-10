@@ -12,6 +12,7 @@ import { requireSession, withDb } from "@/lib/actions/context";
 import { sendEmail } from "@/lib/email/send";
 import { isUserThemeId, normalizeUserThemeId, type UserThemeId } from "@/lib/constants/themes";
 import { resolveTimezone } from "@/lib/schedule/timezone";
+import { profileBioSchema } from "@/lib/users/profile-bio";
 import { AVATAR_OPTIONS, isCustomAvatarKey, type AvatarKey } from "@/lib/constants/avatars";
 import { isCroppedAvatarLargeEnough } from "@/lib/avatars/crop";
 import { getDb } from "@/lib/db/client";
@@ -249,6 +250,7 @@ export async function updateProfilePreferencesAction(
   );
 
   revalidatePath("/profile");
+  revalidatePath("/people-places");
   return { ok: true };
 }
 
@@ -340,6 +342,35 @@ export async function updateDisplayNameAction(displayName: string): Promise<Acti
 
   await logUserActivity(sessionResult.user.id, "profile.display_name_update", parsed.data);
   revalidatePath("/profile");
+  revalidatePath("/people-places");
+  return { ok: true };
+}
+
+/**
+ * Updates the optional People & Places bio for the signed-in user (PC-117).
+ */
+export async function updateProfileBioAction(profileBio: string): Promise<ActionResult> {
+  const sessionResult = await requireSession();
+  if (!sessionResult.ok) {
+    return { ok: false, error: sessionResult.message };
+  }
+
+  const parsed = profileBioSchema.safeParse(profileBio);
+  if (!parsed.success) {
+    return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid bio." };
+  }
+
+  await withDb(async (db) => {
+    const now = new Date().toISOString();
+    await db
+      .update(users)
+      .set({ profileBio: parsed.data, updatedAt: now })
+      .where(eq(users.id, sessionResult.user.id));
+  });
+
+  await logUserActivity(sessionResult.user.id, "profile.bio_update");
+  revalidatePath("/profile");
+  revalidatePath("/people-places");
   return { ok: true };
 }
 
