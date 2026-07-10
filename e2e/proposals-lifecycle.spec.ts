@@ -4,7 +4,7 @@ import { login } from "./helpers/auth";
 import { fillProposalDateTimeField } from "./helpers/datePickers";
 import { DEMO, USERS } from "./helpers/constants";
 import { goToProposals, openProposalCard, selectProposalTab } from "./helpers/navigation";
-import { exitDraftDialog, openEventOrSleepingProposalDraft } from "./helpers/proposals";
+import { exitDraftDialog, expandDraftMoreOptions, openEventOrSleepingProposalDraft } from "./helpers/proposals";
 
 function proposalCard(page: import("@playwright/test").Page, title: string) {
   return page.locator(".MuiCard-root").filter({
@@ -62,6 +62,7 @@ test.describe("Poll proposal draft", () => {
     const title = `E2E Poll ${Date.now()}`;
     const dialog = await openEventOrSleepingProposalDraft(page);
     await dialog.getByLabel("Title").fill(title);
+    await expandDraftMoreOptions(dialog);
     await dialog.getByLabel(/Description/i).fill("Poll with two options.");
     await dialog.getByRole("checkbox", { name: /Time poll/i }).check();
 
@@ -75,6 +76,7 @@ test.describe("Poll proposal draft", () => {
     await exitDraftDialog(dialog);
     await expect(proposalCard(page, title)).toBeVisible();
     await proposalCard(page, title).getByRole("button", { name: "Continue Editing" }).click();
+    await expandDraftMoreOptions(dialog);
     await expect(dialog.getByRole("checkbox", { name: /Time poll/i })).toBeChecked();
   });
 });
@@ -89,6 +91,7 @@ test.describe("Recurring event draft", () => {
     const title = `E2E Recurring ${Date.now()}`;
     const dialog = await openEventOrSleepingProposalDraft(page);
     await dialog.getByLabel("Title").fill(title);
+    await expandDraftMoreOptions(dialog);
     await dialog.getByLabel(/Description/i).fill("Weekly council meetings.");
     await dialog.getByRole("checkbox", { name: /Recurring series/i }).check();
     await fillProposalDateTimeField(dialog.getByLabel("Start").first(), "2099-09-01T09:00");

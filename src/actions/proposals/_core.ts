@@ -37,6 +37,7 @@ import {
   loadEnforcementSettings,
   runProposalEnforcement,
 } from "@/lib/proposals/enforcement";
+import { assertEventPrivacyAllowed } from "@/lib/proposals/event-privacy-availability";
 import {
   recordProposalInviteeView,
   shouldRecordProposalInviteeView,
@@ -1639,6 +1640,10 @@ export async function createDraftProposalAction(
   const isAllDay =
     parsed.data.proposalType === "event" && Boolean(parsed.data.isAllDay);
   const eventPrivacy = parsed.data.eventPrivacy ?? "open";
+  const privacyCheck = await assertEventPrivacyAllowed(db, eventPrivacy);
+  if (!privacyCheck.ok) {
+    return { ok: false, message: privacyCheck.error };
+  }
   const isRecurring = Boolean(parsed.data.isRecurring && parsed.data.recurrenceRule);
   const recurrenceJson = isRecurring
     ? serializeRecurrenceRule(parsed.data.recurrenceRule)
@@ -1822,6 +1827,13 @@ export async function updateDraftProposalAction(
   const intentionalSolo = Boolean(parsed.data.intentionalSolo);
   const afterLocationId = parsed.data.locationId ?? null;
   const afterLocationText = parsed.data.locationText?.trim() || null;
+  const nextEventPrivacy = parsed.data.eventPrivacy ?? proposal.eventPrivacy;
+  if (parsed.data.eventPrivacy !== undefined) {
+    const privacyCheck = await assertEventPrivacyAllowed(db, nextEventPrivacy);
+    if (!privacyCheck.ok) {
+      return { ok: false, message: privacyCheck.error };
+    }
+  }
 
   const existingSlots = await db
     .select({
@@ -1877,7 +1889,7 @@ export async function updateDraftProposalAction(
       isPoll: Boolean(isPoll),
       isAllDay:
         parsed.data.proposalType === "event" && Boolean(parsed.data.isAllDay),
-      eventPrivacy: parsed.data.eventPrivacy ?? proposal.eventPrivacy,
+      eventPrivacy: nextEventPrivacy,
       isRecurrenceParent: isRecurring || proposal.isRecurrenceParent,
       recurrenceRule: recurrenceJson,
       bedroomIndex: parsed.data.bedroomIndex ?? proposal.bedroomIndex,
@@ -2224,6 +2236,8 @@ export async function getProposalDetailAction(
       batchEntriesJson: proposals.batchEntriesJson,
       reminderOffsetMinutes: proposals.reminderOffsetMinutes,
       eventIconKey: proposals.eventIconKey,
+      locationBedroomNames: locations.bedroomNames,
+      locationBedroomCount: locations.bedroomCount,
     })
     .from(proposals)
     .innerJoin(users, eq(proposals.proposerId, users.id))
@@ -2446,6 +2460,20 @@ export async function getProposalDetailAction(
       recurrenceRule,
       occurrenceIndex: row.occurrenceIndex ?? null,
       bedroomIndex: masked ? null : row.bedroomIndex ?? null,
+      bedroomLabel:
+        masked || row.proposalType !== "sleeping" || row.bedroomIndex === null
+          ? null
+          : (() => {
+              const names = parseBedroomNames(row.locationBedroomNames);
+              const labels =
+                names.length > 0
+                  ? names
+                  : Array.from(
+                      { length: row.locationBedroomCount ?? 0 },
+                      (_, index) => `Bedroom ${index + 1}`,
+                    );
+              return labels[row.bedroomIndex!] ?? `Bedroom ${row.bedroomIndex! + 1}`;
+            })(),
       isBatchSleeping: row.isBatchSleeping,
       batchEntries,
       batchPlaceNames,

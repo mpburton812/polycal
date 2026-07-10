@@ -3,13 +3,7 @@ import { expect, test } from "./helpers/test";
 import { login } from "./helpers/auth";
 import { DEMO, USERS } from "./helpers/constants";
 import { goToProposals, selectProposalTab } from "./helpers/navigation";
-import { exitDraftDialog, openEventOrSleepingProposalDraft } from "./helpers/proposals";
-
-function proposalCard(page: import("@playwright/test").Page, title: string) {
-  return page.locator(".MuiCard-root").filter({
-    has: page.getByRole("heading", { name: title, level: 2 }),
-  });
-}
+import { exitDraftDialog, expandDraftMoreOptions, openEventOrSleepingProposalDraft, proposalCard } from "./helpers/proposals";
 
 test.describe("Proposal draft workflows", () => {
   test.beforeEach(async ({ page }) => {
@@ -22,6 +16,7 @@ test.describe("Proposal draft workflows", () => {
 
     const dialog = await openEventOrSleepingProposalDraft(page);
     await dialog.getByLabel("Title").fill(title);
+    await expandDraftMoreOptions(dialog);
     await dialog.getByLabel(/Description/i).fill("Automated E2E draft creation.");
     await dialog.getByRole("button", { name: "Save", exact: true }).click();
 
@@ -78,8 +73,9 @@ test.describe("Proposal submit and conflict warnings", () => {
     const title = `E2E Submit ${Date.now()}`;
     const dialog = await openEventOrSleepingProposalDraft(page);
     await dialog.getByLabel("Title").fill(title);
+    await expandDraftMoreOptions(dialog);
     await dialog.getByLabel(/Description/i).fill("Needs invitee vote.");
-    await dialog.getByRole("button", { name: /Leia Organa/i }).click();
+    await dialog.getByRole("button", { name: /Leia Organa required/i }).click();
     await dialog.getByRole("button", { name: "Save", exact: true }).click();
 
     await expect(dialog.getByRole("button", { name: "Submit" })).toBeVisible();

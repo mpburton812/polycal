@@ -46,6 +46,18 @@ npm run tauri:build
 
 Artifacts land under `src-tauri/target/release/bundle/` (`.msi` / `.exe` depending on targets).
 
+## CI
+
+On pull requests / feature pushes that touch `apps/alpha-feedback-tracker/**`, GitHub Actions runs:
+
+```bash
+cd apps/alpha-feedback-tracker
+npm ci
+npm run build   # tsc -b && vite build
+```
+
+That validates the web UI bundle only. Full `tauri:build` (MSI/EXE) is not run in CI — build installers locally on Windows with Rust + MSVC.
+
 ## API used
 
 | Method | Path | Purpose |

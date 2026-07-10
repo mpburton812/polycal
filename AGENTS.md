@@ -27,11 +27,12 @@ rules live in `.cursorrules`. Only the non-obvious, environment-specific gotchas
   `http://localhost:3000`. Everything else (Resend, VAPID push, Jira, cron) is optional
   and no-ops when unset.
 
-### Lint is not a usable gate here
-- `npm run lint` runs `next lint`, but there is NO committed ESLint config, so it drops
-  into an interactive "How would you like to configure ESLint?" prompt and hangs. CI does
-  not run it. The real quality gates (see `.github/workflows/dev.yml`) are:
-  `npm run audit:check`, `npm run test:unit` (Vitest), and `npm run build`.
+### Lint
+- `npm run lint` runs `next lint` with the committed root `eslint.config.mjs`
+  (FlatCompat + `next/core-web-vitals` / `next/typescript`). It is non-interactive.
+  CI does **not** run lint yet — quality gates remain `npm run audit:check`,
+  `npm run test:unit` (Vitest), and `npm run build` (see `.github/workflows/dev.yml`).
+  `apps/` is ignored by the root ESLint config (tracker has its own package).
 
 ### Git hooks
 - `commit-msg` only rejects commits missing a `PC-xxx` Jira key on `feature/*` branches;

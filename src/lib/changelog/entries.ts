@@ -26,6 +26,89 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "2026.07.10e",
+    date: "2026-07-10",
+    summary: "Privacy option gating; alpha feedback archive and delete.",
+    changes: [
+      {
+        type: "changed",
+        description:
+          "Hide disabled private/super-private options on new proposals; enforce in draft save (PC-134).",
+      },
+      {
+        type: "added",
+        description:
+          "Alpha feedback permanent DELETE and ARCHIVE list with toolbar navigation (PC-135, PC-136).",
+      },
+    ],
+  },
+  {
+    version: "2026.07.10d",
+    date: "2026-07-10",
+    summary: "ESLint config, tracker React align, draft dialog split.",
+    changes: [
+      {
+        type: "added",
+        description:
+          "Committed ESLint flat config; pin eslint-config-next to Next 15; lint is non-interactive (PC-130).",
+      },
+      {
+        type: "changed",
+        description:
+          "Align tracker React/types with root; document separate package (no workspaces) in ARCHITECTURE (PC-131).",
+      },
+      {
+        type: "changed",
+        description:
+          "Extract ProposalDraftDialog event/sleeping/more-options and conflict confirm sections (PC-132).",
+      },
+    ],
+  },
+  {
+    version: "2026.07.10c",
+    date: "2026-07-10",
+    summary: "CI for alpha-feedback tracker web build; GitLab CI marked secondary.",
+    changes: [
+      {
+        type: "added",
+        description:
+          "Path-filtered GitHub Actions job typechecks and Vite-builds apps/alpha-feedback-tracker (PC-128).",
+      },
+      {
+        type: "changed",
+        description:
+          "Document GitLab CI as secondary/legacy; architecture notes for tracker package boundary (PC-128).",
+      },
+    ],
+  },
+  {
+    version: "2026.07.10b",
+    date: "2026-07-10",
+    summary: "Proposal card & draft form UX for events and sleeping.",
+    changes: [
+      {
+        type: "changed",
+        description:
+          "Board cards use what→when→where→act hierarchy with sparse badges and type accent (PC-124).",
+      },
+      {
+        type: "changed",
+        description:
+          "Event schedule pickers use digital time; Reschedule uses ProposalScheduleField (PC-125).",
+      },
+      {
+        type: "changed",
+        description:
+          "Type-aware progressive draft dialog with More options, Required/Optional invitees, Save vs Submit (PC-126).",
+      },
+      {
+        type: "changed",
+        description:
+          "Privacy/notes helper copy and E2E updates for event and sleeping journeys (PC-127).",
+      },
+    ],
+  },
+  {
     version: "2026.07.10",
     date: "2026-07-10",
     summary: "Custom avatar crop: zoom out, WYSIWYG preview, and black-image fix.",

@@ -36,6 +36,6 @@ test.describe("Recurrence slice chooser journey", () => {
 
     await expect(page.getByRole("dialog").getByText("Recurring event")).toBeVisible();
     await page.getByRole("button", { name: "This occurrence" }).click();
-    await expect(page.getByRole("dialog").getByText(/PROPOSED BY/i)).toBeVisible();
+    await expect(page.getByRole("dialog").getByText(/by [A-Za-z]/)).toBeVisible();
   });
 });
