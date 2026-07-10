@@ -174,3 +174,4 @@
 2026-07-10 | 774513c | PC-124 | restore At risk badge and update E2E for card/detail UX | src/components/proposals/ProposalCard.tsx
 2026-07-10 | 052b295 | PC-124 | append requirements log and finish icon E2E fix | e2e/event-icons.spec.ts
 2026-07-10 | df1da7f | PC-130 | add ESLint flat config and pin eslint-config-next to 15.x | AGENTS.md
+2026-07-10 | 8429661 | PC-131 | align tracker React with root; document no workspaces | apps/alpha-feedback-tracker/package-lock.json
