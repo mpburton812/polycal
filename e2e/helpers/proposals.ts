@@ -603,7 +603,15 @@ export async function moveResolvedEventByRedraft(
 
   if (options.allDay) {
     const dayField = draftDialog.getByLabel(/^Day$/i).first();
-    await fillProposalDateField(dayField, options.start);
+    await dayField.click();
+    // Prefer calendar grid selection so MUI DatePicker commits via onChange.
+    const dayNumber = String(Number(options.start.slice(8, 10)));
+    const gridCell = page.getByRole("gridcell", { name: dayNumber, exact: true });
+    if (await gridCell.isVisible().catch(() => false)) {
+      await gridCell.click();
+    } else {
+      await fillProposalDateField(dayField, options.start);
+    }
     await expect(dayField).toHaveValue(
       `${options.start.slice(5, 7)}/${options.start.slice(8, 10)}/${options.start.slice(0, 4)}`,
     );
