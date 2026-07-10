@@ -63,6 +63,7 @@ export function FastSleepingPlanGrid({
       {rows.map((row, index) => (
         <Box
           key={row.nightDate}
+          data-testid={`fast-sleep-night-${row.nightDate}`}
           sx={{
             border: `1px solid ${GARDEN_TOKENS.outlineSoft}`,
             borderRadius: 1,

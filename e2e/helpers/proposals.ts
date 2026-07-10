@@ -283,8 +283,8 @@ export async function createAndSubmitRecurringEventForEveryone(
 }
 
 /**
- * Creates a batch week of solo sleeping nights in one proposal and submits it to resolved.
- * Returns the number of nights added to the batch.
+ * Creates a batch of solo sleeping nights in one proposal and submits it (normal approval;
+ * solo auto-resolves). Nights must fall within the shared 14-day fast plan grid (today+13).
  */
 export async function createAndSubmitSoloSleepingWeek(
   page: Page,
@@ -300,12 +300,13 @@ export async function createAndSubmitSoloSleepingWeek(
     .getByRole("checkbox", { name: "Batch (multiple nights in one proposal)" })
     .check();
 
-  for (let index = 0; index < nightDates.length; index += 1) {
-    if (index > 0) {
-      await dialog.getByRole("button", { name: "Add night" }).click();
-    }
-    await fillProposalDateField(dialog.getByLabel("Night of").nth(index), nightDates[index]!);
-    await dialog.getByRole("button", { name: "Solo", exact: true }).nth(index).click();
+  await expect(dialog.getByTestId("fast-sleeping-plan-grid")).toBeVisible({ timeout: 15_000 });
+
+  for (const nightDate of nightDates) {
+    await configureBatchNight(dialog, page, nightDate, {
+      nightDate,
+      mode: "solo",
+    });
   }
 
   await submitProposalDraft(page, dialog);
@@ -379,11 +380,9 @@ export async function createAndSubmitPoll(
   await submitProposalDraft(page, dialog);
 }
 
-/** Locates the bordered night editor block inside a batch sleeping draft dialog. */
-export function batchNightSection(dialog: Locator, nightIndex: number): Locator {
-  return dialog
-    .getByText(`Night ${nightIndex + 1}`, { exact: true })
-    .locator("xpath=ancestor::div[contains(@class,'MuiBox-root')][1]");
+/** Locates one night block in the shared fast sleeping plan grid by ISO date. */
+export function batchNightSection(dialog: Locator, nightDate: string): Locator {
+  return dialog.getByTestId(`fast-sleep-night-${nightDate.slice(0, 10)}`);
 }
 
 export type BatchNightConfig = {
@@ -397,47 +396,46 @@ export type BatchNightConfig = {
 };
 
 /**
- * Configures one batch sleeping night row (date, solo/invitees, location, comment).
- * Uses nth-index fields and night-section scoping for invitee chips (PC-69).
+ * Configures one night in the shared fast sleeping plan grid (PC-116).
+ * `nightDate` must be within the visible today…+13 window.
  */
 export async function configureBatchNight(
   dialog: Locator,
   page: Page,
-  nightIndex: number,
+  nightDateOrIndex: string | number,
   config: BatchNightConfig,
 ): Promise<void> {
-  const section = batchNightSection(dialog, nightIndex);
-
-  await fillProposalDateField(section.getByLabel("Night of"), config.nightDate);
+  const nightDate =
+    typeof nightDateOrIndex === "string" ? nightDateOrIndex.slice(0, 10) : config.nightDate.slice(0, 10);
+  const section = batchNightSection(dialog, nightDate);
+  await expect(section).toBeVisible({
+    timeout: 10_000,
+  });
 
   if (config.mode === "solo") {
     await section.getByRole("button", { name: "Solo", exact: true }).click();
   } else {
-    await section.getByRole("button", { name: "With invitees" }).click();
+    await section.getByRole("button", { name: "Partners", exact: true }).click();
     for (const displayName of config.requiredInvitees ?? []) {
-      const chip = section.getByRole("button", { name: new RegExp(displayName, "i") });
+      const chip = section.getByRole("button", { name: displayName, exact: true });
       await chip.click();
-      await expect(chip).toHaveText(new RegExp(`${displayName} \\(required\\)`, "i"));
+      await expect(chip).toHaveClass(/MuiChip-colorPrimary|MuiChip-filled/);
     }
   }
 
   if (config.customLocation) {
-    const locationSelect = section.getByRole("combobox", { name: "Location (optional)" });
+    const locationSelect = section.getByRole("combobox", { name: "Place" });
     await locationSelect.click();
     await page.getByRole("option", { name: "None" }).click();
-    await section.getByLabel("Custom location (optional)").fill(config.customLocation);
+    await section.getByLabel("Custom location").fill(config.customLocation);
   } else if (config.locationName) {
-    const locationSelect = section.getByRole("combobox", { name: "Location (optional)" });
+    const locationSelect = section.getByRole("combobox", { name: "Place" });
     await expect(async () => {
       await locationSelect.click();
       const option = page.getByRole("option", { name: config.locationName });
       await expect(option).toBeVisible({ timeout: 2_000 });
       await option.click();
     }).toPass({ timeout: 20_000 });
-  }
-
-  if (config.comment) {
-    await section.getByLabel("Comment (optional)").fill(config.comment);
   }
 }
 
@@ -707,15 +705,12 @@ export async function createAndSubmitBatchSleepingWithInvitee(
 ): Promise<void> {
   const dialog = await openSleepingProposalDraft(page);
   await dialog.getByRole("checkbox", { name: /Batch/i }).check();
-  await fillProposalDateField(dialog.getByLabel("Night of").first(), options.nightDate);
-  await dialog.getByRole("button", { name: "With invitees" }).first().click();
-  await setInviteeRequired(dialog, options.requiredPartnerName);
-  if (options.locationName) {
-    await dialog.getByLabel("Location (optional)").first().click();
-    await page.getByRole("option", { name: options.locationName }).click();
-  }
-  if (options.comment) {
-    await dialog.getByLabel("Comment (optional)").first().fill(options.comment);
-  }
+  await expect(dialog.getByTestId("fast-sleeping-plan-grid")).toBeVisible({ timeout: 15_000 });
+  await configureBatchNight(dialog, page, options.nightDate, {
+    nightDate: options.nightDate,
+    mode: "withInvitees",
+    requiredInvitees: [options.requiredPartnerName],
+    locationName: options.locationName,
+  });
   await submitProposalDraft(page, dialog);
 }
