@@ -21,6 +21,7 @@ export async function resetTestDatabase(): Promise<{
 
   const seedProfile = resolveSeedProfile();
   const client = getSqlClient();
+  await client.execute("DELETE FROM alpha_feedback_submissions");
   await client.execute("DELETE FROM proposal_slot_votes");
   await client.execute("DELETE FROM proposal_comments");
   await client.execute("DELETE FROM proposal_state_log");

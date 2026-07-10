@@ -1,0 +1,215 @@
+"use client";
+
+import FeedbackIcon from "@mui/icons-material/Feedback";
+import {
+  Box,
+  Button,
+  CircularProgress,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  Fab,
+  FormControl,
+  FormControlLabel,
+  FormLabel,
+  Radio,
+  RadioGroup,
+  TextField,
+  Typography,
+} from "@mui/material";
+import { usePathname } from "next/navigation";
+import { useEffect, useState, useTransition } from "react";
+
+import { submitAlphaFeedbackAction } from "@/actions/alpha-feedback";
+import { useToast } from "@/components/providers/ToastProvider";
+import {
+  getConsoleLogTail,
+  installConsoleCapture,
+} from "@/lib/alpha-feedback/console-capture";
+import { parseOsLabel } from "@/lib/alpha-feedback/schema";
+import { captureViewportScreenshot } from "@/lib/alpha-feedback/screenshot";
+import { GARDEN_TOKENS } from "@/theme/tokens";
+
+type FeedbackKind = "bug" | "feature";
+
+/**
+ * Floating feedback control — captures a screenshot then opens the submit dialog (PC-120).
+ */
+export function FeedbackFab() {
+  const pathname = usePathname();
+  const { showToast } = useToast();
+  const [open, setOpen] = useState(false);
+  const [capturing, setCapturing] = useState(false);
+  const [kind, setKind] = useState<FeedbackKind>("bug");
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [screenshotBase64, setScreenshotBase64] = useState<string | undefined>();
+  const [screenshotMimeType, setScreenshotMimeType] = useState<
+    "image/jpeg" | "image/png" | "image/webp" | undefined
+  >();
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+
+  useEffect(() => {
+    installConsoleCapture();
+  }, []);
+
+  useEffect(() => {
+    if (!screenshotBase64 || !screenshotMimeType) {
+      setPreviewUrl(null);
+      return;
+    }
+    const url = `data:${screenshotMimeType};base64,${screenshotBase64}`;
+    setPreviewUrl(url);
+  }, [screenshotBase64, screenshotMimeType]);
+
+  async function handleOpen() {
+    setCapturing(true);
+    setKind("bug");
+    setTitle("");
+    setDescription("");
+    try {
+      const shot = await captureViewportScreenshot();
+      setScreenshotBase64(shot?.base64);
+      setScreenshotMimeType(shot?.mimeType);
+    } finally {
+      setCapturing(false);
+      setOpen(true);
+    }
+  }
+
+  function handleClose() {
+    if (pending) return;
+    setOpen(false);
+  }
+
+  function handleSubmit() {
+    const userAgent = typeof navigator !== "undefined" ? navigator.userAgent : undefined;
+    startTransition(async () => {
+      const result = await submitAlphaFeedbackAction({
+        kind,
+        title,
+        description,
+        pagePath: pathname || undefined,
+        viewportWidth:
+          typeof window !== "undefined" ? Math.round(window.innerWidth) : undefined,
+        viewportHeight:
+          typeof window !== "undefined" ? Math.round(window.innerHeight) : undefined,
+        userAgent,
+        osLabel: parseOsLabel(userAgent),
+        consoleLogTail: getConsoleLogTail(),
+        screenshotBase64,
+        screenshotMimeType,
+      });
+      if (result.ok) {
+        showToast(result.message, "success");
+        setOpen(false);
+      } else {
+        showToast(result.message, "error");
+      }
+    });
+  }
+
+  return (
+    <>
+      <Fab
+        color="secondary"
+        aria-label="Give feedback"
+        onClick={() => void handleOpen()}
+        disabled={capturing}
+        sx={{
+          position: "fixed",
+          bottom: 88,
+          left: 24,
+          zIndex: 1200,
+          bgcolor: GARDEN_TOKENS.terracotta,
+          color: GARDEN_TOKENS.surface,
+          border: `3px solid ${GARDEN_TOKENS.ink}`,
+          boxShadow: "none",
+          "&:hover": {
+            bgcolor: "#A04A32",
+            boxShadow: "none",
+          },
+        }}
+      >
+        {capturing ? <CircularProgress size={22} color="inherit" /> : <FeedbackIcon />}
+      </Fab>
+
+      <Dialog open={open} onClose={handleClose} fullWidth maxWidth="sm">
+        <DialogTitle>Send feedback</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            Report a bug or suggest a feature. A screenshot and diagnostics are attached
+            automatically.
+          </Typography>
+
+          <FormControl component="fieldset" sx={{ mb: 2 }}>
+            <FormLabel component="legend">Type</FormLabel>
+            <RadioGroup
+              row
+              value={kind}
+              onChange={(event) => setKind(event.target.value as FeedbackKind)}
+            >
+              <FormControlLabel value="bug" control={<Radio />} label="Bug" />
+              <FormControlLabel value="feature" control={<Radio />} label="Feature" />
+            </RadioGroup>
+          </FormControl>
+
+          <TextField
+            label="Title"
+            value={title}
+            onChange={(event) => setTitle(event.target.value)}
+            fullWidth
+            required
+            margin="dense"
+            inputProps={{ maxLength: 200 }}
+          />
+          <TextField
+            label="Description"
+            value={description}
+            onChange={(event) => setDescription(event.target.value)}
+            fullWidth
+            required
+            margin="dense"
+            multiline
+            minRows={4}
+            inputProps={{ maxLength: 4000 }}
+          />
+
+          {previewUrl ? (
+            <Box
+              component="img"
+              src={previewUrl}
+              alt="Captured screenshot preview"
+              sx={{
+                mt: 2,
+                width: "100%",
+                maxHeight: 200,
+                objectFit: "contain",
+                border: `1px solid ${GARDEN_TOKENS.ink}22`,
+                borderRadius: 1,
+              }}
+            />
+          ) : (
+            <Typography variant="caption" color="text.secondary" sx={{ mt: 2, display: "block" }}>
+              Screenshot unavailable — feedback can still be submitted.
+            </Typography>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleClose} disabled={pending}>
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            onClick={handleSubmit}
+            disabled={pending || !title.trim() || !description.trim()}
+          >
+            {pending ? "Submitting…" : "Submit"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </>
+  );
+}

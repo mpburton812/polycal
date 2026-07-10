@@ -165,3 +165,6 @@
 2026-07-10 | 855aef8 | PC-116 | update batch sleeping E2E for shared fast plan grid | src/components/proposals/FastSleepingPlanGrid.tsx
 2026-07-10 | 225201e | PC-114 | harden draft update and all-day move E2E | src/actions/proposals/_core.ts
 2026-07-10 | db22e02 | PC-114 | stabilize all-day event move in schedule journey E2E | e2e/event-schedule-views-journey.spec.ts
+2026-07-10 | 6488786 | PC-118 | add alpha tester feedback system | src/actions/alpha-feedback.ts
+2026-07-10 | 463bb93 | PC-122 | exclude apps/ from Next.js TypeScript project | tsconfig.json
+2026-07-10 | 863baa6 | PC-120 | avoid Send feedback aria-label colliding with End fields | src/components/feedback/FeedbackFab.tsx

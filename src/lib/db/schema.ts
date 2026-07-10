@@ -129,6 +129,49 @@ export const storedImages = sqliteTable("stored_images", {
   createdAt: text("created_at").notNull(),
 });
 
+export const alphaFeedbackKinds = ["bug", "feature"] as const;
+export type AlphaFeedbackKind = (typeof alphaFeedbackKinds)[number];
+
+export const alphaFeedbackStatuses = [
+  "not_started",
+  "in_progress",
+  "deferred",
+  "working_as_designed",
+  "closed",
+] as const;
+export type AlphaFeedbackStatus = (typeof alphaFeedbackStatuses)[number];
+
+/**
+ * Alpha tester bug/feature submissions with silent diagnostics + screenshot (PC-119).
+ */
+export const alphaFeedbackSubmissions = sqliteTable("alpha_feedback_submissions", {
+  id: text("id").primaryKey(),
+  kind: text("kind").notNull(),
+  title: text("title").notNull(),
+  description: text("description").notNull(),
+  status: text("status").notNull().default("not_started"),
+  submitterUserId: text("submitter_user_id")
+    .notNull()
+    .references(() => users.id),
+  submitterDisplayName: text("submitter_display_name").notNull(),
+  submittedAt: text("submitted_at").notNull(),
+  environment: text("environment"),
+  buildSha: text("build_sha"),
+  buildBranch: text("build_branch"),
+  pagePath: text("page_path"),
+  viewportWidth: integer("viewport_width"),
+  viewportHeight: integer("viewport_height"),
+  userAgent: text("user_agent"),
+  osLabel: text("os_label"),
+  consoleLogTail: text("console_log_tail"),
+  screenshotMimeType: text("screenshot_mime_type"),
+  screenshotData: blob("screenshot_data", { mode: "buffer" }),
+  internalComment: text("internal_comment"),
+  submitterComment: text("submitter_comment"),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+});
+
 /** Tracks schema version for idempotent bootstrap migrations. */
 export const schemaMeta = sqliteTable("schema_meta", {
   key: text("key").primaryKey(),
@@ -384,6 +427,7 @@ export const schema = {
   locations,
   userActivityLog,
   storedImages,
+  alphaFeedbackSubmissions,
   schemaMeta,
   proposals,
   proposalInvitees,

@@ -1,0 +1,14 @@
+{
+  "permissions": [
+    "core:default",
+    "http:default",
+    {
+      "identifier": "http:allow-fetch",
+      "allow": [
+        { "url": "http://localhost:*" },
+        { "url": "https://*.vercel.app" },
+        { "url": "https://polycal-ebon.vercel.app" }
+      ]
+    }
+  ]
+}
