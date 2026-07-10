@@ -3,9 +3,7 @@
 import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 import {
   Alert,
-  Box,
   Button,
-  Chip,
   Dialog,
   DialogActions,
   DialogContent,
@@ -15,14 +13,6 @@ import {
   MenuItem,
   Select,
   Stack,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableRow,
-  TextField,
-  ToggleButton,
-  ToggleButtonGroup,
   Typography,
 } from "@mui/material";
 import { useRouter } from "next/navigation";
@@ -32,39 +22,17 @@ import {
   adminFastAddSleepingPlanAction,
   listSleepingPartnersForUserAction,
 } from "@/actions/admin-fast-sleeping";
-import type { AdminFastSleepingRow } from "@/lib/admin/fast-sleeping-plan";
 import { listSleepingLocationOptionsAction, type ProposalConflictWarning } from "@/actions/proposals";
-import type { AdminUserRow } from "@/actions/users";
-import type { PersonSummary } from "@/actions/users";
+import type { AdminUserRow, PersonSummary } from "@/actions/users";
 import { AdminCollapsibleSection } from "@/components/admin/AdminCollapsibleSection";
+import { FastSleepingPlanGrid } from "@/components/proposals/FastSleepingPlanGrid";
 import { useToast } from "@/components/providers/ToastProvider";
+import {
+  buildEmptyGridRows,
+  fastSleepingRowHasContent,
+  type FastSleepingRow,
+} from "@/lib/proposals/fast-sleeping-plan";
 import { GARDEN_TOKENS } from "@/theme/tokens";
-
-const GRID_DAYS = 14;
-
-function formatGridDate(date: Date): string {
-  const pad = (value: number) => String(value).padStart(2, "0");
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
-}
-
-function formatDayLabel(dateValue: string): string {
-  const date = new Date(`${dateValue}T00:00:00`);
-  return date.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
-}
-
-function buildEmptyGridRows(): AdminFastSleepingRow[] {
-  const start = new Date();
-  start.setHours(0, 0, 0, 0);
-  return Array.from({ length: GRID_DAYS }, (_, index) => {
-    const day = new Date(start);
-    day.setDate(start.getDate() + index);
-    return {
-      nightDate: formatGridDate(day),
-      inviteeUserIds: [],
-      intentionalSolo: false,
-    };
-  });
-}
 
 function ConflictWarningList({ warnings }: { warnings: ProposalConflictWarning[] }) {
   return (
@@ -84,7 +52,8 @@ interface AdminFastSleepingPlanPanelProps {
 }
 
 /**
- * Admin grid to fast-add a 14-night batch sleeping plan for a target user (PC-119).
+ * Admin grid to fast-add a 14-night batch sleeping plan for a target user (PC-117).
+ * Uses shared FastSleepingPlanGrid; force-resolves after conflict confirm.
  */
 export function AdminFastSleepingPlanPanel({ users }: AdminFastSleepingPlanPanelProps) {
   const router = useRouter();
@@ -97,7 +66,7 @@ export function AdminFastSleepingPlanPanel({ users }: AdminFastSleepingPlanPanel
   );
 
   const [targetUserId, setTargetUserId] = useState("");
-  const [rows, setRows] = useState<AdminFastSleepingRow[]>(buildEmptyGridRows);
+  const [rows, setRows] = useState<FastSleepingRow[]>(() => buildEmptyGridRows());
   const [partners, setPartners] = useState<PersonSummary[]>([]);
   const [locationOptions, setLocationOptions] = useState<
     { id: string; name: string; bedroomCount: number; bedroomNames: string[] }[]
@@ -133,24 +102,6 @@ export function AdminFastSleepingPlanPanel({ users }: AdminFastSleepingPlanPanel
     };
   }, []);
 
-  function updateRow(index: number, patch: Partial<AdminFastSleepingRow>) {
-    setRows((current) => {
-      const next = [...current];
-      next[index] = { ...next[index], ...patch };
-      return next;
-    });
-  }
-
-  function togglePartner(index: number, partnerId: string) {
-    const row = rows[index];
-    if (!row || row.intentionalSolo) return;
-    const hasPartner = row.inviteeUserIds.includes(partnerId);
-    const inviteeUserIds = hasPartner
-      ? row.inviteeUserIds.filter((id) => id !== partnerId)
-      : [...row.inviteeUserIds, partnerId];
-    updateRow(index, { inviteeUserIds });
-  }
-
   function handleSubmit(confirm = false) {
     if (!targetUserId) {
       showToast("Select a target user.", "error");
@@ -183,13 +134,7 @@ export function AdminFastSleepingPlanPanel({ users }: AdminFastSleepingPlanPanel
     });
   }
 
-  const configuredNightCount = rows.filter(
-    (row) =>
-      row.intentionalSolo ||
-      row.inviteeUserIds.length > 0 ||
-      row.locationId ||
-      row.locationText?.trim(),
-  ).length;
+  const configuredNightCount = rows.filter(fastSleepingRowHasContent).length;
 
   return (
     <AdminCollapsibleSection title="Fast sleeping plan add">
@@ -224,102 +169,13 @@ export function AdminFastSleepingPlanPanel({ users }: AdminFastSleepingPlanPanel
         )}
       </Stack>
 
-      <Box sx={{ overflowX: "auto" }}>
-        <Table size="small" sx={{ minWidth: 720 }}>
-          <TableHead>
-            <TableRow>
-              <TableCell>Day / date</TableCell>
-              <TableCell>Partners</TableCell>
-              <TableCell>Location</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {rows.map((row, index) => (
-              <TableRow key={row.nightDate}>
-                <TableCell sx={{ whiteSpace: "nowrap", verticalAlign: "top" }}>
-                  <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                    {formatDayLabel(row.nightDate)}
-                  </Typography>
-                </TableCell>
-                <TableCell sx={{ verticalAlign: "top", minWidth: 200 }}>
-                  <ToggleButtonGroup
-                    exclusive
-                    value={row.intentionalSolo ? "solo" : "network"}
-                    onChange={(_, value) => {
-                      if (!value) return;
-                      const solo = value === "solo";
-                      updateRow(index, {
-                        intentionalSolo: solo,
-                        inviteeUserIds: solo ? [] : row.inviteeUserIds,
-                      });
-                    }}
-                    size="small"
-                    sx={{ mb: 1 }}
-                  >
-                    <ToggleButton value="solo">Solo</ToggleButton>
-                    <ToggleButton value="network">Partners</ToggleButton>
-                  </ToggleButtonGroup>
-                  {!row.intentionalSolo && (
-                    <Stack direction="row" flexWrap="wrap" gap={0.5}>
-                      {partners.map((partner) => {
-                        const selected = row.inviteeUserIds.includes(partner.id);
-                        return (
-                          <Chip
-                            key={partner.id}
-                            label={partner.displayName}
-                            size="small"
-                            color={selected ? "primary" : "default"}
-                            variant={selected ? "filled" : "outlined"}
-                            onClick={() => togglePartner(index, partner.id)}
-                            sx={{ cursor: "pointer" }}
-                          />
-                        );
-                      })}
-                    </Stack>
-                  )}
-                </TableCell>
-                <TableCell sx={{ verticalAlign: "top", minWidth: 220 }}>
-                  <FormControl fullWidth size="small" sx={{ mb: 1 }}>
-                    <InputLabel id={`fast-sleep-loc-${index}`}>Place</InputLabel>
-                    <Select
-                      labelId={`fast-sleep-loc-${index}`}
-                      label="Place"
-                      value={row.locationId ?? ""}
-                      onChange={(event) => {
-                        const value = event.target.value;
-                        updateRow(index, {
-                          locationId: value || undefined,
-                          locationText: value ? undefined : row.locationText,
-                        });
-                      }}
-                    >
-                      <MenuItem value="">None</MenuItem>
-                      {locationOptions.map((place) => (
-                        <MenuItem key={place.id} value={place.id}>
-                          {place.name}
-                        </MenuItem>
-                      ))}
-                    </Select>
-                  </FormControl>
-                  <TextField
-                    label="Custom location"
-                    value={row.locationText ?? ""}
-                    onChange={(event) =>
-                      updateRow(index, {
-                        locationText: event.target.value || undefined,
-                        locationId: event.target.value ? undefined : row.locationId,
-                      })
-                    }
-                    fullWidth
-                    size="small"
-                    placeholder="Optional"
-                  />
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </Box>
+      <FastSleepingPlanGrid
+        rows={rows}
+        onChange={setRows}
+        partnerPeople={partners}
+        locationOptions={locationOptions}
+        disabled={pending || !targetUserId}
+      />
 
       <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 2 }}>
         <Button
@@ -327,7 +183,9 @@ export function AdminFastSleepingPlanPanel({ users }: AdminFastSleepingPlanPanel
           onClick={() => handleSubmit(false)}
           disabled={pending || !targetUserId || configuredNightCount === 0}
         >
-          {pending ? "Saving…" : `Add plan (${configuredNightCount} night${configuredNightCount === 1 ? "" : "s"})`}
+          {pending
+            ? "Saving…"
+            : `Add plan (${configuredNightCount} night${configuredNightCount === 1 ? "" : "s"})`}
         </Button>
         <Typography variant="caption" color="text.secondary">
           Empty rows are skipped.

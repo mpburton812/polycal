@@ -1,105 +1,31 @@
+/**
+ * Compatibility tests — canonical coverage lives in
+ * `src/lib/proposals/fast-sleeping-plan.test.ts` (PC-114).
+ */
 import { describe, expect, it } from "vitest";
 
 import {
   adminFastSleepingPlanSchema,
-  buildBatchEntriesFromAdminRows,
+  buildBatchEntriesFromRows,
   fastSleepingRowHasContent,
-  type AdminFastSleepingRow,
-} from "@/lib/admin/fast-sleeping-plan";
+} from "@/lib/proposals/fast-sleeping-plan";
 
-describe("adminFastSleepingPlanSchema", () => {
-  it("requires target user and at least one row", () => {
-    const result = adminFastSleepingPlanSchema.safeParse({
-      targetUserId: "",
-      rows: [],
-    });
-    expect(result.success).toBe(false);
-  });
-
-  it("accepts up to 14 rows", () => {
-    const rows: AdminFastSleepingRow[] = Array.from({ length: 14 }, (_, index) => ({
-      nightDate: `2099-01-${String(index + 1).padStart(2, "0")}`,
-      inviteeUserIds: [],
-      intentionalSolo: true,
-    }));
+describe("admin fast sleeping plan (compat)", () => {
+  it("accepts a valid admin payload", () => {
     const result = adminFastSleepingPlanSchema.safeParse({
       targetUserId: "user-1",
-      rows,
-      confirm: false,
+      rows: [{ nightDate: "2099-07-01", inviteeUserIds: ["p1"] }],
     });
     expect(result.success).toBe(true);
   });
 
-  it("rejects more than 14 rows", () => {
-    const rows: AdminFastSleepingRow[] = Array.from({ length: 15 }, (_, index) => ({
-      nightDate: `2099-01-${String(index + 1).padStart(2, "0")}`,
-      inviteeUserIds: ["partner-1"],
-    }));
-    const result = adminFastSleepingPlanSchema.safeParse({
-      targetUserId: "user-1",
-      rows,
-    });
-    expect(result.success).toBe(false);
-  });
-
-  it("defaults confirm to false", () => {
-    const result = adminFastSleepingPlanSchema.safeParse({
-      targetUserId: "user-1",
-      rows: [{ nightDate: "2099-07-01", inviteeUserIds: ["p1"], intentionalSolo: false }],
-    });
-    expect(result.success).toBe(true);
-    if (result.success) {
-      expect(result.data.confirm).toBe(false);
-    }
-  });
-});
-
-describe("fastSleepingRowHasContent", () => {
-  it("detects configured rows", () => {
-    expect(
-      fastSleepingRowHasContent({
-        nightDate: "2099-07-01",
-        inviteeUserIds: [],
-      }),
-    ).toBe(false);
-    expect(
-      fastSleepingRowHasContent({
-        nightDate: "2099-07-01",
-        inviteeUserIds: ["p1"],
-      }),
-    ).toBe(true);
-    expect(
-      fastSleepingRowHasContent({
-        nightDate: "2099-07-01",
-        inviteeUserIds: [],
-        intentionalSolo: true,
-      }),
-    ).toBe(true);
-    expect(
-      fastSleepingRowHasContent({
-        nightDate: "2099-07-01",
-        inviteeUserIds: [],
-        locationText: "  Away  ",
-      }),
-    ).toBe(true);
-  });
-});
-
-describe("buildBatchEntriesFromAdminRows", () => {
-  it("skips empty nights and maps invitees to required", () => {
-    const entries = buildBatchEntriesFromAdminRows([
-      { nightDate: "2099-07-01", inviteeUserIds: [] },
-      { nightDate: "2099-07-02", inviteeUserIds: ["p1", "p2"] },
-      { nightDate: "2099-07-03", inviteeUserIds: [], intentionalSolo: true },
+  it("maps rows via shared builder", () => {
+    expect(fastSleepingRowHasContent({ nightDate: "2099-07-01", inviteeUserIds: ["p1"] })).toBe(
+      true,
+    );
+    const entries = buildBatchEntriesFromRows([
+      { nightDate: "2099-07-01", inviteeUserIds: ["p1"] },
     ]);
-
-    expect(entries).toHaveLength(2);
-    expect(entries[0]?.nightDate).toBe("2099-07-02");
-    expect(entries[0]?.invitees).toEqual([
-      { userId: "p1", role: "required" },
-      { userId: "p2", role: "required" },
-    ]);
-    expect(entries[1]?.intentionalSolo).toBe(true);
-    expect(entries[1]?.invitees).toEqual([]);
+    expect(entries[0]?.invitees[0]?.role).toBe("required");
   });
 });
