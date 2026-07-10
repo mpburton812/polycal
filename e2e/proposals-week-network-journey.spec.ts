@@ -9,6 +9,7 @@ import {
   createAndSubmitSoloSleepingWeek,
   sleepingProposalCardsFor,
 } from "./helpers/proposals";
+import { dateOffsetIso } from "./helpers/schedule";
 import { expectToast } from "./helpers/toast";
 
 test.describe("Week schedule poly-family journey", () => {
@@ -30,8 +31,8 @@ test.describe("Week schedule poly-family journey", () => {
     await goToProposals(page);
 
     const nightCount = await createAndSubmitSoloSleepingWeek(page, {
-      rangeStart: "2099-07-07",
-      rangeEnd: "2099-07-13",
+      rangeStart: dateOffsetIso(0),
+      rangeEnd: dateOffsetIso(6),
     });
     expect(nightCount).toBe(7);
 

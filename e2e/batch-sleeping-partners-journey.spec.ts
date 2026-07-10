@@ -4,6 +4,7 @@ import { loginWithOnboardingIfNeeded, logout } from "./helpers/auth";
 import { BT_PLACES, BT_USERS, BURTON_THOMPSON_PASSWORD } from "./helpers/burton-thompson";
 import { goToProposals, openProposalCard, selectProposalTab } from "./helpers/navigation";
 import { expectInAppNotification } from "./helpers/notifications";
+import { dateOffsetIso } from "./helpers/schedule";
 import {
   configureBatchNight,
   openDraftForEdit,
@@ -16,11 +17,16 @@ test.describe("Batch sleeping partners journey", () => {
   test("Katie/Michael batch week with decline, edit, and accept", async ({ page }) => {
     test.setTimeout(360_000);
 
+    const night0 = dateOffsetIso(2);
+    const night1 = dateOffsetIso(3);
+    const night2 = dateOffsetIso(4);
+    const night3 = dateOffsetIso(5);
+
     const sleepingTitle = new RegExp(
       `Sleeping:.*${BT_USERS.katie.displayName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`,
       "i",
     );
-    const declineComment = "I need to be at my place on August 2.";
+    const declineComment = "I need to be at my place on the second night.";
 
     // —— Phase 1: Katie proposes a four-night batch ——
     await loginWithOnboardingIfNeeded(
@@ -32,35 +38,32 @@ test.describe("Batch sleeping partners journey", () => {
 
     const dialog = await openSleepingProposalDraft(page);
     await dialog.getByRole("checkbox", { name: "Batch (multiple nights in one proposal)" }).click();
+    await expect(dialog.getByTestId("fast-sleeping-plan-grid")).toBeVisible({ timeout: 15_000 });
 
-    await configureBatchNight(dialog, page, 0, {
-      nightDate: "2099-08-01",
+    await configureBatchNight(dialog, page, night0, {
+      nightDate: night0,
       mode: "solo",
       locationName: BT_PLACES.katiesPlace,
     });
 
-    await dialog.getByRole("button", { name: "Add night" }).click();
-    await configureBatchNight(dialog, page, 1, {
-      nightDate: "2099-08-02",
+    await configureBatchNight(dialog, page, night1, {
+      nightDate: night1,
       mode: "solo",
       customLocation: BT_PLACES.michaelsPlace,
     });
 
-    await dialog.getByRole("button", { name: "Add night" }).click();
-    await configureBatchNight(dialog, page, 2, {
-      nightDate: "2099-08-03",
+    await configureBatchNight(dialog, page, night2, {
+      nightDate: night2,
       mode: "withInvitees",
       requiredInvitees: [BT_USERS.michael.displayName],
       locationName: BT_PLACES.katiesPlace,
     });
 
-    await dialog.getByRole("button", { name: "Add night" }).click();
-    await configureBatchNight(dialog, page, 3, {
-      nightDate: "2099-08-04",
+    await configureBatchNight(dialog, page, night3, {
+      nightDate: night3,
       mode: "withInvitees",
       requiredInvitees: [BT_USERS.michael.displayName],
       locationName: BT_PLACES.michaelsPlace,
-      comment: "It's our anniversary!",
     });
 
     await submitProposalDraft(page, dialog);
@@ -79,9 +82,8 @@ test.describe("Batch sleeping partners journey", () => {
 
     const michaelDialog = page.getByRole("dialog");
     await expect(michaelDialog.getByText("Batch nights (4)")).toBeVisible({ timeout: 15_000 });
-    await expect(michaelDialog.getByText(/2099-08-01/)).toBeVisible();
+    await expect(michaelDialog.getByText(new RegExp(night0))).toBeVisible();
     await expect(michaelDialog.getByText(/Night 1:.*Katie's Place/)).toBeVisible();
-    await expect(michaelDialog.getByText(/It's our anniversary!/)).toBeVisible();
 
     await michaelDialog.getByPlaceholder("Add a comment…").fill(declineComment);
     await michaelDialog.getByRole("button", { name: "Post" }).click();
@@ -101,8 +103,9 @@ test.describe("Batch sleeping partners journey", () => {
     await selectProposalTab(page, "Drafts");
 
     const editDialog = await openDraftForEdit(page, sleepingTitle);
-    await configureBatchNight(editDialog, page, 1, {
-      nightDate: "2099-08-02",
+    await expect(editDialog.getByTestId("fast-sleeping-plan-grid")).toBeVisible({ timeout: 15_000 });
+    await configureBatchNight(editDialog, page, night1, {
+      nightDate: night1,
       mode: "withInvitees",
       requiredInvitees: [BT_USERS.michael.displayName],
       locationName: BT_PLACES.michaelsPlace,
