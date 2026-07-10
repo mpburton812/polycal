@@ -50,11 +50,14 @@ import {
 import type { PersonSummary } from "@/actions/users";
 import { useToast } from "@/components/providers/ToastProvider";
 import {
-  newBatchEntryId,
-  type BatchSleepingEntry,
-} from "@/lib/proposals/batch-sleeping-client";
+  buildBatchEntriesFromRows,
+  buildEmptyGridRows,
+  FAST_SLEEPING_GRID_DAYS,
+  rowsFromBatchEntries,
+  type FastSleepingRow,
+} from "@/lib/proposals/fast-sleeping-plan";
 
-import { BatchSleepingEntriesEditor } from "./BatchSleepingEntriesEditor";
+import { FastSleepingPlanGrid } from "./FastSleepingPlanGrid";
 import {
   POLY_GREEN,
   POLY_GREEN_HOVER,
@@ -218,7 +221,8 @@ export function ProposalDraftDialog({
   const [isPoll, setIsPoll] = useState(false);
   const [allDay, setAllDay] = useState(false);
   const [batchMode, setBatchMode] = useState(false);
-  const [batchEntries, setBatchEntries] = useState<BatchSleepingEntry[]>([]);
+  const [fastPlanRows, setFastPlanRows] = useState<FastSleepingRow[]>(() => buildEmptyGridRows());
+  const [batchLocationOptions, setBatchLocationOptions] = useState<ProposalPlaceOption[]>([]);
   const [acceptedPartnerIds, setAcceptedPartnerIds] = useState<string[]>([]);
   const [sleepingLocationOptions, setSleepingLocationOptions] = useState<ProposalPlaceOption[]>(
     [],
@@ -264,7 +268,16 @@ export function ProposalDraftDialog({
     proposalType === "sleeping" ? intentionalSolo : soloEvent;
 
   const locationOptions =
-    proposalType === "sleeping" && !batchMode ? sleepingLocationOptions : places;
+    proposalType === "sleeping" && batchMode
+      ? batchLocationOptions
+      : proposalType === "sleeping"
+        ? sleepingLocationOptions
+        : places;
+
+  const configuredBatchEntries = useMemo(
+    () => (batchMode ? buildBatchEntriesFromRows(fastPlanRows) : []),
+    [batchMode, fastPlanRows],
+  );
 
   const locationName =
     locationOptions.find((p) => p.id === locationId)?.name ?? (locationCustom.trim() || null);
@@ -278,8 +291,8 @@ export function ProposalDraftDialog({
       : [];
 
   const previewStartIso = useMemo(() => {
-    if (batchMode && batchEntries.length > 0) {
-      const sorted = [...batchEntries]
+    if (batchMode && configuredBatchEntries.length > 0) {
+      const sorted = [...configuredBatchEntries]
         .map((entry) => localDateToStartIso(entry.nightDate.slice(0, 10)))
         .filter((iso): iso is string => Boolean(iso))
         .sort((a, b) => a.localeCompare(b));
@@ -290,11 +303,11 @@ export function ProposalDraftDialog({
     return proposalType === "sleeping" || allDay
       ? localDateToStartIso(first.startAt)
       : localInputToIso(first.startAt);
-  }, [batchMode, batchEntries, slots, proposalType, allDay]);
+  }, [batchMode, configuredBatchEntries, slots, proposalType, allDay]);
 
   const previewEndIso = useMemo(() => {
-    if (batchMode && batchEntries.length > 0) {
-      const sorted = [...batchEntries]
+    if (batchMode && configuredBatchEntries.length > 0) {
+      const sorted = [...configuredBatchEntries]
         .map((entry) => localDateToEndIso(entry.nightDate.slice(0, 10)))
         .filter((iso): iso is string => Boolean(iso))
         .sort((a, b) => a.localeCompare(b));
@@ -308,7 +321,7 @@ export function ProposalDraftDialog({
         : localDateToEndIso(first.startAt);
     }
     return first.endAt ? localInputToIso(first.endAt) : undefined;
-  }, [batchMode, batchEntries, slots, proposalType, allDay]);
+  }, [batchMode, configuredBatchEntries, slots, proposalType, allDay]);
 
   useEffect(() => {
     if (!open) return;
@@ -317,7 +330,6 @@ export function ProposalDraftDialog({
 
   useEffect(() => {
     if (!open || proposalType !== "sleeping" || batchMode) {
-      setSleepingLocationOptions([]);
       return;
     }
     const inviteeIds = isSoloProposal
@@ -329,9 +341,21 @@ export function ProposalDraftDialog({
   }, [open, proposalType, batchMode, isSoloProposal, inviteeMode]);
 
   useEffect(() => {
-    if (!batchMode || batchEntries.length > 0) return;
-    setBatchEntries([{ id: newBatchEntryId(), nightDate: "", invitees: [], intentionalSolo: false }]);
-  }, [batchMode, batchEntries.length]);
+    if (!open || !batchMode || proposalType !== "sleeping") {
+      return;
+    }
+    const inviteeIds = [
+      ...new Set(
+        fastPlanRows.flatMap((row) => (row.intentionalSolo ? [] : row.inviteeUserIds)),
+      ),
+    ];
+    void listSleepingLocationOptionsAction(inviteeIds).then(setBatchLocationOptions);
+  }, [open, batchMode, proposalType, fastPlanRows]);
+
+  useEffect(() => {
+    if (!batchMode) return;
+    setFastPlanRows((current) => (current.length === FAST_SLEEPING_GRID_DAYS ? current : buildEmptyGridRows()));
+  }, [batchMode]);
 
   const timePreview = formatTimeRange(
     previewStartIso ?? null,
@@ -346,10 +370,10 @@ export function ProposalDraftDialog({
     if (initialDetail) {
       setSavedDraftId(initialDetail.id);
       setBatchMode(initialDetail.isBatchSleeping);
-      setBatchEntries(
+      setFastPlanRows(
         initialDetail.isBatchSleeping && initialDetail.batchEntries.length > 0
-          ? initialDetail.batchEntries
-          : [{ id: newBatchEntryId(), nightDate: "", invitees: [], intentionalSolo: false }],
+          ? rowsFromBatchEntries(initialDetail.batchEntries)
+          : buildEmptyGridRows(),
       );
       setProposalType(initialDetail.proposalType);
       setTitle(initialDetail.title);
@@ -421,7 +445,8 @@ export function ProposalDraftDialog({
       setIsPoll(false);
       setAllDay(false);
       setBatchMode(false);
-      setBatchEntries([]);
+      setFastPlanRows(buildEmptyGridRows());
+      setBatchLocationOptions([]);
       setEventPrivacy("open");
       setIsRecurring(false);
       setRecurrencePattern("weekly");
@@ -441,10 +466,10 @@ export function ProposalDraftDialog({
 
   function applyDetailToForm(detail: ProposalDetail) {
     setBatchMode(detail.isBatchSleeping);
-    setBatchEntries(
+    setFastPlanRows(
       detail.isBatchSleeping && detail.batchEntries.length > 0
-        ? detail.batchEntries
-        : [{ id: newBatchEntryId(), nightDate: "", invitees: [], intentionalSolo: false }],
+        ? rowsFromBatchEntries(detail.batchEntries)
+        : buildEmptyGridRows(),
     );
     setProposalType(detail.proposalType);
     setTitle(detail.title);
@@ -559,13 +584,13 @@ export function ProposalDraftDialog({
                   ),
               intentionalSolo: isSoloProposal,
               locationName: batchMode
-                ? (batchEntries.find((entry) => entry.locationText || entry.locationId)
+                ? (configuredBatchEntries.find((entry) => entry.locationText || entry.locationId)
                     ? locationOptions.find(
                         (place) =>
                           place.id ===
-                          batchEntries.find((entry) => entry.locationId)?.locationId,
+                          configuredBatchEntries.find((entry) => entry.locationId)?.locationId,
                       )?.name ??
-                      batchEntries.find((entry) => entry.locationText)?.locationText ??
+                      configuredBatchEntries.find((entry) => entry.locationText)?.locationText ??
                       null
                     : null)
                 : locationName,
@@ -593,9 +618,7 @@ export function ProposalDraftDialog({
       timeSlots,
       isBatchSleeping: batchMode && proposalType === "sleeping",
       batchEntries:
-        batchMode && proposalType === "sleeping"
-          ? batchEntries.filter((entry) => entry.nightDate.trim())
-          : undefined,
+        batchMode && proposalType === "sleeping" ? configuredBatchEntries : undefined,
       reminderOffsetMinutes:
         proposalType === "event" && reminderEnabled
           ? reminderOffsetToMinutes(reminderValue, reminderUnit)
@@ -1127,40 +1150,41 @@ export function ProposalDraftDialog({
             )}
             {batchMode && proposalType === "sleeping" && (
               <>
-                <BatchSleepingEntriesEditor
-                  entries={batchEntries}
-                  onChange={setBatchEntries}
+                <Typography variant="body2" color="text.secondary">
+                  Configure up to 14 nights. Empty nights are skipped. Selected partners are
+                  required invitees — submit follows the normal approval path.
+                </Typography>
+                <FastSleepingPlanGrid
+                  rows={fastPlanRows}
+                  onChange={setFastPlanRows}
                   partnerPeople={sleepingCandidates}
+                  locationOptions={batchLocationOptions}
+                  disabled={pending}
                 />
-                {batchEntries.some((entry) => entry.nightDate.trim()) && (
+                {configuredBatchEntries.length > 0 && (
                   <Box sx={{ mt: 2, p: 1.5, bgcolor: POLY_GREEN_LIGHT, borderRadius: 1 }}>
                     <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
-                      Proposed nights summary
+                      Proposed nights summary ({configuredBatchEntries.length})
                     </Typography>
                     <Stack spacing={0.75}>
-                      {batchEntries
-                        .filter((entry) => entry.nightDate.trim())
-                        .map((entry, index) => {
-                          const place =
-                            locationOptions.find((p) => p.id === entry.locationId)?.name ??
-                            entry.locationText ??
-                            "No location";
-                          const inviteeLabels = entry.intentionalSolo
-                            ? ["Solo"]
-                            : entry.invitees.map((invitee) => {
-                                const person = people.find((p) => p.id === invitee.userId);
-                                return person
-                                  ? `${person.displayName} (${invitee.role})`
-                                  : invitee.role;
-                              });
-                          return (
-                            <Typography key={entry.id} variant="body2" sx={{ color: POLY_GREEN }}>
-                              Night {index + 1}: {entry.nightDate.slice(0, 10)} · {place}
-                              {inviteeLabels.length > 0 ? ` · ${inviteeLabels.join(", ")}` : ""}
-                              {entry.comment ? ` · "${entry.comment}"` : ""}
-                            </Typography>
-                          );
-                        })}
+                      {configuredBatchEntries.map((entry, index) => {
+                        const place =
+                          locationOptions.find((p) => p.id === entry.locationId)?.name ??
+                          entry.locationText ??
+                          "No location";
+                        const inviteeLabels = entry.intentionalSolo
+                          ? ["Solo"]
+                          : entry.invitees.map((invitee) => {
+                              const person = people.find((p) => p.id === invitee.userId);
+                              return person ? person.displayName : invitee.userId;
+                            });
+                        return (
+                          <Typography key={entry.id} variant="body2" sx={{ color: POLY_GREEN }}>
+                            Night {index + 1}: {entry.nightDate.slice(0, 10)} · {place}
+                            {inviteeLabels.length > 0 ? ` · ${inviteeLabels.join(", ")}` : ""}
+                          </Typography>
+                        );
+                      })}
                     </Stack>
                   </Box>
                 )}

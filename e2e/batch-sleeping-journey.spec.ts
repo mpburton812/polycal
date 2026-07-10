@@ -13,8 +13,8 @@ test.describe("Batch sleeping slice journey", () => {
   test("resolved batch night opens slice detail on schedule", async ({ page }) => {
     test.setTimeout(240_000);
 
-    const rangeStart = dateOffsetIso(21);
-    const rangeEnd = dateOffsetIso(27);
+    const rangeStart = dateOffsetIso(1);
+    const rangeEnd = dateOffsetIso(7);
 
     await loginWithOnboardingIfNeeded(page, USERS.han.username);
     await goToProposals(page);

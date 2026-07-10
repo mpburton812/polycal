@@ -1,7 +1,6 @@
 "use server";
 
-import { randomUUID } from "node:crypto";
-import { and, asc, eq, inArray, or } from "drizzle-orm";
+import { asc, eq, inArray } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 
 import {
@@ -9,13 +8,9 @@ import {
   adminForceResolveProposalAction,
   type ProposalConflictWarning,
 } from "@/actions/proposals";
-import { logUserActivity } from "@/lib/audit";
+import type { PersonSummary } from "@/actions/users";
 import { requireAdminAccess, withDb } from "@/lib/actions/context";
-import {
-  buildBatchEntriesFromAdminRows,
-  adminFastSleepingPlanSchema,
-  type AdminFastSleepingPlanInput,
-} from "@/lib/admin/fast-sleeping-plan";
+import { logUserActivity } from "@/lib/audit";
 import {
   proposalComments,
   proposalInvitees,
@@ -23,154 +18,26 @@ import {
   proposalStateLog,
   proposalTimeSlots,
   proposals,
-  sleepingPartnerships,
   users,
-  locations,
-  type InviteeRole,
 } from "@/lib/db/schema";
-import { getDb } from "@/lib/db/client";
 import {
-  encodeBatchSlotMeta,
-  unionBatchInvitees,
-  type BatchSleepingEntry,
-} from "@/lib/proposals/batch-sleeping";
+  buildBatchEntriesFromRows,
+  adminFastSleepingPlanSchema,
+  type AdminFastSleepingPlanInput,
+} from "@/lib/proposals/fast-sleeping-plan";
+import {
+  createBatchSleepingDraft,
+  getAcceptedSleepingPartnerIds,
+  validateBatchSleepingEntries,
+} from "@/lib/proposals/fast-sleeping-core";
 import { logProposalTransition } from "@/lib/proposals/services/state-log";
-import { formatSleepingDisplayTitle } from "@/lib/proposals/sleeping-display";
-import { sleepingDateToStartIso } from "@/lib/proposals/sleeping-schedule";
-import type { PersonSummary } from "@/actions/users";
+import { getDb } from "@/lib/db/client";
 
 export interface AdminFastSleepingPlanResult {
   ok: boolean;
   message: string;
   warnings?: ProposalConflictWarning[];
   proposalId?: string;
-}
-
-async function getAcceptedSleepingPartnerIds(
-  db: ReturnType<typeof getDb>,
-  userId: string,
-): Promise<Set<string>> {
-  const partnershipRows = await db
-    .select({
-      userLowId: sleepingPartnerships.userLowId,
-      userHighId: sleepingPartnerships.userHighId,
-    })
-    .from(sleepingPartnerships)
-    .where(
-      and(
-        eq(sleepingPartnerships.status, "accepted"),
-        or(
-          eq(sleepingPartnerships.userLowId, userId),
-          eq(sleepingPartnerships.userHighId, userId),
-        ),
-      ),
-    );
-
-  return new Set(
-    partnershipRows.map((row) => (row.userLowId === userId ? row.userHighId : row.userLowId)),
-  );
-}
-
-async function assertSleepingInviteesForTarget(
-  db: ReturnType<typeof getDb>,
-  targetUserId: string,
-  intentionalSolo: boolean,
-  invitees: { userId: string }[],
-): Promise<{ ok: true } | { ok: false; error: string }> {
-  if (intentionalSolo || invitees.length === 0) return { ok: true };
-
-  const partners = await getAcceptedSleepingPartnerIds(db, targetUserId);
-  for (const invitee of invitees) {
-    if (!partners.has(invitee.userId)) {
-      return {
-        ok: false,
-        error:
-          "Sleeping arrangements can only include accepted sleeping partners of the target user, or be solo.",
-      };
-    }
-  }
-  return { ok: true };
-}
-
-async function assertLocationAllowedForAdmin(
-  db: ReturnType<typeof getDb>,
-  locationId: string | undefined,
-  locationText?: string,
-): Promise<{ ok: true } | { ok: false; error: string }> {
-  if (locationId && locationText?.trim()) {
-    return { ok: false, error: "Choose either a registered place or custom location text, not both." };
-  }
-  if (!locationId) return { ok: true };
-
-  const [place] = await db.select().from(locations).where(eq(locations.id, locationId)).limit(1);
-  if (!place) {
-    return { ok: false, error: "Selected place was not found." };
-  }
-  return { ok: true };
-}
-
-async function replaceInvitees(
-  db: ReturnType<typeof getDb>,
-  proposalId: string,
-  proposerId: string,
-  invitees: { userId: string; role: InviteeRole }[],
-): Promise<void> {
-  await db.delete(proposalInvitees).where(eq(proposalInvitees.proposalId, proposalId));
-
-  const now = new Date().toISOString();
-  const uniqueInvitees = invitees.filter(
-    (invitee, index, list) =>
-      invitee.userId !== proposerId &&
-      list.findIndex((row) => row.userId === invitee.userId) === index,
-  );
-
-  for (const invitee of uniqueInvitees) {
-    await db.insert(proposalInvitees).values({
-      id: `pi-${randomUUID()}`,
-      proposalId,
-      userId: invitee.userId,
-      role: invitee.role,
-      voteStatus: "not_seen",
-      createdAt: now,
-    });
-  }
-}
-
-async function persistBatchSleepingDraft(
-  db: ReturnType<typeof getDb>,
-  proposalId: string,
-  entries: BatchSleepingEntry[],
-): Promise<void> {
-  await db.delete(proposalSlotVotes).where(eq(proposalSlotVotes.proposalId, proposalId));
-  await db.delete(proposalTimeSlots).where(eq(proposalTimeSlots.proposalId, proposalId));
-
-  const now = new Date().toISOString();
-  for (let index = 0; index < entries.length; index += 1) {
-    const entry = entries[index];
-    const startIso = sleepingDateToStartIso(entry.nightDate.slice(0, 10));
-    if (!startIso) {
-      throw new Error("Invalid batch night date.");
-    }
-    await db.insert(proposalTimeSlots).values({
-      id: `pts-${randomUUID()}`,
-      proposalId,
-      startAt: startIso,
-      endAt: null,
-      label: encodeBatchSlotMeta({
-        batchEntryId: entry.id,
-        locationId: entry.locationId,
-        locationText: entry.locationText,
-        bedroomIndex: entry.bedroomIndex,
-        intentionalSolo: entry.intentionalSolo,
-        inviteeUserIds: entry.intentionalSolo
-          ? []
-          : entry.invitees.map((invitee) => invitee.userId),
-      }),
-      sortOrder: index,
-      isAllDay: false,
-      createdAt: now,
-    });
-  }
 }
 
 async function deleteDraftProposal(
@@ -185,51 +52,8 @@ async function deleteDraftProposal(
   await db.delete(proposals).where(eq(proposals.id, proposalId));
 }
 
-async function buildSleepingProposalTitle(
-  db: ReturnType<typeof getDb>,
-  input: {
-    proposerName: string;
-    intentionalSolo: boolean;
-    batchEntries: BatchSleepingEntry[];
-    inviteeUserIds: string[];
-  },
-): Promise<string> {
-  let inviteeNames: string[] = [];
-  if (!input.intentionalSolo && input.inviteeUserIds.length > 0) {
-    const rows = await db
-      .select({ displayName: users.displayName })
-      .from(users)
-      .where(inArray(users.id, input.inviteeUserIds));
-    inviteeNames = rows.map((row) => row.displayName);
-  }
-
-  let locationName: string | null = null;
-  const firstLocated = input.batchEntries.find(
-    (entry) => entry.locationId || entry.locationText?.trim(),
-  );
-  if (firstLocated?.locationText?.trim()) {
-    locationName = firstLocated.locationText.trim();
-  } else if (firstLocated?.locationId) {
-    const [place] = await db
-      .select({ name: locations.name })
-      .from(locations)
-      .where(eq(locations.id, firstLocated.locationId))
-      .limit(1);
-    locationName = place?.name ?? null;
-  }
-
-  return formatSleepingDisplayTitle({
-    proposerName: input.proposerName,
-    inviteeNames,
-    intentionalSolo: input.intentionalSolo,
-    locationName,
-    state: "resolved",
-    atRisk: false,
-  });
-}
-
 /**
- * Lists accepted sleeping partners for a target user (admin-only, PC-119).
+ * Lists accepted sleeping partners for a target user (admin-only, PC-117).
  */
 export async function listSleepingPartnersForUserAction(
   targetUserId: string,
@@ -264,8 +88,8 @@ export async function listSleepingPartnersForUserAction(
 }
 
 /**
- * Admin fast-add: creates one resolved batch sleeping proposal for a target user (PC-118).
- * Conflict overlaps warn + confirm before finalizing.
+ * Admin fast-add: creates one resolved batch sleeping proposal for a target user (PC-115).
+ * Uses shared createBatchSleepingDraft core; force-resolves after conflict warn+confirm.
  */
 export async function adminFastAddSleepingPlanAction(
   input: AdminFastSleepingPlanInput,
@@ -281,7 +105,7 @@ export async function adminFastAddSleepingPlanAction(
   }
 
   const { targetUserId, rows, confirm } = parsed.data;
-  const batchEntries = buildBatchEntriesFromAdminRows(rows);
+  const batchEntries = buildBatchEntriesFromRows(rows);
 
   if (batchEntries.length === 0) {
     return { ok: false, message: "Configure at least one night before submitting." };
@@ -306,78 +130,23 @@ export async function adminFastAddSleepingPlanAction(
       return { ok: false, message: "Cannot fast-add sleeping plans for passive users." };
     }
 
-    for (const entry of batchEntries) {
-      const inviteeCheck = await assertSleepingInviteesForTarget(
-        db,
-        targetUserId,
-        Boolean(entry.intentionalSolo),
-        entry.invitees,
-      );
-      if (!inviteeCheck.ok) {
-        return { ok: false, message: inviteeCheck.error };
-      }
-
-      if (!entry.intentionalSolo && entry.invitees.length === 0) {
-        return {
-          ok: false,
-          message: "Each configured night needs partners or intentional solo.",
-        };
-      }
-
-      if (entry.locationId || entry.locationText) {
-        const locationCheck = await assertLocationAllowedForAdmin(
-          db,
-          entry.locationId,
-          entry.locationText,
-        );
-        if (!locationCheck.ok) {
-          return { ok: false, message: locationCheck.error };
-        }
-      }
+    const validation = await validateBatchSleepingEntries(db, {
+      subjectUserId: targetUserId,
+      subjectRole: targetUser.role,
+      entries: batchEntries,
+      locationPolicy: "exists",
+    });
+    if (!validation.ok) {
+      return { ok: false, message: validation.error };
     }
 
-    const intentionalSolo = batchEntries.every((entry) => entry.intentionalSolo);
-    const batchInvitees = unionBatchInvitees(batchEntries);
-    const proposalId = `prop-${randomUUID()}`;
-    const now = new Date().toISOString();
-
-    const proposalTitle = await buildSleepingProposalTitle(db, {
-      proposerName: targetUser.displayName,
-      intentionalSolo,
-      batchEntries,
-      inviteeUserIds: batchInvitees.map((row) => row.userId),
-    });
-
-    await db.insert(proposals).values({
-      id: proposalId,
-      title: proposalTitle,
-      description: null,
-      proposalType: "sleeping",
-      state: "draft",
+    const { proposalId } = await createBatchSleepingDraft(db, {
       proposerId: targetUserId,
-      locationId: null,
-      locationText: null,
-      notes: null,
-      intentionalSolo,
-      isPoll: false,
-      isAllDay: false,
-      eventPrivacy: "open",
-      isRecurrenceParent: false,
-      recurrenceRule: null,
-      occurrenceIndex: null,
-      bedroomIndex: null,
-      isBatchSleeping: true,
-      batchEntriesJson: JSON.stringify(batchEntries),
-      reminderOffsetMinutes: null,
-      reminderSentAt: null,
-      eventIconKey: null,
-      createdAt: now,
-      updatedAt: now,
+      proposerName: targetUser.displayName,
+      actorUserId: adminResult.user.id,
+      entries: batchEntries,
+      titleState: "resolved",
     });
-
-    await replaceInvitees(db, proposalId, targetUserId, batchInvitees);
-    await persistBatchSleepingDraft(db, proposalId, batchEntries);
-    await logProposalTransition(db, proposalId, adminResult.user.id, "draft.created");
 
     if (!confirm) {
       const conflictCheck = await adminCheckProposalConflictsAction(proposalId);
