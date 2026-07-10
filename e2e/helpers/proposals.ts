@@ -4,6 +4,18 @@ import { fillProposalDateField, fillProposalDateTimeField } from "./datePickers"
 import { goToProposals, openProposalCard, selectProposalTab } from "./navigation";
 import { expectToast } from "./toast";
 
+/**
+ * Waits until proposal detail finished loading (Close visible) after open (PC-138).
+ * Close is deferred until detail arrives so early clicks would miss the button.
+ */
+export async function waitForProposalDetailReady(dialog: Locator): Promise<void> {
+  const loading = dialog.getByLabel("Loading proposal");
+  await loading.waitFor({ state: "hidden", timeout: 20_000 }).catch(() => {});
+  await expect(dialog.getByRole("button", { name: "Close" })).toBeVisible({
+    timeout: 20_000,
+  });
+}
+
 /** Locates a proposal Kanban card by exact title heading. */
 export function proposalCard(page: Page, title: string | RegExp) {
   return page.locator(".MuiCard-root").filter({
@@ -474,6 +486,7 @@ export async function acceptProposalWithComment(page: Page, comment: string): Pr
     .catch(() => {});
 
   const closeButton = dialog.getByRole("button", { name: "Close" });
+  await waitForProposalDetailReady(dialog);
   if (await closeButton.isVisible().catch(() => false)) {
     await closeButton.click();
   }
@@ -707,6 +720,7 @@ export async function castInviteeVote(
   }
 
   const closeButton = dialog.getByRole("button", { name: "Close" });
+  await waitForProposalDetailReady(dialog);
   if (await closeButton.isVisible().catch(() => false)) {
     await closeButton.click();
   }

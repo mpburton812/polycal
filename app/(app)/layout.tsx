@@ -30,13 +30,20 @@ export default async function AppLayout({
     redirect("/paused");
   }
 
-  const hasAdminAccess = await userHasAdminAccess(session.user.role);
+  const notificationInboxPromise = getNotificationInboxAction();
+  const notificationPrefsPromise = getNotificationPrefsAction();
+  const groupNamePromise = getPolyGroupDisplayNameAction();
+  const hasAdminAccessPromise = userHasAdminAccess(session.user.role);
+
+  const [hasAdminAccess, notificationInbox, notificationPrefs, groupName] =
+    await Promise.all([
+      hasAdminAccessPromise,
+      notificationInboxPromise,
+      notificationPrefsPromise,
+      groupNamePromise,
+    ]);
+
   const themeId = normalizeUserThemeId(session.user.theme ?? "sage");
-
-  const notificationInbox = await getNotificationInboxAction();
-  const notificationPrefs = await getNotificationPrefsAction();
-  const groupName = await getPolyGroupDisplayNameAction();
-
   const showOnboarding = !session.user.onboardingComplete;
 
   let partnerOptions: { id: string; displayName: string }[] = [];

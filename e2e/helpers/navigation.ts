@@ -39,5 +39,11 @@ export async function selectProposalTab(page: Page, tab: "Drafts" | "Proposed" |
 
 export async function openProposalCard(page: Page, title: string | RegExp): Promise<void> {
   await page.getByRole("heading", { name: title, level: 2 }).first().click();
-  await expect(page.getByRole("dialog")).toBeVisible();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog).toBeVisible();
+  // Detail Close is deferred until fetch completes (PC-138).
+  await dialog.getByLabel("Loading proposal").waitFor({ state: "hidden", timeout: 20_000 }).catch(() => {});
+  await expect(dialog.getByRole("button", { name: "Close" })).toBeVisible({
+    timeout: 20_000,
+  });
 }
