@@ -126,6 +126,8 @@ export function ProposalCard({
     if (proposal.proposalType === "sleeping" && proposal.isBatchSleeping) {
       sparseBadges.push("Batch");
     }
+    // Keep At risk visible when Action needed is the emphasis chip (PC-124).
+    if (proposal.atRisk && status?.label !== "At risk") sparseBadges.push("At risk");
     if (proposal.eventPrivacy === "private" || proposal.eventPrivacy === "super_private") {
       sparseBadges.push("Private");
     }

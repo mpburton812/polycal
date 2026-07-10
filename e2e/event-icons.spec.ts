@@ -6,6 +6,7 @@ import { fillProposalDateTimeField } from "./helpers/datePickers";
 import { goToProposals } from "./helpers/navigation";
 import {
   expectResolvedProposal,
+  expandDraftMoreOptions,
   openEventProposalDraft,
   proposalCard,
   selectEventIcon,
