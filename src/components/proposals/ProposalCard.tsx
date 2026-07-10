@@ -2,7 +2,6 @@
 
 import AccessTimeIcon from "@mui/icons-material/AccessTime";
 import LocationOnOutlinedIcon from "@mui/icons-material/LocationOnOutlined";
-import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 import {
   Box,
   Button,
@@ -22,9 +21,6 @@ import { GARDEN_TOKENS } from "@/theme/tokens";
 import {
   brutalPressSx,
   formatTimeRange,
-  PAST_SCHEDULE_BG,
-  PAST_SCHEDULE_ICON,
-  PAST_SCHEDULE_TEXT,
   primaryButtonSx,
   proposalCardRotation,
   proposalCardSx,
@@ -44,6 +40,53 @@ function responseLabel(proposal: ProposalCardData): string {
   return `${proposal.respondedCount} of ${proposal.inviteeCount} responded`;
 }
 
+/**
+ * Picks one emphasis status chip so the card answers "do I act?" without a chip pile (PC-124).
+ */
+function emphasisStatus(proposal: ProposalCardData): {
+  label: string;
+  sx: Record<string, unknown>;
+} | null {
+  if (proposal.needsViewerAction) {
+    return {
+      label: "Action needed",
+      sx: {
+        bgcolor: GARDEN_TOKENS.sage,
+        color: GARDEN_TOKENS.surface,
+        border: `2px solid ${GARDEN_TOKENS.ink}`,
+      },
+    };
+  }
+  if (proposal.atRisk) {
+    return {
+      label: "At risk",
+      sx: {
+        bgcolor: "#F0C878",
+        color: GARDEN_TOKENS.ink,
+        border: `2px solid ${GARDEN_TOKENS.ink}`,
+      },
+    };
+  }
+  if (proposal.notOnCalendar) {
+    return {
+      label: "Not on calendar",
+      sx: {
+        borderColor: GARDEN_TOKENS.ink,
+        color: GARDEN_TOKENS.ink,
+      },
+    };
+  }
+  return {
+    label: stateBadgeLabel(proposal),
+    sx: {
+      fontWeight: 600,
+      fontSize: "0.65rem",
+      borderColor: GARDEN_TOKENS.ink,
+      color: GARDEN_TOKENS.ink,
+    },
+  };
+}
+
 interface ProposalCardProps {
   proposal: ProposalCardData;
   onOpen: (id: string) => void;
@@ -52,7 +95,7 @@ interface ProposalCardProps {
 }
 
 /**
- * Proposal card with Garden Brutalism ink borders and pastel type chips.
+ * Proposal card with Garden Brutalism ink borders — scan order what → when → where → act (PC-124).
  */
 export function ProposalCard({
   proposal,
@@ -71,6 +114,34 @@ export function ProposalCard({
       ? Math.round((proposal.respondedCount / proposal.inviteeCount) * 100)
       : 0;
   const rotation = proposalCardRotation(proposal.id);
+  const status = emphasisStatus(proposal);
+  const locationLine =
+    proposal.locationName && proposal.bedroomLabel
+      ? `${proposal.locationName} · ${proposal.bedroomLabel}`
+      : proposal.locationName;
+
+  const sparseBadges: string[] = [];
+  if (!proposal.isContentMasked) {
+    if (proposal.proposalType === "event" && proposal.isPoll) sparseBadges.push("Poll");
+    if (proposal.proposalType === "sleeping" && proposal.isBatchSleeping) {
+      sparseBadges.push("Batch");
+    }
+    if (proposal.eventPrivacy === "private" || proposal.eventPrivacy === "super_private") {
+      sparseBadges.push("Private");
+    }
+    if (proposal.isRecurring) sparseBadges.push("Recurring");
+    if (proposal.isPastSchedule) sparseBadges.push("Past");
+  } else {
+    sparseBadges.push("Private");
+  }
+
+  const typeAccent =
+    proposal.proposalType === "sleeping" &&
+    proposal.cardKind !== "partnership" &&
+    proposal.specialKind !== "residency" &&
+    proposal.cardKind !== "residency"
+      ? "#C4B5E8"
+      : "#F5D76E";
 
   return (
     <Card
@@ -80,6 +151,7 @@ export function ProposalCard({
         ...brutalPressSx,
         cursor: "pointer",
         transform: `rotate(${rotation})`,
+        borderLeft: `6px solid ${typeAccent}`,
         "&:hover": {
           ...brutalPressSx["&:hover"],
           transform: `rotate(${rotation}) translate(1px, 1px)`,
@@ -113,104 +185,61 @@ export function ProposalCard({
           </Typography>
         )}
 
-        <Stack direction="row" justifyContent="space-between" alignItems="flex-start" sx={{ mb: 1 }}>
-          <Chip
-            label={typeBadgeLabel(proposal.proposalType, proposal.cardKind, proposal.specialKind)}
-            size="small"
-            sx={typeChipSxForProposal(
-              proposal.proposalType,
-              proposal.cardKind,
-              proposal.specialKind,
-            )}
-          />
-          <Typography
-            variant="caption"
-            sx={{
-              textAlign: "right",
-              fontFamily: fontFamilies.label,
-              color: GARDEN_TOKENS.inkMuted,
-              fontSize: "0.65rem",
-            }}
-          >
-            PROPOSED BY {proposal.proposerName.toUpperCase()}
-          </Typography>
-        </Stack>
-
-        <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" sx={{ mb: 0.5 }}>
+        {/* What */}
+        <Stack direction="row" spacing={1} alignItems="flex-start" sx={{ mb: 0.75 }}>
           <ProposalEventIcon
             eventIconKey={proposal.eventIconKey}
             isContentMasked={proposal.isContentMasked}
             proposalType={proposal.proposalType}
           />
-          <Typography
-            variant="h6"
-            component="h2"
-            sx={{
-              fontFamily: fontFamilies.label,
-              fontSize: "1.1rem",
-              fontWeight: 600,
-            }}
-          >
-            {proposal.title}
-          </Typography>
-          <Chip
-            label={stateBadgeLabel(proposal)}
-            size="small"
-            variant="outlined"
-            sx={{
-              fontWeight: 600,
-              fontSize: "0.65rem",
-              borderColor: GARDEN_TOKENS.ink,
-              color: GARDEN_TOKENS.ink,
-            }}
-          />
-          {proposal.atRisk && (
-            <Chip
-              size="small"
-              label="At risk"
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            <Typography
+              variant="h6"
+              component="h2"
               sx={{
-                bgcolor: "#F0C878",
-                color: GARDEN_TOKENS.ink,
-                border: `2px solid ${GARDEN_TOKENS.ink}`,
+                fontFamily: fontFamilies.label,
+                fontSize: "1.1rem",
+                fontWeight: 600,
+                lineHeight: 1.25,
               }}
-            />
-          )}
-          {proposal.notOnCalendar && (
-            <Chip
-              size="small"
-              label="Not on calendar"
-              color="warning"
-              variant="outlined"
-              sx={{ borderColor: GARDEN_TOKENS.ink }}
-            />
-          )}
-          {proposal.needsViewerAction && (
-            <Chip
-              size="small"
-              label="Action needed"
-              sx={{
-                bgcolor: GARDEN_TOKENS.sage,
-                color: GARDEN_TOKENS.surface,
-                border: `2px solid ${GARDEN_TOKENS.ink}`,
-              }}
-            />
-          )}
+            >
+              {proposal.title}
+            </Typography>
+            <Stack direction="row" spacing={0.75} alignItems="center" flexWrap="wrap" sx={{ mt: 0.5 }}>
+              <Chip
+                label={typeBadgeLabel(proposal.proposalType, proposal.cardKind, proposal.specialKind)}
+                size="small"
+                sx={{
+                  ...typeChipSxForProposal(
+                    proposal.proposalType,
+                    proposal.cardKind,
+                    proposal.specialKind,
+                  ),
+                  height: 20,
+                  fontSize: "0.6rem",
+                  "& .MuiChip-label": { px: 0.75 },
+                }}
+              />
+              <Typography
+                variant="caption"
+                sx={{
+                  fontFamily: fontFamilies.label,
+                  color: GARDEN_TOKENS.inkMuted,
+                  fontSize: "0.65rem",
+                }}
+              >
+                by {proposal.proposerName}
+              </Typography>
+            </Stack>
+          </Box>
         </Stack>
 
-        {proposal.isContentMasked && (
-          <Chip
-            size="small"
-            label="Private"
-            variant="outlined"
-            sx={{ mt: 1, borderColor: GARDEN_TOKENS.ink }}
-          />
-        )}
-
+        {/* When */}
         {timeLabel &&
           !proposal.isContentMasked &&
           proposal.specialKind !== "residency" &&
           proposal.cardKind !== "residency" && (
-            <Stack direction="row" spacing={0.5} alignItems="center" sx={{ mt: 1 }}>
+            <Stack direction="row" spacing={0.5} alignItems="center" sx={{ mt: 0.75 }}>
               <AccessTimeIcon sx={{ fontSize: 16, color: GARDEN_TOKENS.inkMuted }} />
               <Typography variant="body2" sx={{ color: GARDEN_TOKENS.inkMuted }}>
                 {timeLabel}
@@ -218,33 +247,40 @@ export function ProposalCard({
             </Stack>
           )}
 
-        {proposal.locationName && !proposal.isContentMasked && (
+        {/* Where */}
+        {locationLine && !proposal.isContentMasked && (
           <Stack direction="row" spacing={0.5} alignItems="center" sx={{ mt: 0.5 }}>
             <LocationOnOutlinedIcon sx={{ fontSize: 16, color: GARDEN_TOKENS.inkMuted }} />
             <Typography variant="body2" sx={{ color: GARDEN_TOKENS.inkMuted }}>
-              {proposal.locationName}
+              {locationLine}
             </Typography>
           </Stack>
         )}
 
-        {proposal.isPastSchedule && (
-          <Box
-            sx={{
-              mt: 1.5,
-              p: 1,
-              bgcolor: PAST_SCHEDULE_BG,
-              borderRadius: "12px 6px 10px 8px",
-              border: `2px solid ${GARDEN_TOKENS.ink}`,
-              display: "flex",
-              alignItems: "center",
-              gap: 0.5,
-            }}
-          >
-            <WarningAmberIcon sx={{ fontSize: 18, color: PAST_SCHEDULE_ICON }} />
-            <Typography variant="body2" sx={{ color: PAST_SCHEDULE_TEXT, fontWeight: 500 }}>
-              Past schedule
-            </Typography>
-          </Box>
+        {/* Act — one emphasis status */}
+        {status && (
+          <Stack direction="row" spacing={0.75} alignItems="center" flexWrap="wrap" sx={{ mt: 1 }}>
+            <Chip
+              label={status.label}
+              size="small"
+              variant={proposal.notOnCalendar && !proposal.needsViewerAction && !proposal.atRisk ? "outlined" : "filled"}
+              sx={status.sx}
+            />
+            {sparseBadges.map((badge) => (
+              <Chip
+                key={badge}
+                label={badge}
+                size="small"
+                variant="outlined"
+                sx={{
+                  height: 22,
+                  fontSize: "0.65rem",
+                  borderColor: GARDEN_TOKENS.ink,
+                  color: GARDEN_TOKENS.inkMuted,
+                }}
+              />
+            ))}
+          </Stack>
         )}
 
         {proposal.state !== "draft" && proposal.inviteeCount > 0 && (

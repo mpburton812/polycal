@@ -20,6 +20,10 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Changed
+
+- PC-124–PC-127: Proposal card & draft form UX — shared what→when→where→act card scan; digital event times; type-aware progressive drafts (event vs sleeping vs batch); explicit Required/Optional invitees; Save secondary / Submit primary; privacy and notes helper copy.
+
 ### Added
 
 - PC-118–PC-122: Alpha tester feedback system — in-app FAB (screenshot + bug/feature form with silent diagnostics), Turso `alpha_feedback_submissions` (schema v19), admin list/detail/patch/notify API, and Tauri Windows tracker app under `apps/alpha-feedback-tracker/`.

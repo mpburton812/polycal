@@ -106,9 +106,9 @@ flowchart LR
 
 **What happens here:**
 
-- Fill in title, description, optional notes and location.
-- Choose event vs sleeping, times or poll slots, invitees, privacy, recurrence, solo flags.
-- Save anytime; nothing is on the shared calendar yet.
+- Fill the happy path first: **events** — title, when (digital time), invitees (Required/Optional), location; **sleeping** — who (partners), night of / last night, place and bedroom. Use **More options** for description, privacy, notes, poll, recurrence, reminder, and icons.
+- Privacy: Open follows network rules; Private is proposer/invitees/partners (+ optional admins); Super private is proposer/invitees only (+ optional admins). Notes are shared with invitees.
+- Save anytime (keeps a draft); Submit sends it for approval. Nothing is on the shared calendar until resolved.
 - **Conflict warnings** may appear if invitees already have overlapping events. You can still save and submit; reviewers see the same warnings.
 
 **Leaving Draft:**
