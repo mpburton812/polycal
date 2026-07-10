@@ -80,9 +80,14 @@ function compareValues(a: unknown, b: unknown): number {
  * Alpha feedback triage UI — sortable grid + detail dialog (PC-122).
  */
 export function App() {
-  const [baseUrl, setBaseUrl] = useState(ENV_PRESETS[0].value);
+  const [baseUrl, setBaseUrl] = useState(
+    () => localStorage.getItem("afb_base") ?? ENV_PRESETS[0].value,
+  );
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [protectionBypass, setProtectionBypass] = useState(
+    () => localStorage.getItem("afb_bypass") ?? "",
+  );
   const [token, setToken] = useState<string | null>(
     () => localStorage.getItem("afb_token"),
   );
@@ -99,6 +104,8 @@ export function App() {
   const [submitterComment, setSubmitterComment] = useState("");
   const [status, setStatus] = useState<FeedbackStatus>("not_started");
 
+  const apiOptions = { protectionBypass };
+
   const sortedRows = useMemo(() => {
     const copy = [...rows];
     copy.sort((a, b) => {
@@ -112,12 +119,13 @@ export function App() {
     setBusy(true);
     setError(null);
     try {
-      const result = await loginAdmin(baseUrl, username, password);
+      const result = await loginAdmin(baseUrl, username, password, apiOptions);
       setToken(result.token);
       setAdminName(result.displayName);
       localStorage.setItem("afb_token", result.token);
       localStorage.setItem("afb_admin", result.displayName);
       localStorage.setItem("afb_base", baseUrl);
+      localStorage.setItem("afb_bypass", protectionBypass);
       await refresh(result.token, baseUrl);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login failed");
@@ -131,7 +139,7 @@ export function App() {
     setBusy(true);
     setError(null);
     try {
-      const list = await listSubmissions(activeBase, activeToken);
+      const list = await listSubmissions(activeBase, activeToken, apiOptions);
       setRows(list);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load");
@@ -158,7 +166,7 @@ export function App() {
     setBusy(true);
     setError(null);
     try {
-      const submission = await getSubmission(baseUrl, token, id);
+      const submission = await getSubmission(baseUrl, token, id, apiOptions);
       setDetail(submission);
       setStatus(submission.status);
       setInternalComment(submission.internalComment ?? "");
@@ -175,13 +183,19 @@ export function App() {
     setBusy(true);
     setError(null);
     try {
-      await patchSubmission(baseUrl, token, detail.id, {
-        status,
-        internalComment: internalComment || null,
-        submitterComment: submitterComment || null,
-      });
+      await patchSubmission(
+        baseUrl,
+        token,
+        detail.id,
+        {
+          status,
+          internalComment: internalComment || null,
+          submitterComment: submitterComment || null,
+        },
+        apiOptions,
+      );
       await refresh();
-      const updated = await getSubmission(baseUrl, token, detail.id);
+      const updated = await getSubmission(baseUrl, token, detail.id, apiOptions);
       setDetail(updated);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Save failed");
@@ -195,12 +209,24 @@ export function App() {
     setBusy(true);
     setError(null);
     try {
-      await patchSubmission(baseUrl, token, detail.id, {
-        status,
-        internalComment: internalComment || null,
-        submitterComment: submitterComment || null,
-      });
-      await notifySubmitter(baseUrl, token, detail.id, submitterComment);
+      await patchSubmission(
+        baseUrl,
+        token,
+        detail.id,
+        {
+          status,
+          internalComment: internalComment || null,
+          submitterComment: submitterComment || null,
+        },
+        apiOptions,
+      );
+      await notifySubmitter(
+        baseUrl,
+        token,
+        detail.id,
+        submitterComment,
+        apiOptions,
+      );
       await refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Notify failed");
@@ -259,6 +285,14 @@ export function App() {
             onChange={(event) => setPassword(event.target.value)}
             fullWidth
             autoComplete="current-password"
+          />
+          <TextField
+            label="Vercel protection bypass (Dev/Test)"
+            type="password"
+            value={protectionBypass}
+            onChange={(event) => setProtectionBypass(event.target.value)}
+            fullWidth
+            helperText="Required for protected preview URLs. Vercel → Project → Settings → Deployment Protection → Protection Bypass for Automation."
           />
           {error && <Alert severity="error">{error}</Alert>}
           <Button variant="contained" disabled={busy} onClick={() => void handleLogin()}>
