@@ -1,5 +1,9 @@
-# GitLab CI — PolyCal
-# Validates Jira traceability on feature branches and merge requests.
+# GitLab CI — PolyCal (secondary / legacy mirror)
+#
+# Primary promotion and gates run on **GitHub Actions** (see `.github/workflows/`
+# and docs/DEV-PROMOTION.md). Keep this file only if a GitLab remote still runs
+# pipelines; otherwise it is unused. Do not add new gates here without mirroring
+# them on GitHub first.
 
 stages:
   - validate

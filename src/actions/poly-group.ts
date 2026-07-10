@@ -114,6 +114,40 @@ export async function getPolyGroupSettingsAction(): Promise<PolyGroupSettings | 
   return rowToSettings(row);
 }
 
+export interface EventPrivacyAvailability {
+  open: boolean;
+  private: boolean;
+  superPrivate: boolean;
+}
+
+/**
+ * Returns which event privacy levels are enabled for new proposals (any signed-in user) (PC-134).
+ */
+export async function getEventPrivacyAvailabilityAction(): Promise<EventPrivacyAvailability> {
+  const session = await auth();
+  if (!session?.user) {
+    return { open: true, private: false, superPrivate: false };
+  }
+
+  await ensureDbReady();
+  const db = getDb();
+  const [row] = await db
+    .select({
+      eventPrivacyOpen: polyGroup.eventPrivacyOpen,
+      eventPrivacyPrivate: polyGroup.eventPrivacyPrivate,
+      eventPrivacySuperPrivate: polyGroup.eventPrivacySuperPrivate,
+    })
+    .from(polyGroup)
+    .where(eq(polyGroup.id, 1))
+    .limit(1);
+
+  return {
+    open: row?.eventPrivacyOpen ?? true,
+    private: row?.eventPrivacyPrivate ?? true,
+    superPrivate: row?.eventPrivacySuperPrivate ?? true,
+  };
+}
+
 /**
  * Persists poly group settings and applies power-management role overrides (PC-30).
  */

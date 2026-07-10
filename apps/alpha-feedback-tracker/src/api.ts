@@ -35,6 +35,7 @@ export interface FeedbackListItem {
   screenshotMimeType: string | null;
   internalComment: string | null;
   submitterComment: string | null;
+  archivedAt: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -172,11 +173,12 @@ export async function loginAdmin(
 export async function listSubmissions(
   baseUrl: string,
   token: string,
-  options?: ApiClientOptions,
+  options?: ApiClientOptions & { archived?: boolean },
 ): Promise<FeedbackListItem[]> {
+  const query = options?.archived ? "?archived=1" : "";
   const data = await apiFetch<{ submissions: FeedbackListItem[] }>(
     baseUrl,
-    "/api/admin/alpha-feedback",
+    `/api/admin/alpha-feedback${query}`,
     token,
     undefined,
     options,
@@ -208,6 +210,7 @@ export async function patchSubmission(
     status?: FeedbackStatus;
     internalComment?: string | null;
     submitterComment?: string | null;
+    archived?: boolean;
   },
   options?: ApiClientOptions,
 ): Promise<void> {
@@ -219,6 +222,22 @@ export async function patchSubmission(
       method: "PATCH",
       body: JSON.stringify(body),
     },
+    options,
+  );
+}
+
+/** Permanently deletes a submission (PC-135). */
+export async function deleteSubmission(
+  baseUrl: string,
+  token: string,
+  id: string,
+  options?: ApiClientOptions,
+): Promise<void> {
+  await apiFetch(
+    baseUrl,
+    `/api/admin/alpha-feedback/${encodeURIComponent(id)}`,
+    token,
+    { method: "DELETE" },
     options,
   );
 }

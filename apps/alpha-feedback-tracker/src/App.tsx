@@ -29,6 +29,7 @@ import { useMemo, useState } from "react";
 
 import {
   STATUS_LABELS,
+  deleteSubmission,
   getSubmission,
   listSubmissions,
   loginAdmin,
@@ -54,7 +55,7 @@ const ENV_PRESETS = [
   { label: "Production", value: "https://polycal-ebon.vercel.app" },
 ];
 
-const COLUMNS: { key: SortKey; label: string }[] = [
+const COLUMNS: { key: SortKey | "actions"; label: string }[] = [
   { key: "kind", label: "Kind" },
   { key: "title", label: "Title" },
   { key: "status", label: "Status" },
@@ -66,6 +67,7 @@ const COLUMNS: { key: SortKey; label: string }[] = [
   { key: "submittedAt", label: "Submitted" },
   { key: "osLabel", label: "OS" },
   { key: "viewportWidth", label: "Viewport" },
+  { key: "actions", label: "Actions" },
 ];
 
 function compareValues(a: unknown, b: unknown): number {
@@ -103,6 +105,8 @@ export function App() {
   const [internalComment, setInternalComment] = useState("");
   const [submitterComment, setSubmitterComment] = useState("");
   const [status, setStatus] = useState<FeedbackStatus>("not_started");
+  /** Active inbox vs archive list (PC-136). */
+  const [listView, setListView] = useState<"active" | "archive">("active");
 
   const apiOptions = { protectionBypass };
 
@@ -134,12 +138,15 @@ export function App() {
     }
   }
 
-  async function refresh(activeToken = token, activeBase = baseUrl) {
+  async function refresh(activeToken = token, activeBase = baseUrl, view = listView) {
     if (!activeToken) return;
     setBusy(true);
     setError(null);
     try {
-      const list = await listSubmissions(activeBase, activeToken, apiOptions);
+      const list = await listSubmissions(activeBase, activeToken, {
+        ...apiOptions,
+        archived: view === "archive",
+      });
       setRows(list);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load");
@@ -235,6 +242,52 @@ export function App() {
     }
   }
 
+  async function handleArchive(archived: boolean) {
+    if (!token || !detail) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await patchSubmission(
+        baseUrl,
+        token,
+        detail.id,
+        { archived },
+        apiOptions,
+      );
+      setDetail(null);
+      await refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Archive failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleDelete() {
+    if (!token || !detail) return;
+    const confirmed = window.confirm(
+      `Permanently delete “${detail.title}”? This cannot be undone.`,
+    );
+    if (!confirmed) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await deleteSubmission(baseUrl, token, detail.id, apiOptions);
+      setDetail(null);
+      await refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Delete failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function switchListView(view: "active" | "archive") {
+    setListView(view);
+    setDetail(null);
+    void refresh(token ?? undefined, baseUrl, view);
+  }
+
   function logout() {
     setToken(null);
     setRows([]);
@@ -309,10 +362,20 @@ export function App() {
         <Toolbar sx={{ gap: 2 }}>
           <Typography variant="h6" sx={{ flexGrow: 1 }}>
             Alpha Feedback — {adminName}
+            {listView === "archive" ? " (Archive)" : ""}
           </Typography>
           <Typography variant="body2" color="text.secondary">
             {baseUrl}
           </Typography>
+          {listView === "active" ? (
+            <Button onClick={() => switchListView("archive")} disabled={busy}>
+              Archive
+            </Button>
+          ) : (
+            <Button onClick={() => switchListView("active")} disabled={busy}>
+              Active inbox
+            </Button>
+          )}
           <Button startIcon={<RefreshIcon />} disabled={busy} onClick={() => void refresh()}>
             Refresh
           </Button>
@@ -333,13 +396,17 @@ export function App() {
               <TableRow>
                 {COLUMNS.map((column) => (
                   <TableCell key={column.key} sortDirection={sortKey === column.key ? sortDir : false}>
-                    <TableSortLabel
-                      active={sortKey === column.key}
-                      direction={sortKey === column.key ? sortDir : "asc"}
-                      onClick={() => handleSort(column.key)}
-                    >
-                      {column.label}
-                    </TableSortLabel>
+                    {column.key === "actions" ? (
+                      column.label
+                    ) : (
+                      <TableSortLabel
+                        active={sortKey === column.key}
+                        direction={sortKey === column.key ? sortDir : "asc"}
+                        onClick={() => handleSort(column.key as SortKey)}
+                      >
+                        {column.label}
+                      </TableSortLabel>
+                    )}
                   </TableCell>
                 ))}
               </TableRow>
@@ -367,12 +434,105 @@ export function App() {
                       ? `${row.viewportWidth}×${row.viewportHeight}`
                       : "—"}
                   </TableCell>
+                  <TableCell onClick={(event) => event.stopPropagation()}>
+                    <Stack direction="row" spacing={0.5}>
+                      {listView === "active" ? (
+                        <Button
+                          size="small"
+                          disabled={busy || !token}
+                          onClick={() => {
+                            void (async () => {
+                              if (!token) return;
+                              setBusy(true);
+                              try {
+                                await patchSubmission(
+                                  baseUrl,
+                                  token,
+                                  row.id,
+                                  { archived: true },
+                                  apiOptions,
+                                );
+                                await refresh();
+                              } catch (err) {
+                                setError(
+                                  err instanceof Error ? err.message : "Archive failed",
+                                );
+                              } finally {
+                                setBusy(false);
+                              }
+                            })();
+                          }}
+                        >
+                          Archive
+                        </Button>
+                      ) : (
+                        <Button
+                          size="small"
+                          disabled={busy || !token}
+                          onClick={() => {
+                            void (async () => {
+                              if (!token) return;
+                              setBusy(true);
+                              try {
+                                await patchSubmission(
+                                  baseUrl,
+                                  token,
+                                  row.id,
+                                  { archived: false },
+                                  apiOptions,
+                                );
+                                await refresh();
+                              } catch (err) {
+                                setError(
+                                  err instanceof Error ? err.message : "Restore failed",
+                                );
+                              } finally {
+                                setBusy(false);
+                              }
+                            })();
+                          }}
+                        >
+                          Restore
+                        </Button>
+                      )}
+                      <Button
+                        size="small"
+                        color="error"
+                        disabled={busy || !token}
+                        onClick={() => {
+                          const confirmed = window.confirm(
+                            `Permanently delete “${row.title}”? This cannot be undone.`,
+                          );
+                          if (!confirmed || !token) return;
+                          void (async () => {
+                            setBusy(true);
+                            try {
+                              await deleteSubmission(baseUrl, token, row.id, apiOptions);
+                              await refresh();
+                            } catch (err) {
+                              setError(
+                                err instanceof Error ? err.message : "Delete failed",
+                              );
+                            } finally {
+                              setBusy(false);
+                            }
+                          })();
+                        }}
+                      >
+                        Delete
+                      </Button>
+                    </Stack>
+                  </TableCell>
                 </TableRow>
               ))}
               {sortedRows.length === 0 && (
                 <TableRow>
                   <TableCell colSpan={COLUMNS.length}>
-                    <Typography color="text.secondary">No submissions yet.</Typography>
+                    <Typography color="text.secondary">
+                      {listView === "archive"
+                        ? "No archived submissions."
+                        : "No submissions yet."}
+                    </Typography>
                   </TableCell>
                 </TableRow>
               )}
@@ -467,7 +627,24 @@ export function App() {
                 />
               </Stack>
             </DialogContent>
-            <DialogActions>
+            <DialogActions sx={{ flexWrap: "wrap", gap: 1 }}>
+              <Button
+                color="error"
+                disabled={busy}
+                onClick={() => void handleDelete()}
+                sx={{ mr: "auto" }}
+              >
+                Delete
+              </Button>
+              {listView === "archive" ? (
+                <Button disabled={busy} onClick={() => void handleArchive(false)}>
+                  Restore
+                </Button>
+              ) : (
+                <Button disabled={busy} onClick={() => void handleArchive(true)}>
+                  Archive
+                </Button>
+              )}
               <Button onClick={() => setDetail(null)}>Close</Button>
               <Button disabled={busy} onClick={() => void saveDetail()}>
                 Save

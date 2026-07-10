@@ -168,6 +168,8 @@ export const alphaFeedbackSubmissions = sqliteTable("alpha_feedback_submissions"
   screenshotData: blob("screenshot_data", { mode: "buffer" }),
   internalComment: text("internal_comment"),
   submitterComment: text("submitter_comment"),
+  /** ISO timestamp when archived; null means active inbox (PC-136). */
+  archivedAt: text("archived_at"),
   createdAt: text("created_at").notNull(),
   updatedAt: text("updated_at").notNull(),
 });
