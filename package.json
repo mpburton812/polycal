@@ -33,7 +33,8 @@
     "jira:sync-merge": "tsx scripts/jira-transition-issues.ts --status Done",
     "jira:sync-review": "tsx scripts/jira-transition-issues.ts --status \"In Review\"",
     "jira:sync-progress": "tsx scripts/jira-transition-issues.ts --status \"In Progress\"",
-    "merge-feature": "tsx scripts/merge-feature.ts"
+    "merge-feature": "tsx scripts/merge-feature.ts",
+    "tracker:build": "npm --prefix apps/alpha-feedback-tracker run build"
   },
   "devDependencies": {
     "@playwright/test": "^1.61.1",
