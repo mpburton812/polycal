@@ -1,4 +1,4 @@
-import { desc } from "drizzle-orm";
+import { desc, isNotNull, isNull } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
 import { requireAdminApiAccess } from "@/lib/alpha-feedback/admin-auth";
@@ -16,10 +16,14 @@ export function OPTIONS(request: Request): NextResponse {
 
 /**
  * Lists alpha feedback submissions (metadata only; no screenshot bytes) (PC-121).
+ * Query `?archived=1` returns the archive list; default is the active inbox (PC-136).
  */
 export async function GET(request: Request): Promise<NextResponse> {
   const access = await requireAdminApiAccess(request);
   if (!access.ok) return withAlphaFeedbackCors(request, access.response);
+
+  const url = new URL(request.url);
+  const archivedOnly = url.searchParams.get("archived") === "1";
 
   await ensureDbReady();
   const db = getDb();
@@ -46,10 +50,16 @@ export async function GET(request: Request): Promise<NextResponse> {
       screenshotMimeType: alphaFeedbackSubmissions.screenshotMimeType,
       internalComment: alphaFeedbackSubmissions.internalComment,
       submitterComment: alphaFeedbackSubmissions.submitterComment,
+      archivedAt: alphaFeedbackSubmissions.archivedAt,
       createdAt: alphaFeedbackSubmissions.createdAt,
       updatedAt: alphaFeedbackSubmissions.updatedAt,
     })
     .from(alphaFeedbackSubmissions)
+    .where(
+      archivedOnly
+        ? isNotNull(alphaFeedbackSubmissions.archivedAt)
+        : isNull(alphaFeedbackSubmissions.archivedAt),
+    )
     .orderBy(desc(alphaFeedbackSubmissions.submittedAt));
 
   return withAlphaFeedbackCors(
@@ -59,6 +69,7 @@ export async function GET(request: Request): Promise<NextResponse> {
         ...row,
         hasScreenshot: Boolean(row.hasScreenshot),
       })),
+      view: archivedOnly ? "archive" : "active",
     }),
   );
 }

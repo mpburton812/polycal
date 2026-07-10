@@ -46,6 +46,11 @@ describe("alphaFeedbackPatchSchema", () => {
     expect(parsed.success).toBe(true);
   });
 
+  it("accepts archived flag", () => {
+    const parsed = alphaFeedbackPatchSchema.safeParse({ archived: true });
+    expect(parsed.success).toBe(true);
+  });
+
   it("rejects unknown status", () => {
     const parsed = alphaFeedbackPatchSchema.safeParse({ status: "done" });
     expect(parsed.success).toBe(false);

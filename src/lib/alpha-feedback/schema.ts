@@ -29,6 +29,8 @@ export const alphaFeedbackPatchSchema = z.object({
   status: z.enum(alphaFeedbackStatuses).optional(),
   internalComment: z.string().trim().max(4000).nullable().optional(),
   submitterComment: z.string().trim().max(4000).nullable().optional(),
+  /** When true, archives the submission; when false, restores to the active list (PC-136). */
+  archived: z.boolean().optional(),
 });
 
 export type AlphaFeedbackPatchInput = z.infer<typeof alphaFeedbackPatchSchema>;
