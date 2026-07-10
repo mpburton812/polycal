@@ -13,13 +13,19 @@ polycal/
 │   ├── lib/                # Domain logic, DB, auth, schedule, proposals
 │   └── types/              # Shared TypeScript types
 ├── e2e/                    # Playwright specs (journey + regression)
+├── apps/
+│   └── alpha-feedback-tracker/  # Tauri desktop triage UI (separate package)
 ├── scripts/                # Tooling (requirements, Jira sync, CI helpers)
 ├── docs/                   # Architecture, workflow, ADRs, security
 ├── .requirements           # Requirement delivery log (append-only)
 └── .github/workflows/      # Primary CI (GitHub Actions)
 ```
 
-GitLab CI (`.gitlab-ci.yml`) mirrors the same gates for alternate remotes; **GitHub Actions is the primary promotion path** for this project.
+GitLab CI (`.gitlab-ci.yml`) is a **secondary/legacy mirror** of a subset of gates for alternate remotes; **GitHub Actions is the primary promotion path** for this project.
+
+### Companion app: alpha-feedback-tracker
+
+`apps/alpha-feedback-tracker` is intentionally **outside** the Next.js TypeScript project (`tsconfig.json` excludes `apps/`). It has its own `package-lock.json` and CI workflow (`.github/workflows/alpha-feedback-tracker.yml`) that runs `npm run build` (tsc + Vite) on path changes. Full Tauri installer builds remain local (Windows + Rust). The tracker talks only to PolyCal admin HTTP APIs — never to Turso directly.
 
 ## Layer model
 

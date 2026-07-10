@@ -173,3 +173,4 @@
 2026-07-10 | f9f4c8d | PC-124 | redesign card and draft UX for events and sleeping | src/actions/proposals/_core.ts
 2026-07-10 | 774513c | PC-124 | restore At risk badge and update E2E for card/detail UX | src/components/proposals/ProposalCard.tsx
 2026-07-10 | 052b295 | PC-124 | append requirements log and finish icon E2E fix | e2e/event-icons.spec.ts
+2026-07-10 | 0008e0e | PC-128 | add tracker web build workflow and document CI boundaries | src/lib/changelog/entries.ts

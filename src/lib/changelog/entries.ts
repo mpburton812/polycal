@@ -26,6 +26,23 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "2026.07.10c",
+    date: "2026-07-10",
+    summary: "CI for alpha-feedback tracker web build; GitLab CI marked secondary.",
+    changes: [
+      {
+        type: "added",
+        description:
+          "Path-filtered GitHub Actions job typechecks and Vite-builds apps/alpha-feedback-tracker (PC-128).",
+      },
+      {
+        type: "changed",
+        description:
+          "Document GitLab CI as secondary/legacy; architecture notes for tracker package boundary (PC-128).",
+      },
+    ],
+  },
+  {
     version: "2026.07.10b",
     date: "2026-07-10",
     summary: "Proposal card & draft form UX for events and sleeping.",
