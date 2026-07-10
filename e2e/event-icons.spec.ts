@@ -61,6 +61,7 @@ test.describe("Event category icons (PC-116)", () => {
 
     const draft = page.getByRole("dialog");
     await expect(draft.getByLabel("Title")).toHaveValue(`${title} (copy)`, { timeout: 15_000 });
+    await expandDraftMoreOptions(draft);
     await expect(draft.getByRole("button", { name: "Gaming event" })).toHaveAttribute(
       "aria-pressed",
       "true",
