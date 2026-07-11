@@ -584,6 +584,11 @@ export function ProposalDetailDialog({
               <Skeleton variant="rounded" height={96} />
             </Stack>
           )}
+          {!detailLoading && !detail && (
+            <Typography variant="body2" color="text.secondary">
+              This proposal is no longer available.
+            </Typography>
+          )}
           {detail && (
             <>
               <Stack direction="row" spacing={1} alignItems="flex-start" sx={{ mb: 1 }}>
@@ -988,24 +993,26 @@ export function ProposalDetailDialog({
             </>
           )}
         </CardContent>
-        {detail && (
+        {/* Close stays available once the initial fetch settles (success or miss) so
+            post-vote reloads that clear detail cannot trap the user (PC-138). */}
+        {(!detailLoading || detail) && (
           <CardActions sx={{ px: 2, pb: 2, pt: 0, flexWrap: "wrap", gap: 1 }}>
-            {detail.canCancel && (
+            {detail?.canCancel && (
               <Button color="error" onClick={handleCancelClick} disabled={pending}>
                 Cancel
               </Button>
             )}
-            {detail.canClone && (
+            {detail?.canClone && (
               <Button onClick={handleClone} disabled={pending}>
                 Clone
               </Button>
             )}
-            {detail.canRedraft && (
+            {detail?.canRedraft && (
               <Button onClick={handleRedraft} disabled={pending}>
                 Re-draft
               </Button>
             )}
-            {detail.canEdit && (
+            {detail?.canEdit && (
               <>
                 <Button color="error" onClick={handleDelete} disabled={pending}>
                   Delete
@@ -1023,7 +1030,7 @@ export function ProposalDetailDialog({
                 </Button>
               </>
             )}
-            {detail.canReschedule && (
+            {detail?.canReschedule && (
               <Button onClick={openRescheduleDialog} disabled={pending}>
                 Reschedule
               </Button>

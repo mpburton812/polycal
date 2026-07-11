@@ -1,4 +1,4 @@
-import { type Page, expect } from "@playwright/test";
+import { type Locator, type Page, expect } from "@playwright/test";
 
 export async function goToSchedule(page: Page): Promise<void> {
   await page.getByRole("link", { name: "Schedule" }).click();
@@ -37,13 +37,21 @@ export async function selectProposalTab(page: Page, tab: "Drafts" | "Proposed" |
   await page.getByRole("tab", { name: new RegExp(tab, "i") }).click();
 }
 
+/**
+ * Waits until proposal detail finished loading (Close visible) after open (PC-138).
+ * Close is deferred while the initial fetch is in flight.
+ */
+export async function waitForProposalDetailReady(dialog: Locator): Promise<void> {
+  const loading = dialog.getByLabel("Loading proposal");
+  await loading.waitFor({ state: "hidden", timeout: 20_000 }).catch(() => {});
+  await expect(dialog.getByRole("button", { name: "Close" })).toBeVisible({
+    timeout: 20_000,
+  });
+}
+
 export async function openProposalCard(page: Page, title: string | RegExp): Promise<void> {
   await page.getByRole("heading", { name: title, level: 2 }).first().click();
   const dialog = page.getByRole("dialog");
   await expect(dialog).toBeVisible();
-  // Detail Close is deferred until fetch completes (PC-138).
-  await dialog.getByLabel("Loading proposal").waitFor({ state: "hidden", timeout: 20_000 }).catch(() => {});
-  await expect(dialog.getByRole("button", { name: "Close" })).toBeVisible({
-    timeout: 20_000,
-  });
+  await waitForProposalDetailReady(dialog);
 }
