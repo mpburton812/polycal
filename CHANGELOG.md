@@ -22,10 +22,14 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- PC-144: `/api/health` readiness probe (`ensureDbReady` + schema version) for optional warmup.
 - PC-138–PC-139: Proposal detail loading skeleton (defer Close until loaded); route `loading.tsx` for people-places, admin, and app shell.
 
 ### Changed
 
+- PC-143: `runMigrations` short-circuits when `schema_meta.version` matches `SCHEMA_VERSION` (skips Turso PRAGMA storm on cold start).
+- PC-144: JWT user-row refresh throttled (~60s TTL); `SessionProvider` disables refetch-on-focus.
+- PC-145: `dynamic()` code-split for proposal/schedule dialogs and heavy admin panels.
 - PC-140–PC-141: Parallelize `(app)` layout data fetches; skip schedule client double-fetch when server payload is already the current week.
 - PC-134: New proposal privacy MenuItems respect poly group settings (hide disabled private/super-private; reappear when enabled); server rejects disabled levels.
 - PC-135–PC-136: Alpha feedback tracker Delete (permanent) and Archive list (`archivedAt`, `?archived=1`); toolbar link between Active inbox and Archive.

@@ -5,6 +5,9 @@ import { getDb } from "@/lib/db/client";
 import { ensureDbReady } from "@/lib/db/ensure-ready";
 import { users } from "@/lib/db/schema";
 
+/** Skip redundant Turso user selects within this window on warm instances (PC-144). */
+const JWT_DB_REFRESH_TTL_MS = 60_000;
+
 /**
  * Shared Auth.js config (JWT callbacks) — imported by src/lib/auth.ts on the Node runtime.
  * Credentials provider is registered in src/lib/auth.ts (Node runtime only).
@@ -30,6 +33,8 @@ export const authConfig = {
         token.displayName = user.displayName;
         token.avatarKey = user.avatarKey;
         token.theme = user.theme;
+        token.dbRefreshedAt = Date.now();
+        delete token.error;
       }
       if (trigger === "update" && session?.user) {
         token.mustChangePassword = session.user.mustChangePassword;
@@ -40,9 +45,22 @@ export const authConfig = {
         if (typeof session.user.sessionVersion === "number") {
           token.sessionVersion = session.user.sessionVersion;
         }
+        // Force a DB re-check after client session.update (e.g. password change).
+        token.dbRefreshedAt = 0;
       }
 
       if (token.id) {
+        const refreshedAt = typeof token.dbRefreshedAt === "number" ? token.dbRefreshedAt : 0;
+        const withinTtl =
+          trigger !== "update" &&
+          !user &&
+          refreshedAt > 0 &&
+          Date.now() - refreshedAt < JWT_DB_REFRESH_TTL_MS;
+
+        if (withinTtl) {
+          return token;
+        }
+
         await ensureDbReady();
         const db = getDb();
         const [row] = await db
@@ -77,6 +95,8 @@ export const authConfig = {
         token.displayName = row.displayName;
         token.avatarKey = row.avatarKey ?? undefined;
         token.theme = row.theme;
+        token.dbRefreshedAt = Date.now();
+        delete token.error;
       }
 
       return token;
