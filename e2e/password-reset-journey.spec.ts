@@ -5,6 +5,9 @@ import { login } from "./helpers/auth";
 import { USERS } from "./helpers/constants";
 import { resetE2eDatabase } from "./helpers/db";
 
+// Public forgot/reset must start logged out despite project luke storageState (PC-175).
+test.use({ storageState: { cookies: [], origins: [] } });
+
 /**
  * Forgot / reset password public flow (PC-162).
  */
