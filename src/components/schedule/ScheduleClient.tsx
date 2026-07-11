@@ -26,7 +26,7 @@ import {
 } from "@mui/material";
 import dynamic from "next/dynamic";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type { ProposalPlaceOption } from "@/actions/proposals";
 import {
@@ -153,13 +153,22 @@ export function ScheduleClient({
   const initialPayloadHydratedRef = useRef(false);
   const refreshSeqRef = useRef(0);
   const urlHydratedRef = useRef(false);
-  const [viewState, setViewState] = useState<ScheduleViewState>(() => ({
-    ...loadScheduleViewState(),
-    weekStartIso: initialWeekStartIso,
-    monthAnchorIso: initialWeekStartIso,
-  }));
+  const [viewState, setViewState] = useState<ScheduleViewState>(() => {
+    // Prefer persisted anchors so re-entering Schedule restores last period (PC-164).
+    const loaded = loadScheduleViewState();
+    const hasPersistedAnchor =
+      typeof window !== "undefined" &&
+      Boolean(window.localStorage.getItem("polycal.schedule.view"));
+    if (hasPersistedAnchor) return loaded;
+    return {
+      ...loaded,
+      weekStartIso: initialWeekStartIso,
+      monthAnchorIso: initialWeekStartIso,
+    };
+  });
   const [payload, setPayload] = useState<SchedulePayload>(initialPayload);
-  const [pending, startTransition] = useTransition();
+  /** Explicit loading flag — useTransition is unreliable for async server actions (PC-164). */
+  const [pending, setPending] = useState(false);
   const [optionsOpen, setOptionsOpen] = useState(false);
   const [daySheetDay, setDaySheetDay] = useState<Date | null>(null);
   const [fabAnchor, setFabAnchor] = useState<null | HTMLElement>(null);
@@ -227,14 +236,19 @@ export function ScheduleClient({
       );
 
       const seq = ++refreshSeqRef.current;
-      startTransition(async () => {
-        const result = await listScheduleEventsAction({
-          rangeStart: start.toISOString(),
-          rangeEnd: end.toISOString(),
-        });
-        if (seq !== refreshSeqRef.current) return;
-        if (result.ok) setPayload(result.payload);
-      });
+      setPending(true);
+      void (async () => {
+        try {
+          const result = await listScheduleEventsAction({
+            rangeStart: start.toISOString(),
+            rangeEnd: end.toISOString(),
+          });
+          if (seq !== refreshSeqRef.current) return;
+          if (result.ok) setPayload(result.payload);
+        } finally {
+          if (seq === refreshSeqRef.current) setPending(false);
+        }
+      })();
     },
     [viewState.calendarLayout, viewState.compact],
   );
@@ -287,7 +301,9 @@ export function ScheduleClient({
     if (parsed.open) {
       openProposal(parsed.open);
     }
-  }, [openProposal, searchParams]);
+    // Intentionally once on mount — do not re-run when searchParams change from our own sync.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only URL hydrate
+  }, [openProposal]);
 
   /** Keep URL in sync with view (PC-167). */
   useEffect(() => {
@@ -489,7 +505,12 @@ export function ScheduleClient({
             >
               <ChevronRightIcon />
             </IconButton>
-            <IconButton aria-label="Today" onClick={goToday} disabled={pending} size="small">
+            <IconButton
+              aria-label="Jump to today"
+              onClick={goToday}
+              disabled={pending}
+              size="small"
+            >
               <TodayIcon fontSize="small" />
             </IconButton>
           </Stack>

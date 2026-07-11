@@ -14,7 +14,7 @@ test.describe("Schedule calendar", () => {
     await expect(page.getByRole("heading", { name: "Schedule", level: 1 })).toBeVisible();
     await expect(page.getByLabel("Previous period")).toBeVisible();
     await expect(page.getByLabel("Next period")).toBeVisible();
-    await expect(page.getByLabel("Today")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Jump to today" })).toBeVisible();
     await expect(page.getByLabel("Calendar period").getByRole("button", { name: "Week", exact: true })).toHaveAttribute(
       "aria-pressed",
       "true",
@@ -55,7 +55,7 @@ test.describe("Schedule calendar", () => {
 
   test("can jump to today", async ({ page }) => {
     await page.getByLabel("Next period").click();
-    await page.getByLabel("Today").click();
+    await page.getByRole("button", { name: "Jump to today" }).click();
     const monday = new Date();
     const day = monday.getDay();
     const diff = day === 0 ? -6 : 1 - day;
