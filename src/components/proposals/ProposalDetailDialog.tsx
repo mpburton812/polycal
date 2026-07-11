@@ -89,14 +89,18 @@ function PollSlotTimeCell({
 }) {
   const time = formatTimeRange(startAt, endAt);
   return (
-    <Stack spacing={0.25} sx={{ minWidth: 168 }}>
+    <Stack spacing={0.25} sx={{ minWidth: 0, maxWidth: "100%" }}>
       {label && (
-        <Typography variant="body2" sx={{ fontWeight: 600 }}>
+        <Typography variant="body2" sx={{ fontWeight: 600, overflowWrap: "anywhere" }}>
           {label}
         </Typography>
       )}
       {time && (
-        <Typography variant="body2" color="text.secondary" sx={{ whiteSpace: "nowrap" }}>
+        <Typography
+          variant="body2"
+          color="text.secondary"
+          sx={{ overflowWrap: "anywhere", whiteSpace: "normal" }}
+        >
           {time}
         </Typography>
       )}
@@ -689,21 +693,21 @@ export function ProposalDetailDialog({
                   <Typography variant="caption" color="text.secondary">
                     Vote for each time slot. Required invitees must complete all rows before resolution.
                   </Typography>
-                  <Box sx={{ overflowX: "auto", mt: 1 }}>
-                    <Table size="small" sx={{ minWidth: 520 }}>
+                  <Box sx={{ mt: 1, width: "100%" }}>
+                    <Table size="small" sx={{ tableLayout: "fixed", width: "100%" }}>
                       <TableHead>
                         <TableRow>
-                          <TableCell sx={{ minWidth: 180 }}>Time slot</TableCell>
-                          <TableCell align="center" sx={{ minWidth: 52, px: 0.5 }}>
+                          <TableCell sx={{ width: "36%" }}>Time slot</TableCell>
+                          <TableCell align="center" sx={{ width: "14%", px: 0.5 }}>
                             Accept
                           </TableCell>
-                          <TableCell align="center" sx={{ minWidth: 64, px: 0.5 }}>
+                          <TableCell align="center" sx={{ width: "16%", px: 0.5 }}>
                             Sub-opt.
                           </TableCell>
-                          <TableCell align="center" sx={{ minWidth: 64, px: 0.5 }}>
+                          <TableCell align="center" sx={{ width: "14%", px: 0.5 }}>
                             Decline
                           </TableCell>
-                          <TableCell sx={{ minWidth: 100 }}>Your vote</TableCell>
+                          <TableCell sx={{ width: "20%" }}>Your vote</TableCell>
                         </TableRow>
                       </TableHead>
                       <TableBody>
@@ -771,42 +775,54 @@ export function ProposalDetailDialog({
                   </Box>
 
                   {detail.slotVotes.length > 0 && (
-                    <Box sx={{ overflowX: "auto", mt: 2 }}>
+                    <Box sx={{ mt: 2, width: "100%" }}>
                       <Typography variant="subtitle2">All responses</Typography>
-                      <Table size="small" sx={{ minWidth: 400, mt: 0.5 }}>
-                        <TableHead>
-                          <TableRow>
-                            <TableCell sx={{ minWidth: 120 }}>Invitee</TableCell>
-                            {detail.timeSlots.map((slot) => (
-                              <TableCell key={slot.id} sx={{ minWidth: 120, verticalAlign: "top" }}>
-                                <PollSlotTimeCell
-                                  label={slot.label}
-                                  startAt={slot.startAt}
-                                  endAt={slot.endAt}
-                                />
-                              </TableCell>
-                            ))}
-                          </TableRow>
-                        </TableHead>
-                        <TableBody>
-                          {detail.invitees.map((invitee) => (
-                            <TableRow key={invitee.userId}>
-                              <TableCell>{invitee.displayName}</TableCell>
+                      <Stack spacing={1.5} sx={{ mt: 1 }}>
+                        {detail.invitees.map((invitee) => (
+                          <Box
+                            key={invitee.userId}
+                            sx={{
+                              border: 1,
+                              borderColor: "divider",
+                              borderRadius: 1,
+                              p: 1.25,
+                            }}
+                          >
+                            <Typography
+                              variant="subtitle2"
+                              sx={{ mb: 0.75, overflowWrap: "anywhere" }}
+                            >
+                              {invitee.displayName}
+                            </Typography>
+                            <Stack spacing={0.75}>
                               {detail.timeSlots.map((slot) => {
                                 const vote = detail.slotVotes.find(
                                   (v) =>
                                     v.userId === invitee.userId && v.timeSlotId === slot.id,
                                 );
                                 return (
-                                  <TableCell key={slot.id}>
-                                    {vote ? inviteeVoteLabel(vote.voteStatus) : "—"}
-                                  </TableCell>
+                                  <Stack
+                                    key={slot.id}
+                                    direction={{ xs: "column", sm: "row" }}
+                                    spacing={0.5}
+                                    justifyContent="space-between"
+                                    alignItems={{ xs: "flex-start", sm: "center" }}
+                                  >
+                                    <PollSlotTimeCell
+                                      label={slot.label}
+                                      startAt={slot.startAt}
+                                      endAt={slot.endAt}
+                                    />
+                                    <Typography variant="body2" sx={{ overflowWrap: "anywhere" }}>
+                                      {vote ? inviteeVoteLabel(vote.voteStatus) : "—"}
+                                    </Typography>
+                                  </Stack>
                                 );
                               })}
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
+                            </Stack>
+                          </Box>
+                        ))}
+                      </Stack>
                     </Box>
                   )}
                 </>

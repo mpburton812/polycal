@@ -22,7 +22,7 @@ import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { useState, useTransition } from "react";
 
-import { completeOnboardingAction, saveOnboardingPreferencesAction } from "@/actions/onboarding";
+import { completeOnboardingAction, prepareOnboardingWelcomeAction, saveOnboardingPreferencesAction } from "@/actions/onboarding";
 import { proposePartnershipAction } from "@/actions/partnerships";
 import {
   changePasswordAction,
@@ -136,7 +136,8 @@ export function FirstLoginWizard({
         setError(prefsResult.error);
         return;
       }
-      const result = await completeOnboardingAction();
+      // Load welcome copy without marking onboarding complete (PC-156).
+      const result = await prepareOnboardingWelcomeAction();
       if (!result.ok) {
         setError(result.message);
         return;
@@ -148,6 +149,11 @@ export function FirstLoginWizard({
 
   function enterApp() {
     startTransition(async () => {
+      const result = await completeOnboardingAction();
+      if (!result.ok) {
+        setError(result.message);
+        return;
+      }
       await update({ user: { onboardingComplete: true } });
       router.refresh();
     });
@@ -164,9 +170,16 @@ export function FirstLoginWizard({
         >
           Welcome!
         </Typography>
-        <Typography sx={{ mb: 3, whiteSpace: "pre-wrap" }}>{welcomeMessage}</Typography>
+        <Typography sx={{ mb: 3, whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>
+          {welcomeMessage}
+        </Typography>
+        {error && (
+          <Alert severity="error" sx={{ mb: 2 }}>
+            {error}
+          </Alert>
+        )}
         <Button variant="contained" onClick={enterApp} disabled={pending}>
-          {pending ? "Loading…" : "Get started"}
+          {pending ? "Loading…" : "OK"}
         </Button>
       </Paper>
     );

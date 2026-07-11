@@ -204,6 +204,8 @@ export function ProposalCard({
                 fontSize: "1.1rem",
                 fontWeight: 600,
                 lineHeight: 1.25,
+                overflowWrap: "anywhere",
+                wordBreak: "break-word",
               }}
             >
               {proposal.title}
@@ -242,9 +244,12 @@ export function ProposalCard({
           !proposal.isContentMasked &&
           proposal.specialKind !== "residency" &&
           proposal.cardKind !== "residency" && (
-            <Stack direction="row" spacing={0.5} alignItems="center" sx={{ mt: 0.75 }}>
-              <AccessTimeIcon sx={{ fontSize: 16, color: GARDEN_TOKENS.inkMuted }} />
-              <Typography variant="body2" sx={{ color: GARDEN_TOKENS.inkMuted }}>
+            <Stack direction="row" spacing={0.5} alignItems="flex-start" sx={{ mt: 0.75 }}>
+              <AccessTimeIcon sx={{ fontSize: 16, color: GARDEN_TOKENS.inkMuted, mt: 0.25, flexShrink: 0 }} />
+              <Typography
+                variant="body2"
+                sx={{ color: GARDEN_TOKENS.inkMuted, overflowWrap: "anywhere", wordBreak: "break-word" }}
+              >
                 {timeLabel}
               </Typography>
             </Stack>
@@ -252,9 +257,14 @@ export function ProposalCard({
 
         {/* Where */}
         {locationLine && !proposal.isContentMasked && (
-          <Stack direction="row" spacing={0.5} alignItems="center" sx={{ mt: 0.5 }}>
-            <LocationOnOutlinedIcon sx={{ fontSize: 16, color: GARDEN_TOKENS.inkMuted }} />
-            <Typography variant="body2" sx={{ color: GARDEN_TOKENS.inkMuted }}>
+          <Stack direction="row" spacing={0.5} alignItems="flex-start" sx={{ mt: 0.5 }}>
+            <LocationOnOutlinedIcon
+              sx={{ fontSize: 16, color: GARDEN_TOKENS.inkMuted, mt: 0.25, flexShrink: 0 }}
+            />
+            <Typography
+              variant="body2"
+              sx={{ color: GARDEN_TOKENS.inkMuted, overflowWrap: "anywhere", wordBreak: "break-word" }}
+            >
               {locationLine}
             </Typography>
           </Stack>
@@ -311,7 +321,10 @@ export function ProposalCard({
       </CardContent>
 
       {proposal.state === "draft" && (onContinueEdit || onDeleteDraft) && (
-        <CardActions sx={{ px: 2, pb: 2, pt: 0 }} onClick={(e) => e.stopPropagation()}>
+        <CardActions
+          sx={{ px: 2, pb: 2, pt: 0, flexWrap: "wrap", gap: 1 }}
+          onClick={(e) => e.stopPropagation()}
+        >
           {onContinueEdit && (
             <Button
               variant="contained"

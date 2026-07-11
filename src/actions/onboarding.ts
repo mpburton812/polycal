@@ -104,7 +104,44 @@ export async function saveOnboardingPreferencesAction(input: {
 }
 
 /**
- * Marks first-login onboarding complete after wizard finishes (PC-10).
+ * Loads the welcome message after notification prefs are saved (PC-156).
+ * Does not mark onboarding complete — that happens only when the user clicks OK.
+ */
+export async function prepareOnboardingWelcomeAction(): Promise<{
+  ok: boolean;
+  message: string;
+  welcomeMessage?: string;
+}> {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return { ok: false, message: "Not signed in." };
+  }
+
+  await ensureDbReady();
+  const db = getDb();
+  const [row] = await db
+    .select()
+    .from(users)
+    .where(eq(users.id, session.user.id))
+    .limit(1);
+
+  if (!row) {
+    return { ok: false, message: "User not found." };
+  }
+
+  if (row.mustChangePassword) {
+    return { ok: false, message: "Change your password before finishing onboarding." };
+  }
+
+  const [group] = await db.select().from(polyGroup).where(eq(polyGroup.id, 1)).limit(1);
+  const welcomeMessage =
+    group?.onboardingWelcomeMessage?.trim() || DEFAULT_ONBOARDING_WELCOME_MESSAGE;
+
+  return { ok: true, message: "Welcome ready.", welcomeMessage };
+}
+
+/**
+ * Marks first-login onboarding complete after the user acknowledges Welcome (PC-10 / PC-156).
  */
 export async function completeOnboardingAction(): Promise<{
   ok: boolean;
@@ -132,17 +169,20 @@ export async function completeOnboardingAction(): Promise<{
     return { ok: false, message: "Change your password before finishing onboarding." };
   }
 
-  const now = new Date().toISOString();
-  await db
-    .update(users)
-    .set({ onboardingComplete: true, updatedAt: now })
-    .where(eq(users.id, session.user.id));
-
   const [group] = await db.select().from(polyGroup).where(eq(polyGroup.id, 1)).limit(1);
   const welcomeMessage =
     group?.onboardingWelcomeMessage?.trim() || DEFAULT_ONBOARDING_WELCOME_MESSAGE;
 
-  await logUserActivity(session.user.id, "onboarding.complete");
-  revalidatePath("/");
+  if (!row.onboardingComplete) {
+    const now = new Date().toISOString();
+    await db
+      .update(users)
+      .set({ onboardingComplete: true, updatedAt: now })
+      .where(eq(users.id, session.user.id));
+
+    await logUserActivity(session.user.id, "onboarding.complete");
+    revalidatePath("/");
+  }
+
   return { ok: true, message: "Onboarding complete.", welcomeMessage };
 }

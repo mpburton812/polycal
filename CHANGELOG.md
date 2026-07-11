@@ -22,6 +22,7 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- PC-156: Onboarding Welcome stays until the user clicks OK (complete only on acknowledge).
 - PC-152: Draft schedule mode grid (Window / All Day / Poll / Recurring); Poll disables Recurring.
 - PC-153: Two-click date range calendar for all-day events and sleeping nights.
 - PC-144: `/api/health` readiness probe (`ensureDbReady` + schema version) for optional warmup.
@@ -29,6 +30,9 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- PC-155: When “Any user can add people” is on, only admins can choose User/Admin; other provisioners always create User accounts (server-enforced).
+- PC-157: Soft-deleted users are omitted from Admin → User management (no “Former User” rows).
+- PC-158: Card/dialog text and poll responses wrap instead of requiring horizontal swipe.
 - PC-148: Toast snackbar vertically centered (no longer covers bottom AppTabs).
 - PC-149: Removed build/branch environment banner from AppShell; impersonation lives under Admin → Test data.
 - PC-150: Sleeping titles drop brackets — `Sleeping: Name, Status, at Place`.

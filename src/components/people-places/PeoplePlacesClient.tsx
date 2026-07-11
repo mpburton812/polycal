@@ -98,10 +98,12 @@ function CreateUserDialog({
   open,
   onClose,
   canProvision,
+  isAdmin,
 }: {
   open: boolean;
   onClose: () => void;
   canProvision: boolean;
+  isAdmin: boolean;
 }) {
   const router = useRouter();
   const [mode, setMode] = useState<"active" | "passive">("active");
@@ -192,7 +194,12 @@ function CreateUserDialog({
     startTransition(async () => {
       const result =
         mode === "active"
-          ? await createActiveUserAction({ username, displayName, role, avatarKey })
+          ? await createActiveUserAction({
+              username,
+              displayName,
+              role: isAdmin ? role : "user",
+              avatarKey,
+            })
           : await createPassiveUserAction({ displayName, avatarKey });
       setMessage(result.message);
       if (result.loginInstructions) {
@@ -261,7 +268,7 @@ function CreateUserDialog({
             fullWidth
             disabled={formLocked}
           />
-          {mode === "active" && (
+          {mode === "active" && isAdmin && (
             <FormControl fullWidth disabled={formLocked}>
               <InputLabel id="create-user-role">Role</InputLabel>
               <Select
@@ -274,6 +281,11 @@ function CreateUserDialog({
                 <MenuItem value="admin">Admin</MenuItem>
               </Select>
             </FormControl>
+          )}
+          {mode === "active" && !isAdmin && (
+            <Typography variant="body2" color="text.secondary" sx={{ overflowWrap: "anywhere" }}>
+              New accounts are created with User access. Only administrators can assign Admin.
+            </Typography>
           )}
           <FormControl fullWidth disabled={formLocked}>
             <InputLabel id="create-user-avatar">Avatar</InputLabel>
@@ -989,13 +1001,19 @@ export function PeoplePlacesClient({
                 sx={{ cursor: canExpand ? "pointer" : "default" }}
               >
                 <PersonAvatar avatarKey={person.avatarKey} name={person.displayName} />
-                <Box sx={{ flex: 1 }}>
-                  <Stack direction="row" spacing={1} alignItems="baseline">
-                    <Typography fontWeight={600}>{person.displayName}</Typography>
+                <Box sx={{ flex: 1, minWidth: 0 }}>
+                  <Stack direction="row" spacing={1} alignItems="baseline" flexWrap="wrap" useFlexGap>
+                    <Typography fontWeight={600} sx={{ overflowWrap: "anywhere" }}>
+                      {person.displayName}
+                    </Typography>
                     <Chip size="small" label={person.role} variant="outlined" />
                   </Stack>
                   {person.profileBio ? (
-                    <Typography variant="body2" color="text.secondary" sx={{ mt: 0.25 }}>
+                    <Typography
+                      variant="body2"
+                      color="text.secondary"
+                      sx={{ mt: 0.25, overflowWrap: "anywhere" }}
+                    >
                       {person.profileBio}
                     </Typography>
                   ) : null}
@@ -1058,6 +1076,7 @@ export function PeoplePlacesClient({
         open={createOpen}
         onClose={() => setCreateOpen(false)}
         canProvision={canProvision}
+        isAdmin={isAdmin}
       />
       <CreatePlaceDialog
         open={createPlaceOpen}

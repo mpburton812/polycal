@@ -27,10 +27,12 @@ export async function completeFirstLoginOnboarding(
   await expect(page.getByText("Enable notifications")).toBeVisible({ timeout: 15_000 });
   await page.getByRole("button", { name: "Finish setup" }).click();
 
-  const welcomeHeading = page.getByRole("heading", { name: "Welcome!", exact: true });
-  if (await welcomeHeading.isVisible().catch(() => false)) {
-    await page.getByRole("button", { name: "Get started" }).click();
-  }
+  // Welcome must stay until OK — onboarding is not complete until acknowledge (PC-156).
+  await expect(page.getByRole("heading", { name: "Welcome!", exact: true })).toBeVisible({
+    timeout: 15_000,
+  });
+  await expect(page.getByRole("button", { name: "OK", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "OK", exact: true }).click();
 
   // Wait for the schedule page body — AppShell nav is visible during onboarding too.
   await expect(page.getByRole("heading", { name: "Schedule", level: 1 })).toBeVisible({
