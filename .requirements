@@ -192,3 +192,4 @@
 2026-07-11 | 004d64a | PC-154 | expect latest changelog version 2026.07.11 | e2e/admin-code-status-journey.spec.ts
 2026-07-11 | 7517f1d | PC-160 | Resend Scope C — harden, credentials, forgot password | src/actions/password-reset.ts
 2026-07-11 | dda66f6 | PC-164 | UX refactor — chrome, day sheet, agenda, URL/a11y | src/components/proposals/ProposalDraftDialog.tsx
+2026-07-11 | dfff89f | PC-164 | reliable schedule loading flag and Today button a11y name | src/components/schedule/ScheduleClient.tsx
