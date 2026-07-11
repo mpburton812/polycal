@@ -121,6 +121,8 @@ function CreateUserDialog({
   const [createdUserId, setCreatedUserId] = useState<string | null>(null);
   const [temporaryPassword, setTemporaryPassword] = useState<string | null>(null);
   const [creationComplete, setCreationComplete] = useState(false);
+  const [notificationEmail, setNotificationEmail] = useState("");
+  const [emailed, setEmailed] = useState(false);
   const [pending, startTransition] = useTransition();
 
   const showActiveCredentials = mode === "active" && Boolean(instructions);
@@ -138,6 +140,8 @@ function CreateUserDialog({
     setCreatedUserId(null);
     setTemporaryPassword(null);
     setCreationComplete(false);
+    setNotificationEmail("");
+    setEmailed(false);
   }
 
   function handleClose() {
@@ -199,9 +203,11 @@ function CreateUserDialog({
               displayName,
               role: isAdmin ? role : "user",
               avatarKey,
+              notificationEmail: notificationEmail.trim() || undefined,
             })
           : await createPassiveUserAction({ displayName, avatarKey });
       setMessage(result.message);
+      setEmailed(Boolean(result.emailed));
       if (result.loginInstructions) {
         setInstructions(result.loginInstructions);
         setCreatedUserId(result.userId ?? null);
@@ -268,6 +274,17 @@ function CreateUserDialog({
             fullWidth
             disabled={formLocked}
           />
+          {mode === "active" && (
+            <TextField
+              label="Notification email (optional)"
+              type="email"
+              value={notificationEmail}
+              onChange={(event) => setNotificationEmail(event.target.value)}
+              fullWidth
+              disabled={formLocked}
+              helperText="If set, login instructions are emailed and email verification is started."
+            />
+          )}
           {mode === "active" && isAdmin && (
             <FormControl fullWidth disabled={formLocked}>
               <InputLabel id="create-user-role">Role</InputLabel>
@@ -308,7 +325,9 @@ function CreateUserDialog({
           {mode === "active" && instructions && (
             <Box>
               <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1 }}>
-                Share these credentials outside PolyCal (email/SMS):
+                {emailed
+                  ? "Login emailed. Clipboard copy is still available as a backup:"
+                  : "Share these credentials outside PolyCal (email/SMS):"}
               </Typography>
               <TextField multiline minRows={5} value={instructions} fullWidth InputProps={{ readOnly: true }} />
             </Box>

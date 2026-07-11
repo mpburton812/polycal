@@ -35,7 +35,7 @@ Use this checklist before opening or merging a **`test` → `production`** PR. H
 ## Data and secrets
 
 - [ ] No secrets in git (`.env*` gitignored; Vercel env vars for deploy)
-- [ ] Verification tokens redacted from activity log when email unsent
+- [x] Verification tokens redacted from activity log when email unsent (PC-160)
 - [ ] Audit log captures admin identity events (`logUserActivity`)
 
 ## Operational

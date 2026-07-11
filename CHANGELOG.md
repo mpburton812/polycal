@@ -21,6 +21,10 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- PC-160–162: Resend email on `polycal.net` — hardened verify links, credential emails on provision/admin reset (clipboard fallback), self-service forgot/reset password.
+
+
+### Added
 
 - PC-156: Onboarding Welcome stays until the user clicks OK (complete only on acknowledge).
 - PC-152: Draft schedule mode grid (Window / All Day / Poll / Recurring); Poll disables Recurring.

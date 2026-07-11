@@ -39,6 +39,8 @@ export async function applyAdminMigrations(sql: Client): Promise<void> {
   await ensureColumn(sql, "users", "email_verified_at", "TEXT");
   await ensureColumn(sql, "users", "email_verification_token", "TEXT");
   await ensureColumn(sql, "users", "email_verification_token_expires_at", "TEXT");
+  await ensureColumn(sql, "users", "password_reset_token", "TEXT");
+  await ensureColumn(sql, "users", "password_reset_token_expires_at", "TEXT");
   await ensureColumn(sql, "users", "notification_prefs_json", "TEXT");
   await ensureColumn(sql, "users", "onboarding_complete", "INTEGER NOT NULL DEFAULT 1");
   await ensureColumn(sql, "users", "session_version", "INTEGER NOT NULL DEFAULT 0");
