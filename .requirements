@@ -196,3 +196,4 @@
 2026-07-11 | 3a66138 | PC-167 | stop schedule URL sync remount loop sticking pending | src/components/schedule/ScheduleClient.tsx
 2026-07-11 | 1bb30c2 | PC-168 | bump SCHEMA_VERSION to 21 for password_reset columns | src/lib/changelog/entries.ts
 2026-07-11 | 265fbfa | PC-174 | shared CI build, storageState, SAFE_PARALLEL workers | src/lib/changelog/entries.ts
+2026-07-11 | b6cdd47 | PC-174 | include-hidden-files when uploading .next artifact | .github/workflows/e2e.yml
