@@ -283,7 +283,6 @@ export async function createAndSubmitRecurringEventForEveryone(
 ): Promise<void> {
   const dialog = await openEventOrSleepingProposalDraft(page);
   await dialog.getByLabel("Title").fill(options.title);
-  await dialog.getByRole("button", { name: "Solo event (just me)" }).click();
   await selectDraftScheduleMode(dialog, "Recurring");
   await expandDraftMoreOptions(dialog);
   await dialog.getByLabel("Occurrences").fill(String(options.occurrenceCount ?? 4));

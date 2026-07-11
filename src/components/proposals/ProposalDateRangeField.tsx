@@ -69,7 +69,7 @@ export function ProposalDateRangeField({
     onRangeChange(earliest, latest === earliest ? "" : latest);
   }
 
-  function DayButton(props: PickersDayProps) {
+  function DayButton(props: PickersDayProps<Dayjs>) {
     const { day, outsideCurrentMonth, ...other } = props;
     const inRange =
       !outsideCurrentMonth &&
