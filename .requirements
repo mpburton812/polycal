@@ -184,3 +184,4 @@
 2026-07-10 | 14208ef | PC-143 | migration short-circuit, lighter JWT, dynamic dialogs | src/components/proposals/ProposalsClient.tsx
 2026-07-10 | 80a5118 | PC-143 | unit tests for migration version short-circuit | src/lib/db/migrate.test.ts
 2026-07-10 | 74a99a5 | PC-144 | keep JWT DB refresh during onboarding; wait for Schedule | auth.config.ts
+2026-07-10 | ade301d | PC-146 | UX cleanup — detach fix, toast, modes, date range | src/actions/proposals/slices.ts
