@@ -1,5 +1,6 @@
 import { Typography } from "@mui/material";
 import { redirect } from "next/navigation";
+import { Suspense } from "react";
 
 import { listProposalPlaceOptionsAction } from "@/actions/proposals";
 import { listScheduleEventsAction } from "@/actions/schedule";
@@ -15,6 +16,7 @@ import { getDb } from "@/lib/db/client";
 import { ensureDbReady } from "@/lib/db/ensure-ready";
 import { brutalPageTitleSx } from "@/theme/brutalUi";
 import { GARDEN_TOKENS } from "@/theme/tokens";
+import { Box, CircularProgress } from "@mui/material";
 
 export default async function SchedulePage() {
   const session = await auth();
@@ -56,15 +58,23 @@ export default async function SchedulePage() {
       <Typography sx={{ mb: 2, color: GARDEN_TOKENS.inkMuted }}>
         Your network calendar — proposed items appear tentative until approved.
       </Typography>
-      <ScheduleClient
-        initialPayload={scheduleResult.payload}
-        initialWeekStartIso={weekStart.toISOString()}
-        people={people}
-        places={places}
-        currentUserId={session.user.id}
-        acceptedPartnerIds={acceptedPartnerIds}
-        timeZone={timeZone}
-      />
+      <Suspense
+        fallback={
+          <Box sx={{ display: "flex", justifyContent: "center", py: 6 }}>
+            <CircularProgress />
+          </Box>
+        }
+      >
+        <ScheduleClient
+          initialPayload={scheduleResult.payload}
+          initialWeekStartIso={weekStart.toISOString()}
+          people={people}
+          places={places}
+          currentUserId={session.user.id}
+          acceptedPartnerIds={acceptedPartnerIds}
+          timeZone={timeZone}
+        />
+      </Suspense>
     </>
   );
 }

@@ -20,6 +20,7 @@ import {
   startOfMonth,
 } from "@/lib/schedule/month-grid";
 import { localDateKey, scheduleDayCellSx, isTodayDate } from "@/lib/schedule/dates";
+import { GARDEN_TOKENS, ORGANIC_RADIUS } from "@/theme/tokens";
 
 interface ScheduleMonthViewProps {
   monthAnchor: Date;
@@ -111,13 +112,17 @@ export function ScheduleMonthView({
                   key={key}
                   component={onDayClick ? "button" : "div"}
                   type={onDayClick ? "button" : undefined}
+                  aria-label={
+                    onDayClick
+                      ? `${day.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })}, ${busynessLabel}`
+                      : undefined
+                  }
                   onClick={onDayClick ? () => onDayClick(day) : undefined}
                   sx={{
-                    border: 1,
-                    borderColor: daySx.borderColor,
-                    borderRadius: 1,
+                    border: `2px solid ${inMonth ? GARDEN_TOKENS.ink : GARDEN_TOKENS.outlineSoft}`,
+                    borderRadius: ORGANIC_RADIUS,
                     p: 0.5,
-                    bgcolor: inMonth ? daySx.bgcolor : "action.hover",
+                    bgcolor: inMonth ? daySx.bgcolor : GARDEN_TOKENS.outlineSoft,
                     opacity: inMonth ? daySx.opacity : 0.45,
                     height: cellHeight,
                     minHeight: cellHeight,
@@ -129,6 +134,10 @@ export function ScheduleMonthView({
                     display: "flex",
                     flexDirection: "column",
                     overflow: "hidden",
+                    "&:focus-visible": {
+                      outline: `2px solid ${GARDEN_TOKENS.sage}`,
+                      outlineOffset: 1,
+                    },
                   }}
                 >
                   <Box
@@ -159,7 +168,7 @@ export function ScheduleMonthView({
                           borderRadius: "50%",
                           bgcolor: LEVEL_COLORS[busynessLevel],
                           border: "1px solid",
-                          borderColor: "divider",
+                          borderColor: isToday ? GARDEN_TOKENS.sage : GARDEN_TOKENS.outlineSoft,
                         }}
                         aria-hidden
                       />

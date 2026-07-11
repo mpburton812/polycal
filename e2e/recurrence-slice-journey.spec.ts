@@ -6,8 +6,8 @@ import { advanceScheduleUntilEventVisible, dateOffsetIso } from "./helpers/sched
 import { createAndSubmitRecurringEventForEveryone } from "./helpers/proposals";
 import { goToProposals, selectProposalTab } from "./helpers/navigation";
 
-test.describe("Recurrence slice chooser journey", () => {
-  test("schedule tap offers occurrence vs series chooser", async ({ page }) => {
+test.describe("Recurrence schedule open journey", () => {
+  test("schedule tap opens occurrence detail directly", async ({ page }) => {
     test.setTimeout(240_000);
 
     const title = `E2E Recurrence Slice ${Date.now()}`;
@@ -34,8 +34,10 @@ test.describe("Recurrence slice chooser journey", () => {
     });
     await page.getByRole("button", { name: new RegExp(title, "i") }).first().click();
 
-    await expect(page.getByRole("dialog").getByText("Recurring event")).toBeVisible();
-    await page.getByRole("button", { name: "This occurrence" }).click();
+    // PC-166: skip chooser — open the occurrence detail immediately.
+    await expect(page.getByRole("dialog").getByRole("heading", { name: new RegExp(title, "i") })).toBeVisible({
+      timeout: 15_000,
+    });
     await expect(page.getByRole("dialog").getByText(/by [A-Za-z]/)).toBeVisible();
   });
 });

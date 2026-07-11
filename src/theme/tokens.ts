@@ -46,3 +46,14 @@ export const SCHEDULE_SEMANTIC_COLORS: Record<
   masked: { fill: "#E8E2D8", text: "#6B6560", borderStyle: "dashed" },
   archived: { fill: "#D8D4CE", text: "#6B6560", borderStyle: "solid" },
 };
+
+/**
+ * Network busyness levels for heatmap / month day rings — Garden pastels (PC-164).
+ * 0 open → 3 very busy.
+ */
+export const HEATMAP_LEVEL_COLORS = [
+  GARDEN_TOKENS.surface,
+  "#D4E5D0",
+  SCHEDULE_SEMANTIC_COLORS.proposed.fill,
+  SCHEDULE_SEMANTIC_COLORS.conflict.fill,
+] as const;
