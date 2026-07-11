@@ -18,6 +18,8 @@ export default edgeAuth((request) => {
   // Alpha-feedback admin APIs authenticate via Bearer token (Tauri tracker) or session.
   const publicPaths = [
     "/login",
+    "/forgot-password",
+    "/reset-password",
     "/paused",
     "/offline",
     "/api/auth",

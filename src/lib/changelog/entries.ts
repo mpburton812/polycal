@@ -26,6 +26,28 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "2026.07.11b",
+    date: "2026-07-11",
+    summary: "Email: Resend on polycal.net, credentials mail, self-service password reset.",
+    changes: [
+      {
+        type: "added",
+        description:
+          "Self-service forgot/reset password via verified notification email (PC-162).",
+      },
+      {
+        type: "added",
+        description:
+          "Optional notification email on create/activate; credentials emailed with clipboard fallback (PC-161).",
+      },
+      {
+        type: "changed",
+        description:
+          "Verify links use getPublicAppUrl; hide token when Resend succeeds; quiet hours apply to email (PC-160).",
+      },
+    ],
+  },
+  {
     version: "2026.07.11a",
     date: "2026-07-11",
     summary: "User UX: provision roles, onboarding OK, hide deleted users, wrap cards.",

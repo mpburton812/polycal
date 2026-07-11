@@ -234,8 +234,8 @@ export function ProfileSettings({
       setEmailVerified(false);
       setEmailMessage(
         result.verificationUrl
-          ? `Verification link generated (dev): ${result.verificationUrl}`
-          : "Verification email queued.",
+          ? `Email provider unavailable — verification link: ${result.verificationUrl}`
+          : "Verification email sent. Check your inbox.",
       );
     });
   }

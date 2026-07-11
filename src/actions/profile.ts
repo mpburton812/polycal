@@ -9,7 +9,11 @@ import { z } from "zod";
 import { auth } from "@/lib/auth";
 import { logUserActivity } from "@/lib/audit";
 import { requireSession, withDb } from "@/lib/actions/context";
-import { sendEmail } from "@/lib/email/send";
+import {
+  newEmailVerificationToken,
+  sendVerificationEmail,
+} from "@/lib/email/credentials";
+import { getPublicAppUrl } from "@/lib/env";
 import { isUserThemeId, normalizeUserThemeId, type UserThemeId } from "@/lib/constants/themes";
 import { resolveTimezone } from "@/lib/schedule/timezone";
 import { profileBioSchema } from "@/lib/users/profile-bio";
@@ -443,7 +447,7 @@ export async function updateNotificationEmailAction(
 
   await ensureDbReady();
   const db = getDb();
-  const token = `ev-${randomUUID()}`;
+  const token = newEmailVerificationToken();
   const now = new Date().toISOString();
   const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
 
@@ -458,8 +462,7 @@ export async function updateNotificationEmailAction(
     })
     .where(eq(users.id, session.user.id));
 
-  const baseUrl = process.env.NEXTAUTH_URL ?? "http://localhost:3000";
-  const verificationUrl = `${baseUrl}/api/verify-email?token=${token}`;
+  const verificationUrl = `${getPublicAppUrl()}/api/verify-email?token=${token}`;
 
   await logUserActivity(
     session.user.id,
@@ -467,16 +470,18 @@ export async function updateNotificationEmailAction(
     JSON.stringify({ email: parsed.data }),
   );
 
+  let emailed = false;
   try {
-    const sendResult = await sendEmail({
+    const sendResult = await sendVerificationEmail({
       to: parsed.data,
-      subject: "Verify your PolyCal notification email",
-      html: `<p>Click to verify your PolyCal notification email:</p><p><a href="${verificationUrl}">${verificationUrl}</a></p>`,
+      verificationUrl,
     });
+    emailed = sendResult.sent;
     if (!sendResult.sent) {
       await logUserActivity(
         session.user.id,
         "profile.notification_email_dev_link",
+        // Omit raw token from activity logs (SECURITY-CHECKLIST).
         JSON.stringify({ email: parsed.data, verificationPending: true }),
       );
     }
@@ -493,7 +498,8 @@ export async function updateNotificationEmailAction(
   }
 
   revalidatePath("/profile");
-  return { ok: true, verificationUrl };
+  // Only return the link when Resend did not send (dev / misconfigured).
+  return emailed ? { ok: true } : { ok: true, verificationUrl };
 }
 
 /**
