@@ -195,3 +195,4 @@
 2026-07-11 | dfff89f | PC-164 | reliable schedule loading flag and Today button a11y name | src/components/schedule/ScheduleClient.tsx
 2026-07-11 | 3a66138 | PC-167 | stop schedule URL sync remount loop sticking pending | src/components/schedule/ScheduleClient.tsx
 2026-07-11 | 1bb30c2 | PC-168 | bump SCHEMA_VERSION to 21 for password_reset columns | src/lib/changelog/entries.ts
+2026-07-11 | a50b8ee | PC-170 | recurring mode combos and restore env banners | src/components/layout/AppShell.tsx
