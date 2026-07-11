@@ -54,12 +54,14 @@ export function ProposalDraftScheduleModeGrid({
         }}
         sx={{
           display: "grid",
-          gridTemplateColumns: "repeat(4, 1fr)",
+          gridTemplateColumns: { xs: "repeat(2, minmax(0, 1fr))", sm: "repeat(4, minmax(0, 1fr))" },
           gap: 1,
+          width: "100%",
           "& .MuiToggleButtonGroup-grouped": {
             border: `2px solid ${GARDEN_TOKENS.ink} !important`,
             borderRadius: "10px !important",
             margin: 0,
+            minWidth: 0,
           },
         }}
       >
@@ -78,6 +80,8 @@ export function ProposalDraftScheduleModeGrid({
                 px: 0.5,
                 textTransform: "none",
                 color: GARDEN_TOKENS.ink,
+                minWidth: 0,
+                overflow: "hidden",
                 "&.Mui-selected": {
                   bgcolor: POLY_GREEN,
                   color: "#fff",
@@ -89,7 +93,15 @@ export function ProposalDraftScheduleModeGrid({
               }}
             >
               {item.icon}
-              <Typography variant="caption" sx={{ fontWeight: 600, lineHeight: 1.2 }}>
+              <Typography
+                variant="caption"
+                sx={{
+                  fontWeight: 600,
+                  lineHeight: 1.2,
+                  overflowWrap: "anywhere",
+                  textAlign: "center",
+                }}
+              >
                 {item.label}
               </Typography>
             </ToggleButton>
