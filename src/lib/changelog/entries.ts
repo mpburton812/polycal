@@ -26,6 +26,18 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "2026.07.11d",
+    date: "2026-07-11",
+    summary: "Fix hosted DB missing password_reset_token columns (schema v21).",
+    changes: [
+      {
+        type: "fixed",
+        description:
+          "Bump SCHEMA_VERSION to 21 so password_reset_token columns apply on test/production Turso (PC-168).",
+      },
+    ],
+  },
+  {
     version: "2026.07.11c",
     date: "2026-07-11",
     summary: "Schedule UX: chrome, day sheet, create FAB, mobile agenda, URL/a11y.",

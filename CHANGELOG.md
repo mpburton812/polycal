@@ -20,6 +20,9 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+- PC-168: SCHEMA_VERSION 21 so `password_reset_token` columns apply on hosted Turso DBs.
+
 ### Added
 - PC-164–167: Schedule UX refactor — unified period chrome, day sheet, create FAB, mobile agenda, URL/a11y.
 - PC-160–162: Resend email on `polycal.net` — hardened verify links, credential emails on provision/admin reset (clipboard fallback), self-service forgot/reset password.
