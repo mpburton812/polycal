@@ -28,8 +28,40 @@ jobs:
       - name: Vitest unit tests
         run: npm run test:unit
 
-  playwright:
+  e2e-build:
     needs: audit-unit
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Next.js app
+        run: npm run build
+        env:
+          AUTH_SECRET: e2e-test-auth-secret-min-32-characters
+          NEXT_PUBLIC_APP_ENV: feature
+
+      - name: Upload Next build
+        uses: actions/upload-artifact@v4
+        with:
+          name: next-build-production
+          path: |
+            .next
+            public
+          retention-days: 1
+
+  playwright:
+    needs: e2e-build
     runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:
@@ -49,6 +81,11 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Download Next build
+        uses: actions/download-artifact@v4
+        with:
+          name: next-build-production
+
       - name: Install Playwright browsers
         run: npx playwright install chromium --with-deps
 
@@ -56,6 +93,7 @@ jobs:
         run: npm run test:e2e:ci -- --shard=${{ matrix.shard }}/4
         env:
           CI: "1"
+          E2E_PARALLEL_WORKERS: "2"
 
       - name: Upload Playwright report
         if: failure()

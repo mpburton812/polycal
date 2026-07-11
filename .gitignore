@@ -22,6 +22,8 @@ local.db
 local.db-*
 e2e.db
 e2e.db-*
+e2e-w*.db
+e2e-w*.db-*
 db
 db-wal
 db-shm

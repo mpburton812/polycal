@@ -1,6 +1,6 @@
 # E2E parallel journey assessment (PC-72)
 
-Playwright config (`playwright.config.ts`): `workers: 1`, `fullyParallel: false`. Each spec that imports `./helpers/test` gets a fresh `e2e.db` reset via the `_freshDb` fixture before the test runs.
+Playwright config (`playwright.config.ts`): projects `chromium-safe` (SAFE_PARALLEL, `workers` = `E2E_PARALLEL_WORKERS`, default 2) and `chromium-serial` (`workers: 1`). Each worker uses `file:e2e-w{N}.db` on port `3099+N` (PC-176). Auth setup saves JWT `storageState` per origin (PC-175).
 
 **Projects:** `chromium` (desktop) runs the full suite; `mobile-chrome` (Pixel 5) runs `mobile-smoke.spec.ts` only (PC-92).
 

@@ -1,7 +1,10 @@
-import { expect, test } from "./helpers/test";
+import { expect, emptyStorageState, test } from "./helpers/test";
 
 import { login, logout, expectAuthenticatedShell } from "./helpers/auth";
 import { SEED_PASSWORD, USERS } from "./helpers/constants";
+
+// Auth assertions need a logged-out browser; default project storage is luke (PC-175).
+test.use({ storageState: emptyStorageState });
 
 test.describe("Authentication", () => {
   test("rejects invalid credentials", async ({ page }) => {
