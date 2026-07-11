@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   applyPeriodMode,
   buildScheduleUrlSearch,
+  localCalendarDateKey,
   parseScheduleUrlParams,
   periodModeFromState,
   todayAnchors,
@@ -39,7 +40,7 @@ describe("schedule URL helpers", () => {
     });
   });
 
-  it("builds search from state", () => {
+  it("builds search from state using local calendar date", () => {
     const search = buildScheduleUrlSearch(
       {
         weekStartIso: "2026-07-06T12:00:00.000Z",
@@ -54,9 +55,15 @@ describe("schedule URL helpers", () => {
     );
     expect(search).toContain("layout=twoWeek");
     expect(search).toContain("open=abc");
+    expect(search).toMatch(/anchor=\d{4}-\d{2}-\d{2}/);
   });
 });
 
+describe("localCalendarDateKey", () => {
+  it("formats local yyyy-MM-dd", () => {
+    expect(localCalendarDateKey(new Date(2026, 6, 13))).toBe("2026-07-13");
+  });
+});
 describe("todayAnchors", () => {
   it("returns ISO strings", () => {
     const anchors = todayAnchors(new Date("2026-07-11T15:00:00"));

@@ -25,7 +25,7 @@ import {
   useTheme,
 } from "@mui/material";
 import dynamic from "next/dynamic";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type { ProposalPlaceOption } from "@/actions/proposals";
@@ -145,14 +145,13 @@ export function ScheduleClient({
   timeZone,
 }: ScheduleClientProps) {
   const pathname = usePathname();
-  const router = useRouter();
-  const searchParams = useSearchParams();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const previousPathRef = useRef<string | null>(null);
   const initialPayloadHydratedRef = useRef(false);
   const refreshSeqRef = useRef(0);
   const urlHydratedRef = useRef(false);
+  const postHydrateFetchDoneRef = useRef(false);
   const [viewState, setViewState] = useState<ScheduleViewState>(() => {
     // Prefer persisted anchors so re-entering Schedule restores last period (PC-164).
     const loaded = loadScheduleViewState();
@@ -282,7 +281,10 @@ export function ScheduleClient({
   useEffect(() => {
     if (urlHydratedRef.current) return;
     urlHydratedRef.current = true;
-    const parsed = parseScheduleUrlParams(searchParams.toString());
+    // Read location directly — avoid useSearchParams remounts under Suspense.
+    const parsed = parseScheduleUrlParams(
+      typeof window !== "undefined" ? window.location.search : "",
+    );
     setViewState((current) => {
       let next = { ...current };
       if (parsed.layout) next = applyPeriodMode(next, parsed.layout);
@@ -301,66 +303,62 @@ export function ScheduleClient({
     if (parsed.open) {
       openProposal(parsed.open);
     }
-    // Intentionally once on mount — do not re-run when searchParams change from our own sync.
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only URL hydrate
   }, [openProposal]);
 
-  /** Keep URL in sync with view (PC-167). */
+  /**
+   * Keep URL in sync without Next router.replace — router updates remount this
+   * client under Suspense and re-trigger fetch/pending loops (PC-167).
+   */
   useEffect(() => {
     if (!urlHydratedRef.current) return;
     if (pathname !== "/schedule") return;
+    if (typeof window === "undefined") return;
     const next = buildScheduleUrlSearch(
       viewState,
       dialogState.detailOpen ? dialogState.selectedProposalId : null,
     );
-    const current = searchParams.toString();
+    const current = window.location.search.replace(/^\?/, "");
     if (next !== current) {
-      router.replace(`/schedule?${next}`, { scroll: false });
+      const url = next ? `/schedule?${next}` : "/schedule";
+      window.history.replaceState(window.history.state, "", url);
     }
   }, [
     dialogState.detailOpen,
     dialogState.selectedProposalId,
     pathname,
-    router,
-    searchParams,
     viewState,
   ]);
 
   /**
-   * Opening Schedule restores persisted anchors (PC-164). Refetch when needed.
+   * Fetch when landing on Schedule if visible window ≠ SSR week payload (PC-164/167).
+   * One-shot per visit; history.replaceState URL sync must not remount this client.
    */
   useEffect(() => {
-    const onSchedule = pathname === "/schedule";
-    const enteringSchedule =
-      onSchedule &&
-      (previousPathRef.current === null || previousPathRef.current !== "/schedule");
-
-    if (enteringSchedule) {
-      const anchor =
-        viewState.calendarLayout === "month"
-          ? new Date(viewState.monthAnchorIso)
-          : new Date(viewState.weekStartIso);
-      const initialMonday = startOfWeekMonday(new Date(initialWeekStartIso));
-      const viewMonday = startOfWeekMonday(anchor);
-      const sameWeek = isSameLocalCalendarDay(viewMonday, initialMonday);
-      if (!sameWeek || viewState.calendarLayout === "month" || viewState.compact) {
-        refreshSchedule(anchor, {
-          layout: viewState.calendarLayout,
-          compact: viewState.compact,
-        });
-      }
+    if (pathname !== "/schedule") {
+      postHydrateFetchDoneRef.current = false;
+      previousPathRef.current = pathname;
+      return;
     }
-
+    if (postHydrateFetchDoneRef.current) return;
+    postHydrateFetchDoneRef.current = true;
     previousPathRef.current = pathname;
-  }, [
-    pathname,
-    refreshSchedule,
-    viewState.calendarLayout,
-    viewState.compact,
-    viewState.monthAnchorIso,
-    viewState.weekStartIso,
-    initialWeekStartIso,
-  ]);
+
+    const anchor =
+      viewState.calendarLayout === "month"
+        ? new Date(viewState.monthAnchorIso)
+        : new Date(viewState.weekStartIso);
+    const initialMonday = startOfWeekMonday(new Date(initialWeekStartIso));
+    const viewMonday = startOfWeekMonday(anchor);
+    const sameWeek = isSameLocalCalendarDay(viewMonday, initialMonday);
+    if (!sameWeek || viewState.calendarLayout === "month" || viewState.compact) {
+      refreshSchedule(anchor, {
+        layout: viewState.calendarLayout,
+        compact: viewState.compact,
+      });
+    }
+    // Intentionally omit viewState from deps — run once after mount/hydrate for this visit.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- one-shot per schedule visit
+  }, [pathname, refreshSchedule, initialWeekStartIso]);
 
   const filteredEvents = useMemo(
     () =>

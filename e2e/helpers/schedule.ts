@@ -19,6 +19,9 @@ export async function clearScheduleViewState(page: Page): Promise<void> {
   try {
     await page.evaluate((storageKey) => {
       window.localStorage.removeItem(storageKey);
+      if (window.location.pathname === "/schedule" && window.location.search) {
+        window.history.replaceState(window.history.state, "", "/schedule");
+      }
     }, SCHEDULE_VIEW_STORAGE_KEY);
   } catch {
     // Ignore when the page has no storage access yet (e.g. about:blank before login).
