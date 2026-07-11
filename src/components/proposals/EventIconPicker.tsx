@@ -29,13 +29,15 @@ export function EventIconPicker({ value, onChange }: EventIconPickerProps) {
         sx={{
           display: "grid",
           gridTemplateColumns: "repeat(auto-fill, minmax(88px, 1fr))",
-          gap: 1,
+          gap: 0.5,
           width: "100%",
           "& .MuiToggleButtonGroup-grouped": {
             border: "1px solid",
             borderColor: "divider",
             borderRadius: "8px !important",
             margin: 0,
+            py: 0.5,
+            px: 0.5,
           },
           "& .MuiToggleButton-root.Mui-selected": {
             bgcolor: POLY_GREEN,
@@ -50,8 +52,8 @@ export function EventIconPicker({ value, onChange }: EventIconPickerProps) {
         </ToggleButton>
         {EVENT_ICON_REGISTRY.map((entry) => (
           <ToggleButton key={entry.key} value={entry.key} aria-label={entry.a11yLabel}>
-            <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 0.5 }}>
-              <EventCategoryIcon iconKey={entry.key} labeled sx={{ fontSize: 28 }} />
+            <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 0.25 }}>
+              <EventCategoryIcon iconKey={entry.key} labeled sx={{ fontSize: 24 }} />
               <Typography variant="caption" sx={{ lineHeight: 1.1, textAlign: "center" }}>
                 {entry.label}
               </Typography>

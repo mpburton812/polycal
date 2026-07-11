@@ -1,6 +1,6 @@
 import { type Page, expect } from "@playwright/test";
 
-import { fillProposalDateField } from "./datePickers";
+import { fillProposalDateRange, selectDraftScheduleMode } from "./datePickers";
 import { goToSchedule } from "./navigation";
 import { openEventProposalDraft, submitProposalDraft } from "./proposals";
 
@@ -210,9 +210,8 @@ export async function createAndSubmitAllDaySpan(
   const dialog = await openEventProposalDraft(page);
   await dialog.getByLabel("Title").fill(options.title);
   await dialog.getByRole("button", { name: "Solo event (just me)" }).click();
-  await dialog.getByRole("checkbox", { name: /All-day event/i }).check();
-  await fillProposalDateField(dialog.getByLabel(/^Day$/i).first(), options.startDate);
-  await fillProposalDateField(dialog.getByLabel(/End day/i).first(), options.endDate);
+  await selectDraftScheduleMode(dialog, "All Day");
+  await fillProposalDateRange(dialog, options.startDate, options.endDate);
   await dialog.getByRole("button", { name: "Save" }).click();
   await submitProposalDraft(page, dialog);
 }

@@ -48,8 +48,13 @@ export function ToastProvider({ children }: { children: ReactNode }) {
         open={toast.open}
         autoHideDuration={5000}
         onClose={() => setToast((current) => ({ ...current, open: false }))}
-        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
-        sx={{ zIndex: (theme) => theme.zIndex.snackbar + 100 }}
+        // Vertically centered so toasts do not cover bottom AppTabs (PC-148).
+        anchorOrigin={{ vertical: "top", horizontal: "center" }}
+        sx={{
+          zIndex: (theme) => theme.zIndex.snackbar + 100,
+          top: "50% !important",
+          transform: "translateY(-50%)",
+        }}
       >
         <Alert
           onClose={() => setToast((current) => ({ ...current, open: false }))}
