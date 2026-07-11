@@ -37,23 +37,36 @@ export const authConfig = {
         delete token.error;
       }
       if (trigger === "update" && session?.user) {
-        token.mustChangePassword = session.user.mustChangePassword;
-        token.onboardingComplete = session.user.onboardingComplete;
-        token.displayName = session.user.displayName ?? token.displayName;
+        // Only apply fields the client explicitly sent — partial updates must not
+        // clobber mustChangePassword / onboardingComplete with undefined (PC-144).
+        if (typeof session.user.mustChangePassword === "boolean") {
+          token.mustChangePassword = session.user.mustChangePassword;
+        }
+        if (typeof session.user.onboardingComplete === "boolean") {
+          token.onboardingComplete = session.user.onboardingComplete;
+        }
+        if (session.user.displayName) {
+          token.displayName = session.user.displayName;
+        }
         if (session.user.avatarKey) token.avatarKey = session.user.avatarKey;
         if (session.user.theme) token.theme = session.user.theme;
         if (typeof session.user.sessionVersion === "number") {
           token.sessionVersion = session.user.sessionVersion;
         }
-        // Force a DB re-check after client session.update (e.g. password change).
+        // Force a DB re-check after client session.update (password / onboarding).
         token.dbRefreshedAt = 0;
       }
 
       if (token.id) {
         const refreshedAt = typeof token.dbRefreshedAt === "number" ? token.dbRefreshedAt : 0;
+        // Never TTL-skip while the user still owes password change or onboarding —
+        // those flags must stay in sync with Turso or the wizard never exits.
+        const onboardedAndSettled =
+          token.onboardingComplete === true && token.mustChangePassword === false;
         const withinTtl =
           trigger !== "update" &&
           !user &&
+          onboardedAndSettled &&
           refreshedAt > 0 &&
           Date.now() - refreshedAt < JWT_DB_REFRESH_TTL_MS;
 
