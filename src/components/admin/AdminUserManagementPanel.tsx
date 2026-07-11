@@ -81,6 +81,7 @@ export function AdminUserManagementPanel({
 
   const [activateUser, setActivateUser] = useState<AdminUserRow | null>(null);
   const [activateUsername, setActivateUsername] = useState("");
+  const [activateEmail, setActivateEmail] = useState("");
   const [activateRole, setActivateRole] = useState<"user" | "admin">("user");
   const [activateUsernameStatus, setActivateUsernameStatus] = useState({
     checked: false,
@@ -216,6 +217,7 @@ export function AdminUserManagementPanel({
                             onClick={() => {
                               setActivateUser(user);
                               setActivateUsername("");
+                              setActivateEmail("");
                               setActivateRole("user");
                               setActivateUsernameStatus({
                                 checked: false,
@@ -502,6 +504,14 @@ export function AdminUserManagementPanel({
                 <MenuItem value="admin">Admin</MenuItem>
               </Select>
             </FormControl>
+            <TextField
+              label="Notification email (optional)"
+              type="email"
+              value={activateEmail}
+              onChange={(e) => setActivateEmail(e.target.value)}
+              fullWidth
+              helperText="If set, login instructions are emailed."
+            />
           </Stack>
         </DialogContent>
         <DialogActions>
@@ -520,6 +530,7 @@ export function AdminUserManagementPanel({
                   userId: activateUser.id,
                   username: activateUsername,
                   role: activateRole,
+                  notificationEmail: activateEmail.trim() || undefined,
                 });
                 showStatus(result.message, result.ok ? "success" : "error");
                 if (result.ok && result.loginInstructions) {

@@ -215,6 +215,8 @@ Vote options:
 ## 6. Notifications & audit
 
 - Submit, vote, resolve, decline, at-risk, recovery, and partnership changes generate **notifications** (bell icon).
+- Optional **notification email** (Profile): verify the address to receive the same alerts by email when the email channel is enabled.
+- **Forgot password?** on the sign-in page emails a reset link only when that verified notification email is set.
 - Each proposal keeps an **activity / audit log** of state changes (who did what, when). Admins can configure how visible that log is (everyone → admin only).
 
 ---
@@ -254,4 +256,4 @@ Admins can tune enforcement under **Admin → Poly Group Settings**. Defaults if
 - [ARCHITECTURE.md](./ARCHITECTURE.md) — technical environment map  
 - [REQUIREMENTS-WORKFLOW.md](./REQUIREMENTS-WORKFLOW.md) — development & Jira process (for builders)
 
-*Last updated for PC-53 (pending recovery, schedule heatmap, email notifications).*
+*Last updated for PC-160–162 (Resend email, credential delivery, self-service password reset).*

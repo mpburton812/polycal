@@ -26,6 +26,10 @@ import {
 import { notifyUser } from "@/lib/notifications";
 import { enterPendingRecoveryIfNeeded } from "@/lib/proposals/pending-recovery";
 import {
+  deliverLoginCredentials,
+  newEmailVerificationToken,
+} from "@/lib/email/credentials";
+import {
   buildLoginInstructions,
   generateTemporaryPassword,
 } from "@/lib/users/credentials";
@@ -41,6 +45,11 @@ const usernameSchema = z
     "Username may only contain letters, numbers, and these characters: . _ -",
   );
 
+const optionalNotificationEmailSchema = z
+  .union([z.string().trim().email("Enter a valid email address."), z.literal("")])
+  .optional()
+  .transform((value) => (value && value.length > 0 ? value : undefined));
+
 const activeUserSchema = z.object({
   username: usernameSchema,
   displayName: z
@@ -50,6 +59,7 @@ const activeUserSchema = z.object({
     .max(80, "Display name must be 80 characters or fewer."),
   role: z.enum(["admin", "user"]),
   avatarKey: z.string().optional(),
+  notificationEmail: optionalNotificationEmailSchema,
 });
 
 const passiveUserSchema = z.object({
@@ -89,6 +99,8 @@ export interface CreateUserResult {
   loginInstructions?: string;
   temporaryPassword?: string;
   userId?: string;
+  /** True when Resend accepted the credentials email. */
+  emailed?: boolean;
 }
 
 export interface UserActionResult {
@@ -435,6 +447,11 @@ export async function createActiveUserAction(
   const passwordHash = await hash(tempPassword, 12);
   const now = new Date().toISOString();
   const userId = `user-${randomUUID()}`;
+  const notificationEmail = parsed.data.notificationEmail?.trim() || null;
+  const verifyToken = notificationEmail ? newEmailVerificationToken() : null;
+  const verifyExpires = notificationEmail
+    ? new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+    : null;
 
   await db.insert(users).values({
     id: userId,
@@ -448,6 +465,10 @@ export async function createActiveUserAction(
     theme: "mint",
     loginCount: 0,
     onboardingComplete: false,
+    notificationEmail,
+    emailVerifiedAt: null,
+    emailVerificationToken: verifyToken,
+    emailVerificationTokenExpiresAt: verifyExpires,
     createdAt: now,
     updatedAt: now,
   });
@@ -455,8 +476,18 @@ export async function createActiveUserAction(
   await logUserActivity(
     session?.user?.id ?? null,
     "users.create_active",
-    JSON.stringify({ userId, username, role }),
+    JSON.stringify({ userId, username, role, emailedTo: Boolean(notificationEmail) }),
   );
+
+  const delivery = await deliverLoginCredentials({
+    actorUserId: session?.user?.id ?? null,
+    targetUserId: userId,
+    username,
+    password: tempPassword,
+    toEmail: notificationEmail,
+    includeVerifyLink: Boolean(verifyToken),
+    verifyToken,
+  });
 
   revalidatePath("/people-places");
   revalidatePath("/admin");
@@ -464,10 +495,13 @@ export async function createActiveUserAction(
 
   return {
     ok: true,
-    message: `Created active user ${parsed.data.displayName}.`,
+    message: delivery.emailed
+      ? `Created active user ${parsed.data.displayName}. Login emailed.`
+      : `Created active user ${parsed.data.displayName}.`,
     userId,
     temporaryPassword: tempPassword,
-    loginInstructions: buildLoginInstructions({ username, password: tempPassword }),
+    loginInstructions: delivery.loginInstructions,
+    emailed: delivery.emailed,
   };
 }
 
@@ -934,18 +968,27 @@ export async function adminResetPasswordAction(
     JSON.stringify({ userId: user.id }),
   );
 
+  const canEmail = Boolean(user.notificationEmail && user.emailVerifiedAt);
+  const delivery = await deliverLoginCredentials({
+    actorUserId: session.user.id,
+    targetUserId: user.id,
+    username: user.username,
+    password: tempPassword,
+    toEmail: canEmail ? user.notificationEmail : null,
+  });
+
   revalidatePath("/admin");
   revalidatePath("/people-places");
 
   return {
     ok: true,
-    message: `Password reset for ${user.displayName}. Copy instructions to share securely.`,
+    message: delivery.emailed
+      ? `Password reset for ${user.displayName}. Instructions emailed.`
+      : `Password reset for ${user.displayName}. Copy instructions to share securely.`,
     userId: user.id,
     temporaryPassword: tempPassword,
-    loginInstructions: buildLoginInstructions({
-      username: user.username,
-      password: tempPassword,
-    }),
+    loginInstructions: delivery.loginInstructions,
+    emailed: delivery.emailed,
   };
 }
 
@@ -953,10 +996,11 @@ const activatePassiveSchema = z.object({
   userId: z.string().min(1),
   username: usernameSchema,
   role: z.enum(["admin", "user"]).default("user"),
+  notificationEmail: optionalNotificationEmailSchema,
 });
 
 /**
- * Converts a passive profile into an active user with login credentials (PC-10 / PC-155).
+ * Converts a passive profile into an active user with login credentials (PC-10 / PC-155 / PC-161).
  * Non-admin provisioners may only activate as User role.
  */
 export async function activatePassiveUserAction(
@@ -1005,6 +1049,12 @@ export async function activatePassiveUserAction(
   const tempPassword = generateTemporaryPassword();
   const passwordHash = await hash(tempPassword, 12);
   const now = new Date().toISOString();
+  const notificationEmail =
+    parsed.data.notificationEmail?.trim() || user.notificationEmail || null;
+  const verifyToken = notificationEmail ? newEmailVerificationToken() : null;
+  const verifyExpires = notificationEmail
+    ? new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+    : null;
 
   await db
     .update(users)
@@ -1015,6 +1065,10 @@ export async function activatePassiveUserAction(
       mustChangePassword: true,
       onboardingComplete: false,
       activatedFromPassiveAt: now,
+      notificationEmail,
+      emailVerifiedAt: null,
+      emailVerificationToken: verifyToken,
+      emailVerificationTokenExpiresAt: verifyExpires,
       updatedAt: now,
     })
     .where(eq(users.id, user.id));
@@ -1022,8 +1076,18 @@ export async function activatePassiveUserAction(
   await logUserActivity(
     sessionResult.user.id,
     "users.activate_passive",
-    JSON.stringify({ userId: user.id, username }),
+    JSON.stringify({ userId: user.id, username, emailedTo: Boolean(notificationEmail) }),
   );
+
+  const delivery = await deliverLoginCredentials({
+    actorUserId: sessionResult.user.id,
+    targetUserId: user.id,
+    username,
+    password: tempPassword,
+    toEmail: notificationEmail,
+    includeVerifyLink: Boolean(verifyToken),
+    verifyToken,
+  });
 
   revalidatePath("/people-places");
   revalidatePath("/admin");
@@ -1031,10 +1095,13 @@ export async function activatePassiveUserAction(
 
   return {
     ok: true,
-    message: `Activated ${user.displayName} as an active user.`,
+    message: delivery.emailed
+      ? `Activated ${user.displayName} as an active user. Login emailed.`
+      : `Activated ${user.displayName} as an active user.`,
     userId: user.id,
     temporaryPassword: tempPassword,
-    loginInstructions: buildLoginInstructions({ username, password: tempPassword }),
+    loginInstructions: delivery.loginInstructions,
+    emailed: delivery.emailed,
   };
   });
 }
