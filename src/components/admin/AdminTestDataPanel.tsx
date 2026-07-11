@@ -11,6 +11,8 @@ import { useState, useTransition } from "react";
 
 import { resetTestDatabaseAction } from "@/actions/admin";
 import { AdminCollapsibleSection } from "@/components/admin/AdminCollapsibleSection";
+import { AdminImpersonationPanel } from "@/components/admin/AdminImpersonationPanel";
+import { isNonProductionEnvironment } from "@/lib/env";
 
 /**
  * Admin control to wipe and reseed non-production databases (PC-29).
@@ -42,6 +44,7 @@ export function AdminTestDataPanel() {
 
   return (
     <AdminCollapsibleSection title="Test data">
+      {isNonProductionEnvironment() && <AdminImpersonationPanel />}
       <Typography color="text.secondary" sx={{ mb: 2 }}>
         Wipes data and reloads the environment seed profile: Star Wars fixtures on
         feature/dev, Burton-Thompson family users and places on test. Demo

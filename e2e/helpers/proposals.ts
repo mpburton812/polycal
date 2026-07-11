@@ -1,6 +1,6 @@
 import { type Locator, type Page, expect } from "@playwright/test";
 
-import { fillProposalDateField, fillProposalDateTimeField } from "./datePickers";
+import { fillProposalDateTimeField, fillProposalDateRange, selectDraftScheduleMode } from "./datePickers";
 import { goToProposals, openProposalCard, selectProposalTab } from "./navigation";
 import { expectToast } from "./toast";
 
@@ -283,8 +283,9 @@ export async function createAndSubmitRecurringEventForEveryone(
 ): Promise<void> {
   const dialog = await openEventOrSleepingProposalDraft(page);
   await dialog.getByLabel("Title").fill(options.title);
+  await dialog.getByRole("button", { name: "Solo event (just me)" }).click();
+  await selectDraftScheduleMode(dialog, "Recurring");
   await expandDraftMoreOptions(dialog);
-  await dialog.getByRole("checkbox", { name: /Recurring series/i }).check();
   await dialog.getByLabel("Occurrences").fill(String(options.occurrenceCount ?? 4));
   await setAllInviteesRequired(dialog);
   await fillProposalDateTimeField(dialog.getByLabel("Start").first(), options.start);
@@ -369,11 +370,11 @@ export async function createAndSubmitPoll(
 ): Promise<void> {
   const dialog = await openEventOrSleepingProposalDraft(page);
   await dialog.getByLabel("Title").fill(options.title);
-  await expandDraftMoreOptions(dialog);
+  await selectDraftScheduleMode(dialog, "Poll");
   if (options.description) {
+    await expandDraftMoreOptions(dialog);
     await dialog.getByLabel(/Description/i).fill(options.description);
   }
-  await dialog.getByRole("checkbox", { name: /Time poll/i }).check();
   for (const name of options.requiredNames) {
     await setInviteeRequired(dialog, name);
   }
@@ -515,10 +516,10 @@ export async function createAndSubmitSoloAllDayEvent(
   const dialog = await openEventProposalDraft(page);
   await dialog.getByLabel("Title").fill(options.title);
   await dialog.getByRole("button", { name: "Solo event (just me)" }).click();
+  await selectDraftScheduleMode(dialog, "All Day");
   await expandDraftMoreOptions(dialog);
   await dialog.getByLabel(/Description/i).fill(options.comment);
-  await dialog.getByRole("checkbox", { name: /All-day event/i }).check();
-  await fillProposalDateField(dialog.getByLabel(/^Day$/i).first(), options.day);
+  await fillProposalDateRange(dialog, options.day);
   await dialog.getByRole("button", { name: "Save", exact: true }).click();
   await submitProposalDraft(page, dialog);
 }
@@ -537,9 +538,9 @@ export async function createAndSubmitSoloRecurringTimedEvent(
   const dialog = await openEventProposalDraft(page);
   await dialog.getByLabel("Title").fill(options.title);
   await dialog.getByRole("button", { name: "Solo event (just me)" }).click();
+  await selectDraftScheduleMode(dialog, "Recurring");
   await expandDraftMoreOptions(dialog);
   await dialog.getByLabel(/Description/i).fill(options.comment);
-  await dialog.getByRole("checkbox", { name: /Recurring series/i }).check();
   await dialog.getByLabel("Occurrences").fill(String(options.occurrenceCount ?? 4));
   await fillProposalDateTimeField(dialog.getByLabel("Start").first(), options.start);
   await fillProposalDateTimeField(dialog.getByLabel("End (optional)").first(), options.end);
@@ -547,7 +548,7 @@ export async function createAndSubmitSoloRecurringTimedEvent(
   await submitProposalDraft(page, dialog);
 }
 
-/** Creates and submits a solo weekly recurring all-day event with description comment. */
+/** Creates and submits a solo weekly recurring event (timed) with description comment. */
 export async function createAndSubmitSoloRecurringAllDayEvent(
   page: Page,
   options: {
@@ -560,12 +561,14 @@ export async function createAndSubmitSoloRecurringAllDayEvent(
   const dialog = await openEventProposalDraft(page);
   await dialog.getByLabel("Title").fill(options.title);
   await dialog.getByRole("button", { name: "Solo event (just me)" }).click();
+  await selectDraftScheduleMode(dialog, "Recurring");
   await expandDraftMoreOptions(dialog);
   await dialog.getByLabel(/Description/i).fill(options.comment);
-  await dialog.getByRole("checkbox", { name: /All-day event/i }).check();
-  await dialog.getByRole("checkbox", { name: /Recurring series/i }).check();
   await dialog.getByLabel("Occurrences").fill(String(options.occurrenceCount ?? 4));
-  await fillProposalDateField(dialog.getByLabel(/^Day$/i).first(), options.day);
+  const start = `${options.day.slice(0, 10)}T09:00`;
+  const end = `${options.day.slice(0, 10)}T10:00`;
+  await fillProposalDateTimeField(dialog.getByLabel("Start").first(), start);
+  await fillProposalDateTimeField(dialog.getByLabel("End (optional)").first(), end);
   await dialog.getByRole("button", { name: "Save", exact: true }).click();
   await submitProposalDraft(page, dialog);
 }
@@ -620,19 +623,7 @@ export async function moveResolvedEventByRedraft(
   });
 
   if (options.allDay) {
-    const dayField = draftDialog.getByLabel(/^Day$/i).first();
-    await dayField.click();
-    // Prefer calendar grid selection so MUI DatePicker commits via onChange.
-    const dayNumber = String(Number(options.start.slice(8, 10)));
-    const gridCell = page.getByRole("gridcell", { name: dayNumber, exact: true });
-    if (await gridCell.isVisible().catch(() => false)) {
-      await gridCell.click();
-    } else {
-      await fillProposalDateField(dayField, options.start);
-    }
-    await expect(dayField).toHaveValue(
-      `${options.start.slice(5, 7)}/${options.start.slice(8, 10)}/${options.start.slice(0, 4)}`,
-    );
+    await fillProposalDateRange(draftDialog, options.start.slice(0, 10), options.end?.slice(0, 10));
   } else {
     await fillProposalDateTimeField(draftDialog.getByLabel("Start").first(), options.start);
     if (options.end) {
@@ -662,7 +653,7 @@ export async function moveDraftEventDates(
   const draftDialog = await openDraftForEdit(page, title);
 
   if (options.allDay) {
-    await fillProposalDateField(draftDialog.getByLabel(/^Day$/i).first(), options.start);
+    await fillProposalDateRange(draftDialog, options.start.slice(0, 10), options.end?.slice(0, 10));
   } else {
     await fillProposalDateTimeField(draftDialog.getByLabel("Start").first(), options.start);
     if (options.end) {

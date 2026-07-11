@@ -2,7 +2,7 @@ import { expect, test } from "./helpers/test";
 
 import { login, loginWithOnboardingIfNeeded, logout } from "./helpers/auth";
 import { USERS } from "./helpers/constants";
-import { fillProposalDateField } from "./helpers/datePickers";
+import { fillProposalDateRange } from "./helpers/datePickers";
 import { goToPeoplePlaces, goToProposals, openProposalCard, selectProposalTab } from "./helpers/navigation";
 import { expectInAppNotification } from "./helpers/notifications";
 import { expectToast } from "./helpers/toast";
@@ -74,7 +74,7 @@ test.describe("Sleeping partnership journey", () => {
     const draft = await openSleepingProposalDraft(page);
     await setInviteeRequired(draft, USERS.anakin.displayName);
     await draft.getByLabel("Custom location (optional)").fill("Millennium Falcon");
-    await fillProposalDateField(draft.getByLabel("Night of").first(), "2099-07-06");
+    await fillProposalDateRange(draft, "2099-07-06");
     await submitProposalDraft(page, draft);
     await logout(page);
 

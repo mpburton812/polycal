@@ -54,6 +54,11 @@ import {
 } from "./ProposalConflictConfirmDialog";
 import { ProposalDraftEventFields } from "./ProposalDraftEventFields";
 import { ProposalDraftMoreOptions } from "./ProposalDraftMoreOptions";
+import {
+  flagsFromScheduleMode,
+  ProposalDraftScheduleModeGrid,
+  scheduleModeFromFlags,
+} from "./ProposalDraftScheduleModeGrid";
 import { ProposalDraftSleepingFields } from "./ProposalDraftSleepingFields";
 import {
   POLY_GREEN,
@@ -794,11 +799,41 @@ export function ProposalDraftDialog({
           )}
 
           {proposalType === "event" && (
+            <ProposalDraftScheduleModeGrid
+              mode={scheduleModeFromFlags({ allDay, isPoll, isRecurring })}
+              onModeChange={(mode) => {
+                const flags = flagsFromScheduleMode(mode);
+                setAllDay(flags.allDay);
+                setIsPoll(flags.isPoll);
+                setIsRecurring(flags.isRecurring);
+                setSlots((current) =>
+                  current.map((slot) => ({
+                    ...slot,
+                    startAt: slot.startAt
+                      ? flags.allDay
+                        ? slot.startAt.slice(0, 10)
+                        : slot.startAt.includes("T")
+                          ? slot.startAt
+                          : `${slot.startAt.slice(0, 10)}T09:00`
+                      : "",
+                    endAt: slot.endAt
+                      ? flags.allDay
+                        ? slot.endAt.slice(0, 10)
+                        : slot.endAt.includes("T")
+                          ? slot.endAt
+                          : `${slot.endAt.slice(0, 10)}T10:00`
+                      : "",
+                  })),
+                );
+              }}
+            />
+          )}
+
+          {proposalType === "event" && (
             <ProposalDraftEventFields
               title={title}
               onTitleChange={setTitle}
               allDay={allDay}
-              onAllDayChange={setAllDay}
               slots={slots}
               onSlotsChange={setSlots}
               isPoll={isPoll}
@@ -866,11 +901,8 @@ export function ProposalDraftDialog({
             onNotesChange={setNotes}
             eventIconKey={eventIconKey}
             onEventIconKeyChange={setEventIconKey}
-            isPoll={isPoll}
-            onIsPollChange={setIsPoll}
             batchMode={batchMode}
             isRecurring={isRecurring}
-            onIsRecurringChange={setIsRecurring}
             recurrencePattern={recurrencePattern}
             onRecurrencePatternChange={setRecurrencePattern}
             recurrenceCount={recurrenceCount}

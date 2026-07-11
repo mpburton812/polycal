@@ -1,7 +1,7 @@
 import { expect, test } from "./helpers/test";
 
 import { login } from "./helpers/auth";
-import { fillProposalDateTimeField } from "./helpers/datePickers";
+import { fillProposalDateTimeField, selectDraftScheduleMode } from "./helpers/datePickers";
 import { DEMO, USERS } from "./helpers/constants";
 import { goToProposals, openProposalCard, selectProposalTab } from "./helpers/navigation";
 import { exitDraftDialog, expandDraftMoreOptions, openEventOrSleepingProposalDraft } from "./helpers/proposals";
@@ -62,9 +62,9 @@ test.describe("Poll proposal draft", () => {
     const title = `E2E Poll ${Date.now()}`;
     const dialog = await openEventOrSleepingProposalDraft(page);
     await dialog.getByLabel("Title").fill(title);
+    await selectDraftScheduleMode(dialog, "Poll");
     await expandDraftMoreOptions(dialog);
     await dialog.getByLabel(/Description/i).fill("Poll with two options.");
-    await dialog.getByRole("checkbox", { name: /Time poll/i }).check();
 
     const startInputs = dialog.getByLabel("Start");
     await fillProposalDateTimeField(startInputs.nth(0), "2099-08-01T10:00");
@@ -76,8 +76,11 @@ test.describe("Poll proposal draft", () => {
     await exitDraftDialog(dialog);
     await expect(proposalCard(page, title)).toBeVisible();
     await proposalCard(page, title).getByRole("button", { name: "Continue Editing" }).click();
-    await expandDraftMoreOptions(dialog);
-    await expect(dialog.getByRole("checkbox", { name: /Time poll/i })).toBeChecked();
+    await expect(dialog.getByRole("button", { name: "Poll", exact: true })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    await expect(dialog.getByRole("button", { name: "Recurring", exact: true })).toBeDisabled();
   });
 });
 
@@ -91,9 +94,9 @@ test.describe("Recurring event draft", () => {
     const title = `E2E Recurring ${Date.now()}`;
     const dialog = await openEventOrSleepingProposalDraft(page);
     await dialog.getByLabel("Title").fill(title);
+    await selectDraftScheduleMode(dialog, "Recurring");
     await expandDraftMoreOptions(dialog);
     await dialog.getByLabel(/Description/i).fill("Weekly council meetings.");
-    await dialog.getByRole("checkbox", { name: /Recurring series/i }).check();
     await fillProposalDateTimeField(dialog.getByLabel("Start").first(), "2099-09-01T09:00");
     await dialog.getByRole("button", { name: "Save", exact: true }).click();
     await expect(dialog.getByRole("button", { name: "Submit" })).toBeVisible();
