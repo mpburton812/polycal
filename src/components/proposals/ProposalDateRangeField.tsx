@@ -3,7 +3,7 @@
 import { DateCalendar } from "@mui/x-date-pickers/DateCalendar";
 import { PickersDay, type PickersDayProps } from "@mui/x-date-pickers/PickersDay";
 import dayjs, { type Dayjs } from "dayjs";
-import { Box, Stack, Typography } from "@mui/material";
+import { Box, Stack, TextField, Typography } from "@mui/material";
 import { useMemo, useState } from "react";
 
 import { GARDEN_TOKENS } from "@/theme/tokens";
@@ -29,6 +29,7 @@ function parseDate(value: string): Dayjs | null {
 /**
  * Single calendar that accepts two day clicks for a start/end range (PC-153).
  * Earliest click becomes start; latest becomes end. A third click starts a new range.
+ * Compact ISO text fields stay in sync for accessibility and reliable E2E fills.
  */
 export function ProposalDateRangeField({
   startLabel,
@@ -52,6 +53,19 @@ export function ProposalDateRangeField({
     return null;
   }, [start, end]);
 
+  function applyOrderedRange(a: string, b: string) {
+    if (!a) {
+      onRangeChange("", "");
+      return;
+    }
+    if (!b || b === a) {
+      onRangeChange(a, "");
+      return;
+    }
+    const [earliest, latest] = a <= b ? [a, b] : [b, a];
+    onRangeChange(earliest, latest);
+  }
+
   function handleDaySelect(day: Dayjs | null) {
     if (!day || !day.isValid() || disabled) return;
     const iso = day.format("YYYY-MM-DD");
@@ -64,9 +78,8 @@ export function ProposalDateRangeField({
     }
 
     const a = anchor.format("YYYY-MM-DD");
-    const [earliest, latest] = a <= iso ? [a, iso] : [iso, a];
+    applyOrderedRange(a, iso);
     setAnchor(null);
-    onRangeChange(earliest, latest === earliest ? "" : latest);
   }
 
   function DayButton(props: PickersDayProps<Dayjs>) {
@@ -121,6 +134,36 @@ export function ProposalDateRangeField({
         {startLabel}
         {endLabel ? ` / ${endLabel}` : ""}
       </Typography>
+      <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
+        <TextField
+          label={startLabel}
+          size="small"
+          fullWidth
+          disabled={disabled}
+          value={startValue}
+          onChange={(event) => {
+            setAnchor(null);
+            applyOrderedRange(event.target.value.trim(), endValue);
+          }}
+          placeholder="YYYY-MM-DD"
+          helperText="ISO date"
+          inputProps={{ "data-testid": "date-range-start", "aria-label": startLabel }}
+        />
+        <TextField
+          label={endLabel || "End"}
+          size="small"
+          fullWidth
+          disabled={disabled}
+          value={endValue}
+          onChange={(event) => {
+            setAnchor(null);
+            applyOrderedRange(startValue, event.target.value.trim());
+          }}
+          placeholder="YYYY-MM-DD"
+          helperText="Optional end"
+          inputProps={{ "data-testid": "date-range-end", "aria-label": endLabel || "End" }}
+        />
+      </Stack>
       <Box
         sx={{
           border: `1px solid ${GARDEN_TOKENS.ink}`,
