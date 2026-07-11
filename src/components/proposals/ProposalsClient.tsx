@@ -25,14 +25,35 @@ import type { PersonSummary } from "@/actions/users";
 
 import { ProposalCard } from "./ProposalCard";
 import { PartnershipProposalDialog } from "./PartnershipProposalDialog";
-import { ProposalDetailDialog } from "./ProposalDetailDialog";
-import { ProposalDraftDialog } from "./ProposalDraftDialog";
-import { ResidencyCreateDialog } from "./ResidencyCreateDialog";
-import { SleepingPartnerCreateDialog } from "./SleepingPartnerCreateDialog";
 import { PARTNERSHIP_CARD_PREFIX } from "@/lib/proposals/constants";
 import { useToast } from "@/components/providers/ToastProvider";
 import { EmptyState, type EmptyStateIllustration } from "@/components/ui/EmptyState";
 import { GARDEN_TOKENS } from "@/theme/tokens";
+import dynamic from "next/dynamic";
+
+/** Heavy dialogs load on demand so the proposals board paints sooner (PC-145). */
+const ProposalDetailDialog = dynamic(
+  () =>
+    import("./ProposalDetailDialog").then((mod) => ({ default: mod.ProposalDetailDialog })),
+  { ssr: false },
+);
+const ProposalDraftDialog = dynamic(
+  () =>
+    import("./ProposalDraftDialog").then((mod) => ({ default: mod.ProposalDraftDialog })),
+  { ssr: false },
+);
+const ResidencyCreateDialog = dynamic(
+  () =>
+    import("./ResidencyCreateDialog").then((mod) => ({ default: mod.ResidencyCreateDialog })),
+  { ssr: false },
+);
+const SleepingPartnerCreateDialog = dynamic(
+  () =>
+    import("./SleepingPartnerCreateDialog").then((mod) => ({
+      default: mod.SleepingPartnerCreateDialog,
+    })),
+  { ssr: false },
+);
 
 const TAB_KEYS = ["draft", "proposed", "resolved", "archived"] as const;
 type TabKey = (typeof TAB_KEYS)[number];

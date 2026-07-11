@@ -29,8 +29,6 @@ import { PlanningModeDrawer } from "@/components/schedule/PlanningModeDrawer";
 import { ScheduleHeatmap } from "@/components/schedule/ScheduleHeatmap";
 import { ScheduleMonthView } from "@/components/schedule/ScheduleMonthView";
 import { ScheduleWeekView } from "@/components/schedule/ScheduleWeekView";
-import { SeriesOccurrenceChooserDialog } from "@/components/schedule/SeriesOccurrenceChooserDialog";
-import { SliceDetailDialog } from "@/components/schedule/SliceDetailDialog";
 import {
   loadScheduleViewState,
   saveScheduleViewState,
@@ -38,8 +36,6 @@ import {
   type ScheduleViewState,
 } from "@/components/schedule/scheduleViewState";
 import { useScheduleTapRouter } from "@/components/schedule/useScheduleTapRouter";
-import { ProposalDetailDialog } from "@/components/proposals/ProposalDetailDialog";
-import { ProposalDraftDialog } from "@/components/proposals/ProposalDraftDialog";
 import { filterScheduleEvents } from "@/lib/schedule/filters";
 import {
   addDays,
@@ -48,6 +44,37 @@ import {
 } from "@/lib/schedule/dates";
 import { startOfMonth } from "@/lib/schedule/month-grid";
 import { computeScheduleFetchRange } from "@/lib/schedule/fetch-range";
+import dynamic from "next/dynamic";
+
+/** Heavy dialogs load on demand so the calendar paints sooner (PC-145). */
+const ProposalDetailDialog = dynamic(
+  () =>
+    import("@/components/proposals/ProposalDetailDialog").then((mod) => ({
+      default: mod.ProposalDetailDialog,
+    })),
+  { ssr: false },
+);
+const ProposalDraftDialog = dynamic(
+  () =>
+    import("@/components/proposals/ProposalDraftDialog").then((mod) => ({
+      default: mod.ProposalDraftDialog,
+    })),
+  { ssr: false },
+);
+const SeriesOccurrenceChooserDialog = dynamic(
+  () =>
+    import("@/components/schedule/SeriesOccurrenceChooserDialog").then((mod) => ({
+      default: mod.SeriesOccurrenceChooserDialog,
+    })),
+  { ssr: false },
+);
+const SliceDetailDialog = dynamic(
+  () =>
+    import("@/components/schedule/SliceDetailDialog").then((mod) => ({
+      default: mod.SliceDetailDialog,
+    })),
+  { ssr: false },
+);
 import { SCHEDULE_SEMANTIC_COLORS } from "@/theme/tokens";
 
 interface ScheduleLegendItemProps {

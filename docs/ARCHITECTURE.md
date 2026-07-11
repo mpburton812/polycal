@@ -52,6 +52,7 @@ Use an **API route** when the caller is external, binary streaming is required, 
 | Avatar binary stream | Admin user CRUD |
 | E2E harness (`/api/e2e/*`, non-prod) | Notification inbox actions |
 | Build info (`/api/build-info`) | |
+| Health / warmup (`/api/health`) | |
 
 Shared helpers: `src/lib/actions/context.ts` (`requireSession`, `requireAdminAccess`, `withDb`).
 
@@ -119,7 +120,7 @@ Non-production seeding scripts must never run in production. Startup validation 
 
 | ADR | Topic |
 |-----|-------|
-| [ADR-001](./ADR-001-inline-migrations.md) | Inline migrations at startup |
+| [ADR-001](./ADR-001-inline-migrations.md) | Inline migrations at startup (version short-circuit on match) |
 | `docs/adr/` | Future ADRs (next-auth beta, action vs API) |
 
 ## Testing model
