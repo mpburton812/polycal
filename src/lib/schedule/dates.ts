@@ -12,6 +12,15 @@ export function startOfWeekMonday(date: Date): Date {
   return result;
 }
 
+/** True when two dates fall on the same local calendar day (PC-141). */
+export function isSameLocalCalendarDay(a: Date, b: Date): boolean {
+  return (
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate()
+  );
+}
+
 /** Inclusive range end at Sunday 23:59:59.999 for a week starting `weekStart`. */
 export function endOfWeekSunday(weekStart: Date): Date {
   const end = new Date(weekStart);

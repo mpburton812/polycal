@@ -26,6 +26,33 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "2026.07.10f",
+    date: "2026-07-10",
+    summary: "Loading UX for detail dialog and tabs; faster layout/schedule fetch.",
+    changes: [
+      {
+        type: "added",
+        description:
+          "Proposal detail skeleton while loading; Close deferred until detail ready (PC-138).",
+      },
+      {
+        type: "added",
+        description:
+          "Route loading shells for people-places, admin, and app layout (PC-139).",
+      },
+      {
+        type: "changed",
+        description:
+          "Parallelize app layout inbox/prefs/group/admin fetches (PC-140).",
+      },
+      {
+        type: "changed",
+        description:
+          "Skip schedule client refetch when initial week matches current Monday (PC-141).",
+      },
+    ],
+  },
+  {
     version: "2026.07.10e",
     date: "2026-07-10",
     summary: "Privacy option gating; alpha feedback archive and delete.",

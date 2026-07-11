@@ -22,13 +22,15 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
-- PC-135–PC-136: Alpha feedback tracker Delete (permanent) and Archive list (`archivedAt`, `?archived=1`); toolbar link between Active inbox and Archive.
-- PC-130: Usable ESLint flat config (`eslint.config.mjs`); `eslint-config-next` pinned to 15.x; `npm run lint` non-interactive.
-- PC-128: GitHub Actions CI for `apps/alpha-feedback-tracker` (tsc + Vite build on path changes); document GitLab CI as secondary.
+- PC-138–PC-139: Proposal detail loading skeleton (defer Close until loaded); route `loading.tsx` for people-places, admin, and app shell.
 
 ### Changed
 
+- PC-140–PC-141: Parallelize `(app)` layout data fetches; skip schedule client double-fetch when server payload is already the current week.
 - PC-134: New proposal privacy MenuItems respect poly group settings (hide disabled private/super-private; reappear when enabled); server rejects disabled levels.
+- PC-135–PC-136: Alpha feedback tracker Delete (permanent) and Archive list (`archivedAt`, `?archived=1`); toolbar link between Active inbox and Archive.
+- PC-130: Usable ESLint flat config (`eslint.config.mjs`); `eslint-config-next` pinned to 15.x; `npm run lint` non-interactive.
+- PC-128: GitHub Actions CI for `apps/alpha-feedback-tracker` (tsc + Vite build on path changes); document GitLab CI as secondary.
 - PC-131: Tracker React/`@types` aligned with root; ARCHITECTURE documents no npm workspaces for `apps/alpha-feedback-tracker`.
 - PC-132: ProposalDraftDialog split into event/sleeping/more-options section components (UX unchanged).
 - PC-124–PC-127: Proposal card & draft form UX — shared what→when→where→act card scan; digital event times; type-aware progressive drafts (event vs sleeping vs batch); explicit Required/Optional invitees; Save secondary / Submit primary; privacy and notes helper copy.
