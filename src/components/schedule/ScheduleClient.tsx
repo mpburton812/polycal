@@ -1,22 +1,32 @@
 "use client";
 
+import AddIcon from "@mui/icons-material/Add";
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import EventNoteIcon from "@mui/icons-material/EventNote";
+import FilterListIcon from "@mui/icons-material/FilterList";
+import TodayIcon from "@mui/icons-material/Today";
 import {
   Box,
+  Button,
+  Drawer,
+  Fab,
   FormControl,
   IconButton,
   InputLabel,
+  Menu,
   MenuItem,
   Select,
   Stack,
   ToggleButton,
   ToggleButtonGroup,
   Typography,
+  useMediaQuery,
+  useTheme,
 } from "@mui/material";
-import { usePathname } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
+import dynamic from "next/dynamic";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type { ProposalPlaceOption } from "@/actions/proposals";
 import {
@@ -26,13 +36,21 @@ import {
 } from "@/actions/schedule";
 import type { PersonSummary } from "@/actions/users";
 import { PlanningModeDrawer } from "@/components/schedule/PlanningModeDrawer";
+import { ScheduleAgendaView } from "@/components/schedule/ScheduleAgendaView";
+import { ScheduleDaySheet } from "@/components/schedule/ScheduleDaySheet";
 import { ScheduleHeatmap } from "@/components/schedule/ScheduleHeatmap";
 import { ScheduleMonthView } from "@/components/schedule/ScheduleMonthView";
 import { ScheduleWeekView } from "@/components/schedule/ScheduleWeekView";
 import {
+  applyPeriodMode,
+  buildScheduleUrlSearch,
   loadScheduleViewState,
+  parseScheduleUrlParams,
+  periodModeFromState,
   saveScheduleViewState,
+  todayAnchors,
   type ScheduleCalendarLayout,
+  type SchedulePeriodMode,
   type ScheduleViewState,
 } from "@/components/schedule/scheduleViewState";
 import { useScheduleTapRouter } from "@/components/schedule/useScheduleTapRouter";
@@ -44,7 +62,7 @@ import {
 } from "@/lib/schedule/dates";
 import { startOfMonth } from "@/lib/schedule/month-grid";
 import { computeScheduleFetchRange } from "@/lib/schedule/fetch-range";
-import dynamic from "next/dynamic";
+import { GARDEN_TOKENS, SCHEDULE_SEMANTIC_COLORS } from "@/theme/tokens";
 
 /** Heavy dialogs load on demand so the calendar paints sooner (PC-145). */
 const ProposalDetailDialog = dynamic(
@@ -75,7 +93,6 @@ const SliceDetailDialog = dynamic(
     })),
   { ssr: false },
 );
-import { SCHEDULE_SEMANTIC_COLORS } from "@/theme/tokens";
 
 interface ScheduleLegendItemProps {
   label: string;
@@ -83,7 +100,7 @@ interface ScheduleLegendItemProps {
   borderStyle?: "solid" | "dashed";
 }
 
-/** Semantic fill swatch for the schedule status legend (PC-77). */
+/** Semantic fill swatch for the schedule status legend (PC-77 / PC-164). */
 function ScheduleLegendItem({ label, fill, borderStyle = "solid" }: ScheduleLegendItemProps) {
   return (
     <Stack direction="row" alignItems="center" spacing={0.5}>
@@ -92,9 +109,7 @@ function ScheduleLegendItem({ label, fill, borderStyle = "solid" }: ScheduleLege
           width: 10,
           height: 10,
           bgcolor: fill,
-          border: 1,
-          borderColor: "divider",
-          borderStyle,
+          border: `1px ${borderStyle} ${GARDEN_TOKENS.ink}`,
           borderRadius: 0.25,
           flexShrink: 0,
         }}
@@ -118,7 +133,7 @@ interface ScheduleClientProps {
 }
 
 /**
- * Schedule tab — weekly calendar, filters, planning drawer, and proposal detail (PC-42).
+ * Schedule tab — weekly/month calendar with Garden chrome (PC-42 / PC-164–167).
  */
 export function ScheduleClient({
   initialPayload,
@@ -130,16 +145,33 @@ export function ScheduleClient({
   timeZone,
 }: ScheduleClientProps) {
   const pathname = usePathname();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const previousPathRef = useRef<string | null>(null);
   const initialPayloadHydratedRef = useRef(false);
   const refreshSeqRef = useRef(0);
-  const [viewState, setViewState] = useState<ScheduleViewState>(() => ({
-    ...loadScheduleViewState(),
-    weekStartIso: initialWeekStartIso,
-    monthAnchorIso: initialWeekStartIso,
-  }));
+  const urlHydratedRef = useRef(false);
+  const [viewState, setViewState] = useState<ScheduleViewState>(() => {
+    // Prefer persisted anchors so re-entering Schedule restores last period (PC-164).
+    const loaded = loadScheduleViewState();
+    const hasPersistedAnchor =
+      typeof window !== "undefined" &&
+      Boolean(window.localStorage.getItem("polycal.schedule.view"));
+    if (hasPersistedAnchor) return loaded;
+    return {
+      ...loaded,
+      weekStartIso: initialWeekStartIso,
+      monthAnchorIso: initialWeekStartIso,
+    };
+  });
   const [payload, setPayload] = useState<SchedulePayload>(initialPayload);
-  const [pending, startTransition] = useTransition();
+  /** Explicit loading flag — useTransition is unreliable for async server actions (PC-164). */
+  const [pending, setPending] = useState(false);
+  const [optionsOpen, setOptionsOpen] = useState(false);
+  const [daySheetDay, setDaySheetDay] = useState<Date | null>(null);
+  const [fabAnchor, setFabAnchor] = useState<null | HTMLElement>(null);
   const {
     state: dialogState,
     openScheduleEvent,
@@ -150,6 +182,8 @@ export function ScheduleClient({
     handleEditFromDetail,
     openRelatedProposal,
     openDetachedProposal,
+    openCreateDraft,
+    openProposal,
   } = useScheduleTapRouter();
 
   const weekStart = useMemo(
@@ -162,6 +196,7 @@ export function ScheduleClient({
   );
   const dayCount = viewState.compact ? 14 : 7;
   const isMonthLayout = viewState.calendarLayout === "month";
+  const periodMode = periodModeFromState(viewState);
   const rangeEnd = useMemo(() => {
     return computeScheduleFetchRange(
       isMonthLayout ? monthAnchor : weekStart,
@@ -201,14 +236,19 @@ export function ScheduleClient({
       );
 
       const seq = ++refreshSeqRef.current;
-      startTransition(async () => {
-        const result = await listScheduleEventsAction({
-          rangeStart: start.toISOString(),
-          rangeEnd: end.toISOString(),
-        });
-        if (seq !== refreshSeqRef.current) return;
-        if (result.ok) setPayload(result.payload);
-      });
+      setPending(true);
+      void (async () => {
+        try {
+          const result = await listScheduleEventsAction({
+            rangeStart: start.toISOString(),
+            rangeEnd: end.toISOString(),
+          });
+          if (seq !== refreshSeqRef.current) return;
+          if (result.ok) setPayload(result.payload);
+        } finally {
+          if (seq === refreshSeqRef.current) setPending(false);
+        }
+      })();
     },
     [viewState.calendarLayout, viewState.compact],
   );
@@ -238,9 +278,56 @@ export function ScheduleClient({
     }
   }, [initialPayload]);
 
+  /** Hydrate from URL once (PC-167); fall back to persisted anchors (PC-164). */
+  useEffect(() => {
+    if (urlHydratedRef.current) return;
+    urlHydratedRef.current = true;
+    const parsed = parseScheduleUrlParams(searchParams.toString());
+    setViewState((current) => {
+      let next = { ...current };
+      if (parsed.layout) next = applyPeriodMode(next, parsed.layout);
+      if (parsed.anchor) {
+        const anchorDate = new Date(`${parsed.anchor}T12:00:00`);
+        if (!Number.isNaN(anchorDate.getTime())) {
+          next = {
+            ...next,
+            weekStartIso: startOfWeekMonday(anchorDate).toISOString(),
+            monthAnchorIso: startOfMonth(anchorDate).toISOString(),
+          };
+        }
+      }
+      return next;
+    });
+    if (parsed.open) {
+      openProposal(parsed.open);
+    }
+    // Intentionally once on mount — do not re-run when searchParams change from our own sync.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only URL hydrate
+  }, [openProposal]);
+
+  /** Keep URL in sync with view (PC-167). */
+  useEffect(() => {
+    if (!urlHydratedRef.current) return;
+    if (pathname !== "/schedule") return;
+    const next = buildScheduleUrlSearch(
+      viewState,
+      dialogState.detailOpen ? dialogState.selectedProposalId : null,
+    );
+    const current = searchParams.toString();
+    if (next !== current) {
+      router.replace(`/schedule?${next}`, { scroll: false });
+    }
+  }, [
+    dialogState.detailOpen,
+    dialogState.selectedProposalId,
+    pathname,
+    router,
+    searchParams,
+    viewState,
+  ]);
+
   /**
-   * Opening Schedule (mount or navigation) anchors on the current week (PC-55).
-   * Skip the client refetch when server initialPayload already covers this Monday (PC-141).
+   * Opening Schedule restores persisted anchors (PC-164). Refetch when needed.
    */
   useEffect(() => {
     const onSchedule = pathname === "/schedule";
@@ -249,18 +336,18 @@ export function ScheduleClient({
       (previousPathRef.current === null || previousPathRef.current !== "/schedule");
 
     if (enteringSchedule) {
-      const monday = startOfWeekMonday(new Date());
-      setViewState((current) => ({
-        ...current,
-        weekStartIso: monday.toISOString(),
-        monthAnchorIso: monday.toISOString(),
-      }));
-
+      const anchor =
+        viewState.calendarLayout === "month"
+          ? new Date(viewState.monthAnchorIso)
+          : new Date(viewState.weekStartIso);
       const initialMonday = startOfWeekMonday(new Date(initialWeekStartIso));
-      const sameWeek = isSameLocalCalendarDay(monday, initialMonday);
-
-      if (!sameWeek) {
-        refreshSchedule(monday, { layout: viewState.calendarLayout });
+      const viewMonday = startOfWeekMonday(anchor);
+      const sameWeek = isSameLocalCalendarDay(viewMonday, initialMonday);
+      if (!sameWeek || viewState.calendarLayout === "month" || viewState.compact) {
+        refreshSchedule(anchor, {
+          layout: viewState.calendarLayout,
+          compact: viewState.compact,
+        });
       }
     }
 
@@ -269,6 +356,9 @@ export function ScheduleClient({
     pathname,
     refreshSchedule,
     viewState.calendarLayout,
+    viewState.compact,
+    viewState.monthAnchorIso,
+    viewState.weekStartIso,
     initialWeekStartIso,
   ]);
 
@@ -310,24 +400,63 @@ export function ScheduleClient({
     refreshSchedule(next, { layout: "week", compact: viewState.compact });
   }
 
-  function handleMonthDayClick(day: Date) {
+  function goToday() {
+    const anchors = todayAnchors();
+    setViewState((current) => ({ ...current, ...anchors }));
+    const anchor =
+      viewState.calendarLayout === "month"
+        ? new Date(anchors.monthAnchorIso)
+        : new Date(anchors.weekStartIso);
+    refreshSchedule(anchor, {
+      layout: viewState.calendarLayout,
+      compact: viewState.compact,
+    });
+  }
+
+  function handlePeriodModeChange(mode: SchedulePeriodMode) {
+    setViewState((current) => applyPeriodMode(current, mode));
+    const next = applyPeriodMode(viewState, mode);
+    const anchor =
+      next.calendarLayout === "month"
+        ? new Date(next.monthAnchorIso)
+        : new Date(next.weekStartIso);
+    refreshSchedule(anchor, { layout: next.calendarLayout, compact: next.compact });
+  }
+
+  function openDaySheet(day: Date) {
+    setDaySheetDay(day);
+  }
+
+  function openWeekForDay(day: Date) {
     const monday = startOfWeekMonday(day);
+    setDaySheetDay(null);
     setViewState((current) => ({
       ...current,
       calendarLayout: "week",
+      compact: false,
       weekStartIso: monday.toISOString(),
       monthAnchorIso: day.toISOString(),
     }));
-    refreshSchedule(monday, { layout: "week", compact: viewState.compact });
+    refreshSchedule(monday, { layout: "week", compact: false });
   }
+
+  function createForDay(day: Date, lockedType: "event" | "sleeping") {
+    const start = new Date(day);
+    start.setHours(lockedType === "event" ? 10 : 0, 0, 0, 0);
+    setDaySheetDay(null);
+    openCreateDraft({ lockedType, initialStartAt: start.toISOString() });
+  }
+
+  const showAgenda = !isMonthLayout && isMobile;
 
   return (
     <Box
-      sx={{ pb: 2 }}
+      sx={{ pb: 10 }}
       data-testid="schedule-ready"
       data-ready={pending ? "false" : "true"}
       data-range-start={rangeStart.toISOString()}
       data-range-end={rangeEnd.toISOString()}
+      aria-busy={pending}
     >
       <Box
         sx={{ display: "none" }}
@@ -347,183 +476,269 @@ export function ScheduleClient({
           bgcolor: "background.default",
           pt: 0.5,
           pb: 1,
-          borderBottom: 1,
-          borderColor: "divider",
+          borderBottom: `1px solid ${GARDEN_TOKENS.outlineSoft}`,
           mb: 1,
         }}
       >
-      <Stack
-        direction={{ xs: "column", sm: "row" }}
-        spacing={1}
-        alignItems={{ sm: "center" }}
-        justifyContent="space-between"
-        sx={{ mb: 1 }}
-      >
-        <Stack direction="row" alignItems="center" spacing={0.5}>
-          <IconButton aria-label="Previous period" onClick={() => shiftPeriod(-1)} disabled={pending}>
-            <ChevronLeftIcon />
-          </IconButton>
-          <Typography variant="subtitle1" fontWeight={600}>
-            {rangeLabel}
-          </Typography>
-          <IconButton aria-label="Next period" onClick={() => shiftPeriod(1)} disabled={pending}>
-            <ChevronRightIcon />
-          </IconButton>
-        </Stack>
+        <Stack
+          direction={{ xs: "column", sm: "row" }}
+          spacing={1}
+          alignItems={{ sm: "center" }}
+          justifyContent="space-between"
+          sx={{ mb: 1 }}
+        >
+          <Stack direction="row" alignItems="center" spacing={0.5}>
+            <IconButton
+              aria-label="Previous period"
+              onClick={() => shiftPeriod(-1)}
+              disabled={pending}
+            >
+              <ChevronLeftIcon />
+            </IconButton>
+            <Typography variant="subtitle1" fontWeight={600}>
+              {rangeLabel}
+            </Typography>
+            <IconButton
+              aria-label="Next period"
+              onClick={() => shiftPeriod(1)}
+              disabled={pending}
+            >
+              <ChevronRightIcon />
+            </IconButton>
+            <IconButton
+              aria-label="Jump to today"
+              onClick={goToday}
+              disabled={pending}
+              size="small"
+            >
+              <TodayIcon fontSize="small" />
+            </IconButton>
+          </Stack>
 
-        <Stack direction="row" spacing={1} alignItems="center">
-          <ToggleButtonGroup
-            exclusive
-            size="small"
-            value={viewState.calendarLayout}
-            onChange={(_, value: "week" | "month" | null) => {
-              if (!value) return;
-              setViewState((current) => ({ ...current, calendarLayout: value }));
-              refreshSchedule(value === "month" ? monthAnchor : weekStart, {
-                layout: value,
-                compact: viewState.compact,
-              });
-            }}
-            aria-label="Calendar layout"
-          >
-            <ToggleButton value="week">Week</ToggleButton>
-            <ToggleButton value="month">Month</ToggleButton>
-          </ToggleButtonGroup>
-
-          {!isMonthLayout && (
+          <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
             <ToggleButtonGroup
               exclusive
               size="small"
-              value={viewState.compact ? "compact" : "normal"}
-              onChange={(_, value) => {
+              value={periodMode}
+              onChange={(_, value: SchedulePeriodMode | null) => {
                 if (!value) return;
-                const compact = value === "compact";
-                setViewState((current) => ({ ...current, compact }));
-                refreshSchedule(weekStart, { layout: "week", compact });
+                handlePeriodModeChange(value);
               }}
-              aria-label="View density"
+              aria-label="Calendar period"
             >
-              <ToggleButton value="normal">Week</ToggleButton>
-              <ToggleButton value="compact">2 weeks</ToggleButton>
+              <ToggleButton value="week">Week</ToggleButton>
+              <ToggleButton value="twoWeek">2 weeks</ToggleButton>
+              <ToggleButton value="month">Month</ToggleButton>
             </ToggleButtonGroup>
-          )}
-        </Stack>
-      </Stack>
 
-      <Stack
-        direction={{ xs: "column", md: "row" }}
-        spacing={1}
-        sx={{ mb: 2 }}
-        useFlexGap
-        flexWrap="wrap"
-      >
-        <FormControl size="small" sx={{ minWidth: 180 }}>
-          <InputLabel id="schedule-filter-label">Network filter</InputLabel>
-          <Select
-            labelId="schedule-filter-label"
-            label="Network filter"
-            value={viewState.filterMode}
-            onChange={(event) =>
-              setViewState((current) => ({
-                ...current,
-                filterMode: event.target.value as ScheduleFilterMode,
-              }))
-            }
-          >
-            <MenuItem value="whole">Whole network</MenuItem>
-            <MenuItem value="solo">Solo</MenuItem>
-            <MenuItem value="sleeping_network">Sleeping network</MenuItem>
-            <MenuItem value="person">Specific person</MenuItem>
-          </Select>
-        </FormControl>
-
-        {viewState.filterMode === "person" && (
-          <FormControl size="small" sx={{ minWidth: 180 }}>
-            <InputLabel id="schedule-person-label">Person</InputLabel>
-            <Select
-              labelId="schedule-person-label"
-              label="Person"
-              value={viewState.filterPersonId}
-              onChange={(event) =>
-                setViewState((current) => ({ ...current, filterPersonId: event.target.value }))
-              }
+            <IconButton
+              aria-label="View options"
+              aria-expanded={optionsOpen}
+              onClick={() => setOptionsOpen(true)}
+              size="small"
             >
-              {people
-                .filter((person) => person.id !== currentUserId && person.status === "active")
-                .map((person) => (
-                  <MenuItem key={person.id} value={person.id}>
-                    {person.displayName}
-                  </MenuItem>
-                ))}
-            </Select>
-          </FormControl>
-        )}
+              <FilterListIcon />
+            </IconButton>
 
-        <ToggleButton
-          value="planning"
-          selected={viewState.planningOpen}
-          size="small"
-          onClick={() =>
-            setViewState((current) => ({ ...current, planningOpen: !current.planningOpen }))
-          }
-          sx={{
-            alignSelf: "center",
-            textTransform: "none",
-          }}
-        >
-          <EventNoteIcon sx={{ mr: 0.5, fontSize: 18 }} />
-          Planning
-        </ToggleButton>
-      </Stack>
-
-      <Stack direction="row" spacing={2} sx={{ mb: 1 }} flexWrap="wrap" useFlexGap>
-        <ScheduleLegendItem
-          label="Proposed"
-          fill={SCHEDULE_SEMANTIC_COLORS.proposed.fill}
-          borderStyle="dashed"
-        />
-        <ScheduleLegendItem
-          label="Approved events"
-          fill={SCHEDULE_SEMANTIC_COLORS.resolved_event.fill}
-        />
-        <ScheduleLegendItem
-          label="Sleeping"
-          fill={SCHEDULE_SEMANTIC_COLORS.resolved_sleeping.fill}
-        />
-        <ScheduleLegendItem label="Conflict" fill={SCHEDULE_SEMANTIC_COLORS.conflict.fill} />
-        <ScheduleLegendItem label="At risk / tentative" fill={SCHEDULE_SEMANTIC_COLORS.at_risk.fill} />
-        <ScheduleLegendItem label="Archived" fill={SCHEDULE_SEMANTIC_COLORS.archived.fill} />
-      </Stack>
+            <ToggleButton
+              value="planning"
+              selected={viewState.planningOpen}
+              size="small"
+              aria-label="Planning"
+              aria-pressed={viewState.planningOpen}
+              onClick={() =>
+                setViewState((current) => ({
+                  ...current,
+                  planningOpen: !current.planningOpen,
+                }))
+              }
+              sx={{ textTransform: "none" }}
+            >
+              <EventNoteIcon sx={{ mr: 0.5, fontSize: 18 }} />
+              Planning
+            </ToggleButton>
+          </Stack>
+        </Stack>
       </Box>
 
-      <ScheduleHeatmap
-        events={filteredEvents}
-        weekStartIso={rangeStart.toISOString()}
-        dayCount={dayCount}
-        timeZone={timeZone}
-        layout={
-          isMonthLayout ? "month" : viewState.compact ? "twoWeek" : "week"
-        }
-      />
+      <Drawer
+        anchor="right"
+        open={optionsOpen}
+        onClose={() => setOptionsOpen(false)}
+        PaperProps={{ sx: { width: { xs: "100%", sm: 320 }, p: 2 } }}
+      >
+        <Typography variant="h6" sx={{ mb: 2 }}>
+          View options
+        </Typography>
+        <Stack spacing={2}>
+          <FormControl size="small" fullWidth>
+            <InputLabel id="schedule-filter-label">Network filter</InputLabel>
+            <Select
+              labelId="schedule-filter-label"
+              label="Network filter"
+              value={viewState.filterMode}
+              onChange={(event) =>
+                setViewState((current) => ({
+                  ...current,
+                  filterMode: event.target.value as ScheduleFilterMode,
+                }))
+              }
+            >
+              <MenuItem value="whole">Whole network</MenuItem>
+              <MenuItem value="solo">Solo</MenuItem>
+              <MenuItem value="sleeping_network">Sleeping network</MenuItem>
+              <MenuItem value="person">Specific person</MenuItem>
+            </Select>
+          </FormControl>
 
-      {isMonthLayout ? (
-        <ScheduleMonthView
-          monthAnchor={monthAnchor}
+          {viewState.filterMode === "person" && (
+            <FormControl size="small" fullWidth>
+              <InputLabel id="schedule-person-label">Person</InputLabel>
+              <Select
+                labelId="schedule-person-label"
+                label="Person"
+                value={viewState.filterPersonId}
+                onChange={(event) =>
+                  setViewState((current) => ({
+                    ...current,
+                    filterPersonId: event.target.value,
+                  }))
+                }
+              >
+                {people
+                  .filter((person) => person.id !== currentUserId && person.status === "active")
+                  .map((person) => (
+                    <MenuItem key={person.id} value={person.id}>
+                      {person.displayName}
+                    </MenuItem>
+                  ))}
+              </Select>
+            </FormControl>
+          )}
+
+          <Stack direction="row" spacing={2} flexWrap="wrap" useFlexGap>
+            <ScheduleLegendItem
+              label="Proposed"
+              fill={SCHEDULE_SEMANTIC_COLORS.proposed.fill}
+              borderStyle="dashed"
+            />
+            <ScheduleLegendItem
+              label="Approved events"
+              fill={SCHEDULE_SEMANTIC_COLORS.resolved_event.fill}
+            />
+            <ScheduleLegendItem
+              label="Sleeping"
+              fill={SCHEDULE_SEMANTIC_COLORS.resolved_sleeping.fill}
+            />
+            <ScheduleLegendItem label="Conflict" fill={SCHEDULE_SEMANTIC_COLORS.conflict.fill} />
+            <ScheduleLegendItem
+              label="At risk / tentative"
+              fill={SCHEDULE_SEMANTIC_COLORS.at_risk.fill}
+            />
+            <ScheduleLegendItem label="Archived" fill={SCHEDULE_SEMANTIC_COLORS.archived.fill} />
+            <ScheduleLegendItem
+              label="Masked"
+              fill={SCHEDULE_SEMANTIC_COLORS.masked.fill}
+              borderStyle="dashed"
+            />
+          </Stack>
+
+          <Button variant="contained" onClick={() => setOptionsOpen(false)}>
+            Done
+          </Button>
+        </Stack>
+      </Drawer>
+
+      <Box sx={{ opacity: pending ? 0.72 : 1, transition: "opacity 120ms ease" }}>
+        <ScheduleHeatmap
           events={filteredEvents}
-          timeZone={timeZone}
-          onEventClick={openScheduleEvent}
-          onDayClick={handleMonthDayClick}
-        />
-      ) : (
-        <ScheduleWeekView
-          weekStart={weekStart}
+          weekStartIso={rangeStart.toISOString()}
           dayCount={dayCount}
-          events={filteredEvents}
-          compact={viewState.compact}
           timeZone={timeZone}
-          onEventClick={openScheduleEvent}
+          layout={isMonthLayout ? "month" : viewState.compact ? "twoWeek" : "week"}
         />
-      )}
+
+        {isMonthLayout ? (
+          <ScheduleMonthView
+            monthAnchor={monthAnchor}
+            events={filteredEvents}
+            timeZone={timeZone}
+            onEventClick={openScheduleEvent}
+            onDayClick={openDaySheet}
+          />
+        ) : showAgenda ? (
+          <ScheduleAgendaView
+            weekStart={weekStart}
+            dayCount={dayCount}
+            events={filteredEvents}
+            timeZone={timeZone}
+            onEventClick={openScheduleEvent}
+            onDayHeaderClick={openDaySheet}
+            onDayOverflowClick={openDaySheet}
+          />
+        ) : (
+          <ScheduleWeekView
+            weekStart={weekStart}
+            dayCount={dayCount}
+            events={filteredEvents}
+            compact={viewState.compact}
+            timeZone={timeZone}
+            onEventClick={openScheduleEvent}
+            onDayOverflowClick={viewState.compact ? openDaySheet : undefined}
+          />
+        )}
+      </Box>
+
+      <Fab
+        color="primary"
+        aria-label="Create on schedule"
+        onClick={(event) => setFabAnchor(event.currentTarget)}
+        sx={{
+          position: "fixed",
+          right: 16,
+          bottom: 88,
+          bgcolor: GARDEN_TOKENS.sage,
+          color: GARDEN_TOKENS.surface,
+          border: `2px solid ${GARDEN_TOKENS.ink}`,
+          boxShadow: "none",
+          "&:hover": { bgcolor: "#557A5C" },
+        }}
+      >
+        <AddIcon />
+      </Fab>
+      <Menu anchorEl={fabAnchor} open={Boolean(fabAnchor)} onClose={() => setFabAnchor(null)}>
+        <MenuItem
+          onClick={() => {
+            setFabAnchor(null);
+            createForDay(new Date(), "event");
+          }}
+        >
+          New event
+        </MenuItem>
+        <MenuItem
+          onClick={() => {
+            setFabAnchor(null);
+            createForDay(new Date(), "sleeping");
+          }}
+        >
+          New sleeping
+        </MenuItem>
+      </Menu>
+
+      <ScheduleDaySheet
+        open={Boolean(daySheetDay)}
+        day={daySheetDay}
+        events={filteredEvents}
+        timeZone={timeZone}
+        onClose={() => setDaySheetDay(null)}
+        onEventClick={(event) => {
+          setDaySheetDay(null);
+          openScheduleEvent(event);
+        }}
+        onOpenInWeek={openWeekForDay}
+        onCreateEvent={(day) => createForDay(day, "event")}
+        onCreateSleeping={(day) => createForDay(day, "sleeping")}
+      />
 
       <PlanningModeDrawer
         open={viewState.planningOpen}
@@ -594,6 +809,8 @@ export function ScheduleClient({
         places={places}
         currentUserId={currentUserId}
         initialDetail={dialogState.editDetail}
+        lockedProposalType={dialogState.createLockedType ?? undefined}
+        initialStartAt={dialogState.createInitialStartAt}
       />
     </Box>
   );

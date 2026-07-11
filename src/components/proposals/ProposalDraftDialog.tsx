@@ -86,6 +86,8 @@ import {
   localDateToStartIso,
   localInputToIso,
   slotStartInput,
+  toLocalDateInput,
+  toLocalInput,
   type InviteeSelection,
   type SlotDraft,
 } from "./proposalDraftDateUtils";
@@ -100,6 +102,8 @@ interface ProposalDraftDialogProps {
   initialDetail?: ProposalDetail | null;
   /** Locks proposal type for new drafts opened from a specific FAB action (PC-65). */
   lockedProposalType?: "event" | "sleeping";
+  /** Prefills the first slot start when creating from the calendar (PC-165). */
+  initialStartAt?: string | null;
 }
 
 /**
@@ -113,6 +117,7 @@ export function ProposalDraftDialog({
   currentUserId,
   initialDetail,
   lockedProposalType,
+  initialStartAt = null,
 }: ProposalDraftDialogProps) {
   const router = useRouter();
   const [savedDraftId, setSavedDraftId] = useState<string | null>(null);
@@ -384,13 +389,20 @@ export function ProposalDraftDialog({
       setIsRecurring(false);
       setRecurrencePattern("weekly");
       setRecurrenceCount(4);
-      setSlots([{ startAt: "", endAt: "", label: "" }]);
+      const type = lockedProposalType ?? "event";
+      const startInput =
+        initialStartAt != null && initialStartAt.length > 0
+          ? type === "sleeping"
+            ? toLocalDateInput(initialStartAt)
+            : toLocalInput(initialStartAt)
+          : "";
+      setSlots([{ startAt: startInput, endAt: "", label: "" }]);
       setInviteeMode({});
       setReminderEnabled(false);
       setReminderValue(1);
       setReminderUnit("hours");
     }
-  }, [open, initialDetail, lockedProposalType, savedDraftId]);
+  }, [open, initialDetail, lockedProposalType, savedDraftId, initialStartAt]);
 
   function handleClose() {
     setSavedDraftId(null);

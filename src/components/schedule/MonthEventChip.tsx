@@ -1,12 +1,14 @@
 "use client";
 
 import BedIcon from "@mui/icons-material/Bed";
+import EventIcon from "@mui/icons-material/Event";
 import { Box, Typography } from "@mui/material";
 
 import type { ScheduleEvent } from "@/actions/schedule";
 import { EventCategoryIcon } from "@/lib/event-icons/EventCategoryIcon";
 import { isEventIconKey } from "@/lib/event-icons/registry";
 import { scheduleBlockSx, type ScheduleBlockVariant } from "@/lib/schedule/colors";
+import { GARDEN_TOKENS } from "@/theme/tokens";
 
 interface MonthEventChipProps {
   event: ScheduleEvent;
@@ -62,7 +64,15 @@ export function MonthEventIcon({ event, variant, onClick }: MonthEventChipProps)
             filter: `drop-shadow(0 0 0.75px ${colors.color})`,
           }}
         />
-      ) : null}
+      ) : (
+        <EventIcon
+          sx={{
+            fontSize: 16,
+            color: colors.bgcolor,
+            filter: `drop-shadow(0 0 0.75px ${colors.color})`,
+          }}
+        />
+      )}
     </Box>
   );
 }
@@ -83,6 +93,7 @@ export function MonthEventChip({ event, variant, onClick }: MonthEventChipProps)
         onClick();
       }}
       title={label}
+      aria-label={label}
       sx={{
         display: "block",
         width: "100%",
@@ -139,6 +150,7 @@ export function MonthSpanBar({
       type="button"
       onClick={onClick}
       title={title}
+      aria-label={title}
       sx={{
         width: "100%",
         height: "100%",
@@ -171,7 +183,7 @@ interface MonthMoreLinkProps {
   onClick: () => void;
 }
 
-/** Overflow affordance — drills into week view for the day. */
+/** Overflow affordance — opens the day sheet (PC-165). */
 export function MonthMoreLink({ count, onClick }: MonthMoreLinkProps) {
   if (count <= 0) return null;
 
@@ -180,6 +192,7 @@ export function MonthMoreLink({ count, onClick }: MonthMoreLinkProps) {
       component="button"
       type="button"
       variant="caption"
+      aria-label={`Show ${count} more events`}
       onClick={(event) => {
         event.stopPropagation();
         onClick();
@@ -191,9 +204,10 @@ export function MonthMoreLink({ count, onClick }: MonthMoreLinkProps) {
         p: 0,
         mt: 0.25,
         fontSize: "0.6rem",
-        color: "primary.main",
+        color: GARDEN_TOKENS.sage,
         cursor: "pointer",
         textAlign: "left",
+        fontWeight: 600,
         "&:hover": { textDecoration: "underline" },
       }}
     >

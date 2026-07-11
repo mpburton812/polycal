@@ -76,23 +76,21 @@ export function oneHourEventWindow(
   };
 }
 
-/** Forces one-week layout (week calendar + single-week density). */
+/** Forces one-week layout (week calendar, not 2-week or month). */
 export async function selectScheduleOneWeekView(page: Page): Promise<void> {
-  await page.getByLabel("Calendar layout").getByRole("button", { name: "Week" }).click();
-  await page.getByLabel("View density").getByRole("button", { name: "Week", exact: true }).click();
+  await page.getByLabel("Calendar period").getByRole("button", { name: "Week", exact: true }).click();
   await waitForScheduleReady(page);
 }
 
-/** Forces two-week density within week layout. */
+/** Forces two-week density. */
 export async function selectScheduleTwoWeekView(page: Page): Promise<void> {
-  await page.getByLabel("Calendar layout").getByRole("button", { name: "Week" }).click();
-  await page.getByLabel("View density").getByRole("button", { name: "2 weeks" }).click();
+  await page.getByLabel("Calendar period").getByRole("button", { name: "2 weeks" }).click();
   await waitForScheduleReady(page);
 }
 
 /** Switches to month layout. */
 export async function selectScheduleMonthView(page: Page): Promise<void> {
-  await page.getByLabel("Calendar layout").getByRole("button", { name: "Month" }).click();
+  await page.getByLabel("Calendar period").getByRole("button", { name: "Month" }).click();
   await waitForScheduleReady(page);
 }
 
@@ -128,20 +126,13 @@ export async function waitForScheduleReady(page: Page): Promise<void> {
 
 /** Forces week layout so aria-labels and week stepping remain predictable. */
 export async function forceWeekLayout(page: Page): Promise<void> {
-  const layoutWeek = page.getByLabel("Calendar layout").getByRole("button", { name: "Week" });
+  const layoutWeek = page
+    .getByLabel("Calendar period")
+    .getByRole("button", { name: "Week", exact: true });
   if (await layoutWeek.isVisible().catch(() => false)) {
     const selected = await layoutWeek.getAttribute("aria-pressed");
     if (selected !== "true") {
       await layoutWeek.click();
-      await waitForScheduleReady(page);
-    }
-  }
-
-  const densityWeek = page.getByLabel("View density").getByRole("button", { name: "Week", exact: true });
-  if (await densityWeek.isVisible().catch(() => false)) {
-    const selected = await densityWeek.getAttribute("aria-pressed");
-    if (selected !== "true") {
-      await densityWeek.click();
       await waitForScheduleReady(page);
     }
   }

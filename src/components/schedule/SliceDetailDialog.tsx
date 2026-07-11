@@ -173,6 +173,14 @@ export function SliceDetailDialog({
               ) : null}
             </Box>
 
+            <Button
+              variant="contained"
+              onClick={() => onViewParent(detail.rootProposalId)}
+              sx={primaryButtonSx}
+            >
+              Open parent
+            </Button>
+
             <Stack direction="row" spacing={1} alignItems="center">
               <AccessTimeIcon fontSize="small" color="action" />
               <Typography variant="body2">{timeLabel}</Typography>
@@ -200,10 +208,6 @@ export function SliceDetailDialog({
                 Votes apply to the whole series. Open the full proposal to vote.
               </Alert>
             ) : null}
-
-            <Button variant="text" onClick={() => onViewParent(detail.rootProposalId)}>
-              View full series / parent
-            </Button>
 
             <Divider />
 
@@ -254,7 +258,7 @@ export function SliceDetailDialog({
             Detach this {sliceKind === "batch_night" ? "night" : "day"}
           </Button>
         ) : null}
-        <Button onClick={onClose} sx={primaryButtonSx}>
+        <Button onClick={onClose}>
           Close
         </Button>
       </DialogActions>

@@ -26,6 +26,33 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "2026.07.11c",
+    date: "2026-07-11",
+    summary: "Schedule UX: chrome, day sheet, create FAB, mobile agenda, URL/a11y.",
+    changes: [
+      {
+        type: "changed",
+        description:
+          "Unified Week / 2 weeks / Month control; View options sheet; Today; Garden heatmap/month cells (PC-164).",
+      },
+      {
+        type: "added",
+        description:
+          "Month/compact day sheet, create-from-calendar FAB, fallback month icons (PC-165).",
+      },
+      {
+        type: "added",
+        description:
+          "Mobile agenda week list; recurrence opens occurrence directly (PC-166).",
+      },
+      {
+        type: "changed",
+        description:
+          "Schedule URL sync for layout/anchor/open; a11y labels; planning empty state (PC-167).",
+      },
+    ],
+  },
+  {
     version: "2026.07.11b",
     date: "2026-07-11",
     summary: "Email: Resend on polycal.net, credentials mail, self-service password reset.",
