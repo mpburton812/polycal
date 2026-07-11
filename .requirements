@@ -182,3 +182,4 @@
 2026-07-10 | 1b35d4e | PC-138 | loading UX and faster tab/layout fetches | src/components/proposals/ProposalDetailDialog.tsx
 2026-07-10 | 254d69a | PC-138 | keep Close after vote reload and soften e2e dismiss | src/components/proposals/ProposalDetailDialog.tsx
 2026-07-10 | 14208ef | PC-143 | migration short-circuit, lighter JWT, dynamic dialogs | src/components/proposals/ProposalsClient.tsx
+2026-07-10 | 80a5118 | PC-143 | unit tests for migration version short-circuit | src/lib/db/migrate.test.ts
