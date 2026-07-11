@@ -188,11 +188,12 @@ export function ProposalCard({
         )}
 
         {/* What */}
-        <Stack direction="row" spacing={1} alignItems="flex-start" sx={{ mb: 0.75 }}>
+        <Stack direction="row" spacing={0.75} alignItems="center" sx={{ mb: 0.5 }}>
           <ProposalEventIcon
             eventIconKey={proposal.eventIconKey}
             isContentMasked={proposal.isContentMasked}
             proposalType={proposal.proposalType}
+            size={20}
           />
           <Box sx={{ flex: 1, minWidth: 0 }}>
             <Typography

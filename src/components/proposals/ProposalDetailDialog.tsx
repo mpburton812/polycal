@@ -591,12 +591,12 @@ export function ProposalDetailDialog({
           )}
           {detail && (
             <>
-              <Stack direction="row" spacing={1} alignItems="flex-start" sx={{ mb: 1 }}>
+              <Stack direction="row" spacing={0.75} alignItems="center" sx={{ mb: 0.75 }}>
                 <ProposalEventIcon
                   eventIconKey={detail.eventIconKey}
                   isContentMasked={detail.isContentMasked}
                   proposalType={detail.proposalType}
-                  size={24}
+                  size={22}
                 />
                 <Box sx={{ flex: 1, minWidth: 0 }}>
                   <Typography variant="h6" component="h2" sx={{ fontSize: "1.1rem", fontWeight: 600 }}>

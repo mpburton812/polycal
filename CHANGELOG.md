@@ -22,11 +22,17 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- PC-152: Draft schedule mode grid (Window / All Day / Poll / Recurring); Poll disables Recurring.
+- PC-153: Two-click date range calendar for all-day events and sleeping nights.
 - PC-144: `/api/health` readiness probe (`ensureDbReady` + schema version) for optional warmup.
 - PC-138–PC-139: Proposal detail loading skeleton (defer Close until loaded); route `loading.tsx` for people-places, admin, and app shell.
 
 ### Changed
 
+- PC-148: Toast snackbar vertically centered (no longer covers bottom AppTabs).
+- PC-149: Removed build/branch environment banner from AppShell; impersonation lives under Admin → Test data.
+- PC-150: Sleeping titles drop brackets — `Sleeping: Name, Status, at Place`.
+- PC-151: Tighter vertical spacing around event icons on cards and detail.
 - PC-143: `runMigrations` short-circuits when `schema_meta.version` matches `SCHEMA_VERSION` (skips Turso PRAGMA storm on cold start).
 - PC-144: JWT user-row refresh throttled (~60s TTL); `SessionProvider` disables refetch-on-focus.
 - PC-145: `dynamic()` code-split for proposal/schedule dialogs and heavy admin panels.
@@ -45,6 +51,7 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- PC-147: Detaching a night/day from a series no longer throws Failed query (stakeholder notify runs after the DB transaction commits).
 - PC-114: Detach slice migration on remote DBs; MAP visibility defaults to Everyone; month heat-map ring on day numbers.
 - PC-112: Custom avatar crop — react-easy-crop, zoom out (0.5×–3×), load-gated confirm, JPEG background fill, server-side minimum crop size.
 - PC-117: Schedule time labels use viewer timezone for same-day evening events (unit test coverage).

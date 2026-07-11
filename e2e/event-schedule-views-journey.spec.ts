@@ -104,10 +104,10 @@ test.describe("Event schedule views journey", () => {
     await assertEventVisibleInAllScheduleViews(page, new RegExp(title, "i"), moved.day);
   });
 
-  test("4 — solo recurring all-day weekly: auto-resolve, all views, move +1 day", async ({ page }) => {
+  test("4 — solo recurring weekly: auto-resolve, all views, move +1 day", async ({ page }) => {
     test.setTimeout(300_000);
 
-    const title = `E2E Solo Recurring All-day ${Date.now()}`;
+    const title = `E2E Solo Recurring Weekly ${Date.now()}`;
     const initialDay = dateOffsetIso(20);
     const movedDay = shiftIsoDate(initialDay, 1);
 
@@ -123,8 +123,8 @@ test.describe("Event schedule views journey", () => {
     await assertEventVisibleInAllScheduleViews(page, new RegExp(title, "i"), initialDay);
 
     await moveResolvedEventByRedraft(page, title, {
-      start: movedDay,
-      allDay: true,
+      start: `${movedDay}T09:00`,
+      end: `${movedDay}T10:00`,
     });
     await expectResolvedProposal(page, title);
     await assertEventVisibleInAllScheduleViews(page, new RegExp(title, "i"), movedDay);

@@ -3,15 +3,18 @@ import { expect, test } from "./helpers/test";
 import { expandAdminSection } from "./helpers/admin";
 import { login, logout } from "./helpers/auth";
 import { USERS } from "./helpers/constants";
-import { goToAdmin, goToSchedule } from "./helpers/navigation";
+import { goToAdmin } from "./helpers/navigation";
 
 test.describe("Impersonation journey", () => {
-  test("dev bar and admin panel switch identity; admin path logs impersonation", async ({
+  test("admin test-data and user-management switch identity; admin path logs impersonation", async ({
     page,
   }) => {
     test.setTimeout(180_000);
 
+    // —— Phase 1: Admin → Test data impersonation select (replaces removed DevBar) ——
     await login(page, USERS.luke.username);
+    await goToAdmin(page);
+    await expandAdminSection(page, "Test data");
     await expect(page.getByLabel("Impersonate user")).toBeVisible();
 
     await page.getByLabel("Impersonate user").click();

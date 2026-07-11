@@ -540,6 +540,16 @@ export async function detachProposalSliceAction(
   }
 
   let newId: string;
+  /** Notify after commit — in-tx notifyUser uses a separate getDb() and breaks libSQL (PC-147). */
+  let notifyAfterCommit:
+    | {
+        proposalId: string;
+        proposerId: string;
+        title: string;
+        message: string;
+      }
+    | undefined;
+
   try {
     newId = await db.transaction(async (tx) => {
     const now = new Date().toISOString();
@@ -644,14 +654,12 @@ export async function detachProposalSliceAction(
         "proposal.detached_from_parent",
         JSON.stringify({ parentId: rootProposalId, sliceKind, sliceKey }),
       );
-      await notifyStakeholders(
-        tx,
-        rootProposalId,
-        parent.proposerId,
-        parent.title,
-        "proposal_child_detached",
-        `A night was detached from "${parent.title}".`,
-      );
+      notifyAfterCommit = {
+        proposalId: rootProposalId,
+        proposerId: parent.proposerId,
+        title: parent.title,
+        message: `A night was detached from "${parent.title}".`,
+      };
     } else {
       const slotRows = await tx
         .select()
@@ -779,24 +787,40 @@ export async function detachProposalSliceAction(
         "proposal.detached_from_parent",
         JSON.stringify({ parentId: rootProposalId, sliceKind, sliceKey }),
       );
-      await notifyStakeholders(
-        tx,
-        rootProposalId,
-        parent.proposerId,
-        parent.title,
-        "proposal_child_detached",
-        `A day was detached from "${parent.title}".`,
-      );
+      notifyAfterCommit = {
+        proposalId: rootProposalId,
+        proposerId: parent.proposerId,
+        title: parent.title,
+        message: `A day was detached from "${parent.title}".`,
+      };
     }
 
     await archiveParentIfScheduleEmpty(tx, rootProposalId, session.user.id);
     return childId;
     });
   } catch (error) {
+    const detail = error instanceof Error ? error.message : "Detach failed.";
     return {
       ok: false,
-      message: error instanceof Error ? error.message : "Detach failed.",
+      message: detail.startsWith("Failed query")
+        ? `Detach failed (database). ${detail}`
+        : detail,
     };
+  }
+
+  if (notifyAfterCommit) {
+    try {
+      await notifyStakeholders(
+        db,
+        notifyAfterCommit.proposalId,
+        notifyAfterCommit.proposerId,
+        notifyAfterCommit.title,
+        "proposal_child_detached",
+        notifyAfterCommit.message,
+      );
+    } catch {
+      // Detach already committed — do not fail the action on notification errors.
+    }
   }
 
   revalidatePath("/proposals");

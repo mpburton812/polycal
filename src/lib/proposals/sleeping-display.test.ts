@@ -14,10 +14,10 @@ describe("formatSleepingDisplayTitle", () => {
         intentionalSolo: true,
         state: "resolved",
       }),
-    ).toBe("Sleeping: [Han Solo], [Confirmed]");
+    ).toBe("Sleeping: Han Solo, Confirmed");
   });
 
-  it("formats multi-participant sleeping with location on second line", () => {
+  it("formats multi-participant sleeping with location inline (PC-150)", () => {
     expect(
       formatSleepingDisplayTitle({
         proposerName: "Leia Organa",
@@ -25,7 +25,7 @@ describe("formatSleepingDisplayTitle", () => {
         locationName: "Millennium Falcon",
         state: "proposed",
       }),
-    ).toBe("Sleeping: [Leia Organa, Han Solo], [Tentative]\nat Millennium Falcon");
+    ).toBe("Sleeping: Leia Organa, Han Solo, Tentative, at Millennium Falcon");
   });
 
   it("uses Proposed status for drafts", () => {
