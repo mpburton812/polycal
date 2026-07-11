@@ -26,6 +26,33 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "2026.07.11a",
+    date: "2026-07-11",
+    summary: "User UX: provision roles, onboarding OK, hide deleted users, wrap cards.",
+    changes: [
+      {
+        type: "changed",
+        description:
+          "Non-admin provisioners can only create User accounts; Admin role picker is admin-only (PC-155).",
+      },
+      {
+        type: "changed",
+        description:
+          "Onboarding Welcome requires OK before entering the app; complete only on acknowledge (PC-156).",
+      },
+      {
+        type: "changed",
+        description:
+          "Soft-deleted users no longer appear in Admin user management (PC-157).",
+      },
+      {
+        type: "changed",
+        description:
+          "Proposal cards, mode grid, admin table, and poll responses wrap without horizontal swipe (PC-158).",
+      },
+    ],
+  },
+  {
     version: "2026.07.10g",
     date: "2026-07-10",
     summary: "UX cleanup: schedule modes, date range, toast, sleeping titles, detach fix.",

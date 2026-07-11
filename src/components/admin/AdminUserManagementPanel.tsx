@@ -151,24 +151,26 @@ export function AdminUserManagementPanel({
           </Button>
         </Alert>
       )}
-      <Box sx={{ overflowX: "auto" }}>
-        <Table size="small">
+      <Box sx={{ width: "100%", overflowX: "visible" }}>
+        <Table size="small" sx={{ tableLayout: "fixed", width: "100%" }}>
           <TableHead>
             <TableRow>
-              <TableCell>Name</TableCell>
-              <TableCell>Gender</TableCell>
-              <TableCell>Role</TableCell>
-              <TableCell>Status</TableCell>
-              <TableCell>Last login</TableCell>
-              <TableCell>Actions</TableCell>
+              <TableCell sx={{ width: "22%" }}>Name</TableCell>
+              <TableCell sx={{ width: "12%" }}>Gender</TableCell>
+              <TableCell sx={{ width: "12%" }}>Role</TableCell>
+              <TableCell sx={{ width: "14%" }}>Status</TableCell>
+              <TableCell sx={{ width: "18%" }}>Last login</TableCell>
+              <TableCell sx={{ width: "22%" }}>Actions</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
             {users.map((user) => (
               <TableRow key={user.id}>
-                <TableCell>{user.displayName}</TableCell>
-                <TableCell>{user.gender ?? "—"}</TableCell>
-                <TableCell>{user.role}</TableCell>
+                <TableCell sx={{ overflowWrap: "anywhere", wordBreak: "break-word" }}>
+                  {user.displayName}
+                </TableCell>
+                <TableCell sx={{ overflowWrap: "anywhere" }}>{user.gender ?? "—"}</TableCell>
+                <TableCell sx={{ overflowWrap: "anywhere" }}>{user.role}</TableCell>
                 <TableCell>
                   <Chip
                     size="small"
@@ -182,9 +184,10 @@ export function AdminUserManagementPanel({
                             ? "error"
                             : "default"
                     }
+                    sx={{ maxWidth: "100%" }}
                   />
                 </TableCell>
-                <TableCell>
+                <TableCell sx={{ overflowWrap: "anywhere", wordBreak: "break-word" }}>
                   {user.lastLoginAt
                     ? new Date(user.lastLoginAt).toLocaleString()
                     : "Never"}
