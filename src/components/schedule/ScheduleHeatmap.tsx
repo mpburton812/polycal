@@ -5,8 +5,9 @@ import { useMemo } from "react";
 
 import type { ScheduleEvent } from "@/actions/schedule";
 import { addDays, isPastDate, isTodayDate, startOfWeekMonday } from "@/lib/schedule/dates";
+import { GARDEN_TOKENS, HEATMAP_LEVEL_COLORS } from "@/theme/tokens";
 
-const LEVEL_COLORS = ["#e8f5e9", "#fff9c4", "#ffe0b2", "#ffcdd2"];
+const LEVEL_COLORS = [...HEATMAP_LEVEL_COLORS];
 
 export type HeatmapLayout = "week" | "twoWeek" | "month";
 
@@ -69,16 +70,23 @@ function HeatmapCell({ level, day, compact = false, timeZone = "UTC" }: HeatmapC
           borderRadius: 0.5,
           bgcolor: LEVEL_COLORS[level],
           border: "1px solid",
-          borderColor: isToday ? "primary.main" : "divider",
+          borderColor: isToday ? GARDEN_TOKENS.sage : GARDEN_TOKENS.outlineSoft,
           minHeight: compact ? 18 : 28,
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
           fontSize: compact ? "0.6rem" : "0.65rem",
           fontWeight: isToday ? 700 : 600,
-          color: isPast ? "text.disabled" : "text.secondary",
+          color: isPast ? GARDEN_TOKENS.inkMuted : GARDEN_TOKENS.ink,
           opacity: isPast ? 0.55 : 1,
+          outline: "none",
+          "&:focus-visible": {
+            boxShadow: `0 0 0 2px ${GARDEN_TOKENS.ink}`,
+          },
         }}
+        tabIndex={0}
+        role="img"
+        aria-label={`${day.toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" })}: ${busyLabel}${isToday ? ", today" : ""}`}
       >
         {label}
       </Box>

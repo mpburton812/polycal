@@ -22,6 +22,8 @@ export interface ScheduleTapRouterState {
   chooserEvent: ScheduleEvent | null;
   draftOpen: boolean;
   editDetail: ProposalDetail | null;
+  createLockedType: "event" | "sleeping" | null;
+  createInitialStartAt: string | null;
 }
 
 const INITIAL_STATE: ScheduleTapRouterState = {
@@ -33,6 +35,8 @@ const INITIAL_STATE: ScheduleTapRouterState = {
   chooserEvent: null,
   draftOpen: false,
   editDetail: null,
+  createLockedType: null,
+  createInitialStartAt: null,
 };
 
 /**
@@ -54,12 +58,9 @@ export function useScheduleTapRouter() {
   }, []);
 
   const openScheduleEvent = useCallback((event: ScheduleEvent) => {
+    // Recurrence: open the occurrence directly; series edit lives in detail (PC-166).
     if (event.sliceKind === "recurrence_occurrence" && event.occurrenceProposalId) {
-      setState({
-        ...INITIAL_STATE,
-        chooserOpen: true,
-        chooserEvent: event,
-      });
+      openProposal(event.occurrenceProposalId);
       return;
     }
 
@@ -78,6 +79,15 @@ export function useScheduleTapRouter() {
 
     openProposal(event.occurrenceProposalId ?? event.proposalId);
   }, [openProposal]);
+
+  /** Explicit chooser for occurrence vs series when the user asks from detail. */
+  const openRecurrenceChooser = useCallback((event: ScheduleEvent) => {
+    setState({
+      ...INITIAL_STATE,
+      chooserOpen: true,
+      chooserEvent: event,
+    });
+  }, []);
 
   const closeDetail = useCallback(() => {
     setState((current) => ({
@@ -119,6 +129,18 @@ export function useScheduleTapRouter() {
     });
   }, []);
 
+  const openCreateDraft = useCallback(
+    (opts: { lockedType: "event" | "sleeping"; initialStartAt?: string }) => {
+      setState({
+        ...INITIAL_STATE,
+        draftOpen: true,
+        createLockedType: opts.lockedType,
+        createInitialStartAt: opts.initialStartAt ?? null,
+      });
+    },
+    [],
+  );
+
   const openRelatedProposal = useCallback((proposalId: string) => {
     setState((current) => ({
       ...current,
@@ -143,6 +165,7 @@ export function useScheduleTapRouter() {
     state,
     openProposal,
     openScheduleEvent,
+    openRecurrenceChooser,
     closeDetail,
     closeSlice,
     closeChooser,
@@ -151,6 +174,7 @@ export function useScheduleTapRouter() {
     handleEditFromDetail,
     openRelatedProposal,
     openDetachedProposal,
+    openCreateDraft,
   };
 }
 

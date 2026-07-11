@@ -36,6 +36,6 @@ test.describe("Multi-day event slice journey", () => {
     await expect(
       page.getByRole("dialog").getByRole("heading", { name: "This day" }),
     ).toBeVisible();
-    await expect(page.getByRole("button", { name: "View full series / parent" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Open parent" })).toBeVisible();
   });
 });

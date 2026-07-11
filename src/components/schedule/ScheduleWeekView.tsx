@@ -24,7 +24,11 @@ interface ScheduleWeekViewProps {
   compact: boolean;
   timeZone?: string;
   onEventClick: (event: ScheduleEvent) => void;
+  /** Opens day sheet when compact overflow exceeds the visible chip cap (PC-165). */
+  onDayOverflowClick?: (day: Date) => void;
 }
+
+const COMPACT_VISIBLE = 3;
 
 /**
  * Renders a multi-day column grid with events grouped by local day (PC-42).
@@ -36,6 +40,7 @@ export function ScheduleWeekView({
   compact,
   timeZone = "UTC",
   onEventClick,
+  onDayOverflowClick,
 }: ScheduleWeekViewProps) {
   const days = useMemo(() => {
     const monday = startOfWeekMonday(weekStart);
@@ -112,24 +117,47 @@ export function ScheduleWeekView({
                   display: "flex",
                   gap: 0.5,
                   overflow: "hidden",
+                  alignItems: "center",
                 }}
               >
                 {dayEvents.length === 0 ? (
                   <Typography variant="caption" sx={{ color: GARDEN_TOKENS.inkMuted }}>
-                    —
+                    Quiet day
                   </Typography>
                 ) : (
-                  dayEvents.map((event, index) => (
-                    <Box key={event.id} sx={{ flex: 1, minWidth: 0 }}>
-                      <ScheduleEventBlock
-                        event={event}
-                        compact
-                        timeZone={timeZone}
-                        rotationIndex={index}
-                        onClick={() => onEventClick(event)}
-                      />
-                    </Box>
-                  ))
+                  <>
+                    {dayEvents.slice(0, COMPACT_VISIBLE).map((event, index) => (
+                      <Box key={event.id} sx={{ flex: 1, minWidth: 0 }}>
+                        <ScheduleEventBlock
+                          event={event}
+                          compact
+                          timeZone={timeZone}
+                          rotationIndex={index}
+                          onClick={() => onEventClick(event)}
+                        />
+                      </Box>
+                    ))}
+                    {dayEvents.length > COMPACT_VISIBLE && onDayOverflowClick && (
+                      <Typography
+                        component="button"
+                        type="button"
+                        variant="caption"
+                        aria-label={`Show ${dayEvents.length - COMPACT_VISIBLE} more events`}
+                        onClick={() => onDayOverflowClick(day)}
+                        sx={{
+                          flexShrink: 0,
+                          border: "none",
+                          background: "none",
+                          color: GARDEN_TOKENS.sage,
+                          fontWeight: 700,
+                          cursor: "pointer",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        +{dayEvents.length - COMPACT_VISIBLE}
+                      </Typography>
+                    )}
+                  </>
                 )}
               </Box>
             </Box>
