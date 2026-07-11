@@ -473,6 +473,7 @@ export async function acceptProposalWithComment(page: Page, comment: string): Pr
     .waitFor({ state: "visible", timeout: 8_000 })
     .catch(() => {});
 
+  // Soft close: router.refresh after vote may unmount the dialog before Close is usable.
   const closeButton = dialog.getByRole("button", { name: "Close" });
   if (await closeButton.isVisible().catch(() => false)) {
     await closeButton.click();
@@ -706,6 +707,7 @@ export async function castInviteeVote(
     });
   }
 
+  // Soft close: refresh after vote may already dismiss the dialog (PC-138).
   const closeButton = dialog.getByRole("button", { name: "Close" });
   if (await closeButton.isVisible().catch(() => false)) {
     await closeButton.click();

@@ -6,9 +6,24 @@ import {
   eventInRange,
   formatEventTime,
   intervalsOverlap,
+  isSameLocalCalendarDay,
   localDateKey,
   startOfWeekMonday,
 } from "./dates";
+
+describe("isSameLocalCalendarDay", () => {
+  it("returns true for same local day at different times", () => {
+    const morning = new Date(2026, 6, 10, 8, 0, 0);
+    const evening = new Date(2026, 6, 10, 22, 30, 0);
+    expect(isSameLocalCalendarDay(morning, evening)).toBe(true);
+  });
+
+  it("returns false across midnight", () => {
+    const late = new Date(2026, 6, 10, 23, 0, 0);
+    const next = new Date(2026, 6, 11, 0, 30, 0);
+    expect(isSameLocalCalendarDay(late, next)).toBe(false);
+  });
+});
 
 describe("startOfWeekMonday", () => {
   it("returns Monday for a Wednesday", () => {
