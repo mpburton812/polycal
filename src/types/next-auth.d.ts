@@ -40,6 +40,8 @@ declare module "next-auth/jwt" {
     avatarKey?: string;
     theme?: string;
     error?: string;
+    /** Epoch ms of last DB user-row refresh in the jwt callback (PC-144). */
+    dbRefreshedAt?: number;
   }
 }
 

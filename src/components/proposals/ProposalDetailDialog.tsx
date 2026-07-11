@@ -22,6 +22,8 @@ import {
   InputLabel,
   MenuItem,
   Select,
+  CircularProgress,
+  Skeleton,
   Stack,
   Table,
   TableBody,
@@ -143,35 +145,48 @@ export function ProposalDetailDialog({
   const [rescheduleStart, setRescheduleStart] = useState("");
   const [rescheduleEnd, setRescheduleEnd] = useState("");
   const [pending, startTransition] = useTransition();
+  /** True while the initial detail fetch for the open dialog is in flight (PC-138). */
+  const [detailLoading, setDetailLoading] = useState(false);
 
   function notifyResult(result: { ok: boolean; message: string }) {
     showToast(result.message, result.ok ? "success" : "error");
   }
 
-  function reloadDetail(id: string) {
+  function reloadDetail(id: string, options?: { isInitial?: boolean }) {
+    if (options?.isInitial) {
+      setDetailLoading(true);
+    }
     startTransition(async () => {
-      const result = await getProposalDetailAction(id);
-      if (!result.ok || !result.detail) {
-        // The proposal may have left the viewer's scope after their own action
-        // (e.g. a decline that reverts it to a draft only the proposer can see).
-        // Clear the detail silently so a reload error doesn't clobber the
-        // action's own success toast (fixes a flaky "Vote recorded" assertion).
-        setDetail(null);
-        return;
+      try {
+        const result = await getProposalDetailAction(id);
+        if (!result.ok || !result.detail) {
+          // The proposal may have left the viewer's scope after their own action
+          // (e.g. a decline that reverts it to a draft only the proposer can see).
+          // Clear the detail silently so a reload error doesn't clobber the
+          // action's own success toast (fixes a flaky "Vote recorded" assertion).
+          setDetail(null);
+          return;
+        }
+        setDetail(result.detail);
+      } finally {
+        if (options?.isInitial) {
+          setDetailLoading(false);
+        }
       }
-      setDetail(result.detail);
     });
   }
 
   useEffect(() => {
     if (!open || !proposalId) {
       setDetail(null);
+      setDetailLoading(false);
       setCommentText("");
       setConflictWarnings([]);
       setShowConflictConfirm(false);
       return;
     }
-    reloadDetail(proposalId);
+    setDetail(null);
+    reloadDetail(proposalId, { isInitial: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- reload when proposal changes
   }, [open, proposalId]);
 
@@ -554,14 +569,34 @@ export function ProposalDetailDialog({
               Recurring series parent — open individual occurrences on the schedule to vote per date.
             </Alert>
           )}
+          {detailLoading && !detail && (
+            <Stack spacing={1.5} aria-busy="true" aria-label="Loading proposal">
+              <Stack direction="row" spacing={1} alignItems="center">
+                <CircularProgress size={22} aria-hidden />
+                <Typography variant="body2" color="text.secondary">
+                  Loading proposal…
+                </Typography>
+              </Stack>
+              <Skeleton variant="text" width="70%" height={32} />
+              <Skeleton variant="rounded" height={20} width="40%" />
+              <Skeleton variant="rounded" height={72} />
+              <Skeleton variant="rounded" height={48} />
+              <Skeleton variant="rounded" height={96} />
+            </Stack>
+          )}
+          {!detailLoading && !detail && (
+            <Typography variant="body2" color="text.secondary">
+              This proposal is no longer available.
+            </Typography>
+          )}
           {detail && (
             <>
-              <Stack direction="row" spacing={1} alignItems="flex-start" sx={{ mb: 1 }}>
+              <Stack direction="row" spacing={0.75} alignItems="center" sx={{ mb: 0.75 }}>
                 <ProposalEventIcon
                   eventIconKey={detail.eventIconKey}
                   isContentMasked={detail.isContentMasked}
                   proposalType={detail.proposalType}
-                  size={24}
+                  size={22}
                 />
                 <Box sx={{ flex: 1, minWidth: 0 }}>
                   <Typography variant="h6" component="h2" sx={{ fontSize: "1.1rem", fontWeight: 600 }}>
@@ -958,47 +993,51 @@ export function ProposalDetailDialog({
             </>
           )}
         </CardContent>
-        <CardActions sx={{ px: 2, pb: 2, pt: 0, flexWrap: "wrap", gap: 1 }}>
-          {detail?.canCancel && (
-            <Button color="error" onClick={handleCancelClick} disabled={pending}>
-              Cancel
-            </Button>
-          )}
-          {detail?.canClone && (
-            <Button onClick={handleClone} disabled={pending}>
-              Clone
-            </Button>
-          )}
-          {detail?.canRedraft && (
-            <Button onClick={handleRedraft} disabled={pending}>
-              Re-draft
-            </Button>
-          )}
-          {detail?.canEdit && (
-            <>
-              <Button color="error" onClick={handleDelete} disabled={pending}>
-                Delete
+        {/* Close stays available once the initial fetch settles (success or miss) so
+            post-vote reloads that clear detail cannot trap the user (PC-138). */}
+        {(!detailLoading || detail) && (
+          <CardActions sx={{ px: 2, pb: 2, pt: 0, flexWrap: "wrap", gap: 1 }}>
+            {detail?.canCancel && (
+              <Button color="error" onClick={handleCancelClick} disabled={pending}>
+                Cancel
               </Button>
-              <Button onClick={() => onEdit(detail)} disabled={pending}>
-                Edit
+            )}
+            {detail?.canClone && (
+              <Button onClick={handleClone} disabled={pending}>
+                Clone
               </Button>
-              <Button
-                variant="contained"
-                onClick={() => handleSubmit(false)}
-                disabled={pending}
-                sx={primaryButtonSx}
-              >
-                Submit
+            )}
+            {detail?.canRedraft && (
+              <Button onClick={handleRedraft} disabled={pending}>
+                Re-draft
               </Button>
-            </>
-          )}
-          {detail?.canReschedule && (
-            <Button onClick={openRescheduleDialog} disabled={pending}>
-              Reschedule
-            </Button>
-          )}
-          <Button onClick={onClose}>Close</Button>
-        </CardActions>
+            )}
+            {detail?.canEdit && (
+              <>
+                <Button color="error" onClick={handleDelete} disabled={pending}>
+                  Delete
+                </Button>
+                <Button onClick={() => onEdit(detail)} disabled={pending}>
+                  Edit
+                </Button>
+                <Button
+                  variant="contained"
+                  onClick={() => handleSubmit(false)}
+                  disabled={pending}
+                  sx={primaryButtonSx}
+                >
+                  Submit
+                </Button>
+              </>
+            )}
+            {detail?.canReschedule && (
+              <Button onClick={openRescheduleDialog} disabled={pending}>
+                Reschedule
+              </Button>
+            )}
+            <Button onClick={onClose}>Close</Button>
+          </CardActions>
+        )}
       </Card>
     </Dialog>
     <Dialog open={cancelScopeOpen} onClose={() => setCancelScopeOpen(false)}>

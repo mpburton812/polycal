@@ -3,7 +3,6 @@ import { Box, Container } from "@mui/material";
 import { FeedbackFab } from "@/components/feedback/FeedbackFab";
 import { AppHeader } from "@/components/layout/AppHeader";
 import { AppTabs } from "@/components/layout/AppTabs";
-import { DevBar } from "@/components/layout/DevBar";
 import { PushSubscriptionManager } from "@/components/notifications/PushSubscriptionManager";
 import { avatarSrcForKey } from "@/lib/constants/avatars";
 import { getVapidPublicKey } from "@/lib/push";
@@ -49,7 +48,6 @@ export function AppShell({
           zIndex: 1101,
         }}
       >
-        <DevBar />
         <AppHeader
           displayName={displayName}
           groupName={groupName}

@@ -2,7 +2,7 @@ import { expect, test } from "./helpers/test";
 
 import { login } from "./helpers/auth";
 import { USERS } from "./helpers/constants";
-import { fillProposalDateField, fillProposalDateTimeField } from "./helpers/datePickers";
+import { fillProposalDateRange, fillProposalDateTimeField } from "./helpers/datePickers";
 import { goToProposals, selectProposalTab } from "./helpers/navigation";
 import {
   openEventProposalDraft,
@@ -23,7 +23,7 @@ test.describe("Sleeping vs events — no false conflicts", () => {
     await goToProposals(page);
 
     const sleepingDialog = await openSleepingProposalDraft(page);
-    await fillProposalDateField(sleepingDialog.getByLabel("Night of").first(), nightDate);
+    await fillProposalDateRange(sleepingDialog, nightDate);
     await sleepingDialog.getByRole("button", { name: "Solo", exact: true }).first().click();
     await submitProposalDraft(page, sleepingDialog);
 

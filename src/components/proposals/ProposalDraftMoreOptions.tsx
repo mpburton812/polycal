@@ -40,11 +40,8 @@ export interface ProposalDraftMoreOptionsProps {
   onNotesChange: (value: string) => void;
   eventIconKey: EventIconKey | null;
   onEventIconKeyChange: (value: EventIconKey | null) => void;
-  isPoll: boolean;
-  onIsPollChange: (value: boolean) => void;
   batchMode: boolean;
   isRecurring: boolean;
-  onIsRecurringChange: (value: boolean) => void;
   recurrencePattern: "daily" | "weekly" | "monthly" | "yearly";
   onRecurrencePatternChange: (value: "daily" | "weekly" | "monthly" | "yearly") => void;
   recurrenceCount: number;
@@ -71,11 +68,8 @@ export function ProposalDraftMoreOptions({
   onNotesChange,
   eventIconKey,
   onEventIconKeyChange,
-  isPoll,
-  onIsPollChange,
   batchMode,
   isRecurring,
-  onIsRecurringChange,
   recurrencePattern,
   onRecurrencePatternChange,
   recurrenceCount,
@@ -158,66 +152,40 @@ export function ProposalDraftMoreOptions({
               <EventIconPicker value={eventIconKey} onChange={onEventIconKeyChange} />
             </Box>
           )}
-          {proposalType === "event" && (
-            <FormControlLabel
-              control={
-                <Checkbox
-                  checked={isPoll}
-                  onChange={(event) => onIsPollChange(event.target.checked)}
-                  sx={{ color: POLY_GREEN, "&.Mui-checked": { color: POLY_GREEN } }}
-                />
-              }
-              label="Time poll (multiple slot options)"
-            />
-          )}
-          {!batchMode && !isPoll && (
-            <>
-              <FormControlLabel
-                control={
-                  <Checkbox
-                    checked={isRecurring}
-                    onChange={(event) => onIsRecurringChange(event.target.checked)}
-                    sx={{ color: POLY_GREEN, "&.Mui-checked": { color: POLY_GREEN } }}
-                  />
+          {!batchMode && isRecurring && (
+            <Stack direction="row" spacing={1}>
+              <FormControl fullWidth size="small">
+                <InputLabel id="recurrence-pattern-label">Pattern</InputLabel>
+                <Select
+                  labelId="recurrence-pattern-label"
+                  label="Pattern"
+                  value={recurrencePattern}
+                  onChange={(event) =>
+                    onRecurrencePatternChange(
+                      event.target.value as "daily" | "weekly" | "monthly" | "yearly",
+                    )
+                  }
+                >
+                  <MenuItem value="daily">Daily</MenuItem>
+                  <MenuItem value="weekly">Weekly</MenuItem>
+                  <MenuItem value="monthly">Monthly</MenuItem>
+                  <MenuItem value="yearly">Yearly</MenuItem>
+                </Select>
+              </FormControl>
+              <TextField
+                label="Occurrences"
+                type="number"
+                size="small"
+                value={recurrenceCount}
+                onChange={(event) =>
+                  onRecurrenceCountChange(
+                    Math.min(52, Math.max(2, Number(event.target.value) || 2)),
+                  )
                 }
-                label="Recurring series"
+                inputProps={{ min: 2, max: 52 }}
+                sx={{ width: 140 }}
               />
-              {isRecurring && (
-                <Stack direction="row" spacing={1}>
-                  <FormControl fullWidth size="small">
-                    <InputLabel id="recurrence-pattern-label">Pattern</InputLabel>
-                    <Select
-                      labelId="recurrence-pattern-label"
-                      label="Pattern"
-                      value={recurrencePattern}
-                      onChange={(event) =>
-                        onRecurrencePatternChange(
-                          event.target.value as "daily" | "weekly" | "monthly" | "yearly",
-                        )
-                      }
-                    >
-                      <MenuItem value="daily">Daily</MenuItem>
-                      <MenuItem value="weekly">Weekly</MenuItem>
-                      <MenuItem value="monthly">Monthly</MenuItem>
-                      <MenuItem value="yearly">Yearly</MenuItem>
-                    </Select>
-                  </FormControl>
-                  <TextField
-                    label="Occurrences"
-                    type="number"
-                    size="small"
-                    value={recurrenceCount}
-                    onChange={(event) =>
-                      onRecurrenceCountChange(
-                        Math.min(52, Math.max(2, Number(event.target.value) || 2)),
-                      )
-                    }
-                    inputProps={{ min: 2, max: 52 }}
-                    sx={{ width: 140 }}
-                  />
-                </Stack>
-              )}
-            </>
+            </Stack>
           )}
           {proposalType === "event" && (
             <Stack spacing={1.5}>

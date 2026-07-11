@@ -26,6 +26,73 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "2026.07.10g",
+    date: "2026-07-10",
+    summary: "UX cleanup: schedule modes, date range, toast, sleeping titles, detach fix.",
+    changes: [
+      {
+        type: "fixed",
+        description:
+          "Detach night/day from series no longer fails with Failed query (notify after commit) (PC-147).",
+      },
+      {
+        type: "changed",
+        description: "Toast snackbar centered vertically so it does not cover bottom nav (PC-148).",
+      },
+      {
+        type: "changed",
+        description:
+          "Removed build/branch top banner; impersonation under Admin → Test data (PC-149).",
+      },
+      {
+        type: "changed",
+        description:
+          "Sleeping titles without brackets: Sleeping: Name, Status, at Place (PC-150).",
+      },
+      {
+        type: "changed",
+        description: "Tighter vertical padding on event icon picker and card icon rows (PC-151).",
+      },
+      {
+        type: "added",
+        description:
+          "Draft schedule type grid: Window / All Day / Poll / Recurring; Poll greys out Recurring (PC-152).",
+      },
+      {
+        type: "added",
+        description:
+          "Two-click calendar range for all-day events and sleeping nights (PC-153).",
+      },
+    ],
+  },
+  {
+    version: "2026.07.10f",
+    date: "2026-07-10",
+    summary: "Loading UX for detail dialog and tabs; faster layout/schedule fetch.",
+    changes: [
+      {
+        type: "added",
+        description:
+          "Proposal detail skeleton while loading; Close deferred until detail ready (PC-138).",
+      },
+      {
+        type: "added",
+        description:
+          "Route loading shells for people-places, admin, and app layout (PC-139).",
+      },
+      {
+        type: "changed",
+        description:
+          "Parallelize app layout inbox/prefs/group/admin fetches (PC-140).",
+      },
+      {
+        type: "changed",
+        description:
+          "Skip schedule client refetch when initial week matches current Monday (PC-141).",
+      },
+    ],
+  },
+  {
     version: "2026.07.10e",
     date: "2026-07-10",
     summary: "Privacy option gating; alpha feedback archive and delete.",

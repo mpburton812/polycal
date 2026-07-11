@@ -24,8 +24,8 @@ import type { BatchSleepingEntry } from "@/lib/proposals/batch-sleeping";
 import type { FastSleepingRow } from "@/lib/proposals/fast-sleeping-plan";
 
 import { FastSleepingPlanGrid } from "./FastSleepingPlanGrid";
+import { ProposalDateRangeField } from "./ProposalDateRangeField";
 import { ProposalDraftSectionHeader } from "./ProposalDraftSectionHeader";
-import { ProposalScheduleField } from "./ProposalScheduleFields";
 import { POLY_GREEN, POLY_GREEN_HOVER, POLY_GREEN_LIGHT } from "./proposalCardTheme";
 import type { InviteeSelection, SlotDraft } from "./proposalDraftDateUtils";
 
@@ -229,37 +229,26 @@ export function ProposalDraftSleepingFields({
           <ProposalDraftSectionHeader
             icon={<AccessTimeIcon fontSize="small" />}
             title="Night"
-            subtitle="Dates only — no clock times"
+            subtitle="Click two days for a night range — earliest is start, latest is end"
           />
           {slots.map((slot, index) => (
-            <Stack key={`sleep-slot-${index}`} spacing={1}>
-              <ProposalScheduleField
-                label="Night of"
-                mode="date"
-                value={slot.startAt}
-                onChange={(next) => {
-                  const updated = [...slots];
-                  updated[index] = {
-                    ...updated[index],
-                    startAt: next,
-                    endAt: updated[index].endAt || next,
-                  };
-                  onSlotsChange(updated);
-                }}
-              />
-              <ProposalScheduleField
-                label="Last night (optional)"
-                mode="date"
-                value={slot.endAt}
-                disabled={!slot.startAt}
-                onChange={(next) => {
-                  const updated = [...slots];
-                  updated[index] = { ...updated[index], endAt: next };
-                  onSlotsChange(updated);
-                }}
-                helperText="Leave blank for a single night"
-              />
-            </Stack>
+            <ProposalDateRangeField
+              key={`sleep-slot-${index}`}
+              startLabel="Night of"
+              endLabel="Last night"
+              startValue={slot.startAt}
+              endValue={slot.endAt}
+              onRangeChange={(start, end) => {
+                const updated = [...slots];
+                updated[index] = {
+                  ...updated[index],
+                  startAt: start,
+                  endAt: end || start,
+                };
+                onSlotsChange(updated);
+              }}
+              helperText="Leave as a single day for one night"
+            />
           ))}
 
           <ProposalDraftSectionHeader

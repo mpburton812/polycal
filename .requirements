@@ -179,3 +179,12 @@
 2026-07-10 | 10ad7c7 | PC-132 | extract ProposalDraftDialog section components | src/components/proposals/ProposalConflictConfirmDialog.tsx
 2026-07-10 | f6daafd | PC-130 | merge origin/dev and resolve changelog conflicts | n/a
 2026-07-10 | d1b36de | PC-134 | gate privacy options; feedback archive and delete | src/actions/poly-group.ts
+2026-07-10 | 1b35d4e | PC-138 | loading UX and faster tab/layout fetches | src/components/proposals/ProposalDetailDialog.tsx
+2026-07-10 | 254d69a | PC-138 | keep Close after vote reload and soften e2e dismiss | src/components/proposals/ProposalDetailDialog.tsx
+2026-07-10 | 14208ef | PC-143 | migration short-circuit, lighter JWT, dynamic dialogs | src/components/proposals/ProposalsClient.tsx
+2026-07-10 | 80a5118 | PC-143 | unit tests for migration version short-circuit | src/lib/db/migrate.test.ts
+2026-07-10 | 74a99a5 | PC-144 | keep JWT DB refresh during onboarding; wait for Schedule | auth.config.ts
+2026-07-10 | ade301d | PC-146 | UX cleanup — detach fix, toast, modes, date range | src/actions/proposals/slices.ts
+2026-07-10 | d87c73b | PC-146 | type PickersDayProps and restore invitees on recurring helper | src/components/proposals/ProposalDateRangeField.tsx
+2026-07-10 | a5206dd | PC-146 | impersonation journey + reliable date-range fills | e2e/helpers/datePickers.ts
+2026-07-10 | cc84feb | PC-153 | ISO text fields synced with date-range calendar | src/components/proposals/ProposalDateRangeField.tsx

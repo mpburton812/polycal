@@ -1,9 +1,9 @@
 /**
- * Shared sleeping arrangement title and participant formatting (PC-66).
+ * Shared sleeping arrangement title and participant formatting (PC-66 / PC-150).
  *
  * Format:
- *   Sleeping: [Name1, Name2], [Status]
- *   at [Location]
+ *   Sleeping: Name1, Name2, Status
+ *   Sleeping: Name1, Name2, Status, at Location
  */
 
 export type SleepingDisplayStatus = "Confirmed" | "Tentative" | "Proposed" | "At risk";
@@ -42,10 +42,10 @@ export function formatSleepingParticipantNames(input: SleepingDisplayInput): str
 export function formatSleepingDisplayTitle(input: SleepingDisplayInput): string {
   const names = formatSleepingParticipantNames(input);
   const status = sleepingDisplayStatus(input);
-  let title = `Sleeping: [${names.join(", ")}], [${status}]`;
+  let title = `Sleeping: ${names.join(", ")}, ${status}`;
   const location = input.locationName?.trim();
   if (location) {
-    title += `\nat ${location}`;
+    title += `, at ${location}`;
   }
   return title;
 }

@@ -22,13 +22,25 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
-- PC-135–PC-136: Alpha feedback tracker Delete (permanent) and Archive list (`archivedAt`, `?archived=1`); toolbar link between Active inbox and Archive.
-- PC-130: Usable ESLint flat config (`eslint.config.mjs`); `eslint-config-next` pinned to 15.x; `npm run lint` non-interactive.
-- PC-128: GitHub Actions CI for `apps/alpha-feedback-tracker` (tsc + Vite build on path changes); document GitLab CI as secondary.
+- PC-152: Draft schedule mode grid (Window / All Day / Poll / Recurring); Poll disables Recurring.
+- PC-153: Two-click date range calendar for all-day events and sleeping nights.
+- PC-144: `/api/health` readiness probe (`ensureDbReady` + schema version) for optional warmup.
+- PC-138–PC-139: Proposal detail loading skeleton (defer Close until loaded); route `loading.tsx` for people-places, admin, and app shell.
 
 ### Changed
 
+- PC-148: Toast snackbar vertically centered (no longer covers bottom AppTabs).
+- PC-149: Removed build/branch environment banner from AppShell; impersonation lives under Admin → Test data.
+- PC-150: Sleeping titles drop brackets — `Sleeping: Name, Status, at Place`.
+- PC-151: Tighter vertical spacing around event icons on cards and detail.
+- PC-143: `runMigrations` short-circuits when `schema_meta.version` matches `SCHEMA_VERSION` (skips Turso PRAGMA storm on cold start).
+- PC-144: JWT user-row refresh throttled (~60s TTL); `SessionProvider` disables refetch-on-focus.
+- PC-145: `dynamic()` code-split for proposal/schedule dialogs and heavy admin panels.
+- PC-140–PC-141: Parallelize `(app)` layout data fetches; skip schedule client double-fetch when server payload is already the current week.
 - PC-134: New proposal privacy MenuItems respect poly group settings (hide disabled private/super-private; reappear when enabled); server rejects disabled levels.
+- PC-135–PC-136: Alpha feedback tracker Delete (permanent) and Archive list (`archivedAt`, `?archived=1`); toolbar link between Active inbox and Archive.
+- PC-130: Usable ESLint flat config (`eslint.config.mjs`); `eslint-config-next` pinned to 15.x; `npm run lint` non-interactive.
+- PC-128: GitHub Actions CI for `apps/alpha-feedback-tracker` (tsc + Vite build on path changes); document GitLab CI as secondary.
 - PC-131: Tracker React/`@types` aligned with root; ARCHITECTURE documents no npm workspaces for `apps/alpha-feedback-tracker`.
 - PC-132: ProposalDraftDialog split into event/sleeping/more-options section components (UX unchanged).
 - PC-124–PC-127: Proposal card & draft form UX — shared what→when→where→act card scan; digital event times; type-aware progressive drafts (event vs sleeping vs batch); explicit Required/Optional invitees; Save secondary / Submit primary; privacy and notes helper copy.
@@ -39,6 +51,7 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- PC-147: Detaching a night/day from a series no longer throws Failed query (stakeholder notify runs after the DB transaction commits).
 - PC-114: Detach slice migration on remote DBs; MAP visibility defaults to Everyone; month heat-map ring on day numbers.
 - PC-112: Custom avatar crop — react-easy-crop, zoom out (0.5×–3×), load-gated confirm, JPEG background fill, server-side minimum crop size.
 - PC-117: Schedule time labels use viewer timezone for same-day evening events (unit test coverage).
