@@ -13,6 +13,7 @@ import {
 } from "@mui/material";
 
 import type { SchedulePlanningItem } from "@/actions/schedule";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { EventCategoryIcon } from "@/lib/event-icons/EventCategoryIcon";
 import { isEventIconKey } from "@/lib/event-icons/registry";
 
@@ -55,9 +56,14 @@ export function PlanningModeDrawer({
       </Typography>
       <List dense>
         {items.length === 0 ? (
-          <Typography variant="body2" color="text.secondary" sx={{ px: 2, py: 2 }}>
-            No proposals in planning view.
-          </Typography>
+          <Box sx={{ px: 2, py: 2 }}>
+            <EmptyState
+              illustration="schedule-day"
+              title="Nothing in planning"
+              description="Drafts and open proposals will show up here."
+              compact
+            />
+          </Box>
         ) : (
           items.map((item) => {
             const onCalendar = eventIdsOnCalendar?.has(item.id) ?? true;
