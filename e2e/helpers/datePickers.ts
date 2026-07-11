@@ -90,14 +90,27 @@ async function navigateCalendarToMonth(calendar: Locator, iso: string): Promise<
 }
 
 /**
- * Selects two days on the visible DateCalendar range picker (PC-153).
- * Earliest becomes start; latest becomes end.
+ * Fills the all-day / sleeping date range fields (PC-153).
+ * Prefers ISO text inputs for reliability; falls back to calendar clicks.
  */
 export async function fillProposalDateRange(
   dialog: Locator,
   startIso: string,
   endIso?: string,
 ): Promise<void> {
+  const startField = dialog.getByTestId("date-range-start").first();
+  const endField = dialog.getByTestId("date-range-end").first();
+  if (await startField.isVisible().catch(() => false)) {
+    await startField.click();
+    await startField.fill(startIso);
+    await startField.press("Tab");
+    const endValue = endIso && endIso !== startIso ? endIso : "";
+    await endField.click();
+    await endField.fill(endValue);
+    await endField.press("Tab");
+    return;
+  }
+
   const calendar = dialog.locator(".MuiDateCalendar-root").first();
   await expect(calendar).toBeVisible({ timeout: 10_000 });
 
@@ -114,7 +127,6 @@ export async function fillProposalDateRange(
     await navigateCalendarToMonth(calendar, endIso);
     await clickDay(String(Number(endIso.slice(8, 10))));
   } else {
-    // Second click on the same day confirms a single-day range.
     await clickDay(String(Number(startIso.slice(8, 10))));
   }
 }
