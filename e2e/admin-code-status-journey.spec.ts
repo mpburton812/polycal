@@ -27,7 +27,7 @@ test.describe("Admin Code Status journey", () => {
     await expect(
       page.getByText("Latest change control entry", { exact: true }),
     ).toBeVisible();
-    await expect(page.getByText("2026.07.11d").first()).toBeVisible();
+    await expect(page.getByText("2026.07.11e").first()).toBeVisible();
   });
 
   test("build number opens the full change control log", async ({ page }) => {
@@ -36,7 +36,7 @@ test.describe("Admin Code Status journey", () => {
     const dialog = page.getByRole("dialog", { name: "Change control log" });
     await expect(dialog).toBeVisible();
     // Full log lists multiple promoted versions.
-    await expect(dialog.getByText("2026.07.11d").first()).toBeVisible();
+    await expect(dialog.getByText("2026.07.11e").first()).toBeVisible();
     await expect(dialog.getByText("2026.07.11c").first()).toBeVisible();
     await expect(dialog.getByText("2026.07.11b").first()).toBeVisible();
     await expect(dialog.getByText("2026.07.10").first()).toBeVisible();

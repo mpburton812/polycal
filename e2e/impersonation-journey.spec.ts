@@ -11,13 +11,14 @@ test.describe("Impersonation journey", () => {
   }) => {
     test.setTimeout(180_000);
 
-    // —— Phase 1: Admin → Test data impersonation select (replaces removed DevBar) ——
+    // —— Phase 1: Admin → Test data impersonation (distinct from DevBar env banner) ——
     await login(page, USERS.luke.username);
     await goToAdmin(page);
     await expandAdminSection(page, "Test data");
-    await expect(page.getByLabel("Impersonate user")).toBeVisible();
+    const adminImpersonate = page.locator('[aria-labelledby="admin-impersonate-label"]');
+    await expect(adminImpersonate).toBeVisible();
 
-    await page.getByLabel("Impersonate user").click();
+    await adminImpersonate.click();
     await page
       .getByRole("option", { name: new RegExp(`${USERS.leia.displayName}.*${USERS.leia.username}`, "i") })
       .click();

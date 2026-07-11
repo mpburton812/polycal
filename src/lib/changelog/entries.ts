@@ -26,6 +26,23 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "2026.07.11e",
+    date: "2026-07-11",
+    summary: "Recurring schedule mode combos; restore DEV/TEST env banners.",
+    changes: [
+      {
+        type: "changed",
+        description:
+          "Window/All Day/Poll exclusive; Recurring combinable; recurrence UI under dates (PC-170, PC-171).",
+      },
+      {
+        type: "added",
+        description:
+          "Restore colored environment banners (DEV red / TEST yellow) via DevBar (PC-172).",
+      },
+    ],
+  },
+  {
     version: "2026.07.11d",
     date: "2026-07-11",
     summary: "Fix hosted DB missing password_reset_token columns (schema v21).",
