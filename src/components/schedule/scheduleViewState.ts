@@ -111,6 +111,7 @@ export function parseScheduleUrlParams(search: string): ScheduleUrlParams {
 
 /**
  * Builds schedule URL search string from view state (PC-167).
+ * Anchor uses local calendar YYYY-MM-DD (not UTC slice of ISO) to avoid remount loops.
  */
 export function buildScheduleUrlSearch(
   state: ScheduleViewState,
@@ -118,11 +119,19 @@ export function buildScheduleUrlSearch(
 ): string {
   const params = new URLSearchParams();
   params.set("layout", periodModeFromState(state));
-  const anchor =
-    state.calendarLayout === "month" ? state.monthAnchorIso : state.weekStartIso;
-  params.set("anchor", anchor.slice(0, 10));
+  const anchorDate =
+    state.calendarLayout === "month"
+      ? new Date(state.monthAnchorIso)
+      : new Date(state.weekStartIso);
+  params.set("anchor", localCalendarDateKey(anchorDate));
   if (openProposalId) params.set("open", openProposalId);
   return params.toString();
+}
+
+/** Local calendar day as yyyy-MM-dd (PC-167). */
+export function localCalendarDateKey(date: Date): string {
+  const pad = (value: number) => String(value).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 }
 
 /**
