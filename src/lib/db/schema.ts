@@ -44,6 +44,8 @@ export const users = sqliteTable("users", {
   emailVerifiedAt: text("email_verified_at"),
   emailVerificationToken: text("email_verification_token"),
   emailVerificationTokenExpiresAt: text("email_verification_token_expires_at"),
+  passwordResetToken: text("password_reset_token"),
+  passwordResetTokenExpiresAt: text("password_reset_token_expires_at"),
   notificationPrefsJson: text("notification_prefs_json"),
   /** IANA timezone for schedule display normalization (PC-48 / spec §10). */
   timezone: text("timezone").notNull().default("UTC"),

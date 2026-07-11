@@ -1,5 +1,6 @@
 import { Box, Button, Paper, TextField, Typography } from "@mui/material";
 import Image from "next/image";
+import Link from "next/link";
 import { eq } from "drizzle-orm";
 import { redirect } from "next/navigation";
 
@@ -14,7 +15,7 @@ import { brutalPaperSx } from "@/theme/brutalUi";
 import { GARDEN_TOKENS } from "@/theme/tokens";
 
 interface LoginPageProps {
-  searchParams: Promise<{ error?: string; callbackUrl?: string }>;
+  searchParams: Promise<{ error?: string; callbackUrl?: string; reset?: string }>;
 }
 
 /**
@@ -98,6 +99,11 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
             Invalid username or password.
           </Typography>
         )}
+        {params.reset === "1" && (
+          <Typography color="success.main" variant="body2" sx={{ mb: 2 }}>
+            Password updated. Sign in with your new password.
+          </Typography>
+        )}
         <Box component="form" action={loginAction}>
           <input
             type="hidden"
@@ -135,6 +141,14 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
             Sign in
           </Button>
         </Box>
+        <Button
+          component={Link}
+          href="/forgot-password"
+          fullWidth
+          sx={{ mt: 1.5, color: GARDEN_TOKENS.inkMuted }}
+        >
+          Forgot password?
+        </Button>
         {loginHint && (
           <Typography variant="caption" display="block" sx={{ mt: 2, color: GARDEN_TOKENS.inkMuted }}>
             {loginHint}
