@@ -82,12 +82,12 @@ test.describe("Admin bad user lifecycle journey", () => {
     // —— Phase 7: deleted bad_user cannot sign in ——
     await expectLoginRejected(page, USERS.badUser.username);
 
-    // —— Phase 8: admin sees deleted status and removed artifacts ——
+    // —— Phase 8: admin no longer lists soft-deleted former users (PC-157) ——
     await login(page, USERS.luke.username);
     await goToAdmin(page);
     await expandAdminSection(page, "User management");
-    const formerUserRow = page.getByRole("row").filter({ hasText: "Former User" });
-    await expect(formerUserRow.getByText("deleted", { exact: true })).toBeVisible();
+    await expect(page.getByRole("row").filter({ hasText: "Former User" })).toHaveCount(0);
+    await expect(page.getByText(USERS.badUser.displayName)).toHaveCount(0);
 
     await goToProposals(page);
     await selectProposalTab(page, "Proposed");

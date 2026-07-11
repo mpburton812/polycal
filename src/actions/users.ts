@@ -2,7 +2,7 @@
 
 import { hash } from "bcryptjs";
 import { randomUUID } from "node:crypto";
-import { and, asc, eq, inArray, or } from "drizzle-orm";
+import { and, asc, eq, inArray, ne, or } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
@@ -394,7 +394,8 @@ export async function listPeopleAction(): Promise<PersonSummary[]> {
 }
 
 /**
- * Creates an active user with a temporary password and clipboard instructions (PC-35).
+ * Creates an active user with a temporary password and clipboard instructions (PC-35 / PC-155).
+ * Non-admin provisioners may only create User-role accounts.
  */
 export async function createActiveUserAction(
   input: z.infer<typeof activeUserSchema>,
@@ -407,6 +408,15 @@ export async function createActiveUserAction(
   const parsed = activeUserSchema.safeParse(input);
   if (!parsed.success) {
     return { ok: false, message: formatZodError(parsed.error) };
+  }
+
+  const callerIsAdmin = session?.user?.role === "admin";
+  const role = callerIsAdmin ? parsed.data.role : "user";
+  if (!callerIsAdmin && parsed.data.role === "admin") {
+    return {
+      ok: false,
+      message: "Only administrators can create admin accounts.",
+    };
   }
 
   await ensureDbReady();
@@ -431,7 +441,7 @@ export async function createActiveUserAction(
     username,
     displayName: parsed.data.displayName,
     passwordHash,
-    role: parsed.data.role,
+    role,
     status: "active",
     mustChangePassword: true,
     avatarKey: parsed.data.avatarKey ?? "bird_blue",
@@ -445,7 +455,7 @@ export async function createActiveUserAction(
   await logUserActivity(
     session?.user?.id ?? null,
     "users.create_active",
-    JSON.stringify({ userId, username, role: parsed.data.role }),
+    JSON.stringify({ userId, username, role }),
   );
 
   revalidatePath("/people-places");
@@ -786,7 +796,8 @@ export async function deleteUserAction(userId: string): Promise<UserActionResult
 }
 
 /**
- * Lists users for the admin management table (PC-31).
+ * Lists users for the admin management table (PC-31 / PC-157).
+ * Soft-deleted ("Former User") rows are omitted from the management screen.
  */
 export async function listAdminUsersAction(): Promise<AdminUserRow[]> {
   const session = await requireAdminSession();
@@ -806,6 +817,7 @@ export async function listAdminUsersAction(): Promise<AdminUserRow[]> {
       loginCount: users.loginCount,
     })
     .from(users)
+    .where(ne(users.status, "deleted"))
     .orderBy(asc(users.displayName));
 
   return rows;
@@ -944,7 +956,8 @@ const activatePassiveSchema = z.object({
 });
 
 /**
- * Converts a passive profile into an active user with login credentials (PC-10).
+ * Converts a passive profile into an active user with login credentials (PC-10 / PC-155).
+ * Non-admin provisioners may only activate as User role.
  */
 export async function activatePassiveUserAction(
   input: z.infer<typeof activatePassiveSchema>,
@@ -961,6 +974,15 @@ export async function activatePassiveUserAction(
   const parsed = activatePassiveSchema.safeParse(input);
   if (!parsed.success) {
     return { ok: false, message: formatZodError(parsed.error) };
+  }
+
+  const callerIsAdmin = sessionResult.user.role === "admin";
+  const role = callerIsAdmin ? parsed.data.role : "user";
+  if (!callerIsAdmin && parsed.data.role === "admin") {
+    return {
+      ok: false,
+      message: "Only administrators can activate users as admins.",
+    };
   }
 
   return withDb(async (db) => {
@@ -989,7 +1011,7 @@ export async function activatePassiveUserAction(
     .set({
       username,
       passwordHash,
-      role: parsed.data.role,
+      role,
       mustChangePassword: true,
       onboardingComplete: false,
       activatedFromPassiveAt: now,
