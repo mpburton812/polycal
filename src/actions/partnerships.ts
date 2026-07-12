@@ -465,7 +465,7 @@ export interface SleepingPartnershipMapEdge {
 }
 
 /**
- * Accepted partnership edges for the People & Places MAP tab (PC-73).
+ * Accepted partnership edges for the People & Places Sleeping Partners tab (PC-73 / PC-180).
  */
 export async function listSleepingPartnershipMapEdgesAction(): Promise<SleepingPartnershipMapEdge[]> {
   const session = await auth();

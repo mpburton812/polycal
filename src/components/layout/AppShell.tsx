@@ -3,14 +3,16 @@ import { Box, Container } from "@mui/material";
 import { FeedbackFab } from "@/components/feedback/FeedbackFab";
 import { AppHeader } from "@/components/layout/AppHeader";
 import { AppTabs } from "@/components/layout/AppTabs";
+import { DevBar } from "@/components/layout/DevBar";
 import { PushSubscriptionManager } from "@/components/notifications/PushSubscriptionManager";
 import { avatarSrcForKey } from "@/lib/constants/avatars";
+import { getAppEnvironment } from "@/lib/env";
 import { getVapidPublicKey } from "@/lib/push";
 import type { NotificationItem } from "@/actions/notifications";
 import type { NotificationPrefs } from "@/types/notification-prefs";
 
 /**
- * Authenticated shell wrapping all primary tabs with dev tooling and bottom nav.
+ * Authenticated shell wrapping all primary tabs with env banner and bottom nav.
  */
 export function AppShell({
   children,
@@ -33,6 +35,8 @@ export function AppShell({
 }) {
   const avatarSrc = avatarSrcForKey(avatarKey);
   const vapidPublicKey = getVapidPublicKey();
+  /** Restore colored env banner (DEV red / TEST yellow / …) (PC-172). */
+  const showEnvBanner = getAppEnvironment() !== "production";
 
   return (
     <>
@@ -48,6 +52,7 @@ export function AppShell({
           zIndex: 1101,
         }}
       >
+        {showEnvBanner ? <DevBar /> : null}
         <AppHeader
           displayName={displayName}
           groupName={groupName}

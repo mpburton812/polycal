@@ -55,9 +55,9 @@ import {
 import { ProposalDraftEventFields } from "./ProposalDraftEventFields";
 import { ProposalDraftMoreOptions } from "./ProposalDraftMoreOptions";
 import {
-  flagsFromScheduleMode,
+  flagsFromTimingMode,
   ProposalDraftScheduleModeGrid,
-  scheduleModeFromFlags,
+  timingModeFromFlags,
 } from "./ProposalDraftScheduleModeGrid";
 import { ProposalDraftSleepingFields } from "./ProposalDraftSleepingFields";
 import {
@@ -812,12 +812,14 @@ export function ProposalDraftDialog({
 
           {proposalType === "event" && (
             <ProposalDraftScheduleModeGrid
-              mode={scheduleModeFromFlags({ allDay, isPoll, isRecurring })}
-              onModeChange={(mode) => {
-                const flags = flagsFromScheduleMode(mode);
+              timingMode={timingModeFromFlags({ allDay, isPoll })}
+              isRecurring={isRecurring}
+              disableRecurring={false}
+              onTimingModeChange={(mode) => {
+                const flags = flagsFromTimingMode(mode);
                 setAllDay(flags.allDay);
                 setIsPoll(flags.isPoll);
-                setIsRecurring(flags.isRecurring);
+                if (flags.isPoll) setIsRecurring(false);
                 setSlots((current) =>
                   current.map((slot) => ({
                     ...slot,
@@ -838,6 +840,7 @@ export function ProposalDraftDialog({
                   })),
                 );
               }}
+              onRecurringChange={setIsRecurring}
             />
           )}
 
@@ -866,6 +869,11 @@ export function ProposalDraftDialog({
               onLocationIdChange={setLocationId}
               onLocationCustomChange={setLocationCustom}
               onClearBedroom={() => setBedroomIndex("")}
+              isRecurring={!batchMode && isRecurring}
+              recurrencePattern={recurrencePattern}
+              onRecurrencePatternChange={setRecurrencePattern}
+              recurrenceCount={recurrenceCount}
+              onRecurrenceCountChange={setRecurrenceCount}
             />
           )}
 
@@ -913,12 +921,6 @@ export function ProposalDraftDialog({
             onNotesChange={setNotes}
             eventIconKey={eventIconKey}
             onEventIconKeyChange={setEventIconKey}
-            batchMode={batchMode}
-            isRecurring={isRecurring}
-            recurrencePattern={recurrencePattern}
-            onRecurrencePatternChange={setRecurrencePattern}
-            recurrenceCount={recurrenceCount}
-            onRecurrenceCountChange={setRecurrenceCount}
             reminderEnabled={reminderEnabled}
             onReminderEnabledChange={setReminderEnabled}
             reminderValue={reminderValue}

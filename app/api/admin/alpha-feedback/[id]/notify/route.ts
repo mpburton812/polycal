@@ -77,9 +77,30 @@ export async function POST(
     );
   }
 
+  // Prefer body override (SAVE flow), then draft field, then latest log entry (PC-184).
+  let commentFromLog: string | undefined;
+  try {
+    const log = row.commentLog ? (JSON.parse(row.commentLog) as unknown) : [];
+    if (Array.isArray(log)) {
+      for (let i = log.length - 1; i >= 0; i -= 1) {
+        const entry = log[i] as { submitterComment?: unknown };
+        if (
+          typeof entry?.submitterComment === "string" &&
+          entry.submitterComment.trim()
+        ) {
+          commentFromLog = entry.submitterComment.trim();
+          break;
+        }
+      }
+    }
+  } catch {
+    commentFromLog = undefined;
+  }
+
   const comment =
     parsed.data.submitterComment?.trim() ||
     row.submitterComment?.trim() ||
+    commentFromLog ||
     "(no comment)";
   const statusLabel =
     ALPHA_FEEDBACK_STATUS_LABELS[
@@ -88,15 +109,7 @@ export async function POST(
 
   const message = `Feedback update: "${row.title}" — ${statusLabel}. ${comment}`;
 
-  if (parsed.data.submitterComment !== undefined) {
-    await db
-      .update(alphaFeedbackSubmissions)
-      .set({
-        submitterComment: parsed.data.submitterComment,
-        updatedAt: new Date().toISOString(),
-      })
-      .where(eq(alphaFeedbackSubmissions.id, id));
-  }
+  // Do not re-write draft submitterComment — history lives in comment_log (PC-183/184).
 
   await notifyUser(row.submitterUserId, "alpha_feedback_reply", message, {
     url: "/schedule",
