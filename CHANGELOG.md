@@ -24,6 +24,7 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - PC-170 / PC-171: Recurring combinable with Window/All Day; recurrence configurator under date fields.
 - PC-178: Admin User management two-line mobile layout.
 - PC-179: Production admin impersonation when `AUTH_IMPERSONATION_SECRET` is set.
+- PC-180: People & Places tab label MAP → Sleeping Partners.
 - PC-174–176: E2E speedup — shared CI Next build, luke storageState, SAFE_PARALLEL per-worker DBs.
 
 ### Added

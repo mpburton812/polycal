@@ -16,6 +16,11 @@ test.describe("People & Places", () => {
     await expect(page.getByText("Leia Organa")).toBeVisible();
   });
 
+  test("shows Sleeping Partners tab with partnership map", async ({ page }) => {
+    await page.getByRole("tab", { name: "Sleeping Partners" }).click();
+    await expect(page.getByRole("tab", { name: "Sleeping Partners", selected: true })).toBeVisible();
+  });
+
   test("shows seed places collapsed by default on places tab", async ({ page }) => {
     await page.getByRole("tab", { name: "Places" }).click();
     await expect(page.getByRole("heading", { name: "Millennium Falcon", level: 2 })).toBeVisible();

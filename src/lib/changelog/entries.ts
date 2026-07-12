@@ -50,6 +50,11 @@ export const CHANGELOG: ChangelogEntry[] = [
         description:
           "Admin impersonation works in production when AUTH_IMPERSONATION_SECRET is set (PC-179).",
       },
+      {
+        type: "changed",
+        description:
+          "People & Places tab label MAP renamed to Sleeping Partners (PC-180).",
+      },
     ],
   },
   {

@@ -276,9 +276,9 @@ export function AdminPolyGroupSettingsPanel({
           label="Hide sleeping arrangements from non-sleeping partners on calendar"
         />
         <FormControl fullWidth>
-          <InputLabel>Places MAP tab visibility</InputLabel>
+          <InputLabel>Sleeping Partners tab visibility</InputLabel>
           <Select
-            label="Places MAP tab visibility"
+            label="Sleeping Partners tab visibility"
             value={settings.placesMapVisibility}
             onChange={(e) =>
               setSettings({
