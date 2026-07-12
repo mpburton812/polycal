@@ -21,7 +21,13 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Changed
+- PC-170 / PC-171: Recurring combinable with Window/All Day; recurrence configurator under date fields.
+- PC-178: Admin User management two-line mobile layout.
+- PC-179: Production admin impersonation when `AUTH_IMPERSONATION_SECRET` is set.
 - PC-174–176: E2E speedup — shared CI Next build, luke storageState, SAFE_PARALLEL per-worker DBs.
+
+### Added
+- PC-172: Restore DEV (red) / TEST (yellow) environment banners.
 
 ### Fixed
 - PC-168: SCHEMA_VERSION 21 so `password_reset_token` columns apply on hosted Turso DBs.

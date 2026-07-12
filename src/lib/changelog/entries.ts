@@ -26,6 +26,33 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "2026.07.12a",
+    date: "2026-07-12",
+    summary: "Recurring modes, admin mobile rows, production impersonation.",
+    changes: [
+      {
+        type: "changed",
+        description:
+          "Window/All Day/Poll exclusive; Recurring combinable; recurrence UI under dates (PC-170, PC-171).",
+      },
+      {
+        type: "added",
+        description:
+          "Restore colored environment banners (DEV red / TEST yellow) via DevBar (PC-172).",
+      },
+      {
+        type: "changed",
+        description:
+          "Admin User management uses two-line stacked cards on phone screens (PC-178).",
+      },
+      {
+        type: "changed",
+        description:
+          "Admin impersonation works in production when AUTH_IMPERSONATION_SECRET is set (PC-179).",
+      },
+    ],
+  },
+  {
     version: "2026.07.11e",
     date: "2026-07-11",
     summary: "E2E speedup: shared CI build, auth storageState, SAFE_PARALLEL workers.",

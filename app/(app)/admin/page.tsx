@@ -9,6 +9,7 @@ import { AdminCodeStatusPanel } from "@/components/admin/AdminCodeStatusPanel";
 import { auth } from "@/lib/auth";
 import { userHasAdminAccess } from "@/lib/admin-access";
 import { CHANGELOG, getLatestChangelogEntry } from "@/lib/changelog/entries";
+import { isImpersonationConfigured } from "@/lib/auth/impersonation";
 import { getBuildInfo, isNonProductionEnvironment } from "@/lib/env";
 import { brutalPageTitleSx } from "@/theme/brutalUi";
 import { GARDEN_TOKENS } from "@/theme/tokens";
@@ -90,7 +91,11 @@ export default async function AdminPage() {
         />
         <AdminPolyGroupSettingsPanel initialSettings={settings} />
         <AdminFastSleepingPlanPanel users={adminUsers} />
-        <AdminUserManagementPanel users={adminUsers} currentUserId={session.user.id} />
+        <AdminUserManagementPanel
+          users={adminUsers}
+          currentUserId={session.user.id}
+          impersonationEnabled={isImpersonationConfigured()}
+        />
         <AdminActivityLogPanel entries={logEntries} />
         {isNonProductionEnvironment() && <AdminTestDataPanel />}
       </Stack>

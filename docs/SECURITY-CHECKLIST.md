@@ -8,8 +8,8 @@ Use this checklist before opening or merging a **`test` → `production`** PR. H
 - [ ] `NEXT_PUBLIC_APP_ENV=production` on the production deployment
 - [ ] Production Turso database (`polycal-prod`) — no `file:` local DB URL
 - [ ] `E2E_TEST_MODE` unset or `0` in production; `/api/e2e/*` routes unreachable
-- [ ] Impersonation provider disabled in production (`AUTH_IMPERSONATION_SECRET` not used as fallback to `AUTH_SECRET`)
-- [ ] Seeding scripts and dev bar excluded from production build
+- [ ] Impersonation uses dedicated `AUTH_IMPERSONATION_SECRET` only (never falls back to `AUTH_SECRET`); unset secret disables impersonation even for admins
+- [ ] Seeding scripts and Test data panel excluded from production build
 
 ## High (resolve in parallel; track in Jira PC-74)
 

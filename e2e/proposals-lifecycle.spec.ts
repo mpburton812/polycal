@@ -95,6 +95,7 @@ test.describe("Recurring event draft", () => {
     const dialog = await openEventOrSleepingProposalDraft(page);
     await dialog.getByLabel("Title").fill(title);
     await selectDraftScheduleMode(dialog, "Recurring");
+    await dialog.getByLabel("Occurrences").fill("4");
     await expandDraftMoreOptions(dialog);
     await dialog.getByLabel(/Description/i).fill("Weekly council meetings.");
     await fillProposalDateTimeField(dialog.getByLabel("Start").first(), "2099-09-01T09:00");
