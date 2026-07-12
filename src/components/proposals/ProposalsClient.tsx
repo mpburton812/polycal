@@ -102,6 +102,8 @@ interface ProposalsClientProps {
   board: ProposalBoard;
   people: PersonSummary[];
   places: ProposalPlaceOption[];
+  /** All places with member names for residency self-join (PC-190). */
+  residencyPlaces?: ProposalPlaceOption[];
   currentUserId: string;
 }
 
@@ -112,6 +114,7 @@ export function ProposalsClient({
   board,
   people,
   places,
+  residencyPlaces,
   currentUserId,
 }: ProposalsClientProps) {
   const router = useRouter();
@@ -347,8 +350,9 @@ export function ProposalsClient({
         open={residencyCreateOpen}
         onClose={() => setResidencyCreateOpen(false)}
         people={people}
-        places={places}
+        places={residencyPlaces ?? places}
         currentUserId={currentUserId}
+        lockTargetToSelf
       />
       <ProposalDetailDialog
         proposalId={selectedProposalId}

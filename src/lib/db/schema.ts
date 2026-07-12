@@ -14,13 +14,22 @@ import {
 } from "@/types/user";
 import {
   partnershipStatuses,
+  placeRoles,
   residencyStatuses,
   type PartnershipStatus,
+  type PlaceRole,
   type ResidencyStatus,
 } from "@/types/relationship";
 
 export { userRoles, userStatuses, type UserRole, type UserStatus };
-export { partnershipStatuses, residencyStatuses, type PartnershipStatus, type ResidencyStatus };
+export {
+  partnershipStatuses,
+  placeRoles,
+  residencyStatuses,
+  type PartnershipStatus,
+  type PlaceRole,
+  type ResidencyStatus,
+};
 
 /**
  * Core identity table — credentials auth with bcrypt hashes; no PII in JSON blobs.
@@ -419,6 +428,8 @@ export const locationResidents = sqliteTable("location_residents", {
     .notNull()
     .references(() => users.id),
   status: text("status", { enum: residencyStatuses }).notNull(),
+  /** Owner can add members immediately; owners approve self-join proposals. */
+  placeRole: text("place_role", { enum: placeRoles }).notNull().default("resident"),
   proposedById: text("proposed_by_id")
     .notNull()
     .references(() => users.id),

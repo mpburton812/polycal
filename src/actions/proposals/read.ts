@@ -5,6 +5,7 @@ export {
   getProposalDetailAction,
   listAcceptedSleepingPartnerIdsAction,
   listProposalPlaceOptionsAction,
+  listResidencyPlaceOptionsAction,
   listSleepingLocationOptionsAction,
 } from "./_core";
 

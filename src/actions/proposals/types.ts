@@ -72,6 +72,10 @@ export interface ProposalPlaceOption {
   name: string;
   bedroomCount: number;
   bedroomNames: string[];
+  /** Accepted owner display names (residency picker). */
+  owners?: string[];
+  /** Accepted resident (non-owner) display names. */
+  residents?: string[];
 }
 
 export interface ProposalInviteeView {

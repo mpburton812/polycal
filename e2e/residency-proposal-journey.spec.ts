@@ -5,66 +5,27 @@ import { login, loginWithOnboardingIfNeeded, logout } from "./helpers/auth";
 import { USERS } from "./helpers/constants";
 import { goToAdmin, goToPeoplePlaces, goToProposals, selectProposalTab } from "./helpers/navigation";
 import { expectInAppNotification } from "./helpers/notifications";
-import { associateResident, expandPlace } from "./helpers/people-places";
+import { addPersonToPlace, expandPlace } from "./helpers/people-places";
 import { proposalCard } from "./helpers/proposals";
 
 const PLACE = "Cloud City";
 const RESIDENCY_TITLE = `Residency at ${PLACE}`;
 
 test.describe("Residency proposal journey", () => {
-  test("admin assigns residency, invitee responds, ownership edit flow", async ({ page }) => {
+  test("owner adds resident immediately; self-join requires owner approval", async ({ page }) => {
     test.setTimeout(300_000);
 
-    // —— Phase 1: Luke assigns Leia residency at Cloud City ——
+    // —— Phase 1: Luke (owner/admin) adds Han as Resident immediately ——
     await login(page, USERS.luke.username);
     await goToPeoplePlaces(page);
-    await associateResident(page, PLACE, USERS.leia.displayName);
+    await addPersonToPlace(page, PLACE, USERS.han.displayName, "Resident");
+    await expandPlace(page, PLACE);
+    await expect(page.getByText(USERS.han.displayName)).toBeVisible({ timeout: 15_000 });
     await logout(page);
 
-    // —— Phase 2: Leia notified, declines via Proposals ——
-    await loginWithOnboardingIfNeeded(page, USERS.leia.username);
-    await expectInAppNotification(page, new RegExp(PLACE, "i"));
-    await goToProposals(page);
-    await selectProposalTab(page, "Proposed");
-    await expect(proposalCard(page, RESIDENCY_TITLE)).toBeVisible({ timeout: 20_000 });
-    await proposalCard(page, RESIDENCY_TITLE).click();
-    const leiaDialog = page.getByRole("dialog");
-    await leiaDialog.getByRole("button", { name: "Decline" }).click();
-    await logout(page);
-
-    // —— Phase 3: Luke sees declined draft, deletes it ——
-    await login(page, USERS.luke.username);
-    await expectInAppNotification(page, /moved back to drafts|vote was cast/i);
-    await goToProposals(page);
-    await selectProposalTab(page, "Drafts");
-    await expect(proposalCard(page, RESIDENCY_TITLE)).toBeVisible({ timeout: 20_000 });
-    await proposalCard(page, RESIDENCY_TITLE).click();
-    const lukeDraftDialog = page.getByRole("dialog");
-    page.once("dialog", (dialog) => dialog.accept());
-    await lukeDraftDialog.getByRole("button", { name: "Delete" }).click();
-    await expect(proposalCard(page, RESIDENCY_TITLE)).toHaveCount(0, { timeout: 15_000 });
-    await logout(page);
-
-    // —— Phase 4: Luke assigns Han, Han accepts with comment ——
-    await login(page, USERS.luke.username);
-    await goToPeoplePlaces(page);
-    await associateResident(page, PLACE, USERS.han.displayName);
-    await logout(page);
-
+    // —— Phase 2: Han is notified and can edit the place as resident ——
     await loginWithOnboardingIfNeeded(page, USERS.han.username);
     await expectInAppNotification(page, new RegExp(PLACE, "i"));
-    await goToProposals(page);
-    await selectProposalTab(page, "Proposed");
-    await proposalCard(page, RESIDENCY_TITLE).click();
-    const hanDialog = page.getByRole("dialog");
-    const comment = "this is great";
-    await hanDialog.getByPlaceholder("Add a comment…").fill(comment);
-    await hanDialog.getByRole("button", { name: "Post" }).click();
-    await expect(hanDialog.getByText(comment)).toBeVisible({ timeout: 15_000 });
-    await hanDialog.getByRole("button", { name: "Accept" }).click();
-    await hanDialog.getByRole("button", { name: "Close" }).click({ timeout: 15_000 });
-
-    // —— Phase 5: Han edits place bedrooms as accepted resident ——
     await goToPeoplePlaces(page);
     await expandPlace(page, PLACE);
     await page.getByRole("button", { name: "Edit place" }).click();
@@ -77,16 +38,44 @@ test.describe("Residency proposal journey", () => {
     await expect(page.getByText("bedroom sad")).toBeVisible();
     await logout(page);
 
-    // —— Phase 6: Admin activity log contains residency actions ——
+    // —— Phase 3: Leia self-joins via residency proposal (owners approve) ——
+    await loginWithOnboardingIfNeeded(page, USERS.leia.username);
+    await goToProposals(page);
+    await page.getByRole("button", { name: "New proposal" }).click();
+    await page.getByRole("menuitem", { name: "Place residency proposal" }).click();
+    const residencyDialog = page.getByRole("dialog", { name: "Place residency proposal" });
+    await residencyDialog.getByLabel("Place").click();
+    await page.getByRole("option", { name: PLACE }).click();
+    await expect(residencyDialog.getByText(/Owners:/i)).toBeVisible();
+    await expect(residencyDialog.getByText(/Luke/i)).toBeVisible();
+    await residencyDialog.getByLabel("Access level").click();
+    await page.getByRole("option", { name: "Resident" }).click();
+    await residencyDialog.getByRole("button", { name: "Submit" }).click();
+    await expect(residencyDialog).toBeHidden({ timeout: 20_000 });
+    await logout(page);
+
+    // —— Phase 4: Luke (owner) accepts Leia's self-join ——
     await login(page, USERS.luke.username);
+    await expectInAppNotification(page, /Residency|Cloud City/i);
+    await goToProposals(page);
+    await selectProposalTab(page, "Proposed");
+    await expect(proposalCard(page, RESIDENCY_TITLE)).toBeVisible({ timeout: 20_000 });
+    await proposalCard(page, RESIDENCY_TITLE).click();
+    const lukeDialog = page.getByRole("dialog");
+    await lukeDialog.getByRole("button", { name: "Accept" }).click();
+    await lukeDialog.getByRole("button", { name: "Close" }).click({ timeout: 15_000 });
+
+    await goToPeoplePlaces(page);
+    await expandPlace(page, PLACE);
+    await expect(page.getByText(USERS.leia.displayName)).toBeVisible({ timeout: 15_000 });
+
+    // —— Phase 5: Admin activity log ——
     await goToAdmin(page);
     await expandAdminSection(page, "System administrator log");
-    await expect(page.getByText("places.propose_residency").first()).toBeVisible({
+    await expect(page.getByText("places.add_person").first()).toBeVisible({
       timeout: 15_000,
     });
-    await expect(page.getByText("places.decline_residency").first()).toBeVisible();
+    await expect(page.getByText("places.propose_residency").first()).toBeVisible();
     await expect(page.getByText("places.accept_residency").first()).toBeVisible();
-    await expect(page.getByRole("table")).toContainText(USERS.leia.displayName);
-    await expect(page.getByRole("table")).toContainText(USERS.han.displayName);
   });
 });
