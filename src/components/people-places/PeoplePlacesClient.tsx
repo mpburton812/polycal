@@ -971,7 +971,7 @@ export function PeoplePlacesClient({
         <Tabs value={tab} onChange={(_, value) => setTab(value)}>
           <Tab label="People" />
           <Tab label="Places" />
-          {showMapTab && <Tab label="MAP" />}
+          {showMapTab && <Tab label="Sleeping Partners" />}
         </Tabs>
         {canProvision && tab === 0 && (
           <Button variant="contained" onClick={() => setCreateOpen(true)}>

@@ -165,7 +165,7 @@ export function minutesFromNowDateTime(minutesFromNow: number): string {
   return `${y}-${m}-${d}T${h}:${min}`;
 }
 
-/** Selects Window / All Day / Poll / Recurring on the draft mode grid (PC-152). */
+/** Selects Window / All Day / Poll on the exclusive timing group, or toggles Recurring (PC-170). */
 export async function selectDraftScheduleMode(
   dialog: Locator,
   mode: "Window" | "All Day" | "Poll" | "Recurring",

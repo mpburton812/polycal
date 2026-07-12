@@ -46,6 +46,12 @@ export interface ProposalDraftEventFieldsProps {
   onLocationIdChange: (value: string) => void;
   onLocationCustomChange: (value: string) => void;
   onClearBedroom: () => void;
+  /** When true, show recurrence pattern/count under the date fields (PC-171). */
+  isRecurring?: boolean;
+  recurrencePattern?: "daily" | "weekly" | "monthly" | "yearly";
+  onRecurrencePatternChange?: (value: "daily" | "weekly" | "monthly" | "yearly") => void;
+  recurrenceCount?: number;
+  onRecurrenceCountChange?: (value: number) => void;
 }
 
 /**
@@ -71,6 +77,11 @@ export function ProposalDraftEventFields({
   onLocationIdChange,
   onLocationCustomChange,
   onClearBedroom,
+  isRecurring = false,
+  recurrencePattern = "weekly",
+  onRecurrencePatternChange,
+  recurrenceCount = 4,
+  onRecurrenceCountChange,
 }: ProposalDraftEventFieldsProps) {
   return (
     <Stack spacing={2} sx={{ mb: 2 }}>
@@ -165,6 +176,40 @@ export function ProposalDraftEventFields({
           Add poll option
         </Button>
       )}
+
+      {isRecurring && onRecurrencePatternChange && onRecurrenceCountChange ? (
+        <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
+          <FormControl fullWidth size="small">
+            <InputLabel id="recurrence-pattern-label">Pattern</InputLabel>
+            <Select
+              labelId="recurrence-pattern-label"
+              label="Pattern"
+              value={recurrencePattern}
+              onChange={(event) =>
+                onRecurrencePatternChange(
+                  event.target.value as "daily" | "weekly" | "monthly" | "yearly",
+                )
+              }
+            >
+              <MenuItem value="daily">Daily</MenuItem>
+              <MenuItem value="weekly">Weekly</MenuItem>
+              <MenuItem value="monthly">Monthly</MenuItem>
+              <MenuItem value="yearly">Yearly</MenuItem>
+            </Select>
+          </FormControl>
+          <TextField
+            label="Occurrences"
+            type="number"
+            size="small"
+            value={recurrenceCount}
+            onChange={(event) =>
+              onRecurrenceCountChange(Math.min(52, Math.max(2, Number(event.target.value) || 2)))
+            }
+            inputProps={{ min: 2, max: 52 }}
+            sx={{ width: { xs: "100%", sm: 140 } }}
+          />
+        </Stack>
+      ) : null}
 
       <ProposalDraftSectionHeader
         icon={<GroupsOutlinedIcon fontSize="small" />}

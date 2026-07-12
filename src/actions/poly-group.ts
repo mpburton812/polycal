@@ -361,7 +361,7 @@ export async function proposeGroupNameChangeAction(
 }
 
 /**
- * Returns MAP tab visibility for People & Places (PC-73).
+ * Returns Sleeping Partners tab visibility for People & Places (PC-73 / PC-180).
  */
 export async function getPlacesMapVisibilityAction(): Promise<PlacesMapVisibility> {
   await ensureDbReady();
