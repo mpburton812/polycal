@@ -10,6 +10,10 @@ import {
   ALPHA_FEEDBACK_STATUS_LABELS,
   alphaFeedbackPatchSchema,
 } from "@/lib/alpha-feedback/schema";
+import {
+  appendAlphaFeedbackCommentLog,
+  parseAlphaFeedbackCommentLog,
+} from "@/lib/alpha-feedback/comment-log";
 import { getDb } from "@/lib/db/client";
 import { ensureDbReady } from "@/lib/db/ensure-ready";
 import { alphaFeedbackSubmissions } from "@/lib/db/schema";
@@ -60,6 +64,7 @@ export async function GET(
         screenshotBase64: row.screenshotData
           ? Buffer.from(row.screenshotData).toString("base64")
           : null,
+        commentLog: parseAlphaFeedbackCommentLog(row.commentLog),
         statusLabel:
           ALPHA_FEEDBACK_STATUS_LABELS[
             row.status as keyof typeof ALPHA_FEEDBACK_STATUS_LABELS
@@ -123,7 +128,10 @@ export async function PATCH(
   await ensureDbReady();
   const db = getDb();
   const [existing] = await db
-    .select({ id: alphaFeedbackSubmissions.id })
+    .select({
+      id: alphaFeedbackSubmissions.id,
+      commentLog: alphaFeedbackSubmissions.commentLog,
+    })
     .from(alphaFeedbackSubmissions)
     .where(eq(alphaFeedbackSubmissions.id, id))
     .limit(1);
@@ -136,16 +144,34 @@ export async function PATCH(
   }
 
   const now = new Date().toISOString();
+  const appended =
+    parsed.data.internalComment !== undefined ||
+    parsed.data.submitterComment !== undefined
+      ? appendAlphaFeedbackCommentLog(existing.commentLog, {
+          internalComment: parsed.data.internalComment,
+          submitterComment: parsed.data.submitterComment,
+        }, now)
+      : null;
+
   await db
     .update(alphaFeedbackSubmissions)
     .set({
       ...(parsed.data.status !== undefined ? { status: parsed.data.status } : {}),
-      ...(parsed.data.internalComment !== undefined
-        ? { internalComment: parsed.data.internalComment }
-        : {}),
-      ...(parsed.data.submitterComment !== undefined
-        ? { submitterComment: parsed.data.submitterComment }
-        : {}),
+      ...(appended
+        ? {
+            commentLog: appended.logJson,
+            // Draft fields are working areas — clear after appending to the log (PC-183).
+            internalComment: null,
+            submitterComment: null,
+          }
+        : {
+            ...(parsed.data.internalComment !== undefined
+              ? { internalComment: parsed.data.internalComment }
+              : {}),
+            ...(parsed.data.submitterComment !== undefined
+              ? { submitterComment: parsed.data.submitterComment }
+              : {}),
+          }),
       ...(parsed.data.archived !== undefined
         ? { archivedAt: parsed.data.archived ? now : null }
         : {}),
@@ -159,6 +185,7 @@ export async function PATCH(
       status: alphaFeedbackSubmissions.status,
       internalComment: alphaFeedbackSubmissions.internalComment,
       submitterComment: alphaFeedbackSubmissions.submitterComment,
+      commentLog: alphaFeedbackSubmissions.commentLog,
       archivedAt: alphaFeedbackSubmissions.archivedAt,
       updatedAt: alphaFeedbackSubmissions.updatedAt,
     })
@@ -168,7 +195,12 @@ export async function PATCH(
 
   return withAlphaFeedbackCors(
     request,
-    NextResponse.json({ submission: updated }),
+    NextResponse.json({
+      submission: {
+        ...updated,
+        commentLog: parseAlphaFeedbackCommentLog(updated?.commentLog),
+      },
+    }),
   );
 }
 

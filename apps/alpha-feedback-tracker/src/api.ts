@@ -13,6 +13,12 @@ export const STATUS_LABELS: Record<FeedbackStatus, string> = {
   closed: "Closed",
 };
 
+export interface FeedbackCommentLogEntry {
+  at: string;
+  internalComment?: string;
+  submitterComment?: string;
+}
+
 export interface FeedbackListItem {
   id: string;
   kind: "bug" | "feature";
@@ -35,6 +41,7 @@ export interface FeedbackListItem {
   screenshotMimeType: string | null;
   internalComment: string | null;
   submitterComment: string | null;
+  commentLog?: FeedbackCommentLogEntry[] | string | null;
   archivedAt: string | null;
   createdAt: string;
   updatedAt: string;
@@ -43,6 +50,7 @@ export interface FeedbackListItem {
 export interface FeedbackDetail extends FeedbackListItem {
   screenshotBase64: string | null;
   statusLabel?: string;
+  commentLog?: FeedbackCommentLogEntry[];
 }
 
 export interface ApiClientOptions {

@@ -26,6 +26,28 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "2026.07.12b",
+    date: "2026-07-12",
+    summary: "Alpha Feedback screenshot lightbox, comment log, notify on Save.",
+    changes: [
+      {
+        type: "added",
+        description:
+          "Alpha Feedback tracker: click screenshot to view full size (PC-182).",
+      },
+      {
+        type: "added",
+        description:
+          "Alpha Feedback: dated comment log on Save; draft fields clear after append (PC-183).",
+      },
+      {
+        type: "changed",
+        description:
+          "Alpha Feedback: remove Notify Submitter button; Save notifies when a submitter comment is present (PC-184).",
+      },
+    ],
+  },
+  {
     version: "2026.07.12a",
     date: "2026-07-12",
     summary: "Recurring modes, admin mobile rows, production impersonation.",
