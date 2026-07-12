@@ -26,6 +26,28 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "2026.07.11e",
+    date: "2026-07-11",
+    summary: "E2E speedup: shared CI build, auth storageState, SAFE_PARALLEL workers.",
+    changes: [
+      {
+        type: "changed",
+        description:
+          "Playwright CI builds Next once and shares .next across shards (PC-174).",
+      },
+      {
+        type: "changed",
+        description:
+          "Seed-user JWT storageState + login fast-path; empty storage for auth/reset specs (PC-175).",
+      },
+      {
+        type: "changed",
+        description:
+          "SAFE_PARALLEL project uses per-worker DBs/ports; SERIAL_ONLY stays workers:1 (PC-176).",
+      },
+    ],
+  },
+  {
     version: "2026.07.11d",
     date: "2026-07-11",
     summary: "Fix hosted DB missing password_reset_token columns (schema v21).",

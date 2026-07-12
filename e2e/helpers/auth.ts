@@ -5,14 +5,37 @@ import { completeFirstLoginOnboarding } from "./onboarding";
 import { openProfileMenu } from "./navigation";
 
 /**
+ * Returns true when the current JWT session is already the requested seed user (PC-175).
+ */
+async function sessionMatchesUser(page: Page, username: string): Promise<boolean> {
+  try {
+    const response = await page.request.get("/api/auth/session");
+    if (!response.ok()) return false;
+    const body = (await response.json()) as { user?: { email?: string } };
+    return body.user?.email?.toLowerCase() === username.toLowerCase();
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Signs in via the credentials form and waits for the authenticated shell.
+ * Reuses storageState / existing JWT when already the requested user (PC-175).
  */
 export async function login(
   page: Page,
   username: string,
   password: string = SEED_PASSWORD,
 ): Promise<void> {
+  if (password === SEED_PASSWORD && (await sessionMatchesUser(page, username))) {
+    await page.goto("/schedule");
+    if (!page.url().includes("/login")) {
+      return;
+    }
+  }
+
   for (let attempt = 0; attempt < 3; attempt += 1) {
+    await page.context().clearCookies();
     await page.goto("/login");
     if (!(await page.getByLabel("Username").isVisible().catch(() => false))) {
       await page.context().clearCookies();

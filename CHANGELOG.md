@@ -20,6 +20,9 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Changed
+- PC-174–176: E2E speedup — shared CI Next build, luke storageState, SAFE_PARALLEL per-worker DBs.
+
 ### Fixed
 - PC-168: SCHEMA_VERSION 21 so `password_reset_token` columns apply on hosted Turso DBs.
 

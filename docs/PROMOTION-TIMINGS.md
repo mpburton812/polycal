@@ -18,6 +18,8 @@ Wall-clock reference for Playwright-heavy promotion steps. Shard times are per-m
 
 ## Notes
 
-- E2E CI uses `npm run test:e2e:ci` with `--shard=N/4` (`e2e.yml`, `production.yml`).
+- E2E CI builds Next **once** (`build` / `e2e-build` job), uploads `.next`, and shards only `next start` + Playwright (PC-174).
+- SAFE_PARALLEL specs run with `E2E_PARALLEL_WORKERS` (default 2) against `e2e-w{N}.db` on ports `3099+N` (PC-176); SERIAL_ONLY stays `workers: 1`.
+- Auth setup writes JWT `storageState` per worker origin (PC-175).
 - `e2e.yml` adds `concurrency` with `cancel-in-progress` to dedupe feature-push + PR runs.
-- Update the **This run** column after merge using `gh pr checks` and `gh run list --workflow=e2e.yml`.
+- Update timings after merge using `gh pr checks` and `gh run list --workflow=e2e.yml`.
