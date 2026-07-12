@@ -40,3 +40,16 @@ export function getSqlClient(): Client {
   }
   return client!;
 }
+
+/**
+ * Clears the process-wide DB singleton so prepare scripts can seed multiple file DBs (PC-176).
+ */
+export function resetDbSingleton(): void {
+  try {
+    client?.close();
+  } catch {
+    // Ignore close errors when switching file URLs during e2e prepare.
+  }
+  client = undefined;
+  database = undefined;
+}

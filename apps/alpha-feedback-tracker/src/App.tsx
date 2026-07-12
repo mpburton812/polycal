@@ -35,6 +35,7 @@ import {
   loginAdmin,
   notifySubmitter,
   patchSubmission,
+  type FeedbackCommentLogEntry,
   type FeedbackDetail,
   type FeedbackListItem,
   type FeedbackStatus,
@@ -107,8 +108,16 @@ export function App() {
   const [status, setStatus] = useState<FeedbackStatus>("not_started");
   /** Active inbox vs archive list (PC-136). */
   const [listView, setListView] = useState<"active" | "archive">("active");
+  /** Full-size screenshot lightbox (PC-182). */
+  const [screenshotLightboxOpen, setScreenshotLightboxOpen] = useState(false);
 
   const apiOptions = { protectionBypass };
+
+  const commentLogEntries = useMemo((): FeedbackCommentLogEntry[] => {
+    const raw = detail?.commentLog;
+    if (!raw) return [];
+    return Array.isArray(raw) ? raw : [];
+  }, [detail?.commentLog]);
 
   const sortedRows = useMemo(() => {
     const copy = [...rows];
@@ -172,6 +181,7 @@ export function App() {
     if (!token) return;
     setBusy(true);
     setError(null);
+    setScreenshotLightboxOpen(false);
     try {
       const submission = await getSubmission(baseUrl, token, id, apiOptions);
       setDetail(submission);
@@ -185,8 +195,14 @@ export function App() {
     }
   }
 
+  /**
+   * Persist status + comments: append non-empty drafts to the dated log, clear
+   * fields, and email/notify the submitter when a submitter comment was saved (PC-183/184).
+   */
   async function saveDetail() {
     if (!token || !detail) return;
+    const submitterDraft = submitterComment.trim();
+    const hadSubmitterComment = submitterDraft.length > 0;
     setBusy(true);
     setError(null);
     try {
@@ -201,42 +217,23 @@ export function App() {
         },
         apiOptions,
       );
+      if (hadSubmitterComment) {
+        await notifySubmitter(
+          baseUrl,
+          token,
+          detail.id,
+          submitterDraft,
+          apiOptions,
+        );
+      }
+      setInternalComment("");
+      setSubmitterComment("");
       await refresh();
       const updated = await getSubmission(baseUrl, token, detail.id, apiOptions);
       setDetail(updated);
+      setStatus(updated.status);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Save failed");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function handleNotify() {
-    if (!token || !detail) return;
-    setBusy(true);
-    setError(null);
-    try {
-      await patchSubmission(
-        baseUrl,
-        token,
-        detail.id,
-        {
-          status,
-          internalComment: internalComment || null,
-          submitterComment: submitterComment || null,
-        },
-        apiOptions,
-      );
-      await notifySubmitter(
-        baseUrl,
-        token,
-        detail.id,
-        submitterComment,
-        apiOptions,
-      );
-      await refresh();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Notify failed");
     } finally {
       setBusy(false);
     }
@@ -543,7 +540,10 @@ export function App() {
 
       <Dialog
         open={Boolean(detail)}
-        onClose={() => setDetail(null)}
+        onClose={() => {
+          setScreenshotLightboxOpen(false);
+          setDetail(null);
+        }}
         fullWidth
         maxWidth="md"
       >
@@ -587,11 +587,34 @@ export function App() {
                 )}
                 {detail.screenshotBase64 && (
                   <Box
-                    component="img"
-                    alt="Submission screenshot"
-                    src={`data:${detail.screenshotMimeType ?? "image/jpeg"};base64,${detail.screenshotBase64}`}
-                    sx={{ maxWidth: "100%", maxHeight: 360, objectFit: "contain", border: 1, borderColor: "divider" }}
-                  />
+                    component="button"
+                    type="button"
+                    onClick={() => setScreenshotLightboxOpen(true)}
+                    aria-label="View screenshot full size"
+                    sx={{
+                      display: "block",
+                      p: 0,
+                      m: 0,
+                      border: 1,
+                      borderColor: "divider",
+                      bgcolor: "transparent",
+                      cursor: "zoom-in",
+                      maxWidth: "100%",
+                      textAlign: "left",
+                    }}
+                  >
+                    <Box
+                      component="img"
+                      alt="Submission screenshot"
+                      src={`data:${detail.screenshotMimeType ?? "image/jpeg"};base64,${detail.screenshotBase64}`}
+                      sx={{
+                        display: "block",
+                        maxWidth: "100%",
+                        maxHeight: 360,
+                        objectFit: "contain",
+                      }}
+                    />
+                  </Box>
                 )}
                 <FormControl fullWidth>
                   <InputLabel id="status-label">Status</InputLabel>
@@ -623,8 +646,48 @@ export function App() {
                   multiline
                   minRows={2}
                   fullWidth
-                  helperText="Included when notifying the submitter"
+                  helperText="Saving with a submitter comment notifies the submitter"
                 />
+                {commentLogEntries.length > 0 && (
+                  <Box>
+                    <Typography variant="subtitle2" gutterBottom>
+                      Comment log
+                    </Typography>
+                    <Stack spacing={1.5}>
+                      {[...commentLogEntries].reverse().map((entry, index) => (
+                        <Box
+                          key={`${entry.at}-${index}`}
+                          sx={{
+                            p: 1.5,
+                            border: 1,
+                            borderColor: "divider",
+                            borderRadius: 1,
+                          }}
+                        >
+                          <Typography variant="caption" color="text.secondary">
+                            {new Date(entry.at).toLocaleString()}
+                          </Typography>
+                          {entry.internalComment ? (
+                            <Typography
+                              variant="body2"
+                              sx={{ mt: 0.5, whiteSpace: "pre-wrap" }}
+                            >
+                              <strong>Internal:</strong> {entry.internalComment}
+                            </Typography>
+                          ) : null}
+                          {entry.submitterComment ? (
+                            <Typography
+                              variant="body2"
+                              sx={{ mt: 0.5, whiteSpace: "pre-wrap" }}
+                            >
+                              <strong>Submitter:</strong> {entry.submitterComment}
+                            </Typography>
+                          ) : null}
+                        </Box>
+                      ))}
+                    </Stack>
+                  </Box>
+                )}
               </Stack>
             </DialogContent>
             <DialogActions sx={{ flexWrap: "wrap", gap: 1 }}>
@@ -645,16 +708,62 @@ export function App() {
                   Archive
                 </Button>
               )}
-              <Button onClick={() => setDetail(null)}>Close</Button>
-              <Button disabled={busy} onClick={() => void saveDetail()}>
-                Save
+              <Button
+                onClick={() => {
+                  setScreenshotLightboxOpen(false);
+                  setDetail(null);
+                }}
+              >
+                Close
               </Button>
-              <Button variant="contained" disabled={busy} onClick={() => void handleNotify()}>
-                Notify submitter
+              <Button
+                variant="contained"
+                disabled={busy}
+                onClick={() => void saveDetail()}
+              >
+                Save
               </Button>
             </DialogActions>
           </>
         )}
+      </Dialog>
+
+      <Dialog
+        open={Boolean(detail?.screenshotBase64) && screenshotLightboxOpen}
+        onClose={() => setScreenshotLightboxOpen(false)}
+        maxWidth={false}
+        fullWidth
+        PaperProps={{
+          sx: {
+            m: 1,
+            maxWidth: "min(96vw, 1400px)",
+            bgcolor: "#111",
+          },
+        }}
+      >
+        <DialogTitle sx={{ color: "#fff", py: 1 }}>
+          Screenshot
+          <Button
+            onClick={() => setScreenshotLightboxOpen(false)}
+            sx={{ float: "right", color: "#fff" }}
+          >
+            Close
+          </Button>
+        </DialogTitle>
+        <DialogContent sx={{ p: 1, display: "flex", justifyContent: "center" }}>
+          {detail?.screenshotBase64 ? (
+            <Box
+              component="img"
+              alt="Submission screenshot full size"
+              src={`data:${detail.screenshotMimeType ?? "image/jpeg"};base64,${detail.screenshotBase64}`}
+              sx={{
+                maxWidth: "100%",
+                maxHeight: "85vh",
+                objectFit: "contain",
+              }}
+            />
+          ) : null}
+        </DialogContent>
       </Dialog>
     </Box>
   );

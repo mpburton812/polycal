@@ -1,4 +1,5 @@
 /** Environment variables for isolated Playwright runs (no app imports). */
+
 export const E2E_PORT = Number(process.env.E2E_PORT ?? 3099);
 
 export const E2E_API_SECRET = "e2e-api-secret-for-playwright-tests";
@@ -19,14 +20,27 @@ export const E2E_ANCHOR_DATE = resolveE2eAnchorDate();
 
 export const E2E_CRON_SECRET = "e2e-cron-secret-for-playwright-tests";
 
-export const E2E_ENV = {
-  TURSO_DATABASE_URL: "file:e2e.db",
-  NEXT_PUBLIC_APP_ENV: "feature",
-  AUTH_SECRET: "e2e-test-auth-secret-min-32-characters",
-  AUTH_IMPERSONATION_SECRET: E2E_IMPERSONATION_SECRET,
-  AUTH_URL: `http://localhost:${E2E_PORT}`,
-  E2E_TEST_MODE: "1",
-  E2E_API_SECRET,
-  E2E_ANCHOR_DATE,
-  CRON_SECRET: E2E_CRON_SECRET,
-} as const;
+/** File URL for worker-isolated SQLite DB (PC-176). */
+export function e2eDbUrl(workerIndex = 0): string {
+  return `file:e2e-w${workerIndex}.db`;
+}
+
+/** Base env shared by all e2e Next servers (AUTH_URL / DB set per worker). */
+export function e2eEnvForWorker(workerIndex: number): Record<string, string> {
+  const port = E2E_PORT + workerIndex;
+  return {
+    TURSO_DATABASE_URL: e2eDbUrl(workerIndex),
+    NEXT_PUBLIC_APP_ENV: "feature",
+    AUTH_SECRET: "e2e-test-auth-secret-min-32-characters",
+    AUTH_IMPERSONATION_SECRET: E2E_IMPERSONATION_SECRET,
+    AUTH_URL: `http://localhost:${port}`,
+    E2E_TEST_MODE: "1",
+    E2E_API_SECRET,
+    E2E_ANCHOR_DATE,
+    CRON_SECRET: E2E_CRON_SECRET,
+    PORT: String(port),
+  };
+}
+
+/** @deprecated Prefer e2eEnvForWorker(0) — kept for scripts that expect a flat map. */
+export const E2E_ENV = e2eEnvForWorker(0);

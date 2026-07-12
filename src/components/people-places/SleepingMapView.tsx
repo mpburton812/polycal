@@ -84,7 +84,7 @@ function MapNode({
 }
 
 /**
- * Simple partnership graph for the People & Places MAP tab (PC-73).
+ * Simple partnership graph for the People & Places Sleeping Partners tab (PC-73 / PC-180).
  */
 export function SleepingMapView({ edges }: SleepingMapViewProps) {
   if (edges.length === 0) {

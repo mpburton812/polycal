@@ -31,9 +31,11 @@ import {
   TextField,
   Tooltip,
   Typography,
+  useMediaQuery,
 } from "@mui/material";
+import { useTheme } from "@mui/material/styles";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useState, useTransition, type ReactNode } from "react";
 
 import { adminImpersonateUserAction } from "@/actions/admin";
 import { AdminCollapsibleSection } from "@/components/admin/AdminCollapsibleSection";
@@ -48,17 +50,24 @@ import {
   updateUserAction,
 } from "@/actions/users";
 import { AVATAR_OPTIONS } from "@/lib/constants/avatars";
+import { GARDEN_TOKENS, ORGANIC_RADIUS, STROKE_DEFAULT } from "@/theme/tokens";
 
 /**
- * Admin user management with edit, impersonate, and delete (PC-31).
+ * Admin user management with edit, impersonate, and delete (PC-31 / PC-178).
  */
 export function AdminUserManagementPanel({
   users,
   currentUserId,
+  impersonationEnabled = false,
 }: {
   users: AdminUserRow[];
   currentUserId: string;
+  /** When true, Impersonate is offered (AUTH_IMPERSONATION_SECRET configured) — PC-179. */
+  impersonationEnabled?: boolean;
 }) {
+  const theme = useTheme();
+  /** Stack identity + actions on two lines below md so phones stay tappable (PC-178). */
+  const isCompact = useMediaQuery(theme.breakpoints.down("md"));
   const router = useRouter();
   const [message, setMessage] = useState<string | null>(null);
   const [messageSeverity, setMessageSeverity] = useState<"success" | "error" | "info">("info");
@@ -108,7 +117,7 @@ export function AdminUserManagementPanel({
     );
   }
 
-  function checkEditUsername(userId: string, currentUsername: string) {
+  function checkEditUsername(userId: string) {
     if (!editUsername.trim()) return;
     startTransition(async () => {
       const result = await checkUsernameAvailableAction(editUsername, userId);
@@ -132,6 +141,167 @@ export function AdminUserManagementPanel({
     });
   }
 
+  function statusChip(user: AdminUserRow): ReactNode {
+    return (
+      <Chip
+        size="small"
+        label={user.status}
+        color={
+          user.status === "active"
+            ? "success"
+            : user.status === "paused"
+              ? "warning"
+              : user.status === "deleted"
+                ? "error"
+                : "default"
+        }
+        sx={{ maxWidth: "100%" }}
+      />
+    );
+  }
+
+  function userActions(user: AdminUserRow): ReactNode {
+    return (
+      <Stack direction="row" spacing={0.25} flexWrap="wrap" useFlexGap>
+        <Tooltip title="Edit">
+          <span>
+            <IconButton
+              size="small"
+              aria-label={`Edit ${user.displayName}`}
+              disabled={pending}
+              onClick={() => openEdit(user)}
+            >
+              <EditOutlinedIcon fontSize="small" />
+            </IconButton>
+          </span>
+        </Tooltip>
+        {user.role === "passive" && user.status === "active" && (
+          <Tooltip title="Activate">
+            <span>
+              <IconButton
+                size="small"
+                aria-label={`Activate ${user.displayName}`}
+                disabled={pending}
+                onClick={() => {
+                  setActivateUser(user);
+                  setActivateUsername("");
+                  setActivateEmail("");
+                  setActivateRole("user");
+                  setActivateUsernameStatus({
+                    checked: false,
+                    available: false,
+                    message: "",
+                  });
+                }}
+              >
+                <HowToRegOutlinedIcon fontSize="small" />
+              </IconButton>
+            </span>
+          </Tooltip>
+        )}
+        {impersonationEnabled && user.role !== "passive" && user.status === "active" && (
+          <Tooltip title="Impersonate">
+            <span>
+              <IconButton
+                size="small"
+                aria-label={`Impersonate ${user.displayName}`}
+                disabled={pending}
+                onClick={() =>
+                  startTransition(async () => {
+                    const result = await adminImpersonateUserAction(user.id);
+                    if (!result.ok) {
+                      showStatus(result.message, "error");
+                    }
+                  })
+                }
+              >
+                <SwitchAccountOutlinedIcon fontSize="small" />
+              </IconButton>
+            </span>
+          </Tooltip>
+        )}
+        {user.role !== "passive" && user.status === "active" && (
+          <Tooltip title="Reset password">
+            <span>
+              <IconButton
+                size="small"
+                aria-label={`Reset password for ${user.displayName}`}
+                disabled={pending}
+                onClick={() =>
+                  startTransition(async () => {
+                    const result = await adminResetPasswordAction({ userId: user.id });
+                    showStatus(result.message, result.ok ? "success" : "error");
+                    if (result.loginInstructions) {
+                      setCredentials(result.loginInstructions);
+                    }
+                  })
+                }
+              >
+                <LockResetIcon fontSize="small" />
+              </IconButton>
+            </span>
+          </Tooltip>
+        )}
+        {user.status === "active" && user.id !== currentUserId && (
+          <Tooltip title="Pause">
+            <span>
+              <IconButton
+                size="small"
+                aria-label={`Pause ${user.displayName}`}
+                color="warning"
+                disabled={pending}
+                onClick={() =>
+                  startTransition(async () => {
+                    const result = await pauseUserAction(user.id);
+                    showStatus(result.message, result.ok ? "success" : "error");
+                    if (result.ok) router.refresh();
+                  })
+                }
+              >
+                <PauseCircleOutlineIcon fontSize="small" />
+              </IconButton>
+            </span>
+          </Tooltip>
+        )}
+        {user.status === "paused" && (
+          <Tooltip title="Resume">
+            <span>
+              <IconButton
+                size="small"
+                aria-label={`Resume ${user.displayName}`}
+                disabled={pending}
+                onClick={() =>
+                  startTransition(async () => {
+                    const result = await resumeUserAction(user.id);
+                    showStatus(result.message, result.ok ? "success" : "error");
+                    if (result.ok) router.refresh();
+                  })
+                }
+              >
+                <PlayCircleOutlineIcon fontSize="small" />
+              </IconButton>
+            </span>
+          </Tooltip>
+        )}
+        {user.id !== currentUserId && user.status !== "deleted" && (
+          <Tooltip title="Delete">
+            <span>
+              <IconButton
+                size="small"
+                aria-label={`Delete ${user.displayName}`}
+                color="error"
+                disabled={pending}
+                onClick={() => setDeleteTarget(user)}
+              >
+                <DeleteOutlineIcon fontSize="small" />
+              </IconButton>
+            </span>
+          </Tooltip>
+        )}
+      </Stack>
+    );
+  }
+
   return (
     <AdminCollapsibleSection title="User management">
       {message && (
@@ -152,191 +322,78 @@ export function AdminUserManagementPanel({
           </Button>
         </Alert>
       )}
-      <Box sx={{ width: "100%", overflowX: "visible" }}>
-        <Table size="small" sx={{ tableLayout: "fixed", width: "100%" }}>
-          <TableHead>
-            <TableRow>
-              <TableCell sx={{ width: "22%" }}>Name</TableCell>
-              <TableCell sx={{ width: "12%" }}>Gender</TableCell>
-              <TableCell sx={{ width: "12%" }}>Role</TableCell>
-              <TableCell sx={{ width: "14%" }}>Status</TableCell>
-              <TableCell sx={{ width: "18%" }}>Last login</TableCell>
-              <TableCell sx={{ width: "22%" }}>Actions</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {users.map((user) => (
-              <TableRow key={user.id}>
-                <TableCell sx={{ overflowWrap: "anywhere", wordBreak: "break-word" }}>
-                  {user.displayName}
-                </TableCell>
-                <TableCell sx={{ overflowWrap: "anywhere" }}>{user.gender ?? "—"}</TableCell>
-                <TableCell sx={{ overflowWrap: "anywhere" }}>{user.role}</TableCell>
-                <TableCell>
-                  <Chip
-                    size="small"
-                    label={user.status}
-                    color={
-                      user.status === "active"
-                        ? "success"
-                        : user.status === "paused"
-                          ? "warning"
-                          : user.status === "deleted"
-                            ? "error"
-                            : "default"
-                    }
-                    sx={{ maxWidth: "100%" }}
-                  />
-                </TableCell>
-                <TableCell sx={{ overflowWrap: "anywhere", wordBreak: "break-word" }}>
-                  {user.lastLoginAt
-                    ? new Date(user.lastLoginAt).toLocaleString()
-                    : "Never"}
-                </TableCell>
-                <TableCell>
-                  <Stack direction="row" spacing={0.25} flexWrap="wrap" useFlexGap>
-                    <Tooltip title="Edit">
-                      <span>
-                        <IconButton
-                          size="small"
-                          aria-label={`Edit ${user.displayName}`}
-                          disabled={pending}
-                          onClick={() => openEdit(user)}
-                        >
-                          <EditOutlinedIcon fontSize="small" />
-                        </IconButton>
-                      </span>
-                    </Tooltip>
-                    {user.role === "passive" && user.status === "active" && (
-                      <Tooltip title="Activate">
-                        <span>
-                          <IconButton
-                            size="small"
-                            aria-label={`Activate ${user.displayName}`}
-                            disabled={pending}
-                            onClick={() => {
-                              setActivateUser(user);
-                              setActivateUsername("");
-                              setActivateEmail("");
-                              setActivateRole("user");
-                              setActivateUsernameStatus({
-                                checked: false,
-                                available: false,
-                                message: "",
-                              });
-                            }}
-                          >
-                            <HowToRegOutlinedIcon fontSize="small" />
-                          </IconButton>
-                        </span>
-                      </Tooltip>
-                    )}
-                    {user.role !== "passive" && user.status === "active" && (
-                      <Tooltip title="Impersonate">
-                        <span>
-                          <IconButton
-                            size="small"
-                            aria-label={`Impersonate ${user.displayName}`}
-                            disabled={pending}
-                            onClick={() =>
-                              startTransition(async () => {
-                                const result = await adminImpersonateUserAction(user.id);
-                                if (!result.ok) {
-                                  showStatus(result.message, "error");
-                                }
-                              })
-                            }
-                          >
-                            <SwitchAccountOutlinedIcon fontSize="small" />
-                          </IconButton>
-                        </span>
-                      </Tooltip>
-                    )}
-                    {user.role !== "passive" && user.status === "active" && (
-                      <Tooltip title="Reset password">
-                        <span>
-                          <IconButton
-                            size="small"
-                            aria-label={`Reset password for ${user.displayName}`}
-                            disabled={pending}
-                            onClick={() =>
-                              startTransition(async () => {
-                                const result = await adminResetPasswordAction({ userId: user.id });
-                                showStatus(result.message, result.ok ? "success" : "error");
-                                if (result.loginInstructions) {
-                                  setCredentials(result.loginInstructions);
-                                }
-                              })
-                            }
-                          >
-                            <LockResetIcon fontSize="small" />
-                          </IconButton>
-                        </span>
-                      </Tooltip>
-                    )}
-                    {user.status === "active" && user.id !== currentUserId && (
-                      <Tooltip title="Pause">
-                        <span>
-                          <IconButton
-                            size="small"
-                            aria-label={`Pause ${user.displayName}`}
-                            color="warning"
-                            disabled={pending}
-                            onClick={() =>
-                              startTransition(async () => {
-                                const result = await pauseUserAction(user.id);
-                                showStatus(result.message, result.ok ? "success" : "error");
-                                if (result.ok) router.refresh();
-                              })
-                            }
-                          >
-                            <PauseCircleOutlineIcon fontSize="small" />
-                          </IconButton>
-                        </span>
-                      </Tooltip>
-                    )}
-                    {user.status === "paused" && (
-                      <Tooltip title="Resume">
-                        <span>
-                          <IconButton
-                            size="small"
-                            aria-label={`Resume ${user.displayName}`}
-                            disabled={pending}
-                            onClick={() =>
-                              startTransition(async () => {
-                                const result = await resumeUserAction(user.id);
-                                showStatus(result.message, result.ok ? "success" : "error");
-                                if (result.ok) router.refresh();
-                              })
-                            }
-                          >
-                            <PlayCircleOutlineIcon fontSize="small" />
-                          </IconButton>
-                        </span>
-                      </Tooltip>
-                    )}
-                    {user.id !== currentUserId && user.status !== "deleted" && (
-                      <Tooltip title="Delete">
-                        <span>
-                          <IconButton
-                            size="small"
-                            aria-label={`Delete ${user.displayName}`}
-                            color="error"
-                            disabled={pending}
-                            onClick={() => setDeleteTarget(user)}
-                          >
-                            <DeleteOutlineIcon fontSize="small" />
-                          </IconButton>
-                        </span>
-                      </Tooltip>
-                    )}
-                  </Stack>
-                </TableCell>
+      {isCompact ? (
+        <Stack spacing={1.5} role="list" aria-label="User management">
+          {users.map((user) => (
+            <Box
+              key={user.id}
+              role="listitem"
+              sx={{
+                p: 1.5,
+                border: STROKE_DEFAULT,
+                borderRadius: ORGANIC_RADIUS,
+                bgcolor: GARDEN_TOKENS.surface,
+              }}
+            >
+              <Stack spacing={1}>
+                <Stack spacing={0.5}>
+                  <Typography fontWeight={600} sx={{ overflowWrap: "anywhere" }}>
+                    {user.displayName}
+                  </Typography>
+                  <Typography
+                    variant="body2"
+                    color="text.secondary"
+                    sx={{ overflowWrap: "anywhere" }}
+                  >
+                    {[
+                      user.gender ?? "—",
+                      user.role,
+                      user.lastLoginAt
+                        ? `Last login ${new Date(user.lastLoginAt).toLocaleString()}`
+                        : "Never logged in",
+                    ].join(" · ")}
+                  </Typography>
+                  {statusChip(user)}
+                </Stack>
+                {userActions(user)}
+              </Stack>
+            </Box>
+          ))}
+        </Stack>
+      ) : (
+        <Box sx={{ width: "100%", overflowX: "visible" }}>
+          <Table size="small" sx={{ tableLayout: "fixed", width: "100%" }}>
+            <TableHead>
+              <TableRow>
+                <TableCell sx={{ width: "22%" }}>Name</TableCell>
+                <TableCell sx={{ width: "12%" }}>Gender</TableCell>
+                <TableCell sx={{ width: "12%" }}>Role</TableCell>
+                <TableCell sx={{ width: "14%" }}>Status</TableCell>
+                <TableCell sx={{ width: "18%" }}>Last login</TableCell>
+                <TableCell sx={{ width: "22%" }}>Actions</TableCell>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </Box>
+            </TableHead>
+            <TableBody>
+              {users.map((user) => (
+                <TableRow key={user.id}>
+                  <TableCell sx={{ overflowWrap: "anywhere", wordBreak: "break-word" }}>
+                    {user.displayName}
+                  </TableCell>
+                  <TableCell sx={{ overflowWrap: "anywhere" }}>{user.gender ?? "—"}</TableCell>
+                  <TableCell sx={{ overflowWrap: "anywhere" }}>{user.role}</TableCell>
+                  <TableCell>{statusChip(user)}</TableCell>
+                  <TableCell sx={{ overflowWrap: "anywhere", wordBreak: "break-word" }}>
+                    {user.lastLoginAt
+                      ? new Date(user.lastLoginAt).toLocaleString()
+                      : "Never"}
+                  </TableCell>
+                  <TableCell>{userActions(user)}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </Box>
+      )}
 
       <Dialog open={Boolean(deleteTarget)} onClose={() => setDeleteTarget(null)}>
         <DialogTitle>Delete user?</DialogTitle>
@@ -394,7 +451,7 @@ export function AdminUserManagementPanel({
                     setEditUsername(e.target.value);
                     setEditUsernameStatus({ checked: false, available: false, message: "" });
                   }}
-                  onBlur={() => editUser && checkEditUsername(editUser.id, editUser.username)}
+                  onBlur={() => editUser && checkEditUsername(editUser.id)}
                   fullWidth
                   required
                   error={editUsernameStatus.checked && !editUsernameStatus.available}

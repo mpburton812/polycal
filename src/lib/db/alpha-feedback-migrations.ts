@@ -1,7 +1,7 @@
 import type { Client } from "@libsql/client";
 
 /**
- * Alpha feedback submissions table (PC-119) + archive column (PC-136).
+ * Alpha feedback submissions table (PC-119) + archive (PC-136) + comment log (PC-182).
  */
 export async function applyAlphaFeedbackMigrations(sql: Client): Promise<void> {
   await sql.execute(`
@@ -27,18 +27,21 @@ export async function applyAlphaFeedbackMigrations(sql: Client): Promise<void> {
       screenshot_data BLOB,
       internal_comment TEXT,
       submitter_comment TEXT,
+      comment_log TEXT,
       archived_at TEXT,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     );
   `);
 
-  // Idempotent add for DBs created before PC-136.
-  try {
-    await sql.execute(
-      `ALTER TABLE alpha_feedback_submissions ADD COLUMN archived_at TEXT`,
-    );
-  } catch {
-    // Column already exists
+  // Idempotent adds for DBs created before PC-136 / PC-182.
+  for (const column of ["archived_at TEXT", "comment_log TEXT"]) {
+    try {
+      await sql.execute(
+        `ALTER TABLE alpha_feedback_submissions ADD COLUMN ${column}`,
+      );
+    } catch {
+      // Column already exists
+    }
   }
 }

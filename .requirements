@@ -195,3 +195,8 @@
 2026-07-11 | dfff89f | PC-164 | reliable schedule loading flag and Today button a11y name | src/components/schedule/ScheduleClient.tsx
 2026-07-11 | 3a66138 | PC-167 | stop schedule URL sync remount loop sticking pending | src/components/schedule/ScheduleClient.tsx
 2026-07-11 | 1bb30c2 | PC-168 | bump SCHEMA_VERSION to 21 for password_reset columns | src/lib/changelog/entries.ts
+2026-07-11 | 265fbfa | PC-174 | shared CI build, storageState, SAFE_PARALLEL workers | src/lib/changelog/entries.ts
+2026-07-11 | b6cdd47 | PC-174 | include-hidden-files when uploading .next artifact | .github/workflows/e2e.yml
+2026-07-12 | d5dcdf0 | PC-170 | mobile user rows, prod impersonation, recurring modes | src/components/admin/AdminUserManagementPanel.tsx
+2026-07-12 | 9582570 | PC-180 | rename MAP tab to Sleeping Partners | src/actions/partnerships.ts
+2026-07-12 | dba0487 | PC-182 | lightbox, comment log, notify on Save | src/lib/alpha-feedback/comment-log.test.ts

@@ -284,7 +284,6 @@ export async function createAndSubmitRecurringEventForEveryone(
   const dialog = await openEventOrSleepingProposalDraft(page);
   await dialog.getByLabel("Title").fill(options.title);
   await selectDraftScheduleMode(dialog, "Recurring");
-  await expandDraftMoreOptions(dialog);
   await dialog.getByLabel("Occurrences").fill(String(options.occurrenceCount ?? 4));
   await setAllInviteesRequired(dialog);
   await fillProposalDateTimeField(dialog.getByLabel("Start").first(), options.start);
@@ -547,7 +546,7 @@ export async function createAndSubmitSoloRecurringTimedEvent(
   await submitProposalDraft(page, dialog);
 }
 
-/** Creates and submits a solo weekly recurring event (timed) with description comment. */
+/** Creates and submits a solo weekly recurring all-day event with description comment. */
 export async function createAndSubmitSoloRecurringAllDayEvent(
   page: Page,
   options: {
@@ -560,14 +559,13 @@ export async function createAndSubmitSoloRecurringAllDayEvent(
   const dialog = await openEventProposalDraft(page);
   await dialog.getByLabel("Title").fill(options.title);
   await dialog.getByRole("button", { name: "Solo event (just me)" }).click();
+  await selectDraftScheduleMode(dialog, "All Day");
   await selectDraftScheduleMode(dialog, "Recurring");
   await expandDraftMoreOptions(dialog);
   await dialog.getByLabel(/Description/i).fill(options.comment);
   await dialog.getByLabel("Occurrences").fill(String(options.occurrenceCount ?? 4));
-  const start = `${options.day.slice(0, 10)}T09:00`;
-  const end = `${options.day.slice(0, 10)}T10:00`;
-  await fillProposalDateTimeField(dialog.getByLabel("Start").first(), start);
-  await fillProposalDateTimeField(dialog.getByLabel("End (optional)").first(), end);
+  const day = options.day.slice(0, 10);
+  await fillProposalDateRange(dialog, day, day);
   await dialog.getByRole("button", { name: "Save", exact: true }).click();
   await submitProposalDraft(page, dialog);
 }

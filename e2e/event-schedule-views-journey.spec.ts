@@ -123,8 +123,9 @@ test.describe("Event schedule views journey", () => {
     await assertEventVisibleInAllScheduleViews(page, new RegExp(title, "i"), initialDay);
 
     await moveResolvedEventByRedraft(page, title, {
-      start: `${movedDay}T09:00`,
-      end: `${movedDay}T10:00`,
+      start: movedDay,
+      end: movedDay,
+      allDay: true,
     });
     await expectResolvedProposal(page, title);
     await assertEventVisibleInAllScheduleViews(page, new RegExp(title, "i"), movedDay);

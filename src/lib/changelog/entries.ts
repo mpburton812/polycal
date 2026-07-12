@@ -26,6 +26,82 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "2026.07.12b",
+    date: "2026-07-12",
+    summary: "Alpha Feedback screenshot lightbox, comment log, notify on Save.",
+    changes: [
+      {
+        type: "added",
+        description:
+          "Alpha Feedback tracker: click screenshot to view full size (PC-182).",
+      },
+      {
+        type: "added",
+        description:
+          "Alpha Feedback: dated comment log on Save; draft fields clear after append (PC-183).",
+      },
+      {
+        type: "changed",
+        description:
+          "Alpha Feedback: remove Notify Submitter button; Save notifies when a submitter comment is present (PC-184).",
+      },
+    ],
+  },
+  {
+    version: "2026.07.12a",
+    date: "2026-07-12",
+    summary: "Recurring modes, admin mobile rows, production impersonation.",
+    changes: [
+      {
+        type: "changed",
+        description:
+          "Window/All Day/Poll exclusive; Recurring combinable; recurrence UI under dates (PC-170, PC-171).",
+      },
+      {
+        type: "added",
+        description:
+          "Restore colored environment banners (DEV red / TEST yellow) via DevBar (PC-172).",
+      },
+      {
+        type: "changed",
+        description:
+          "Admin User management uses two-line stacked cards on phone screens (PC-178).",
+      },
+      {
+        type: "changed",
+        description:
+          "Admin impersonation works in production when AUTH_IMPERSONATION_SECRET is set (PC-179).",
+      },
+      {
+        type: "changed",
+        description:
+          "People & Places tab label MAP renamed to Sleeping Partners (PC-180).",
+      },
+    ],
+  },
+  {
+    version: "2026.07.11e",
+    date: "2026-07-11",
+    summary: "E2E speedup: shared CI build, auth storageState, SAFE_PARALLEL workers.",
+    changes: [
+      {
+        type: "changed",
+        description:
+          "Playwright CI builds Next once and shares .next across shards (PC-174).",
+      },
+      {
+        type: "changed",
+        description:
+          "Seed-user JWT storageState + login fast-path; empty storage for auth/reset specs (PC-175).",
+      },
+      {
+        type: "changed",
+        description:
+          "SAFE_PARALLEL project uses per-worker DBs/ports; SERIAL_ONLY stays workers:1 (PC-176).",
+      },
+    ],
+  },
+  {
     version: "2026.07.11d",
     date: "2026-07-11",
     summary: "Fix hosted DB missing password_reset_token columns (schema v21).",
