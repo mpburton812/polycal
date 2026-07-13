@@ -89,6 +89,20 @@ export const proposalCardSx = {
   boxShadow: "none",
 } as const;
 
+/** Soft orange fill when an admin views someone else's proposal (PC-196). */
+export const ADMIN_OVERSIGHT_BG = "#FFE8D6";
+
+/**
+ * True when the viewer is an app admin looking at a proposal they did not propose.
+ */
+export function isAdminOversightView(
+  isAdmin: boolean,
+  currentUserId: string,
+  proposerId: string | null | undefined,
+): boolean {
+  return Boolean(isAdmin && proposerId && proposerId !== currentUserId);
+}
+
 export const brutalPressSx = {
   transition: "transform 0.12s ease",
   "&:hover": {

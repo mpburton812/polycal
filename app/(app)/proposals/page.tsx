@@ -6,14 +6,18 @@ import { listProposalBoardAction, listProposalPlaceOptionsAction, listResidencyP
 import { listPeopleAction } from "@/actions/users";
 import { ProposalsClient } from "@/components/proposals/ProposalsClient";
 import { auth } from "@/lib/auth";
+import { userHasAdminAccess } from "@/lib/admin-access";
 import { brutalPageTitleSx } from "@/theme/brutalUi";
 import { GARDEN_TOKENS } from "@/theme/tokens";
+import type { UserRole } from "@/types/user";
 
 export default async function ProposalsPage() {
   const session = await auth();
   if (!session?.user) {
     redirect("/login");
   }
+
+  const isAdmin = await userHasAdminAccess(session.user.role as UserRole);
 
   const [board, people, places, residencyPlaces] = await Promise.all([
     listProposalBoardAction(),
@@ -37,6 +41,7 @@ export default async function ProposalsPage() {
           places={places}
           residencyPlaces={residencyPlaces}
           currentUserId={session.user.id}
+          isAdmin={isAdmin}
         />
       </Suspense>
     </>

@@ -10,7 +10,10 @@ import {
   FormControlLabel,
   FormGroup,
   FormLabel,
+  InputLabel,
+  MenuItem,
   Paper,
+  Select,
   Stack,
   Step,
   StepLabel,
@@ -27,12 +30,16 @@ import { proposePartnershipAction } from "@/actions/partnerships";
 import {
   changePasswordAction,
   setInitialPasswordAction,
+  updateNotificationEmailAction,
   updateNotificationPrefsAction,
 } from "@/actions/profile";
 import { AVATAR_OPTIONS } from "@/lib/constants/avatars";
 import { ThemeAccentPicker } from "@/components/ui/ThemeAccentPicker";
 import { normalizeUserThemeId, type UserThemeId } from "@/lib/constants/themes";
-import { defaultBrowserTimezone } from "@/lib/schedule/timezone";
+import {
+  COMMON_TIMEZONES,
+  DEFAULT_VIEWER_TIMEZONE,
+} from "@/lib/schedule/timezone";
 import { PROFILE_BIO_MAX_LENGTH } from "@/lib/users/profile-bio";
 import { brutalPaperSx } from "@/theme/brutalUi";
 import { fontFamilies } from "@/theme/fonts";
@@ -50,7 +57,7 @@ interface PartnerOption {
 const STEPS = ["Password", "Avatar & theme", "Sleeping partners", "Notifications", "Welcome"];
 
 /**
- * Multi-step first-login onboarding per spec §4 (PC-10).
+ * Multi-step first-login onboarding per spec §4 (PC-10 / PC-194).
  */
 export function FirstLoginWizard({
   mustChangePassword,
@@ -71,8 +78,11 @@ export function FirstLoginWizard({
   const [avatarKey, setAvatarKey] = useState(initialAvatarKey ?? "bird_blue");
   const [theme, setTheme] = useState<UserThemeId>(normalizeUserThemeId(initialTheme));
   const [profileBio, setProfileBio] = useState("");
+  const [timezone, setTimezone] = useState(DEFAULT_VIEWER_TIMEZONE);
   const [selectedPartners, setSelectedPartners] = useState<string[]>([]);
   const [prefs, setPrefs] = useState<NotificationPrefs>(DEFAULT_NOTIFICATION_PREFS);
+  const [notificationEmail, setNotificationEmail] = useState("");
+  const [emailStatus, setEmailStatus] = useState<string | null>(null);
   const [welcomeMessage, setWelcomeMessage] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -106,7 +116,7 @@ export function FirstLoginWizard({
       const result = await saveOnboardingPreferencesAction({
         avatarKey,
         theme,
-        timezone: defaultBrowserTimezone(),
+        timezone,
         profileBio,
       });
       if (!result.ok) {
@@ -130,13 +140,30 @@ export function FirstLoginWizard({
 
   function finishOnboarding() {
     setError(null);
+    setEmailStatus(null);
+    const email = notificationEmail.trim();
+    if (!email) {
+      setError("Enter a notification email to continue. You can verify it later from the link we send.");
+      return;
+    }
+
     startTransition(async () => {
+      const emailResult = await updateNotificationEmailAction(email);
+      if (!emailResult.ok) {
+        setError(emailResult.error);
+        return;
+      }
+      setEmailStatus(
+        "Verification link sent (when email delivery is configured). You can finish setup now and verify later.",
+      );
+
       const prefsResult = await updateNotificationPrefsAction(prefs);
       if (!prefsResult.ok) {
         setError(prefsResult.error);
         return;
       }
       // Load welcome copy without marking onboarding complete (PC-156).
+      // Email verification is not required to finish (PC-194).
       const result = await prepareOnboardingWelcomeAction();
       if (!result.ok) {
         setError(result.message);
@@ -281,6 +308,21 @@ export function FirstLoginWizard({
             <FormLabel component="legend">Accent theme</FormLabel>
             <ThemeAccentPicker value={theme} onChange={setTheme} />
           </FormControl>
+          <FormControl fullWidth>
+            <InputLabel id="onboarding-timezone">Time zone</InputLabel>
+            <Select
+              labelId="onboarding-timezone"
+              label="Time zone"
+              value={timezone}
+              onChange={(event) => setTimezone(event.target.value)}
+            >
+              {COMMON_TIMEZONES.map((tz) => (
+                <MenuItem key={tz} value={tz}>
+                  {tz}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
           <TextField
             label="About you (optional)"
             value={profileBio}
@@ -336,6 +378,19 @@ export function FirstLoginWizard({
 
       {activeStep === 3 && (
         <Stack spacing={2}>
+          <TextField
+            label="Notification email"
+            type="email"
+            value={notificationEmail}
+            onChange={(event) => setNotificationEmail(event.target.value)}
+            required
+            fullWidth
+            helperText="We send a verification link. You can finish setup before clicking it — email delivery waits until verified."
+            autoComplete="email"
+          />
+          {emailStatus && (
+            <Alert severity="info">{emailStatus}</Alert>
+          )}
           <FormControlLabel
             control={
               <Checkbox
@@ -373,7 +428,7 @@ export function FirstLoginWizard({
                   }
                 />
               }
-              label="Email (sends verification link when Resend is configured)"
+              label="Email (after you verify the address above)"
             />
             <FormControlLabel
               control={
