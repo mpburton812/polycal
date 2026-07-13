@@ -200,3 +200,6 @@
 2026-07-12 | d5dcdf0 | PC-170 | mobile user rows, prod impersonation, recurring modes | src/components/admin/AdminUserManagementPanel.tsx
 2026-07-12 | 9582570 | PC-180 | rename MAP tab to Sleeping Partners | src/actions/partnerships.ts
 2026-07-12 | dba0487 | PC-182 | lightbox, comment log, notify on Save | src/lib/alpha-feedback/comment-log.test.ts
+2026-07-12 | cb6dce3 | PC-185 | place owners, immediate add, self-join role pick | src/actions/places.ts
+2026-07-12 | 8c5ec31 | PC-191 | stabilize dev navigation and forgot-password hydration | e2e/helpers/navigation.ts
+2026-07-12 | 7b8fc3c | PC-191 | fix residency journey member locator strict mode | e2e/residency-proposal-journey.spec.ts

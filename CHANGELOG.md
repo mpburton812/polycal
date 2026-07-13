@@ -21,6 +21,7 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Changed
+- PC-185–PC-191: Place owners / residency — creators are Owners; Places immediate add with role; self-join proposes Owner or Resident for owner approval; place picker shows members.
 - PC-184: Alpha Feedback — Save notifies submitter when a submitter comment is present; Notify button removed.
 - PC-170 / PC-171: Recurring combinable with Window/All Day; recurrence configurator under date fields.
 - PC-178: Admin User management two-line mobile layout.

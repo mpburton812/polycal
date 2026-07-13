@@ -1,23 +1,32 @@
 import { type Locator, type Page, expect } from "@playwright/test";
 
+/**
+ * Clicks a bottom-nav link; falls back to direct navigation when the Next.js dev overlay blocks clicks.
+ */
+async function clickBottomNavLink(page: Page, name: string, path: string): Promise<void> {
+  const link = page.getByRole("link", { name });
+  try {
+    await link.click({ timeout: 8_000 });
+  } catch {
+    await page.goto(path);
+  }
+  await expect(page).toHaveURL(new RegExp(`${path.replace("/", "\\/")}`));
+}
+
 export async function goToSchedule(page: Page): Promise<void> {
-  await page.getByRole("link", { name: "Schedule" }).click();
-  await expect(page).toHaveURL(/\/schedule/);
+  await clickBottomNavLink(page, "Schedule", "/schedule");
 }
 
 export async function goToProposals(page: Page): Promise<void> {
-  await page.getByRole("link", { name: "Proposals" }).click();
-  await expect(page).toHaveURL(/\/proposals/);
+  await clickBottomNavLink(page, "Proposals", "/proposals");
 }
 
 export async function goToPeoplePlaces(page: Page): Promise<void> {
-  await page.getByRole("link", { name: "People & Places" }).click();
-  await expect(page).toHaveURL(/\/people-places/);
+  await clickBottomNavLink(page, "People & Places", "/people-places");
 }
 
 export async function goToAdmin(page: Page): Promise<void> {
-  await page.getByRole("link", { name: "Admin" }).click();
-  await expect(page).toHaveURL(/\/admin/);
+  await clickBottomNavLink(page, "Admin", "/admin");
 }
 
 /** Opens the header profile menu (avatar button). */

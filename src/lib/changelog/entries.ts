@@ -26,6 +26,33 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "2026.07.12c",
+    date: "2026-07-12",
+    summary: "Place owners, immediate add, self-join owner approval.",
+    changes: [
+      {
+        type: "added",
+        description:
+          "location_residents.place_role (owner/resident); creators seeded as owners (PC-186).",
+      },
+      {
+        type: "added",
+        description:
+          "Owners/admins add people immediately as Owner or Resident from Places (PC-187, PC-189).",
+      },
+      {
+        type: "changed",
+        description:
+          "Residency self-join proposals invite place owners; proposer selects Owner or Resident access (PC-188).",
+      },
+      {
+        type: "added",
+        description:
+          "Residency place picker shows current owners and residents (PC-190).",
+      },
+    ],
+  },
+  {
     version: "2026.07.12b",
     date: "2026-07-12",
     summary: "Alpha Feedback screenshot lightbox, comment log, notify on Save.",
