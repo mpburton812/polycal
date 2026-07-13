@@ -203,3 +203,6 @@
 2026-07-12 | cb6dce3 | PC-185 | place owners, immediate add, self-join role pick | src/actions/places.ts
 2026-07-12 | 8c5ec31 | PC-191 | stabilize dev navigation and forgot-password hydration | e2e/helpers/navigation.ts
 2026-07-12 | 7b8fc3c | PC-191 | fix residency journey member locator strict mode | e2e/residency-proposal-journey.spec.ts
+2026-07-13 | 171e071 | PC-193 | people, onboarding, and proposal polish release | src/actions/places.ts
+2026-07-13 | 9a58625 | PC-192 | change control log for 2026.07.13 promotion | src/lib/changelog/entries.ts
+2026-07-13 | f8a6231 | PC-192 | assert latest changelog version dynamically | e2e/admin-code-status-journey.spec.ts

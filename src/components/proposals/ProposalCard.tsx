@@ -21,6 +21,8 @@ import { GARDEN_TOKENS } from "@/theme/tokens";
 import {
   brutalPressSx,
   formatTimeRange,
+  isAdminOversightView,
+  ADMIN_OVERSIGHT_BG,
   primaryButtonSx,
   proposalCardRotation,
   proposalCardSx,
@@ -92,6 +94,9 @@ interface ProposalCardProps {
   onOpen: (id: string) => void;
   onContinueEdit?: (id: string) => void;
   onDeleteDraft?: (id: string) => void;
+  /** App admin viewer — used for oversight chrome (PC-196). */
+  isAdmin?: boolean;
+  currentUserId?: string;
 }
 
 /**
@@ -102,6 +107,8 @@ export function ProposalCard({
   onOpen,
   onContinueEdit,
   onDeleteDraft,
+  isAdmin = false,
+  currentUserId = "",
 }: ProposalCardProps) {
   const timeLabel = formatTimeRange(
     proposal.scheduledStartAt,
@@ -119,6 +126,7 @@ export function ProposalCard({
     proposal.locationName && proposal.bedroomLabel
       ? `${proposal.locationName} · ${proposal.bedroomLabel}`
       : proposal.locationName;
+  const adminOversight = isAdminOversightView(isAdmin, currentUserId, proposal.proposerId);
 
   const sparseBadges: string[] = [];
   if (!proposal.isContentMasked) {
@@ -151,6 +159,7 @@ export function ProposalCard({
       sx={{
         ...proposalCardSx,
         ...brutalPressSx,
+        ...(adminOversight ? { bgcolor: ADMIN_OVERSIGHT_BG } : {}),
         cursor: "pointer",
         transform: `rotate(${rotation})`,
         borderLeft: `6px solid ${typeAccent}`,
