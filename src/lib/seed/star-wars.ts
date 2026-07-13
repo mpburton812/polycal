@@ -167,8 +167,20 @@ export async function seedStarWarsFoundation(options?: {
       ...location,
       bedroomCount: 2,
       bedroomNames: JSON.stringify(["Main", "Guest"]),
+      createdById: "sw-luke",
       createdAt: now,
       updatedAt: now,
+    });
+    await db.insert(locationResidents).values({
+      id: `res-${location.id}`,
+      locationId: location.id,
+      userId: "sw-luke",
+      status: "accepted",
+      placeRole: "owner",
+      proposedById: "sw-luke",
+      createdAt: now,
+      updatedAt: now,
+      respondedAt: now,
     });
   }
 
@@ -188,6 +200,7 @@ export async function seedStarWarsFoundation(options?: {
     locationId: "loc-bad-user",
     userId: "sw-bad-user",
     status: "accepted",
+    placeRole: "owner",
     proposedById: "sw-bad-user",
     createdAt: now,
     updatedAt: now,

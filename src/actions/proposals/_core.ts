@@ -422,6 +422,8 @@ function mapPlaceOption(row: {
   name: string;
   bedroomCount: number;
   bedroomNames: string | null;
+  owners?: string[];
+  residents?: string[];
 }): ProposalPlaceOption {
   const names = parseBedroomNames(row.bedroomNames);
   return {
@@ -432,7 +434,26 @@ function mapPlaceOption(row: {
       names.length > 0
         ? names
         : Array.from({ length: row.bedroomCount }, (_, index) => `Bedroom ${index + 1}`),
+    owners: row.owners ?? [],
+    residents: row.residents ?? [],
   };
+}
+
+/**
+ * Attaches accepted owner/resident display names to place options (PC-190).
+ */
+async function enrichPlaceOptionsWithMembers(
+  db: ReturnType<typeof getDb>,
+  options: ProposalPlaceOption[],
+): Promise<ProposalPlaceOption[]> {
+  if (options.length === 0) return options;
+  const { listAcceptedPlaceMemberNames } = await import("@/lib/places/membership");
+  return Promise.all(
+    options.map(async (option) => {
+      const members = await listAcceptedPlaceMemberNames(db, option.id);
+      return { ...option, owners: members.owners, residents: members.residents };
+    }),
+  );
 }
 
 /**
@@ -628,7 +649,7 @@ export async function listProposalPlaceOptionsAction(): Promise<ProposalPlaceOpt
 
   if (isAdmin) {
     const all = await db.select(placeSelect).from(locations).orderBy(asc(locations.name));
-    return all.map(mapPlaceOption);
+    return enrichPlaceOptionsWithMembers(db, all.map(mapPlaceOption));
   }
 
   const locationIds = await getEligibleLocationIdsForUser(db, session.user.id);
@@ -640,7 +661,29 @@ export async function listProposalPlaceOptionsAction(): Promise<ProposalPlaceOpt
     .where(inArray(locations.id, locationIds))
     .orderBy(asc(locations.name));
 
-  return placeRows.map(mapPlaceOption);
+  return enrichPlaceOptionsWithMembers(db, placeRows.map(mapPlaceOption));
+}
+
+/**
+ * All places for residency self-join proposals, with owner/resident names (PC-190).
+ */
+export async function listResidencyPlaceOptionsAction(): Promise<ProposalPlaceOption[]> {
+  await ensureDbReady();
+  const session = await auth();
+  if (!session?.user) return [];
+
+  const db = getDb();
+  const placeRows = await db
+    .select({
+      id: locations.id,
+      name: locations.name,
+      bedroomCount: locations.bedroomCount,
+      bedroomNames: locations.bedroomNames,
+    })
+    .from(locations)
+    .orderBy(asc(locations.name));
+
+  return enrichPlaceOptionsWithMembers(db, placeRows.map(mapPlaceOption));
 }
 
 /**

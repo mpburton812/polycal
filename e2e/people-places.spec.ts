@@ -27,13 +27,15 @@ test.describe("People & Places", () => {
     await expect(
       page.getByRole("button", { name: /Millennium Falcon.*bedrooms/i }),
     ).toBeVisible();
-    await expect(page.getByRole("button", { name: "Associate" })).not.toBeVisible();
+    await expect(page.getByRole("button", { name: "Add", exact: true })).not.toBeVisible();
   });
 
   test("expands place details when chevron clicked", async ({ page }) => {
     await page.getByRole("tab", { name: "Places" }).click();
     await page.getByRole("heading", { name: "Millennium Falcon", level: 2 }).click();
-    await expect(page.getByRole("button", { name: "Associate" })).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByRole("button", { name: "Add", exact: true })).toBeVisible({
+      timeout: 10_000,
+    });
   });
 
   test("shows Add place button on places tab", async ({ page }) => {

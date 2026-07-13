@@ -31,12 +31,31 @@ export async function applyPeoplePlacesMigrations(sql: Client): Promise<void> {
       location_id TEXT NOT NULL REFERENCES locations(id),
       user_id TEXT NOT NULL REFERENCES users(id),
       status TEXT NOT NULL,
+      place_role TEXT NOT NULL DEFAULT 'resident',
       proposed_by_id TEXT NOT NULL REFERENCES users(id),
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL,
       responded_at TEXT,
       UNIQUE(location_id, user_id)
     );
+  `);
+
+  // Owner/Resident roles (PC-186): column + backfill creators as owners.
+  await ensureColumn(sql, "location_residents", "place_role", "TEXT NOT NULL DEFAULT 'resident'");
+  await sql.execute(`
+    UPDATE location_residents
+    SET place_role = 'owner'
+    WHERE status = 'accepted'
+      AND user_id IN (
+        SELECT created_by_id FROM locations
+        WHERE created_by_id IS NOT NULL
+          AND locations.id = location_residents.location_id
+      )
+  `);
+  await sql.execute(`
+    UPDATE location_residents
+    SET place_role = 'resident'
+    WHERE place_role IS NULL OR place_role = ''
   `);
 }
 

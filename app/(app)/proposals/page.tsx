@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import { Typography } from "@mui/material";
 import { redirect } from "next/navigation";
 
-import { listProposalBoardAction, listProposalPlaceOptionsAction } from "@/actions/proposals";
+import { listProposalBoardAction, listProposalPlaceOptionsAction, listResidencyPlaceOptionsAction } from "@/actions/proposals";
 import { listPeopleAction } from "@/actions/users";
 import { ProposalsClient } from "@/components/proposals/ProposalsClient";
 import { auth } from "@/lib/auth";
@@ -15,10 +15,11 @@ export default async function ProposalsPage() {
     redirect("/login");
   }
 
-  const [board, people, places] = await Promise.all([
+  const [board, people, places, residencyPlaces] = await Promise.all([
     listProposalBoardAction(),
     listPeopleAction(),
     listProposalPlaceOptionsAction(),
+    listResidencyPlaceOptionsAction(),
   ]);
 
   return (
@@ -34,6 +35,7 @@ export default async function ProposalsPage() {
           board={board}
           people={people}
           places={places}
+          residencyPlaces={residencyPlaces}
           currentUserId={session.user.id}
         />
       </Suspense>

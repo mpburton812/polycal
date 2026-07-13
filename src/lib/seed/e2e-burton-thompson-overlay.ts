@@ -81,6 +81,7 @@ export async function seedE2eBurtonThompsonOverlay(): Promise<void> {
         description: null,
         bedroomCount: 1,
         bedroomNames: JSON.stringify(["Main"]),
+        createdById: place.residentId,
         createdAt: now,
         updatedAt: now,
       });
@@ -102,6 +103,7 @@ export async function seedE2eBurtonThompsonOverlay(): Promise<void> {
         locationId: place.id,
         userId: place.residentId,
         status: "accepted",
+        placeRole: "owner",
         proposedById: place.residentId,
         createdAt: now,
         updatedAt: now,

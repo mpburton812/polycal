@@ -20,6 +20,8 @@ import {
   users,
 } from "@/lib/db/schema";
 import { notifyUser } from "@/lib/notifications";
+import { userIsPlaceOwner } from "@/lib/places/membership";
+import type { PlaceRole } from "@/types/relationship";
 import type { UserRole } from "@/types/user";
 
 const placeSchema = z.object({
@@ -33,6 +35,12 @@ const placeSchema = z.object({
 const respondResidencySchema = z.object({
   residencyId: z.string().min(1),
   accept: z.boolean(),
+});
+
+const addPersonToPlaceSchema = z.object({
+  locationId: z.string().min(1),
+  targetUserId: z.string().min(1),
+  placeRole: z.enum(["owner", "resident"]),
 });
 
 export interface PlaceSummary {
@@ -51,6 +59,7 @@ export interface ResidentView {
   userId: string;
   displayName: string;
   status: string;
+  placeRole: PlaceRole;
   isIncoming: boolean;
 }
 
@@ -290,6 +299,7 @@ function mapResidentRows(
     id: string;
     userId: string;
     status: string;
+    placeRole?: string | null;
     proposedById: string;
     displayName: string;
   }[],
@@ -300,6 +310,7 @@ function mapResidentRows(
     userId: row.userId,
     displayName: row.displayName,
     status: row.status,
+    placeRole: row.placeRole === "owner" ? "owner" : "resident",
     isIncoming:
       row.status === "proposed" &&
       Boolean(viewerId) &&
@@ -322,6 +333,7 @@ export async function listPlacesAction(): Promise<PlaceSummary[]> {
       locationId: locationResidents.locationId,
       userId: locationResidents.userId,
       status: locationResidents.status,
+      placeRole: locationResidents.placeRole,
       proposedById: locationResidents.proposedById,
       displayName: users.displayName,
     })
@@ -390,6 +402,7 @@ export async function createPlaceAction(
     locationId: placeId,
     userId: session.user.id,
     status: "accepted",
+    placeRole: "owner",
     proposedById: session.user.id,
     createdAt: now,
     updatedAt: now,
@@ -417,6 +430,7 @@ export async function listResidentsForPlaceAction(
       id: locationResidents.id,
       userId: locationResidents.userId,
       status: locationResidents.status,
+      placeRole: locationResidents.placeRole,
       proposedById: locationResidents.proposedById,
       displayName: users.displayName,
     })
@@ -543,16 +557,134 @@ export async function deletePlaceAction(
 }
 
 /**
- * Associates a user with a place via the standard proposal draft workflow (PC-60).
+ * Owner/admin immediately associates a person as Owner or Resident (PC-187).
+ */
+export async function addPersonToPlaceAction(
+  input: z.infer<typeof addPersonToPlaceSchema>,
+): Promise<{ ok: boolean; message: string }> {
+  const session = await auth();
+  if (!session?.user) {
+    return { ok: false, message: "Sign in required." };
+  }
+
+  const parsed = addPersonToPlaceSchema.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, message: parsed.error.issues[0]?.message ?? "Invalid input." };
+  }
+
+  await ensureDbReady();
+  const db = getDb();
+
+  if (
+    !(await userIsPlaceOwner(
+      db,
+      session.user.id,
+      session.user.role as UserRole,
+      parsed.data.locationId,
+    ))
+  ) {
+    return { ok: false, message: "Only place owners (or admins) can add people." };
+  }
+
+  const [place] = await db
+    .select()
+    .from(locations)
+    .where(eq(locations.id, parsed.data.locationId))
+    .limit(1);
+  const [target] = await db
+    .select()
+    .from(users)
+    .where(eq(users.id, parsed.data.targetUserId))
+    .limit(1);
+  if (!place || !target || target.status !== "active") {
+    return { ok: false, message: "Place or user not found." };
+  }
+
+  if (parsed.data.targetUserId === session.user.id) {
+    return { ok: false, message: "You are already managing this place." };
+  }
+
+  const [existing] = await db
+    .select()
+    .from(locationResidents)
+    .where(
+      and(
+        eq(locationResidents.locationId, parsed.data.locationId),
+        eq(locationResidents.userId, parsed.data.targetUserId),
+      ),
+    )
+    .limit(1);
+
+  if (existing?.status === "accepted") {
+    return { ok: false, message: "User is already associated with this place." };
+  }
+
+  const now = new Date().toISOString();
+  if (existing) {
+    await db
+      .update(locationResidents)
+      .set({
+        status: "accepted",
+        placeRole: parsed.data.placeRole,
+        proposedById: session.user.id,
+        proposalId: null,
+        updatedAt: now,
+        respondedAt: now,
+      })
+      .where(eq(locationResidents.id, existing.id));
+  } else {
+    await db.insert(locationResidents).values({
+      id: `lr-${randomUUID()}`,
+      locationId: parsed.data.locationId,
+      userId: parsed.data.targetUserId,
+      status: "accepted",
+      placeRole: parsed.data.placeRole,
+      proposedById: session.user.id,
+      createdAt: now,
+      updatedAt: now,
+      respondedAt: now,
+    });
+  }
+
+  const roleLabel = parsed.data.placeRole === "owner" ? "Owner" : "Resident";
+  await notifyUser(
+    parsed.data.targetUserId,
+    "place_member_added",
+    `${session.user.displayName ?? "Someone"} added you as ${roleLabel} at ${place.name}.`,
+    { url: "/people-places", placeId: place.id },
+  );
+
+  await logUserActivity(
+    session.user.id,
+    "places.add_person",
+    JSON.stringify({
+      locationId: place.id,
+      targetUserId: parsed.data.targetUserId,
+      placeRole: parsed.data.placeRole,
+      placeName: place.name,
+    }),
+  );
+
+  revalidatePath("/people-places");
+  return {
+    ok: true,
+    message: `Added ${target.displayName} as ${roleLabel}.`,
+  };
+}
+
+/**
+ * Self-join residency proposal via standard workflow (PC-188). Prefer addPersonToPlaceAction for owner invites.
  */
 export async function proposeResidencyAction(
   locationId: string,
   targetUserId: string,
+  placeRole: "owner" | "resident" = "resident",
 ): Promise<{ ok: boolean; message: string }> {
   const { createResidencyDraftProposalAction } = await import("@/actions/residency-proposals");
   const result = await createResidencyDraftProposalAction({
     locationId,
     targetUserId,
+    placeRole,
     submitImmediately: true,
   });
   return { ok: result.ok, message: result.message };
