@@ -43,6 +43,12 @@ const addPersonToPlaceSchema = z.object({
   placeRole: z.enum(["owner", "resident"]),
 });
 
+const updatePlaceMemberRoleSchema = z.object({
+  locationId: z.string().min(1),
+  targetUserId: z.string().min(1),
+  placeRole: z.enum(["owner", "resident"]),
+});
+
 export interface PlaceSummary {
   id: string;
   name: string;
@@ -669,6 +675,123 @@ export async function addPersonToPlaceAction(
   return {
     ok: true,
     message: `Added ${target.displayName} as ${roleLabel}.`,
+  };
+}
+
+/**
+ * Change an accepted member's place role between owner and resident (PC-193).
+ * Authorized for place owners and app admins; refuses demoting the last accepted owner.
+ */
+export async function updatePlaceMemberRoleAction(
+  input: z.infer<typeof updatePlaceMemberRoleSchema>,
+): Promise<{ ok: boolean; message: string }> {
+  const session = await auth();
+  if (!session?.user) {
+    return { ok: false, message: "Sign in required." };
+  }
+
+  const parsed = updatePlaceMemberRoleSchema.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, message: parsed.error.issues[0]?.message ?? "Invalid input." };
+  }
+
+  await ensureDbReady();
+  const db = getDb();
+
+  if (
+    !(await userIsPlaceOwner(
+      db,
+      session.user.id,
+      session.user.role as UserRole,
+      parsed.data.locationId,
+    ))
+  ) {
+    return { ok: false, message: "Only place owners (or admins) can change access levels." };
+  }
+
+  const [place] = await db
+    .select()
+    .from(locations)
+    .where(eq(locations.id, parsed.data.locationId))
+    .limit(1);
+  const [target] = await db
+    .select()
+    .from(users)
+    .where(eq(users.id, parsed.data.targetUserId))
+    .limit(1);
+  if (!place || !target || target.status !== "active") {
+    return { ok: false, message: "Place or user not found." };
+  }
+
+  const [membership] = await db
+    .select()
+    .from(locationResidents)
+    .where(
+      and(
+        eq(locationResidents.locationId, parsed.data.locationId),
+        eq(locationResidents.userId, parsed.data.targetUserId),
+        eq(locationResidents.status, "accepted"),
+      ),
+    )
+    .limit(1);
+
+  if (!membership) {
+    return { ok: false, message: "User is not an accepted member of this place." };
+  }
+
+  if (membership.placeRole === parsed.data.placeRole) {
+    const sameLabel = parsed.data.placeRole === "owner" ? "Owner" : "Resident";
+    return { ok: true, message: `${target.displayName} is already ${sameLabel}.` };
+  }
+
+  if (membership.placeRole === "owner" && parsed.data.placeRole === "resident") {
+    const owners = await db
+      .select({ id: locationResidents.id })
+      .from(locationResidents)
+      .where(
+        and(
+          eq(locationResidents.locationId, parsed.data.locationId),
+          eq(locationResidents.status, "accepted"),
+          eq(locationResidents.placeRole, "owner"),
+        ),
+      );
+    if (owners.length <= 1) {
+      return {
+        ok: false,
+        message: "Cannot demote the last owner. Promote another member first.",
+      };
+    }
+  }
+
+  const now = new Date().toISOString();
+  await db
+    .update(locationResidents)
+    .set({ placeRole: parsed.data.placeRole, updatedAt: now })
+    .where(eq(locationResidents.id, membership.id));
+
+  const roleLabel = parsed.data.placeRole === "owner" ? "Owner" : "Resident";
+  await notifyUser(
+    parsed.data.targetUserId,
+    "place_member_role_changed",
+    `${session.user.displayName ?? "Someone"} set your access at ${place.name} to ${roleLabel}.`,
+    { url: "/people-places", placeId: place.id },
+  );
+
+  await logUserActivity(
+    session.user.id,
+    "places.update_member_role",
+    JSON.stringify({
+      locationId: place.id,
+      targetUserId: parsed.data.targetUserId,
+      placeRole: parsed.data.placeRole,
+      placeName: place.name,
+    }),
+  );
+
+  revalidatePath("/people-places");
+  return {
+    ok: true,
+    message: `Updated ${target.displayName} to ${roleLabel}.`,
   };
 }
 

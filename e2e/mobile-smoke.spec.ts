@@ -2,7 +2,7 @@ import { expect, test } from "./helpers/test";
 
 import { expectAuthenticatedShell, login } from "./helpers/auth";
 import { USERS } from "./helpers/constants";
-import { goToProposals, goToSchedule } from "./helpers/navigation";
+import { goToPeoplePlaces, goToProposals, goToSchedule } from "./helpers/navigation";
 
 test.describe("Mobile viewport smoke", () => {
   test("bottom nav, schedule, and proposals tab work on mobile", async ({ page }) => {
@@ -17,5 +17,14 @@ test.describe("Mobile viewport smoke", () => {
 
     await goToSchedule(page);
     await expect(page.getByRole("button", { name: /Month/i })).toBeVisible();
+  });
+
+  test("Add place button stays visible on Places tab", async ({ page }) => {
+    await login(page, USERS.luke.username);
+    await goToPeoplePlaces(page);
+    await page.getByRole("tab", { name: "Places" }).click();
+    const addPlace = page.getByRole("button", { name: "Add place" });
+    await expect(addPlace).toBeVisible();
+    await expect(addPlace).toBeInViewport();
   });
 });

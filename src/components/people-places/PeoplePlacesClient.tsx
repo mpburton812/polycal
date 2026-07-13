@@ -47,6 +47,7 @@ import {
   getPlaceDeleteImpactAction,
   listResidentsForPlaceAction,
   updatePlaceAction,
+  updatePlaceMemberRoleAction,
   type PlaceDeleteImpact,
   type PlaceSummary,
   type ResidentView,
@@ -635,12 +636,46 @@ function PlaceDetail({
         </Typography>
       )}
       {residents.map((row) => (
-        <Stack key={row.id} direction="row" spacing={1} alignItems="center">
-          <Chip
-            size="small"
-            label={row.placeRole === "owner" ? "Owner" : "Resident"}
-            color={row.placeRole === "owner" ? "primary" : "default"}
-          />
+        <Stack
+          key={row.id}
+          direction={{ xs: "column", sm: "row" }}
+          spacing={1}
+          alignItems={{ xs: "stretch", sm: "center" }}
+        >
+          {canManageMembers && row.status === "accepted" ? (
+            <FormControl size="small" sx={{ minWidth: 140 }}>
+              <InputLabel id={`member-role-${row.id}`}>Access</InputLabel>
+              <Select
+                labelId={`member-role-${row.id}`}
+                label="Access"
+                value={row.placeRole}
+                disabled={pending}
+                onChange={(event) => {
+                  const nextRole = event.target.value as "owner" | "resident";
+                  if (nextRole === row.placeRole) return;
+                  startTransition(async () => {
+                    const result = await updatePlaceMemberRoleAction({
+                      locationId: place.id,
+                      targetUserId: row.userId,
+                      placeRole: nextRole,
+                    });
+                    setMessage(result.message);
+                    refreshResidents();
+                    router.refresh();
+                  });
+                }}
+              >
+                <MenuItem value="resident">Resident</MenuItem>
+                <MenuItem value="owner">Owner</MenuItem>
+              </Select>
+            </FormControl>
+          ) : (
+            <Chip
+              size="small"
+              label={row.placeRole === "owner" ? "Owner" : "Resident"}
+              color={row.placeRole === "owner" ? "primary" : "default"}
+            />
+          )}
           {row.status !== "accepted" && (
             <Chip size="small" label={row.status} color={residentStatusColor(row.status)} />
           )}
@@ -1002,19 +1037,39 @@ export function PeoplePlacesClient({
 
   return (
     <Box>
-      <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
-        <Tabs value={tab} onChange={(_, value) => setTab(value)}>
+      <Stack
+        direction={{ xs: "column", sm: "row" }}
+        justifyContent="space-between"
+        alignItems={{ xs: "stretch", sm: "center" }}
+        spacing={1.5}
+        sx={{ mb: 2 }}
+      >
+        <Tabs
+          value={tab}
+          onChange={(_, value) => setTab(value)}
+          variant="scrollable"
+          allowScrollButtonsMobile
+          sx={{ minWidth: 0, flex: 1 }}
+        >
           <Tab label="People" />
           <Tab label="Places" />
           {showMapTab && <Tab label="Sleeping Partners" />}
         </Tabs>
         {canProvision && tab === 0 && (
-          <Button variant="contained" onClick={() => setCreateOpen(true)}>
+          <Button
+            variant="contained"
+            onClick={() => setCreateOpen(true)}
+            sx={{ alignSelf: { xs: "stretch", sm: "center" }, flexShrink: 0 }}
+          >
             Add person
           </Button>
         )}
         {tab === 1 && (
-          <Button variant="contained" onClick={() => setCreatePlaceOpen(true)}>
+          <Button
+            variant="contained"
+            onClick={() => setCreatePlaceOpen(true)}
+            sx={{ alignSelf: { xs: "stretch", sm: "center" }, flexShrink: 0 }}
+          >
             Add place
           </Button>
         )}
