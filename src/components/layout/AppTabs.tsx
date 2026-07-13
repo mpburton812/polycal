@@ -12,22 +12,25 @@ import {
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
+import { MAIN_TAB_HREFS } from "@/components/layout/mainTabs";
 import { fontFamilies } from "@/theme/fonts";
 import { GARDEN_TOKENS } from "@/theme/tokens";
 
-const tabs = [
-  { label: "Schedule", href: "/schedule", icon: EventNoteIcon },
-  { label: "Proposals", href: "/proposals", icon: HowToVoteIcon },
-  { label: "People & Places", href: "/people-places", icon: GroupsIcon },
-  { label: "Admin", href: "/admin", icon: AdminPanelSettingsIcon },
-] as const;
+const tabMeta = {
+  "/schedule": { label: "Schedule", icon: EventNoteIcon },
+  "/proposals": { label: "Proposals", icon: HowToVoteIcon },
+  "/people-places": { label: "People & Places", icon: GroupsIcon },
+  "/admin": { label: "Admin", icon: AdminPanelSettingsIcon },
+} as const;
 
 /**
  * Bottom tab navigation with ink border and flat fill (Garden Brutalism).
  */
 export function AppTabs({ isAdmin }: { isAdmin: boolean }) {
   const pathname = usePathname();
-  const visibleTabs = isAdmin ? tabs : tabs.filter((t) => t.href !== "/admin");
+  const visibleTabs = MAIN_TAB_HREFS.filter(
+    (href) => isAdmin || href !== "/admin",
+  ).map((href) => ({ href, ...tabMeta[href] }));
 
   const current =
     visibleTabs.find((t) => pathname.startsWith(t.href))?.href ?? "/schedule";

@@ -79,6 +79,12 @@ export function oneHourEventWindow(
   };
 }
 
+/** Forces day hour-grid layout (PC-204). */
+export async function selectScheduleDayView(page: Page): Promise<void> {
+  await page.getByLabel("Calendar period").getByRole("button", { name: "Day", exact: true }).click();
+  await waitForScheduleReady(page);
+}
+
 /** Forces one-week layout (week calendar, not 2-week or month). */
 export async function selectScheduleOneWeekView(page: Page): Promise<void> {
   await page.getByLabel("Calendar period").getByRole("button", { name: "Week", exact: true }).click();

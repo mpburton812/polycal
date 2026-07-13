@@ -10,7 +10,8 @@ import {
 } from "@/components/schedule/scheduleViewState";
 
 describe("scheduleViewState period mode", () => {
-  it("maps week / twoWeek / month", () => {
+  it("maps day / week / twoWeek / month", () => {
+    expect(periodModeFromState({ calendarLayout: "day", compact: false })).toBe("day");
     expect(periodModeFromState({ calendarLayout: "week", compact: false })).toBe("week");
     expect(periodModeFromState({ calendarLayout: "week", compact: true })).toBe("twoWeek");
     expect(periodModeFromState({ calendarLayout: "month", compact: false })).toBe("month");
@@ -28,11 +29,17 @@ describe("scheduleViewState period mode", () => {
     };
     expect(applyPeriodMode(base, "twoWeek").compact).toBe(true);
     expect(applyPeriodMode(base, "month").calendarLayout).toBe("month");
+    expect(applyPeriodMode(base, "day").calendarLayout).toBe("day");
   });
 });
 
 describe("schedule URL helpers", () => {
   it("parses layout and open", () => {
+    expect(parseScheduleUrlParams("layout=day&anchor=2026-07-11&open=p1")).toEqual({
+      layout: "day",
+      anchor: "2026-07-11",
+      open: "p1",
+    });
     expect(parseScheduleUrlParams("layout=twoWeek&anchor=2026-07-11&open=p1")).toEqual({
       layout: "twoWeek",
       anchor: "2026-07-11",
@@ -56,6 +63,19 @@ describe("schedule URL helpers", () => {
     expect(search).toContain("layout=twoWeek");
     expect(search).toContain("open=abc");
     expect(search).toMatch(/anchor=\d{4}-\d{2}-\d{2}/);
+  });
+
+  it("builds day layout search", () => {
+    const search = buildScheduleUrlSearch({
+      weekStartIso: "2026-07-13T12:00:00.000Z",
+      monthAnchorIso: "2026-07-01T12:00:00.000Z",
+      calendarLayout: "day",
+      compact: false,
+      filterMode: "whole",
+      filterPersonId: "",
+      planningOpen: false,
+    });
+    expect(search).toContain("layout=day");
   });
 });
 

@@ -1,10 +1,5 @@
-import { Box, CircularProgress } from "@mui/material";
+import { BrandedLoading } from "@/components/ui/BrandedLoading";
 
-/** Lightweight shell while People & Places data loads (PC-139). */
 export default function PeoplePlacesLoading() {
-  return (
-    <Box sx={{ display: "flex", justifyContent: "center", py: 8 }}>
-      <CircularProgress aria-label="Loading people and places" />
-    </Box>
-  );
+  return <BrandedLoading label="Loading people & places…" />;
 }

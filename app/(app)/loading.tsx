@@ -1,10 +1,6 @@
-import { Box, CircularProgress } from "@mui/material";
+import { BrandedLoading } from "@/components/ui/BrandedLoading";
 
-/** Shared route loading shell while tab RSC data loads (PC-139). */
+/** Shared route loading shell while tab RSC data loads (PC-139 / PC-202). */
 export default function AppRouteLoading() {
-  return (
-    <Box sx={{ display: "flex", justifyContent: "center", py: 8 }}>
-      <CircularProgress aria-label="Loading" />
-    </Box>
-  );
+  return <BrandedLoading label="Loading…" />;
 }
