@@ -3,6 +3,7 @@
 import CssBaseline from "@mui/material/CssBaseline";
 import { ThemeProvider } from "@mui/material/styles";
 
+import { PwaUpdateGate } from "@/components/pwa/PwaUpdateGate";
 import { AuthSessionProvider } from "@/components/providers/AuthSessionProvider";
 import { DatePickerProvider } from "@/components/providers/DatePickerProvider";
 import { ToastProvider } from "@/components/providers/ToastProvider";
@@ -17,7 +18,10 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
         <CssBaseline />
         <DatePickerProvider>
           <ToastProvider>
-            <AuthSessionProvider>{children}</AuthSessionProvider>
+            <AuthSessionProvider>
+              <PwaUpdateGate />
+              {children}
+            </AuthSessionProvider>
           </ToastProvider>
         </DatePickerProvider>
       </ThemeProvider>

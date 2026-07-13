@@ -25,4 +25,12 @@ describe("computeScheduleFetchRange", () => {
     expect(scheduleFetchRangeDayCount(range)).toBeGreaterThanOrEqual(13);
     expect(scheduleFetchRangeDayCount(range)).toBeLessThanOrEqual(15);
   });
+
+  it("uses a single local calendar day for day layout", () => {
+    const anchor = new Date(2099, 6, 15, 15, 30, 0);
+    const range = computeScheduleFetchRange(anchor, "day", false);
+    expect(range.rangeStart.getHours()).toBe(0);
+    expect(range.rangeEnd.getHours()).toBe(23);
+    expect(scheduleFetchRangeDayCount(range)).toBe(1);
+  });
 });

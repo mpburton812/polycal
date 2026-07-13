@@ -9,7 +9,7 @@ import { GARDEN_TOKENS, HEATMAP_LEVEL_COLORS } from "@/theme/tokens";
 
 const LEVEL_COLORS = [...HEATMAP_LEVEL_COLORS];
 
-export type HeatmapLayout = "week" | "twoWeek" | "month";
+export type HeatmapLayout = "day" | "week" | "twoWeek" | "month";
 
 /** Formats a day label as MM/DD for heatmap cells. */
 function formatHeatmapDate(day: Date): string {
@@ -110,7 +110,14 @@ export function ScheduleHeatmap({
   layout?: HeatmapLayout;
   timeZone?: string;
 }) {
-  const weekStart = useMemo(() => startOfWeekMonday(new Date(weekStartIso)), [weekStartIso]);
+  const weekStart = useMemo(() => {
+    const anchor = new Date(weekStartIso);
+    if (layout === "day") {
+      anchor.setHours(0, 0, 0, 0);
+      return anchor;
+    }
+    return startOfWeekMonday(anchor);
+  }, [layout, weekStartIso]);
 
   const levels = useMemo(
     () => computeBusynessLevels(events, weekStart, dayCount),

@@ -21,10 +21,12 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
-- PC-199: Place owners/admins can remove accepted members from a place card (last owner protected; audit `places.remove_person`).
+- PC-202: Garden-branded loading splash, streamed app shell, and PWA “Updating PolyCal…” cue after new builds.
+- PC-203: Swipe left/right on main content to move between bottom tabs.
+- PC-204: Schedule Day period with 12a–12a hour grid and all-day strip.
 
-### Fixed
-- PC-200: Residency self-join proposal shows read-only “Requesting for: you” instead of a grayed Person select.
+### Changed
+- PC-205: Removed status legend from schedule View options (network filter remains).
 
 ## [2026.07.13b] - 2026-07-13
 

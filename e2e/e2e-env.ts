@@ -35,6 +35,7 @@ export function e2eEnvForWorker(workerIndex: number): Record<string, string> {
     AUTH_IMPERSONATION_SECRET: E2E_IMPERSONATION_SECRET,
     AUTH_URL: `http://localhost:${port}`,
     E2E_TEST_MODE: "1",
+    NEXT_PUBLIC_E2E_TEST_MODE: "1",
     E2E_API_SECRET,
     E2E_ANCHOR_DATE,
     CRON_SECRET: E2E_CRON_SECRET,
