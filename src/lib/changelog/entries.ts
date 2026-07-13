@@ -26,6 +26,23 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "2026.07.13b",
+    date: "2026-07-13",
+    summary: "Remove place members; residency self-join person UX.",
+    changes: [
+      {
+        type: "added",
+        description:
+          "Owners/admins can remove accepted Residents or Owners from the place card; last owner protected; audit places.remove_person (PC-199).",
+      },
+      {
+        type: "fixed",
+        description:
+          "Residency proposal dialog uses read-only Requesting for: you instead of a grayed Person select (PC-200).",
+      },
+    ],
+  },
+  {
     version: "2026.07.13",
     date: "2026-07-13",
     summary: "Place role toggle, onboarding email/TZ, mobile Add Place, admin oversight chrome.",
