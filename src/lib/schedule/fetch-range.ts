@@ -9,7 +9,7 @@ export interface ScheduleFetchRange {
 }
 
 /**
- * Computes the inclusive API fetch window for week or month calendar layouts (PC-77).
+ * Computes the inclusive API fetch window for day, week, or month layouts (PC-77 / PC-204).
  */
 export function computeScheduleFetchRange(
   anchorDate: Date,
@@ -19,6 +19,14 @@ export function computeScheduleFetchRange(
   if (layout === "month") {
     const monthRange = monthGridRange(startOfMonth(anchorDate));
     return { rangeStart: monthRange.rangeStart, rangeEnd: monthRange.rangeEnd };
+  }
+
+  if (layout === "day") {
+    const rangeStart = new Date(anchorDate);
+    rangeStart.setHours(0, 0, 0, 0);
+    const rangeEnd = new Date(rangeStart);
+    rangeEnd.setHours(23, 59, 59, 999);
+    return { rangeStart, rangeEnd };
   }
 
   const rangeStart = startOfWeekMonday(anchorDate);

@@ -6,10 +6,10 @@ import { startOfMonth } from "@/lib/schedule/month-grid";
 
 const STORAGE_KEY = "polycal.schedule.view";
 
-export type ScheduleCalendarLayout = "week" | "month";
+export type ScheduleCalendarLayout = "day" | "week" | "month";
 
-/** Unified chrome control: Week | 2 weeks | Month (PC-164). */
-export type SchedulePeriodMode = "week" | "twoWeek" | "month";
+/** Unified chrome control: Day | Week | 2 weeks | Month (PC-164 / PC-204). */
+export type SchedulePeriodMode = "day" | "week" | "twoWeek" | "month";
 
 export interface ScheduleViewState {
   weekStartIso: string;
@@ -21,8 +21,11 @@ export interface ScheduleViewState {
   planningOpen: boolean;
 }
 
-export function periodModeFromState(state: Pick<ScheduleViewState, "calendarLayout" | "compact">): SchedulePeriodMode {
+export function periodModeFromState(
+  state: Pick<ScheduleViewState, "calendarLayout" | "compact">,
+): SchedulePeriodMode {
   if (state.calendarLayout === "month") return "month";
+  if (state.calendarLayout === "day") return "day";
   return state.compact ? "twoWeek" : "week";
 }
 
@@ -32,6 +35,9 @@ export function applyPeriodMode(
 ): ScheduleViewState {
   if (mode === "month") {
     return { ...state, calendarLayout: "month", compact: false };
+  }
+  if (mode === "day") {
+    return { ...state, calendarLayout: "day", compact: false };
   }
   return {
     ...state,
@@ -65,10 +71,15 @@ export function loadScheduleViewState(): ScheduleViewState {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (!raw) return defaults;
     const parsed = JSON.parse(raw) as Partial<ScheduleViewState>;
+    const layout = parsed.calendarLayout;
+    const calendarLayout: ScheduleCalendarLayout =
+      layout === "day" || layout === "week" || layout === "month"
+        ? layout
+        : defaults.calendarLayout;
     return {
       ...defaults,
       compact: parsed.compact ?? defaults.compact,
-      calendarLayout: parsed.calendarLayout ?? defaults.calendarLayout,
+      calendarLayout,
       filterMode: parsed.filterMode ?? defaults.filterMode,
       filterPersonId: parsed.filterPersonId ?? defaults.filterPersonId,
       planningOpen: parsed.planningOpen ?? defaults.planningOpen,
@@ -101,7 +112,10 @@ export function parseScheduleUrlParams(search: string): ScheduleUrlParams {
   const params = new URLSearchParams(search.startsWith("?") ? search.slice(1) : search);
   const layoutRaw = params.get("layout");
   const layout =
-    layoutRaw === "week" || layoutRaw === "twoWeek" || layoutRaw === "month"
+    layoutRaw === "day" ||
+    layoutRaw === "week" ||
+    layoutRaw === "twoWeek" ||
+    layoutRaw === "month"
       ? layoutRaw
       : undefined;
   const anchor = params.get("anchor") ?? undefined;
@@ -136,10 +150,22 @@ export function localCalendarDateKey(date: Date): string {
 
 /**
  * Anchors “Today” — Monday of current week + current month (PC-164).
+ * Day mode overrides weekStartIso to local noon of today in ScheduleClient.
  */
-export function todayAnchors(now = new Date()): Pick<ScheduleViewState, "weekStartIso" | "monthAnchorIso"> {
+export function todayAnchors(
+  now = new Date(),
+): Pick<ScheduleViewState, "weekStartIso" | "monthAnchorIso"> {
   return {
     weekStartIso: startOfWeekMonday(now).toISOString(),
     monthAnchorIso: startOfMonth(now).toISOString(),
   };
+}
+
+/**
+ * Normalizes an anchor to local noon on that calendar day for day layout (PC-204).
+ */
+export function startOfLocalDayNoon(date: Date): Date {
+  const next = new Date(date);
+  next.setHours(12, 0, 0, 0);
+  return next;
 }

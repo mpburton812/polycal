@@ -4,6 +4,7 @@ import { FeedbackFab } from "@/components/feedback/FeedbackFab";
 import { AppHeader } from "@/components/layout/AppHeader";
 import { AppTabs } from "@/components/layout/AppTabs";
 import { DevBar } from "@/components/layout/DevBar";
+import { TabSwipeRegion } from "@/components/layout/TabSwipeRegion";
 import { PushSubscriptionManager } from "@/components/notifications/PushSubscriptionManager";
 import { avatarSrcForKey } from "@/lib/constants/avatars";
 import { getAppEnvironment } from "@/lib/env";
@@ -66,7 +67,7 @@ export function AppShell({
         maxWidth="md"
         sx={{ py: 2, pb: 10, minHeight: "calc(100vh - 120px)" }}
       >
-        {children}
+        <TabSwipeRegion isAdmin={isAdmin}>{children}</TabSwipeRegion>
       </Container>
       <AppTabs isAdmin={isAdmin} />
       <FeedbackFab />

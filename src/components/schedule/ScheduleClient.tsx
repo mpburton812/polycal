@@ -38,6 +38,7 @@ import type { PersonSummary } from "@/actions/users";
 import { PlanningModeDrawer } from "@/components/schedule/PlanningModeDrawer";
 import { ScheduleAgendaView } from "@/components/schedule/ScheduleAgendaView";
 import { ScheduleDaySheet } from "@/components/schedule/ScheduleDaySheet";
+import { ScheduleDayView } from "@/components/schedule/ScheduleDayView";
 import { ScheduleHeatmap } from "@/components/schedule/ScheduleHeatmap";
 import { ScheduleMonthView } from "@/components/schedule/ScheduleMonthView";
 import { ScheduleWeekView } from "@/components/schedule/ScheduleWeekView";
@@ -48,6 +49,7 @@ import {
   parseScheduleUrlParams,
   periodModeFromState,
   saveScheduleViewState,
+  startOfLocalDayNoon,
   todayAnchors,
   type ScheduleCalendarLayout,
   type SchedulePeriodMode,
@@ -62,7 +64,7 @@ import {
 } from "@/lib/schedule/dates";
 import { startOfMonth } from "@/lib/schedule/month-grid";
 import { computeScheduleFetchRange } from "@/lib/schedule/fetch-range";
-import { GARDEN_TOKENS, SCHEDULE_SEMANTIC_COLORS } from "@/theme/tokens";
+import { GARDEN_TOKENS } from "@/theme/tokens";
 
 /** Heavy dialogs load on demand so the calendar paints sooner (PC-145). */
 const ProposalDetailDialog = dynamic(
@@ -93,34 +95,6 @@ const SliceDetailDialog = dynamic(
     })),
   { ssr: false },
 );
-
-interface ScheduleLegendItemProps {
-  label: string;
-  fill: string;
-  borderStyle?: "solid" | "dashed";
-}
-
-/** Semantic fill swatch for the schedule status legend (PC-77 / PC-164). */
-function ScheduleLegendItem({ label, fill, borderStyle = "solid" }: ScheduleLegendItemProps) {
-  return (
-    <Stack direction="row" alignItems="center" spacing={0.5}>
-      <Box
-        sx={{
-          width: 10,
-          height: 10,
-          bgcolor: fill,
-          border: `1px ${borderStyle} ${GARDEN_TOKENS.ink}`,
-          borderRadius: 0.25,
-          flexShrink: 0,
-        }}
-        aria-hidden
-      />
-      <Typography variant="caption" color="text.secondary">
-        {label}
-      </Typography>
-    </Stack>
-  );
-}
 
 interface ScheduleClientProps {
   initialPayload: SchedulePayload;
@@ -189,37 +163,51 @@ export function ScheduleClient({
     () => startOfWeekMonday(new Date(viewState.weekStartIso)),
     [viewState.weekStartIso],
   );
+  const dayAnchor = useMemo(
+    () => startOfLocalDayNoon(new Date(viewState.weekStartIso)),
+    [viewState.weekStartIso],
+  );
   const monthAnchor = useMemo(
     () => startOfMonth(new Date(viewState.monthAnchorIso)),
     [viewState.monthAnchorIso],
   );
-  const dayCount = viewState.compact ? 14 : 7;
   const isMonthLayout = viewState.calendarLayout === "month";
+  const isDayLayout = viewState.calendarLayout === "day";
+  const dayCount = isDayLayout ? 1 : viewState.compact ? 14 : 7;
   const periodMode = periodModeFromState(viewState);
+  const fetchAnchor = isMonthLayout ? monthAnchor : isDayLayout ? dayAnchor : weekStart;
   const rangeEnd = useMemo(() => {
     return computeScheduleFetchRange(
-      isMonthLayout ? monthAnchor : weekStart,
-      isMonthLayout ? "month" : "week",
+      fetchAnchor,
+      viewState.calendarLayout,
       viewState.compact,
     ).rangeEnd;
-  }, [isMonthLayout, monthAnchor, viewState.compact, weekStart]);
+  }, [fetchAnchor, viewState.calendarLayout, viewState.compact]);
 
   const rangeStart = useMemo(() => {
     return computeScheduleFetchRange(
-      isMonthLayout ? monthAnchor : weekStart,
-      isMonthLayout ? "month" : "week",
+      fetchAnchor,
+      viewState.calendarLayout,
       viewState.compact,
     ).rangeStart;
-  }, [isMonthLayout, monthAnchor, viewState.compact, weekStart]);
+  }, [fetchAnchor, viewState.calendarLayout, viewState.compact]);
 
   const rangeLabel = useMemo(() => {
     if (isMonthLayout) {
       return monthAnchor.toLocaleDateString(undefined, { month: "long", year: "numeric" });
     }
+    if (isDayLayout) {
+      return dayAnchor.toLocaleDateString(undefined, {
+        weekday: "short",
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      });
+    }
     const end = addDays(weekStart, dayCount - 1);
     const fmt: Intl.DateTimeFormatOptions = { month: "short", day: "numeric" };
     return `${weekStart.toLocaleDateString(undefined, fmt)} – ${end.toLocaleDateString(undefined, fmt)}`;
-  }, [dayCount, isMonthLayout, monthAnchor, weekStart]);
+  }, [dayAnchor, dayCount, isDayLayout, isMonthLayout, monthAnchor, weekStart]);
 
   const refreshSchedule = useCallback(
     (
@@ -253,17 +241,15 @@ export function ScheduleClient({
   );
 
   const refreshCurrentView = useCallback(() => {
-    refreshSchedule(isMonthLayout ? monthAnchor : weekStart, {
+    refreshSchedule(fetchAnchor, {
       layout: viewState.calendarLayout,
       compact: viewState.compact,
     });
   }, [
-    isMonthLayout,
-    monthAnchor,
+    fetchAnchor,
     refreshSchedule,
     viewState.calendarLayout,
     viewState.compact,
-    weekStart,
   ]);
 
   useEffect(() => {
@@ -291,9 +277,13 @@ export function ScheduleClient({
       if (parsed.anchor) {
         const anchorDate = new Date(`${parsed.anchor}T12:00:00`);
         if (!Number.isNaN(anchorDate.getTime())) {
+          const nextLayout = next.calendarLayout;
           next = {
             ...next,
-            weekStartIso: startOfWeekMonday(anchorDate).toISOString(),
+            weekStartIso:
+              nextLayout === "day"
+                ? startOfLocalDayNoon(anchorDate).toISOString()
+                : startOfWeekMonday(anchorDate).toISOString(),
             monthAnchorIso: startOfMonth(anchorDate).toISOString(),
           };
         }
@@ -346,11 +336,18 @@ export function ScheduleClient({
     const anchor =
       viewState.calendarLayout === "month"
         ? new Date(viewState.monthAnchorIso)
-        : new Date(viewState.weekStartIso);
+        : viewState.calendarLayout === "day"
+          ? startOfLocalDayNoon(new Date(viewState.weekStartIso))
+          : new Date(viewState.weekStartIso);
     const initialMonday = startOfWeekMonday(new Date(initialWeekStartIso));
     const viewMonday = startOfWeekMonday(anchor);
     const sameWeek = isSameLocalCalendarDay(viewMonday, initialMonday);
-    if (!sameWeek || viewState.calendarLayout === "month" || viewState.compact) {
+    if (
+      !sameWeek ||
+      viewState.calendarLayout === "month" ||
+      viewState.calendarLayout === "day" ||
+      viewState.compact
+    ) {
       refreshSchedule(anchor, {
         layout: viewState.calendarLayout,
         compact: viewState.compact,
@@ -392,6 +389,17 @@ export function ScheduleClient({
       return;
     }
 
+    if (isDayLayout) {
+      const next = startOfLocalDayNoon(addDays(dayAnchor, delta));
+      setViewState((current) => ({
+        ...current,
+        weekStartIso: next.toISOString(),
+        monthAnchorIso: startOfMonth(next).toISOString(),
+      }));
+      refreshSchedule(next, { layout: "day" });
+      return;
+    }
+
     const step = viewState.compact ? 14 : 7;
     const next = addDays(weekStart, delta * step);
     setViewState((current) => ({ ...current, weekStartIso: next.toISOString() }));
@@ -400,6 +408,17 @@ export function ScheduleClient({
 
   function goToday() {
     const anchors = todayAnchors();
+    const now = new Date();
+    if (viewState.calendarLayout === "day") {
+      const day = startOfLocalDayNoon(now);
+      setViewState((current) => ({
+        ...current,
+        weekStartIso: day.toISOString(),
+        monthAnchorIso: anchors.monthAnchorIso,
+      }));
+      refreshSchedule(day, { layout: "day", compact: false });
+      return;
+    }
     setViewState((current) => ({ ...current, ...anchors }));
     const anchor =
       viewState.calendarLayout === "month"
@@ -412,12 +431,21 @@ export function ScheduleClient({
   }
 
   function handlePeriodModeChange(mode: SchedulePeriodMode) {
-    setViewState((current) => applyPeriodMode(current, mode));
     const next = applyPeriodMode(viewState, mode);
+    if (mode === "day") {
+      const day = startOfLocalDayNoon(
+        viewState.calendarLayout === "month" ? monthAnchor : new Date(viewState.weekStartIso),
+      );
+      const withDay = { ...next, weekStartIso: day.toISOString() };
+      setViewState(withDay);
+      refreshSchedule(day, { layout: "day", compact: false });
+      return;
+    }
+    setViewState(next);
     const anchor =
       next.calendarLayout === "month"
         ? new Date(next.monthAnchorIso)
-        : new Date(next.weekStartIso);
+        : startOfWeekMonday(new Date(next.weekStartIso));
     refreshSchedule(anchor, { layout: next.calendarLayout, compact: next.compact });
   }
 
@@ -445,7 +473,7 @@ export function ScheduleClient({
     openCreateDraft({ lockedType, initialStartAt: start.toISOString() });
   }
 
-  const showAgenda = !isMonthLayout && isMobile;
+  const showAgenda = !isMonthLayout && !isDayLayout && isMobile;
 
   return (
     <Box
@@ -524,6 +552,7 @@ export function ScheduleClient({
               }}
               aria-label="Calendar period"
             >
+              <ToggleButton value="day">Day</ToggleButton>
               <ToggleButton value="week">Week</ToggleButton>
               <ToggleButton value="twoWeek">2 weeks</ToggleButton>
               <ToggleButton value="month">Month</ToggleButton>
@@ -614,33 +643,6 @@ export function ScheduleClient({
             </FormControl>
           )}
 
-          <Stack direction="row" spacing={2} flexWrap="wrap" useFlexGap>
-            <ScheduleLegendItem
-              label="Proposed"
-              fill={SCHEDULE_SEMANTIC_COLORS.proposed.fill}
-              borderStyle="dashed"
-            />
-            <ScheduleLegendItem
-              label="Approved events"
-              fill={SCHEDULE_SEMANTIC_COLORS.resolved_event.fill}
-            />
-            <ScheduleLegendItem
-              label="Sleeping"
-              fill={SCHEDULE_SEMANTIC_COLORS.resolved_sleeping.fill}
-            />
-            <ScheduleLegendItem label="Conflict" fill={SCHEDULE_SEMANTIC_COLORS.conflict.fill} />
-            <ScheduleLegendItem
-              label="At risk / tentative"
-              fill={SCHEDULE_SEMANTIC_COLORS.at_risk.fill}
-            />
-            <ScheduleLegendItem label="Archived" fill={SCHEDULE_SEMANTIC_COLORS.archived.fill} />
-            <ScheduleLegendItem
-              label="Masked"
-              fill={SCHEDULE_SEMANTIC_COLORS.masked.fill}
-              borderStyle="dashed"
-            />
-          </Stack>
-
           <Button variant="contained" onClick={() => setOptionsOpen(false)}>
             Done
           </Button>
@@ -650,10 +652,18 @@ export function ScheduleClient({
       <Box sx={{ opacity: pending ? 0.72 : 1, transition: "opacity 120ms ease" }}>
         <ScheduleHeatmap
           events={filteredEvents}
-          weekStartIso={rangeStart.toISOString()}
+          weekStartIso={isDayLayout ? dayAnchor.toISOString() : rangeStart.toISOString()}
           dayCount={dayCount}
           timeZone={timeZone}
-          layout={isMonthLayout ? "month" : viewState.compact ? "twoWeek" : "week"}
+          layout={
+            isMonthLayout
+              ? "month"
+              : isDayLayout
+                ? "day"
+                : viewState.compact
+                  ? "twoWeek"
+                  : "week"
+          }
         />
 
         {isMonthLayout ? (
@@ -663,6 +673,13 @@ export function ScheduleClient({
             timeZone={timeZone}
             onEventClick={openScheduleEvent}
             onDayClick={openDaySheet}
+          />
+        ) : isDayLayout ? (
+          <ScheduleDayView
+            day={dayAnchor}
+            events={filteredEvents}
+            timeZone={timeZone}
+            onEventClick={openScheduleEvent}
           />
         ) : showAgenda ? (
           <ScheduleAgendaView

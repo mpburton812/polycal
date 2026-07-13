@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { redirect } from "next/navigation";
 
 import { listPeopleAction } from "@/actions/users";
@@ -7,16 +8,26 @@ import { getNotificationPrefsAction } from "@/actions/profile";
 import { AppShell } from "@/components/layout/AppShell";
 import { FirstLoginWizard } from "@/components/onboarding/FirstLoginWizard";
 import { UserThemeProvider } from "@/components/providers/UserThemeProvider";
+import { BrandedLoading } from "@/components/ui/BrandedLoading";
 import { auth } from "@/lib/auth";
 import { getLiveUserStatus } from "@/lib/auth-session";
 import { userHasAdminAccess } from "@/lib/admin-access";
 import { normalizeUserThemeId } from "@/lib/constants/themes";
+import { DEFAULT_NOTIFICATION_PREFS } from "@/types/notification-prefs";
 
-export default async function AppLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+/**
+ * Authenticated app chrome. Outer Suspense shows a branded splash while this
+ * layout’s auth + shell data resolve (PC-202).
+ */
+export default function AppLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <Suspense fallback={<BrandedLoading fullPage label="Loading PolyCal…" />}>
+      <AppLayoutReady>{children}</AppLayoutReady>
+    </Suspense>
+  );
+}
+
+async function AppLayoutReady({ children }: { children: React.ReactNode }) {
   const session = await auth();
   if (!session?.user?.id) {
     redirect("/login");
@@ -30,52 +41,112 @@ export default async function AppLayout({
     redirect("/paused");
   }
 
+  const themeId = normalizeUserThemeId(session.user.theme ?? "sage");
+  const showOnboarding = !session.user.onboardingComplete;
+
+  // Shell chrome can paint as soon as admin flag resolves; inbox/prefs stream in parallel.
+  const hasAdminAccessPromise = userHasAdminAccess(session.user.role);
   const notificationInboxPromise = getNotificationInboxAction();
   const notificationPrefsPromise = getNotificationPrefsAction();
   const groupNamePromise = getPolyGroupDisplayNameAction();
-  const hasAdminAccessPromise = userHasAdminAccess(session.user.role);
 
-  const [hasAdminAccess, notificationInbox, notificationPrefs, groupName] =
-    await Promise.all([
-      hasAdminAccessPromise,
-      notificationInboxPromise,
-      notificationPrefsPromise,
-      groupNamePromise,
-    ]);
+  const hasAdminAccess = await hasAdminAccessPromise;
 
-  const themeId = normalizeUserThemeId(session.user.theme ?? "sage");
-  const showOnboarding = !session.user.onboardingComplete;
+  return (
+    <UserThemeProvider themeId={themeId}>
+      <Suspense
+        fallback={
+          <AppShell
+            displayName={session.user.displayName}
+            groupName="…"
+            isAdmin={hasAdminAccess}
+            avatarKey={session.user.avatarKey}
+            notificationCount={0}
+            notificationItems={[]}
+            notificationPrefs={DEFAULT_NOTIFICATION_PREFS}
+          >
+            <BrandedLoading label="Loading…" />
+          </AppShell>
+        }
+      >
+        <AppShellWithData
+          displayName={session.user.displayName}
+          avatarKey={session.user.avatarKey}
+          isAdmin={hasAdminAccess}
+          showOnboarding={showOnboarding}
+          mustChangePassword={session.user.mustChangePassword}
+          themeId={themeId}
+          userId={session.user.id}
+          notificationInboxPromise={notificationInboxPromise}
+          notificationPrefsPromise={notificationPrefsPromise}
+          groupNamePromise={groupNamePromise}
+        >
+          {children}
+        </AppShellWithData>
+      </Suspense>
+    </UserThemeProvider>
+  );
+}
+
+async function AppShellWithData({
+  children,
+  displayName,
+  avatarKey,
+  isAdmin,
+  showOnboarding,
+  mustChangePassword,
+  themeId,
+  userId,
+  notificationInboxPromise,
+  notificationPrefsPromise,
+  groupNamePromise,
+}: {
+  children: React.ReactNode;
+  displayName: string;
+  avatarKey?: string;
+  isAdmin: boolean;
+  showOnboarding: boolean;
+  mustChangePassword: boolean;
+  themeId: string;
+  userId: string;
+  notificationInboxPromise: ReturnType<typeof getNotificationInboxAction>;
+  notificationPrefsPromise: ReturnType<typeof getNotificationPrefsAction>;
+  groupNamePromise: ReturnType<typeof getPolyGroupDisplayNameAction>;
+}) {
+  const [notificationInbox, notificationPrefs, groupName] = await Promise.all([
+    notificationInboxPromise,
+    notificationPrefsPromise,
+    groupNamePromise,
+  ]);
 
   let partnerOptions: { id: string; displayName: string }[] = [];
   if (showOnboarding) {
     const people = await listPeopleAction();
     partnerOptions = people
-      .filter((p) => p.id !== session.user.id)
+      .filter((p) => p.id !== userId)
       .map((p) => ({ id: p.id, displayName: p.displayName }));
   }
 
   return (
-    <UserThemeProvider themeId={themeId}>
-      <AppShell
-        displayName={session.user.displayName}
-        groupName={groupName}
-        isAdmin={hasAdminAccess}
-        avatarKey={session.user.avatarKey}
-        notificationCount={notificationInbox.count}
-        notificationItems={notificationInbox.items}
-        notificationPrefs={notificationPrefs}
-      >
-        {showOnboarding ? (
-          <FirstLoginWizard
-            mustChangePassword={session.user.mustChangePassword}
-            initialAvatarKey={session.user.avatarKey ?? null}
-            initialTheme={themeId}
-            partnerOptions={partnerOptions}
-          />
-        ) : (
-          children
-        )}
-      </AppShell>
-    </UserThemeProvider>
+    <AppShell
+      displayName={displayName}
+      groupName={groupName}
+      isAdmin={isAdmin}
+      avatarKey={avatarKey}
+      notificationCount={notificationInbox.count}
+      notificationItems={notificationInbox.items}
+      notificationPrefs={notificationPrefs}
+    >
+      {showOnboarding ? (
+        <FirstLoginWizard
+          mustChangePassword={mustChangePassword}
+          initialAvatarKey={avatarKey ?? null}
+          initialTheme={themeId}
+          partnerOptions={partnerOptions}
+        />
+      ) : (
+        children
+      )}
+    </AppShell>
   );
 }

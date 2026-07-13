@@ -26,6 +26,31 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "2026.07.13c",
+    date: "2026-07-13",
+    summary: "Branded splash, tab swipe, Day schedule view, View options legend cleanup.",
+    changes: [
+      {
+        type: "added",
+        description:
+          "Garden-branded loading splash, streamed app shell, and PWA Updating PolyCal cue after deploys (PC-202).",
+      },
+      {
+        type: "added",
+        description: "Swipe left/right on main content to navigate bottom tabs (PC-203).",
+      },
+      {
+        type: "added",
+        description:
+          "Schedule Day period with 12a–12a hour grid and all-day events strip (PC-204).",
+      },
+      {
+        type: "changed",
+        description: "Removed status legend from schedule View options drawer (PC-205).",
+      },
+    ],
+  },
+  {
     version: "2026.07.13b",
     date: "2026-07-13",
     summary: "Remove place members; residency self-join person UX.",

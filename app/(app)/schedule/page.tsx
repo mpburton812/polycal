@@ -7,6 +7,7 @@ import { listScheduleEventsAction } from "@/actions/schedule";
 import { listPartnershipsForUserAction } from "@/actions/partnerships";
 import { listPeopleAction } from "@/actions/users";
 import { ScheduleClient } from "@/components/schedule/ScheduleClient";
+import { BrandedLoading } from "@/components/ui/BrandedLoading";
 import { auth } from "@/lib/auth";
 import { endOfWeekSunday, startOfWeekMonday } from "@/lib/schedule/dates";
 import { resolveTimezone } from "@/lib/schedule/timezone";
@@ -16,7 +17,6 @@ import { getDb } from "@/lib/db/client";
 import { ensureDbReady } from "@/lib/db/ensure-ready";
 import { brutalPageTitleSx } from "@/theme/brutalUi";
 import { GARDEN_TOKENS } from "@/theme/tokens";
-import { Box, CircularProgress } from "@mui/material";
 
 export default async function SchedulePage() {
   const session = await auth();
@@ -58,13 +58,7 @@ export default async function SchedulePage() {
       <Typography sx={{ mb: 2, color: GARDEN_TOKENS.inkMuted }}>
         Your network calendar — proposed items appear tentative until approved.
       </Typography>
-      <Suspense
-        fallback={
-          <Box sx={{ display: "flex", justifyContent: "center", py: 6 }}>
-            <CircularProgress />
-          </Box>
-        }
-      >
+      <Suspense fallback={<BrandedLoading label="Loading schedule…" />}>
         <ScheduleClient
           initialPayload={scheduleResult.payload}
           initialWeekStartIso={weekStart.toISOString()}

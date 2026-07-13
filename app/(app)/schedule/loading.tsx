@@ -1,10 +1,6 @@
-import { Box, CircularProgress } from "@mui/material";
+import { BrandedLoading } from "@/components/ui/BrandedLoading";
 
-/** Lightweight shell while schedule data loads (PC-53 perf). */
+/** Lightweight shell while schedule data loads (PC-53 / PC-202). */
 export default function ScheduleLoading() {
-  return (
-    <Box sx={{ display: "flex", justifyContent: "center", py: 8 }}>
-      <CircularProgress aria-label="Loading schedule" />
-    </Box>
-  );
+  return <BrandedLoading label="Loading schedule…" />;
 }
