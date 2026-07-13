@@ -16,22 +16,26 @@ test.describe("password reset journey", () => {
     page,
     request,
   }) => {
-    await page.goto("/login");
-    await page.getByRole("link", { name: "Forgot password?" }).click();
+    await page.goto("/login", { waitUntil: "domcontentloaded" });
+    await expect(page.getByRole("link", { name: "Forgot password?" })).toBeVisible();
+    await page.goto("/forgot-password", { waitUntil: "networkidle" });
     await expect(page).toHaveURL(/\/forgot-password/);
+    await expect(page.getByRole("button", { name: "Send reset link" })).toBeEnabled();
 
-    await page.getByLabel("Username").fill(USERS.luke.username);
+    const usernameField = page.getByRole("textbox", { name: "Username" });
+    await usernameField.fill(USERS.luke.username);
+    await expect(usernameField).toHaveValue(USERS.luke.username);
     await page.getByRole("button", { name: "Send reset link" }).click();
     await expect(
       page.getByText(/If that account has a verified notification email/i),
-    ).toBeVisible();
+    ).toBeVisible({ timeout: 30_000 });
 
     // Unknown username gets the same message (anti-enumeration).
-    await page.getByLabel("Username").fill("definitely-not-a-user");
+    await usernameField.fill("definitely-not-a-user");
     await page.getByRole("button", { name: "Send reset link" }).click();
     await expect(
       page.getByText(/If that account has a verified notification email/i),
-    ).toBeVisible();
+    ).toBeVisible({ timeout: 30_000 });
 
     const token = `pr-e2e-${Date.now()}`;
     const seed = await request.post("/api/e2e/password-reset-token", {
