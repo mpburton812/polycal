@@ -6,16 +6,24 @@ import { useEffect, useState } from "react";
 import { fontFamilies } from "@/theme/fonts";
 import { GARDEN_TOKENS } from "@/theme/tokens";
 
+function isAutomatedBrowser(): boolean {
+  if (typeof window === "undefined") return false;
+  if (process.env.NEXT_PUBLIC_E2E_TEST_MODE === "1") return true;
+  // Playwright / Selenium set webdriver; never block e2e on the update overlay.
+  return Boolean(navigator.webdriver);
+}
+
 /**
  * Detects Serwist/service-worker activation after a new deploy and shows a
- * blocking “Updating…” overlay before reloading (PC-202). Complements admin
- * force-reload; does not unregister caches.
+ * brief “Updating…” overlay before reloading (PC-202). Complements admin
+ * force-reload. Disabled under Playwright/e2e so the overlay cannot intercept clicks.
  */
 export function PwaUpdateGate() {
   const [updating, setUpdating] = useState(false);
 
   useEffect(() => {
     if (typeof window === "undefined" || !("serviceWorker" in navigator)) return;
+    if (isAutomatedBrowser()) return;
 
     let refreshing = false;
 
@@ -23,7 +31,6 @@ export function PwaUpdateGate() {
       if (refreshing) return;
       refreshing = true;
       setUpdating(true);
-      // Brief paint so the user sees the cue before reload.
       window.setTimeout(() => {
         window.location.reload();
       }, 400);
@@ -38,18 +45,19 @@ export function PwaUpdateGate() {
         const installing = registration.installing;
         if (!installing) return;
         installing.addEventListener("statechange", () => {
-          // Installed while a controller exists ⇒ a new build is taking over.
+          // New worker installed while a page is controlled — ask it to activate
+          // (serwist already uses skipWaiting; this covers waiting edge cases).
           if (
             installing.state === "installed" &&
-            navigator.serviceWorker.controller
+            navigator.serviceWorker.controller &&
+            registration.waiting
           ) {
-            setUpdating(true);
+            registration.waiting.postMessage({ type: "SKIP_WAITING" });
           }
         });
       };
 
       registration.addEventListener("updatefound", onUpdateFound);
-      // Opportunistic check when the shell mounts (post-deploy return visits).
       void registration.update().catch(() => undefined);
 
       return () => {
