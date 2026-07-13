@@ -208,3 +208,4 @@
 2026-07-13 | f8a6231 | PC-192 | assert latest changelog version dynamically | e2e/admin-code-status-journey.spec.ts
 2026-07-13 | e5f1ee9 | PC-199 | remove place members and fix residency self-join UX | src/actions/places.ts
 2026-07-13 | 2572930 | PC-202 | splash, tab swipe, Day schedule view, legend cleanup | src/components/layout/AppShell.tsx
+2026-07-13 | f67e9b8 | PC-202 | disable update overlay under Playwright e2e | src/components/pwa/PwaUpdateGate.tsx
