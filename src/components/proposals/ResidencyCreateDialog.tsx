@@ -30,12 +30,11 @@ interface ResidencyCreateDialogProps {
   people: PersonSummary[];
   places: ProposalPlaceOption[];
   currentUserId: string;
-  /** When true, target is locked to self (non-admin self-join). */
-  lockTargetToSelf?: boolean;
 }
 
 /**
- * Creates a residency self-join draft for owner approval (PC-188 / PC-190).
+ * Creates a residency self-join draft for owner approval (PC-188 / PC-200).
+ * Always requests for the signed-in user — no grayed Person picker.
  */
 export function ResidencyCreateDialog({
   open,
@@ -43,22 +42,12 @@ export function ResidencyCreateDialog({
   people,
   places,
   currentUserId,
-  lockTargetToSelf = true,
 }: ResidencyCreateDialogProps) {
   const router = useRouter();
   const { showToast } = useToast();
   const [locationId, setLocationId] = useState("");
-  const [targetUserId, setTargetUserId] = useState(
-    lockTargetToSelf ? currentUserId : "",
-  );
   const [placeRole, setPlaceRole] = useState<"" | "owner" | "resident">("");
   const [pending, startTransition] = useTransition();
-
-  useEffect(() => {
-    if (open && lockTargetToSelf) {
-      setTargetUserId(currentUserId);
-    }
-  }, [open, lockTargetToSelf, currentUserId]);
 
   useEffect(() => {
     if (!open) {
@@ -66,26 +55,26 @@ export function ResidencyCreateDialog({
     }
   }, [open]);
 
-  const candidates = useMemo(
-    () => people.filter((person) => person.status === "active"),
-    [people],
+  const selfName = useMemo(
+    () =>
+      people.find((person) => person.id === currentUserId)?.displayName ?? "You",
+    [people, currentUserId],
   );
 
   const selectedPlace = places.find((place) => place.id === locationId);
 
   function handleClose() {
     setLocationId("");
-    setTargetUserId(lockTargetToSelf ? currentUserId : "");
     setPlaceRole("");
     onClose();
   }
 
   function handleCreate(immediate: boolean) {
-    if (!locationId || !targetUserId || !placeRole) return;
+    if (!locationId || !placeRole) return;
     startTransition(async () => {
       const result = await createResidencyDraftProposalAction({
         locationId,
-        targetUserId,
+        targetUserId: currentUserId,
         placeRole,
         submitImmediately: immediate,
       });
@@ -104,6 +93,9 @@ export function ResidencyCreateDialog({
           <Alert severity="info" sx={{ py: 0.5 }}>
             Place owners must approve. You receive the access level you choose below.
           </Alert>
+          <Typography variant="body2">
+            Requesting for: <strong>{selfName}</strong> (you)
+          </Typography>
           <FormControl fullWidth size="small">
             <InputLabel id="residency-place-label">Place</InputLabel>
             <Select
@@ -153,25 +145,9 @@ export function ResidencyCreateDialog({
             <strong>Resident</strong> — can use and edit the place but cannot manage
             membership or approve residency requests.
           </Typography>
-          <FormControl fullWidth size="small">
-            <InputLabel id="residency-user-label">Person</InputLabel>
-            <Select
-              labelId="residency-user-label"
-              label="Person"
-              value={targetUserId}
-              disabled={lockTargetToSelf}
-              onChange={(event) => setTargetUserId(event.target.value)}
-            >
-              {candidates.map((person) => (
-                <MenuItem key={person.id} value={person.id}>
-                  {person.displayName}
-                  {person.id === currentUserId ? " (you)" : ""}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
           <Typography variant="body2" color="text.secondary">
-            Save as draft to review later, or submit now to notify place owners.
+            Save as draft to review later, or submit now to notify place owners. To add
+            someone else immediately, use Places → Add person.
           </Typography>
         </Stack>
       </DialogContent>
@@ -181,14 +157,14 @@ export function ResidencyCreateDialog({
         </Button>
         <Button
           variant="text"
-          disabled={pending || !locationId || !targetUserId || !placeRole}
+          disabled={pending || !locationId || !placeRole}
           onClick={() => handleCreate(false)}
         >
           Save draft
         </Button>
         <Button
           variant="contained"
-          disabled={pending || !locationId || !targetUserId || !placeRole}
+          disabled={pending || !locationId || !placeRole}
           onClick={() => handleCreate(true)}
           sx={primaryButtonSx}
         >
