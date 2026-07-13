@@ -137,26 +137,28 @@ export async function seedTestFamilyFoundation(options?: {
   }
 
   for (const location of TEST_FAMILY_LOCATIONS) {
+    const residentUserId = userIdByUsername.get(location.residentUsername);
+    if (!residentUserId) {
+      throw new Error(`Missing resident user for ${location.name}`);
+    }
+
     await db.insert(locations).values({
       id: location.id,
       name: location.name,
       description: null,
       bedroomCount: 1,
       bedroomNames: JSON.stringify(["Main"]),
+      createdById: residentUserId,
       createdAt: now,
       updatedAt: now,
     });
-
-    const residentUserId = userIdByUsername.get(location.residentUsername);
-    if (!residentUserId) {
-      throw new Error(`Missing resident user for ${location.name}`);
-    }
 
     await db.insert(locationResidents).values({
       id: randomUUID(),
       locationId: location.id,
       userId: residentUserId,
       status: "accepted",
+      placeRole: "owner",
       proposedById: adminUserId,
       createdAt: now,
       updatedAt: now,

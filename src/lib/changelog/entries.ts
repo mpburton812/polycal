@@ -26,6 +26,65 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "2026.07.13",
+    date: "2026-07-13",
+    summary: "Place role toggle, onboarding email/TZ, mobile Add Place, admin oversight chrome.",
+    changes: [
+      {
+        type: "added",
+        description:
+          "Owners/admins can change accepted place members between Resident and Owner; last-owner demotion blocked (PC-193).",
+      },
+      {
+        type: "added",
+        description:
+          "Onboarding collects notification email (verify link; finish not blocked) and timezone defaulting to America/New_York (PC-194).",
+      },
+      {
+        type: "fixed",
+        description:
+          "People & Places Add place / Add person remain usable on small screens (PC-195).",
+      },
+      {
+        type: "added",
+        description:
+          "Admin-viewed proposals belonging to others use a light orange background on the board and in detail (PC-196).",
+      },
+      {
+        type: "changed",
+        description:
+          "Sleeping Partner Proposal list includes passive profiles (auto-accept) (PC-197).",
+      },
+    ],
+  },
+  {
+    version: "2026.07.12c",
+    date: "2026-07-12",
+    summary: "Place owners, immediate add, self-join owner approval.",
+    changes: [
+      {
+        type: "added",
+        description:
+          "location_residents.place_role (owner/resident); creators seeded as owners (PC-186).",
+      },
+      {
+        type: "added",
+        description:
+          "Owners/admins add people immediately as Owner or Resident from Places (PC-187, PC-189).",
+      },
+      {
+        type: "changed",
+        description:
+          "Residency self-join proposals invite place owners; proposer selects Owner or Resident access (PC-188).",
+      },
+      {
+        type: "added",
+        description:
+          "Residency place picker shows current owners and residents (PC-190).",
+      },
+    ],
+  },
+  {
     version: "2026.07.12b",
     date: "2026-07-12",
     summary: "Alpha Feedback screenshot lightbox, comment log, notify on Save.",

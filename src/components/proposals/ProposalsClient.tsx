@@ -102,7 +102,11 @@ interface ProposalsClientProps {
   board: ProposalBoard;
   people: PersonSummary[];
   places: ProposalPlaceOption[];
+  /** All places with member names for residency self-join (PC-190). */
+  residencyPlaces?: ProposalPlaceOption[];
   currentUserId: string;
+  /** App admin — enables oversight chrome on others' cards (PC-196). */
+  isAdmin?: boolean;
 }
 
 /**
@@ -112,7 +116,9 @@ export function ProposalsClient({
   board,
   people,
   places,
+  residencyPlaces,
   currentUserId,
+  isAdmin = false,
 }: ProposalsClientProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -251,6 +257,8 @@ export function ProposalsClient({
               key={proposal.id}
               proposal={proposal}
               onOpen={openDetail}
+              isAdmin={isAdmin}
+              currentUserId={currentUserId}
               onContinueEdit={
                 isStandardDraftProposal(proposal) ? handleContinueEdit : undefined
               }
@@ -347,13 +355,16 @@ export function ProposalsClient({
         open={residencyCreateOpen}
         onClose={() => setResidencyCreateOpen(false)}
         people={people}
-        places={places}
+        places={residencyPlaces ?? places}
         currentUserId={currentUserId}
+        lockTargetToSelf
       />
       <ProposalDetailDialog
         proposalId={selectedProposalId}
         open={detailOpen}
         people={people}
+        isAdmin={isAdmin}
+        currentUserId={currentUserId}
         onClose={() => {
           setDetailOpen(false);
           setSelectedProposalId(null);

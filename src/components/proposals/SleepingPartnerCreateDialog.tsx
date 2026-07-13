@@ -70,13 +70,11 @@ export function SleepingPartnerCreateDialog({
     return ids;
   }, [partnerships]);
 
+  // Include passive profiles — proposePartnershipAction auto-accepts them (PC-197).
   const candidates = useMemo(
     () =>
       people.filter(
-        (person) =>
-          person.id !== currentUserId &&
-          person.status === "active" &&
-          person.role !== "passive",
+        (person) => person.id !== currentUserId && person.status === "active",
       ),
     [people, currentUserId],
   );
@@ -102,8 +100,8 @@ export function SleepingPartnerCreateDialog({
       <DialogTitle>Sleeping Partner Proposal</DialogTitle>
       <DialogContent>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-          Choose someone to propose a sleeping partnership with. People you already partner with
-          or have a pending proposal with are unavailable.
+          Choose someone to propose a sleeping partnership with. Passive profiles auto-accept;
+          people you already partner with or have a pending proposal with are unavailable.
         </Typography>
         {loading ? (
           <Typography variant="body2" color="text.secondary">
@@ -121,7 +119,9 @@ export function SleepingPartnerCreateDialog({
                   ? "Already partners"
                   : partnership?.status === "proposed"
                     ? "Proposal pending"
-                    : undefined;
+                    : person.role === "passive"
+                      ? "Passive — auto-accepts"
+                      : undefined;
 
               return (
                 <ListItemButton

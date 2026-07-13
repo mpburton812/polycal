@@ -60,7 +60,9 @@ import type { PersonSummary } from "@/actions/users";
 import { handleCommentEnterKey } from "@/lib/ui/comment-keydown";
 
 import {
+  ADMIN_OVERSIGHT_BG,
   formatTimeRange,
+  isAdminOversightView,
   POLY_GREEN,
   primaryButtonSx,
   proposalCardSx,
@@ -123,6 +125,9 @@ interface ProposalDetailDialogProps {
   onEdit: (detail: ProposalDetail) => void;
   people?: PersonSummary[];
   onOpenRelatedProposal?: (proposalId: string) => void;
+  /** App admin oversight chrome (PC-196). */
+  isAdmin?: boolean;
+  currentUserId?: string;
 }
 
 /**
@@ -135,6 +140,8 @@ export function ProposalDetailDialog({
   onEdit,
   people = [],
   onOpenRelatedProposal,
+  isAdmin = false,
+  currentUserId = "",
 }: ProposalDetailDialogProps) {
   const router = useRouter();
   const { showToast } = useToast();
@@ -443,6 +450,7 @@ export function ProposalDetailDialog({
     : null;
 
   const isPollMatrix = detail?.isPoll && (detail.timeSlots.length ?? 0) > 1;
+  const adminOversight = isAdminOversightView(isAdmin, currentUserId, detail?.proposerId);
 
   return (
     <>
@@ -457,7 +465,7 @@ export function ProposalDetailDialog({
         variant="outlined"
         sx={{
           ...proposalCardSx,
-          bgcolor: GARDEN_TOKENS.surface,
+          bgcolor: adminOversight ? ADMIN_OVERSIGHT_BG : GARDEN_TOKENS.surface,
           maxHeight: "min(90vh, 900px)",
           display: "flex",
           flexDirection: "column",

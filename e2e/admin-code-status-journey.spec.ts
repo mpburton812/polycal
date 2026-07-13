@@ -3,6 +3,7 @@ import { expect, test, type Page } from "./helpers/test";
 import { login } from "./helpers/auth";
 import { USERS } from "./helpers/constants";
 import { goToAdmin } from "./helpers/navigation";
+import { CHANGELOG } from "../src/lib/changelog/entries";
 
 /** Expands a collapsed admin accordion section by title. */
 async function expandAdminSection(page: Page, title: string): Promise<void> {
@@ -27,7 +28,7 @@ test.describe("Admin Code Status journey", () => {
     await expect(
       page.getByText("Latest change control entry", { exact: true }),
     ).toBeVisible();
-    await expect(page.getByText("2026.07.12b").first()).toBeVisible();
+    await expect(page.getByText(CHANGELOG[0]!.version).first()).toBeVisible();
   });
 
   test("build number opens the full change control log", async ({ page }) => {
@@ -35,14 +36,10 @@ test.describe("Admin Code Status journey", () => {
 
     const dialog = page.getByRole("dialog", { name: "Change control log" });
     await expect(dialog).toBeVisible();
-    // Full log lists multiple promoted versions.
-    await expect(dialog.getByText("2026.07.12b").first()).toBeVisible();
-    await expect(dialog.getByText("2026.07.11c").first()).toBeVisible();
-    await expect(dialog.getByText("2026.07.11b").first()).toBeVisible();
-    await expect(dialog.getByText("2026.07.10").first()).toBeVisible();
-    await expect(dialog.getByText("2026.07.09").first()).toBeVisible();
-    await expect(dialog.getByText("2026.07.08").first()).toBeVisible();
-    await expect(dialog.getByText("2026.07.03").first()).toBeVisible();
+    // Full log lists multiple promoted versions (newest first).
+    for (const entry of CHANGELOG.slice(0, 8)) {
+      await expect(dialog.getByText(entry.version).first()).toBeVisible();
+    }
 
     await dialog.getByRole("button", { name: "Close change control log" }).click();
     await expect(dialog).toBeHidden();

@@ -1,9 +1,13 @@
-/** Metadata shape stored in proposal.description for place residency (PC-60). */
+/** Metadata shape stored in proposal.description for place residency (PC-60 / PC-188). */
 export interface ResidencyProposalMeta {
   residencyProposal: true;
   targetUserId: string;
   /** Linked location_residents row once submitted or resolved. */
   locationResidentsId?: string;
+  /** Self-join proposals are approved by place owners. */
+  kind?: "self_join";
+  /** Role applied on acceptance when owners unanimously approve. */
+  placeRole?: "owner" | "resident";
 }
 
 /** Metadata shape stored in proposal.description for poly group rename (PC-45/PC-60). */
@@ -26,6 +30,10 @@ export function parseResidencyProposalMeta(
     const parsed = JSON.parse(description) as Partial<ResidencyProposalMeta>;
     if (parsed.residencyProposal !== true) return null;
     if (typeof parsed.targetUserId !== "string" || !parsed.targetUserId.trim()) return null;
+    const placeRole =
+      parsed.placeRole === "owner" || parsed.placeRole === "resident"
+        ? parsed.placeRole
+        : undefined;
     return {
       residencyProposal: true,
       targetUserId: parsed.targetUserId.trim(),
@@ -33,6 +41,8 @@ export function parseResidencyProposalMeta(
         typeof parsed.locationResidentsId === "string"
           ? parsed.locationResidentsId.trim()
           : undefined,
+      kind: parsed.kind === "self_join" ? "self_join" : undefined,
+      placeRole,
     };
   } catch {
     return null;
@@ -107,8 +117,15 @@ export function proposalDescriptionForDisplay(description: string | null): strin
     return `Rename to "${groupMeta.proposedName}"${from}`;
   }
 
-  if (parseResidencyProposalMeta(description)) {
-    return null;
+  const residencyMeta = parseResidencyProposalMeta(description);
+  if (residencyMeta) {
+    if (residencyMeta.placeRole === "owner") {
+      return "Requesting Owner access — can manage members and approve residency requests.";
+    }
+    if (residencyMeta.placeRole === "resident") {
+      return "Requesting Resident access — can use the place but cannot manage membership.";
+    }
+    return "Place residency request.";
   }
 
   if (getProposalSpecialKind(description)) {

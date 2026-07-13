@@ -19,6 +19,8 @@ describe("special-proposals metadata", () => {
       residencyProposal: true,
       targetUserId: "user-1",
       locationResidentsId: undefined,
+      kind: undefined,
+      placeRole: undefined,
     });
     expect(getProposalSpecialKind(json)).toBe("residency");
     expect(isNonScheduleProposal(json)).toBe(true);
@@ -44,12 +46,23 @@ describe("special-proposals metadata", () => {
     expect(isNonScheduleProposal(null)).toBe(false);
   });
 
-  it("formats group rename and hides residency JSON for display", () => {
+  it("formats group rename and residency role for display", () => {
     const residencyJson = serializeResidencyProposalMeta({
       residencyProposal: true,
       targetUserId: "user-1",
+      placeRole: "resident",
     });
-    expect(proposalDescriptionForDisplay(residencyJson)).toBeNull();
+    expect(proposalDescriptionForDisplay(residencyJson)).toBe(
+      "Requesting Resident access — can use the place but cannot manage membership.",
+    );
+    const ownerJson = serializeResidencyProposalMeta({
+      residencyProposal: true,
+      targetUserId: "user-1",
+      placeRole: "owner",
+    });
+    expect(proposalDescriptionForDisplay(ownerJson)).toBe(
+      "Requesting Owner access — can manage members and approve residency requests.",
+    );
     expect(
       proposalDescriptionForDisplay(
         JSON.stringify({

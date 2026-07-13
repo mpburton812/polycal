@@ -42,11 +42,12 @@ import type { PlacesMapVisibility } from "@/types/poly-group";
 import { SleepingMapView } from "@/components/people-places/SleepingMapView";
 import {
   createPlaceAction,
+  addPersonToPlaceAction,
   deletePlaceAction,
   getPlaceDeleteImpactAction,
   listResidentsForPlaceAction,
-  proposeResidencyAction,
   updatePlaceAction,
+  updatePlaceMemberRoleAction,
   type PlaceDeleteImpact,
   type PlaceSummary,
   type ResidentView,
@@ -508,6 +509,7 @@ function PlaceDetail({
   const router = useRouter();
   const [residents, setResidents] = useState<ResidentView[]>(place.residents);
   const [targetUserId, setTargetUserId] = useState("");
+  const [addPlaceRole, setAddPlaceRole] = useState<"owner" | "resident">("resident");
   const [message, setMessage] = useState<string | null>(null);
   const [editOpen, setEditOpen] = useState(false);
   const [editName, setEditName] = useState(place.name);
@@ -525,6 +527,13 @@ function PlaceDetail({
   const isResident = residents.some(
     (row) => row.userId === currentUserId && row.status === "accepted",
   );
+  const isOwner = residents.some(
+    (row) =>
+      row.userId === currentUserId &&
+      row.status === "accepted" &&
+      row.placeRole === "owner",
+  );
+  const canManageMembers = isAdmin || isOwner;
   const canEditPlace = isAdmin || place.createdById === currentUserId || isResident;
   const canDeletePlace = isAdmin || isResident || place.createdById === currentUserId;
 
@@ -620,38 +629,95 @@ function PlaceDetail({
           Bedrooms: {place.bedroomNames.join(", ")}
         </Typography>
       )}
-      <Typography variant="subtitle2">Residents</Typography>
+      <Typography variant="subtitle2">People</Typography>
       {residents.length === 0 && (
         <Typography variant="body2" color="text.secondary">
-          No residents yet.
+          No owners or residents yet.
         </Typography>
       )}
       {residents.map((row) => (
-        <Stack key={row.id} direction="row" spacing={1} alignItems="center">
-          <Chip size="small" label={row.status} color={residentStatusColor(row.status)} />
+        <Stack
+          key={row.id}
+          direction={{ xs: "column", sm: "row" }}
+          spacing={1}
+          alignItems={{ xs: "stretch", sm: "center" }}
+        >
+          {canManageMembers && row.status === "accepted" ? (
+            <FormControl size="small" sx={{ minWidth: 140 }}>
+              <InputLabel id={`member-role-${row.id}`}>Access</InputLabel>
+              <Select
+                labelId={`member-role-${row.id}`}
+                label="Access"
+                value={row.placeRole}
+                disabled={pending}
+                onChange={(event) => {
+                  const nextRole = event.target.value as "owner" | "resident";
+                  if (nextRole === row.placeRole) return;
+                  startTransition(async () => {
+                    const result = await updatePlaceMemberRoleAction({
+                      locationId: place.id,
+                      targetUserId: row.userId,
+                      placeRole: nextRole,
+                    });
+                    setMessage(result.message);
+                    refreshResidents();
+                    router.refresh();
+                  });
+                }}
+              >
+                <MenuItem value="resident">Resident</MenuItem>
+                <MenuItem value="owner">Owner</MenuItem>
+              </Select>
+            </FormControl>
+          ) : (
+            <Chip
+              size="small"
+              label={row.placeRole === "owner" ? "Owner" : "Resident"}
+              color={row.placeRole === "owner" ? "primary" : "default"}
+            />
+          )}
+          {row.status !== "accepted" && (
+            <Chip size="small" label={row.status} color={residentStatusColor(row.status)} />
+          )}
           <Typography variant="body2">{row.displayName}</Typography>
           {row.isIncoming && row.userId === currentUserId && row.status === "proposed" && (
             <Typography variant="caption" color="text.secondary">
-              Respond in Proposals
+              Owners approve in Proposals
             </Typography>
           )}
         </Stack>
       ))}
-      {isAdmin && (
-        <Stack direction="row" spacing={1} alignItems="center">
+      {canManageMembers && (
+        <Stack direction={{ xs: "column", sm: "row" }} spacing={1} alignItems={{ sm: "center" }}>
           <FormControl size="small" sx={{ minWidth: 180 }}>
-            <InputLabel id={`resident-${place.id}`}>Add resident</InputLabel>
+            <InputLabel id={`person-${place.id}`}>Add person</InputLabel>
             <Select
-              labelId={`resident-${place.id}`}
-              label="Add resident"
+              labelId={`person-${place.id}`}
+              label="Add person"
               value={targetUserId}
               onChange={(event) => setTargetUserId(event.target.value)}
             >
-              {people.map((row) => (
-                <MenuItem key={row.id} value={row.id}>
-                  {row.displayName}
-                </MenuItem>
-              ))}
+              {people
+                .filter((row) => !residents.some((r) => r.userId === row.id && r.status === "accepted"))
+                .map((row) => (
+                  <MenuItem key={row.id} value={row.id}>
+                    {row.displayName}
+                  </MenuItem>
+                ))}
+            </Select>
+          </FormControl>
+          <FormControl size="small" sx={{ minWidth: 140 }}>
+            <InputLabel id={`role-${place.id}`}>Role</InputLabel>
+            <Select
+              labelId={`role-${place.id}`}
+              label="Role"
+              value={addPlaceRole}
+              onChange={(event) =>
+                setAddPlaceRole(event.target.value as "owner" | "resident")
+              }
+            >
+              <MenuItem value="resident">Resident</MenuItem>
+              <MenuItem value="owner">Owner</MenuItem>
             </Select>
           </FormControl>
           <Button
@@ -660,7 +726,11 @@ function PlaceDetail({
             disabled={!targetUserId || pending}
             onClick={() =>
               startTransition(async () => {
-                const result = await proposeResidencyAction(place.id, targetUserId);
+                const result = await addPersonToPlaceAction({
+                  locationId: place.id,
+                  targetUserId,
+                  placeRole: addPlaceRole,
+                });
                 setMessage(result.message);
                 setTargetUserId("");
                 refreshResidents();
@@ -668,11 +738,11 @@ function PlaceDetail({
               })
             }
           >
-            Associate
+            Add
           </Button>
         </Stack>
       )}
-      {!isAdmin && isResident && (
+      {!canManageMembers && isResident && (
         <Typography variant="caption" color="text.secondary">
           You are associated with this place.
         </Typography>
@@ -967,19 +1037,39 @@ export function PeoplePlacesClient({
 
   return (
     <Box>
-      <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
-        <Tabs value={tab} onChange={(_, value) => setTab(value)}>
+      <Stack
+        direction={{ xs: "column", sm: "row" }}
+        justifyContent="space-between"
+        alignItems={{ xs: "stretch", sm: "center" }}
+        spacing={1.5}
+        sx={{ mb: 2 }}
+      >
+        <Tabs
+          value={tab}
+          onChange={(_, value) => setTab(value)}
+          variant="scrollable"
+          allowScrollButtonsMobile
+          sx={{ minWidth: 0, flex: 1 }}
+        >
           <Tab label="People" />
           <Tab label="Places" />
           {showMapTab && <Tab label="Sleeping Partners" />}
         </Tabs>
         {canProvision && tab === 0 && (
-          <Button variant="contained" onClick={() => setCreateOpen(true)}>
+          <Button
+            variant="contained"
+            onClick={() => setCreateOpen(true)}
+            sx={{ alignSelf: { xs: "stretch", sm: "center" }, flexShrink: 0 }}
+          >
             Add person
           </Button>
         )}
         {tab === 1 && (
-          <Button variant="contained" onClick={() => setCreatePlaceOpen(true)}>
+          <Button
+            variant="contained"
+            onClick={() => setCreatePlaceOpen(true)}
+            sx={{ alignSelf: { xs: "stretch", sm: "center" }, flexShrink: 0 }}
+          >
             Add place
           </Button>
         )}
