@@ -357,7 +357,6 @@ export function ProposalsClient({
         people={people}
         places={residencyPlaces ?? places}
         currentUserId={currentUserId}
-        lockTargetToSelf
       />
       <ProposalDetailDialog
         proposalId={selectedProposalId}
