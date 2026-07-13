@@ -20,7 +20,9 @@ test.describe("Residency proposal journey", () => {
     await goToPeoplePlaces(page);
     await addPersonToPlace(page, PLACE, USERS.han.displayName, "Resident");
     await expandPlace(page, PLACE);
-    await expect(page.getByText(USERS.han.displayName)).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText(USERS.han.displayName, { exact: true })).toBeVisible({
+      timeout: 15_000,
+    });
     await logout(page);
 
     // —— Phase 2: Han is notified and can edit the place as resident ——
