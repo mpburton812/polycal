@@ -206,3 +206,4 @@
 2026-07-13 | 171e071 | PC-193 | people, onboarding, and proposal polish release | src/actions/places.ts
 2026-07-13 | 9a58625 | PC-192 | change control log for 2026.07.13 promotion | src/lib/changelog/entries.ts
 2026-07-13 | f8a6231 | PC-192 | assert latest changelog version dynamically | e2e/admin-code-status-journey.spec.ts
+2026-07-13 | e5f1ee9 | PC-199 | remove place members and fix residency self-join UX | src/actions/places.ts

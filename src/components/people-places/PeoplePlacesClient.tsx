@@ -46,6 +46,7 @@ import {
   deletePlaceAction,
   getPlaceDeleteImpactAction,
   listResidentsForPlaceAction,
+  removePersonFromPlaceAction,
   updatePlaceAction,
   updatePlaceMemberRoleAction,
   type PlaceDeleteImpact,
@@ -684,6 +685,33 @@ function PlaceDetail({
             <Typography variant="caption" color="text.secondary">
               Owners approve in Proposals
             </Typography>
+          )}
+          {canManageMembers && row.status === "accepted" && (
+            <Button
+              size="small"
+              color="error"
+              disabled={pending}
+              onClick={() => {
+                if (
+                  !window.confirm(
+                    `Remove ${row.displayName} from ${place.name}? They will no longer be associated with this place.`,
+                  )
+                ) {
+                  return;
+                }
+                startTransition(async () => {
+                  const result = await removePersonFromPlaceAction({
+                    locationId: place.id,
+                    targetUserId: row.userId,
+                  });
+                  setMessage(result.message);
+                  refreshResidents();
+                  router.refresh();
+                });
+              }}
+            >
+              Remove
+            </Button>
           )}
         </Stack>
       ))}

@@ -21,16 +21,18 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
-- PC-193: Place owners/admins can change accepted members between Resident and Owner (last-owner demotion blocked).
-- PC-194: Onboarding collects notification email (verify link sent; finish not blocked) and timezone (defaults to America/New_York).
-- PC-196: Admin oversight proposals use a light orange background on the board and in detail.
-
-### Changed
-- PC-197: Sleeping Partner Proposal list includes passive profiles (auto-accept).
-- PC-185–PC-191: Place owners / residency — creators are Owners; Places immediate add with role; self-join proposes Owner or Resident for owner approval; place picker shows members.
+- PC-199: Place owners/admins can remove accepted members from a place card (last owner protected; audit `places.remove_person`).
 
 ### Fixed
-- PC-195: People & Places Add place / Add person buttons remain usable on small screens.
+- PC-200: Residency self-join proposal shows read-only “Requesting for: you” instead of a grayed Person select.
+
+## [2026.07.13b] - 2026-07-13
+
+### Added
+- PC-199: Place owners/admins can remove accepted members from a place card (last owner protected; audit `places.remove_person`).
+
+### Fixed
+- PC-200: Residency self-join proposal shows read-only “Requesting for: you” instead of a grayed Person select.
 
 ## [2026.07.13] - 2026-07-13
 

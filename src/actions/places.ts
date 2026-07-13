@@ -49,6 +49,11 @@ const updatePlaceMemberRoleSchema = z.object({
   placeRole: z.enum(["owner", "resident"]),
 });
 
+const removePersonFromPlaceSchema = z.object({
+  locationId: z.string().min(1),
+  targetUserId: z.string().min(1),
+});
+
 export interface PlaceSummary {
   id: string;
   name: string;
@@ -792,6 +797,114 @@ export async function updatePlaceMemberRoleAction(
   return {
     ok: true,
     message: `Updated ${target.displayName} to ${roleLabel}.`,
+  };
+}
+
+/**
+ * Remove an accepted place member (PC-199). Immediate — not a proposal.
+ * Authorized for place owners and app admins; refuses removing the last accepted owner.
+ */
+export async function removePersonFromPlaceAction(
+  input: z.infer<typeof removePersonFromPlaceSchema>,
+): Promise<{ ok: boolean; message: string }> {
+  const session = await auth();
+  if (!session?.user) {
+    return { ok: false, message: "Sign in required." };
+  }
+
+  const parsed = removePersonFromPlaceSchema.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, message: parsed.error.issues[0]?.message ?? "Invalid input." };
+  }
+
+  await ensureDbReady();
+  const db = getDb();
+
+  if (
+    !(await userIsPlaceOwner(
+      db,
+      session.user.id,
+      session.user.role as UserRole,
+      parsed.data.locationId,
+    ))
+  ) {
+    return { ok: false, message: "Only place owners (or admins) can remove people." };
+  }
+
+  const [place] = await db
+    .select()
+    .from(locations)
+    .where(eq(locations.id, parsed.data.locationId))
+    .limit(1);
+  const [target] = await db
+    .select()
+    .from(users)
+    .where(eq(users.id, parsed.data.targetUserId))
+    .limit(1);
+  if (!place || !target) {
+    return { ok: false, message: "Place or user not found." };
+  }
+
+  const [membership] = await db
+    .select()
+    .from(locationResidents)
+    .where(
+      and(
+        eq(locationResidents.locationId, parsed.data.locationId),
+        eq(locationResidents.userId, parsed.data.targetUserId),
+        eq(locationResidents.status, "accepted"),
+      ),
+    )
+    .limit(1);
+
+  if (!membership) {
+    return { ok: false, message: "User is not an accepted member of this place." };
+  }
+
+  if (membership.placeRole === "owner") {
+    const owners = await db
+      .select({ id: locationResidents.id })
+      .from(locationResidents)
+      .where(
+        and(
+          eq(locationResidents.locationId, parsed.data.locationId),
+          eq(locationResidents.status, "accepted"),
+          eq(locationResidents.placeRole, "owner"),
+        ),
+      );
+    if (owners.length <= 1) {
+      return {
+        ok: false,
+        message: "Cannot remove the last owner. Promote another member first.",
+      };
+    }
+  }
+
+  await db.delete(locationResidents).where(eq(locationResidents.id, membership.id));
+
+  const roleLabel = membership.placeRole === "owner" ? "Owner" : "Resident";
+  await notifyUser(
+    parsed.data.targetUserId,
+    "place_member_removed",
+    `${session.user.displayName ?? "Someone"} removed you as ${roleLabel} from ${place.name}.`,
+    { url: "/people-places", placeId: place.id },
+  );
+
+  await logUserActivity(
+    session.user.id,
+    "places.remove_person",
+    JSON.stringify({
+      locationId: place.id,
+      targetUserId: parsed.data.targetUserId,
+      placeRole: membership.placeRole,
+      placeName: place.name,
+    }),
+  );
+
+  revalidatePath("/people-places");
+  return {
+    ok: true,
+    message: `Removed ${target.displayName} (${roleLabel}) from ${place.name}.`,
   };
 }
 
