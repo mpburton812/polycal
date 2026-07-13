@@ -31,6 +31,19 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 - PC-195: People & Places Add place / Add person buttons remain usable on small screens.
+
+## [2026.07.13] - 2026-07-13
+
+### Added
+- PC-193: Place owners/admins can change accepted members between Resident and Owner (last-owner demotion blocked).
+- PC-194: Onboarding collects notification email (verify link sent; finish not blocked) and timezone (defaults to America/New_York).
+- PC-196: Admin oversight proposals use a light orange background on the board and in detail.
+
+### Changed
+- PC-197: Sleeping Partner Proposal list includes passive profiles (auto-accept).
+
+### Fixed
+- PC-195: People & Places Add place / Add person buttons remain usable on small screens.
 - PC-184: Alpha Feedback — Save notifies submitter when a submitter comment is present; Notify button removed.
 - PC-170 / PC-171: Recurring combinable with Window/All Day; recurrence configurator under date fields.
 - PC-178: Admin User management two-line mobile layout.
