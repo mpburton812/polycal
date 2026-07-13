@@ -202,3 +202,4 @@
 2026-07-12 | dba0487 | PC-182 | lightbox, comment log, notify on Save | src/lib/alpha-feedback/comment-log.test.ts
 2026-07-12 | cb6dce3 | PC-185 | place owners, immediate add, self-join role pick | src/actions/places.ts
 2026-07-12 | 8c5ec31 | PC-191 | stabilize dev navigation and forgot-password hydration | e2e/helpers/navigation.ts
+2026-07-12 | 7b8fc3c | PC-191 | fix residency journey member locator strict mode | e2e/residency-proposal-journey.spec.ts
