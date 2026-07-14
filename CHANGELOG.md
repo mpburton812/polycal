@@ -21,6 +21,7 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Fixed
+- PC-216 / PC-217–219: Accepting or declining a proposal (Proposals UI or notification bell) soft-dismisses matching actionable inbox rows so they stay cleared after reload; bell vote rows include Decline.
 - PC-213: Mobile smoke no longer shares SERIAL w0; workers≤1 serializes SAFE behind serial.
 - PC-209: All Day / sleeping End day typing no longer lexicographically swaps into Day until both values are valid ISO dates.
 

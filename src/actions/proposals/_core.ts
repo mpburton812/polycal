@@ -29,6 +29,7 @@ import {
   type ProposalType,
 } from "@/lib/db/schema";
 import { notifyUser } from "@/lib/notifications";
+import { dismissNotificationsForProposal } from "@/actions/notifications";
 import {
   atRiskExpiresAtIso,
   computeAtRiskExpiresAt,
@@ -2863,6 +2864,9 @@ export async function castProposalVoteAction(
     await evaluateProposalAfterVote(db, proposal.id, session.user.id);
   }
 
+  // Clear invitee's actionable inbox rows for this proposal (Proposals UI + push Accept) (PC-217).
+  await dismissNotificationsForProposal(session.user.id, proposal.id);
+
   revalidatePath("/proposals");
   revalidatePath("/schedule");
 
@@ -3216,6 +3220,7 @@ export async function respondAttendeeUpdateAction(
       "proposal.attendee_update_maintained",
       "Required invitee maintained acceptance after attendee change.",
     );
+    await dismissNotificationsForProposal(session.user.id, proposal.id);
     revalidatePath("/proposals");
     return { ok: true, message: "Your acceptance is unchanged." };
   }
@@ -3232,6 +3237,8 @@ export async function respondAttendeeUpdateAction(
     session.user.id,
     "Required invitee revoked acceptance after attendee change.",
   );
+
+  await dismissNotificationsForProposal(session.user.id, proposal.id);
 
   revalidatePath("/proposals");
   revalidatePath("/schedule");
