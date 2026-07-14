@@ -4,6 +4,8 @@ import path from "node:path";
 import { E2E_PORT, e2eEnvForWorker } from "./e2e/e2e-env";
 import {
   dbIndexForProject,
+  includeMobileServer,
+  mobileDbIndex,
   resolveParallelWorkers,
   resolveServerCount,
   safeParallelTestMatch,
@@ -12,22 +14,27 @@ import {
 
 const parallelWorkers = resolveParallelWorkers();
 const serverCount = resolveServerCount();
+const mobileIndex = mobileDbIndex();
 const authDir = path.join(__dirname, "e2e", ".auth");
+/** Explicit opt-in — default off so local runs never attach to a stale wrong-env process (PC-214). */
+const reuseExistingServer = process.env.E2E_REUSE_SERVER === "1";
 
 function lukeStorage(dbIndex: number): string {
   return path.join(authDir, `luke-w${dbIndex}.json`);
 }
 
+/**
+ * Wraps next start/dev so an unexpected process exit is labeled as webServer death (PC-214).
+ */
 function webServers() {
   return Array.from({ length: serverCount }, (_, workerIndex) => {
     const port = E2E_PORT + workerIndex;
     const env = e2eEnvForWorker(workerIndex);
+    const mode = process.env.CI ? "start" : "dev";
     return {
-      command: process.env.CI
-        ? `npx next start -p ${port}`
-        : `npx next dev -p ${port}`,
+      command: `npx tsx scripts/e2e-serve.ts --port ${port} --mode ${mode}`,
       url: `http://localhost:${port}/login`,
-      reuseExistingServer: !process.env.CI,
+      reuseExistingServer,
       timeout: 180_000,
       stdout: "pipe" as const,
       stderr: "pipe" as const,
@@ -39,6 +46,9 @@ function webServers() {
     };
   });
 }
+
+const safeDependencies =
+  parallelWorkers <= 1 ? (["chromium-serial"] as const) : (["setup"] as const);
 
 export default defineConfig({
   testDir: "./e2e",
@@ -74,9 +84,9 @@ export default defineConfig({
       },
     },
     {
-      // Owns DB indices 1..N — can run in parallel with serial on w0 (PC-176).
+      // Owns DB indices 1..N when parallelizing; when workers≤1 shares w0 after serial (PC-213).
       name: "chromium-safe",
-      dependencies: ["setup"],
+      dependencies: [...safeDependencies],
       testMatch: safeParallelTestMatch(),
       fullyParallel: parallelWorkers > 1,
       workers: parallelWorkers,
@@ -86,17 +96,21 @@ export default defineConfig({
         storageState: lukeStorage(dbIndexForProject("chromium-safe", 0)),
       },
     },
-    {
-      name: "mobile-chrome",
-      dependencies: ["setup"],
-      testMatch: /mobile-smoke\.spec\.ts$/,
-      workers: 1,
-      use: {
-        ...devices["Pixel 5"],
-        baseURL: `http://localhost:${E2E_PORT}`,
-        storageState: lukeStorage(0),
-      },
-    },
+    ...(includeMobileServer()
+      ? [
+          {
+            name: "mobile-chrome",
+            dependencies: ["setup"],
+            testMatch: /mobile-smoke\.spec\.ts$/,
+            workers: 1,
+            use: {
+              ...devices["Pixel 5"],
+              baseURL: `http://localhost:${E2E_PORT + mobileIndex}`,
+              storageState: lukeStorage(mobileIndex),
+            },
+          },
+        ]
+      : []),
   ],
   webServer: webServers(),
 });

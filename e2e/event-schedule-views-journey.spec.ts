@@ -1,7 +1,8 @@
-import { expect, test } from "./helpers/test";
+import { expect, testManualDb as test } from "./helpers/test";
 
 import { login, logout } from "./helpers/auth";
 import { USERS } from "./helpers/constants";
+import { resetE2eDatabase } from "./helpers/db";
 import { goToProposals } from "./helpers/navigation";
 import {
   castInviteeVote,
@@ -25,6 +26,11 @@ const COMMENT = "E2E schedule journey comment";
 
 test.describe("Event schedule views journey", () => {
   test.describe.configure({ mode: "serial" });
+
+  // One seed for the whole serial file — unique titles avoid cross-test bleed (PC-214).
+  test.beforeAll(async ({ request }) => {
+    await resetE2eDatabase(request);
+  });
 
   test("1 — solo 1-hour event: auto-resolve, all views, move +1 day", async ({ page }) => {
     test.setTimeout(300_000);

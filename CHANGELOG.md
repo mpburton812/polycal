@@ -21,9 +21,12 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Fixed
+- PC-213: Mobile smoke no longer shares SERIAL w0; workers≤1 serializes SAFE behind serial.
 - PC-209: All Day / sleeping End day typing no longer lexicographically swaps into Day until both values are valid ISO dates.
 
 ### Added
+- PC-214: `E2E_REUSE_SERVER` opt-in, `test:e2e:cleanup`, `test:e2e:journeys`, parallel e2e prepare, `testManualDb` for heavy serial journeys.
+- PC-215: E2E multi-server monitoring canvas (topology + flake classes).
 - PC-210: `dates-times-journey` covering Window / All Day / Poll / Recurring valid and invalid When fields.
 - PC-211: Playwright CI matrix expanded to 5 shards.
 
