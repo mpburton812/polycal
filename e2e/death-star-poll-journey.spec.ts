@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { expect, testManualDb as test } from "./helpers/test";
 
 import { login, logout } from "./helpers/auth";
 import { USERS } from "./helpers/constants";

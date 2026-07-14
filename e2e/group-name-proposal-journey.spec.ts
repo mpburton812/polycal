@@ -25,8 +25,10 @@ test.describe("Group name proposal journey", () => {
 
     // —— Phase 2: Propose rename (draft) and deep-link to proposals ——
     await page.getByLabel("Proposed new name").fill(proposedName);
-    await page.getByRole("button", { name: "Propose name change (draft)" }).click();
-    await expect(page).toHaveURL(/\/proposals\?open=/, { timeout: 15_000 });
+    await Promise.all([
+      page.waitForURL(/\/proposals\?open=/, { timeout: 30_000 }),
+      page.getByRole("button", { name: "Propose name change (draft)" }).click(),
+    ]);
 
     const draftDialog = page.getByRole("dialog");
     await expect(
