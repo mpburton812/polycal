@@ -218,3 +218,4 @@
 2026-07-14 | 7101ab6 | PC-221 | Ready For Testing status and stable ticket IDs | src/actions/alpha-feedback.ts
 2026-07-14 | 7e4128c | PC-223 | capability identifier and icons for MSI build | apps/alpha-feedback-tracker/src-tauri/capabilities/default.json
 2026-07-14 | 17f4018 | PC-223 | append requirements log for tracker MSI fix | n/a
+2026-07-14 | ceae3f8 | PC-222 | cast libsql Row via unknown for ticket backfill | src/lib/db/alpha-feedback-migrations.ts
