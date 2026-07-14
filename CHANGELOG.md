@@ -20,7 +20,14 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+- PC-209: All Day / sleeping End day typing no longer lexicographically swaps into Day until both values are valid ISO dates.
+
 ### Added
+- PC-210: `dates-times-journey` covering Window / All Day / Poll / Recurring valid and invalid When fields.
+- PC-211: Playwright CI matrix expanded to 5 shards.
+
+### Previously
 - PC-207: Branded `/verify-email` landing for notification email confirmation (Continue to PolyCal); legacy `/api/verify-email` redirects.
 - PC-202: Garden-branded loading splash, streamed app shell, and PWA “Updating PolyCal…” cue after new builds.
 - PC-203: Swipe left/right on main content to move between bottom tabs.
