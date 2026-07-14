@@ -26,6 +26,18 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "2026.07.14",
+    date: "2026-07-14",
+    summary: "Branded notification email verification landing.",
+    changes: [
+      {
+        type: "added",
+        description:
+          "Public /verify-email success/error page with Continue to PolyCal; mail links updated; /api/verify-email redirects for old emails (PC-207).",
+      },
+    ],
+  },
+  {
     version: "2026.07.13c",
     date: "2026-07-13",
     summary: "Branded splash, tab swipe, Day schedule view, View options legend cleanup.",
