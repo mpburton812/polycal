@@ -1,7 +1,7 @@
 "use server";
 
 import { randomUUID } from "node:crypto";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 
 import {
@@ -51,12 +51,21 @@ export async function submitAlphaFeedbackAction(
       .where(eq(users.id, sessionResult.user.id))
       .limit(1);
 
+    // Next permanent human-visible id (#N); max+1 is fine at alpha feedback volume (PC-222).
+    const [maxRow] = await db
+      .select({
+        maxTicket: sql<number | null>`max(${alphaFeedbackSubmissions.ticketNumber})`,
+      })
+      .from(alphaFeedbackSubmissions);
+    const ticketNumber = (Number(maxRow?.maxTicket) || 0) + 1;
+
     await db.insert(alphaFeedbackSubmissions).values({
       id,
       kind: parsed.data.kind,
       title: parsed.data.title,
       description: parsed.data.description,
       status: "not_started",
+      ticketNumber,
       submitterUserId: sessionResult.user.id,
       submitterDisplayName: userRow?.displayName ?? "User",
       submittedAt: now,

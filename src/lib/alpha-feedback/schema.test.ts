@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  ALPHA_FEEDBACK_STATUS_COLORS,
   ALPHA_FEEDBACK_STATUS_LABELS,
   alphaFeedbackPatchSchema,
   alphaFeedbackSubmitSchema,
@@ -46,6 +47,13 @@ describe("alphaFeedbackPatchSchema", () => {
     expect(parsed.success).toBe(true);
   });
 
+  it("accepts ready_for_testing status", () => {
+    const parsed = alphaFeedbackPatchSchema.safeParse({
+      status: "ready_for_testing",
+    });
+    expect(parsed.success).toBe(true);
+  });
+
   it("accepts archived flag", () => {
     const parsed = alphaFeedbackPatchSchema.safeParse({ archived: true });
     expect(parsed.success).toBe(true);
@@ -80,6 +88,10 @@ describe("parseOsLabel / decodeScreenshotPayload / labels", () => {
     expect(ALPHA_FEEDBACK_STATUS_LABELS.working_as_designed).toBe(
       "Working As Designed",
     );
+    expect(ALPHA_FEEDBACK_STATUS_LABELS.ready_for_testing).toBe(
+      "Ready For Testing",
+    );
+    expect(ALPHA_FEEDBACK_STATUS_COLORS.ready_for_testing).toBe("success");
   });
 });
 

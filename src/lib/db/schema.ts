@@ -146,6 +146,7 @@ export type AlphaFeedbackKind = (typeof alphaFeedbackKinds)[number];
 export const alphaFeedbackStatuses = [
   "not_started",
   "in_progress",
+  "ready_for_testing",
   "deferred",
   "working_as_designed",
   "closed",
@@ -161,6 +162,10 @@ export const alphaFeedbackSubmissions = sqliteTable("alpha_feedback_submissions"
   title: text("title").notNull(),
   description: text("description").notNull(),
   status: text("status").notNull().default("not_started"),
+  /**
+   * Stable human-visible ticket number (#N). Assigned once at insert; never reused (PC-222).
+   */
+  ticketNumber: integer("ticket_number"),
   submitterUserId: text("submitter_user_id")
     .notNull()
     .references(() => users.id),
