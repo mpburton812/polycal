@@ -217,3 +217,4 @@
 2026-07-14 | 48f5504 | PC-214 | wrap journeys runner in async main | scripts/e2e-run-journeys.ts
 2026-07-14 | 32bd980 | PC-214 | use regex journey filter on Windows | scripts/e2e-run-journeys.ts
 2026-07-14 | fad21cd | PC-214 | wait for propose enabled after group settings save | e2e/helpers/admin.ts
+2026-07-14 | 336bb47 | PC-214 | stabilize group-rename propose after settings refresh | e2e/group-name-proposal-journey.spec.ts
