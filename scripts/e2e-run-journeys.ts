@@ -28,10 +28,11 @@ function run(command: string, args: string[]): Promise<void> {
 
 async function main(): Promise<void> {
   await run(npx, ["tsx", "scripts/e2e-prepare.ts"]);
+  // Regex (not shell glob) so Windows does not drop the filter as a literal path.
   await run(npx, [
     "playwright",
     "test",
-    "e2e/*journey*.spec.ts",
+    "e2e/.*journey.*\\.spec\\.ts",
     "--project=chromium-serial",
     "--project=chromium-safe",
   ]);
