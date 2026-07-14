@@ -15,19 +15,30 @@ test.describe("Schedule calendar", () => {
     await expect(page.getByLabel("Previous period")).toBeVisible();
     await expect(page.getByLabel("Next period")).toBeVisible();
     await expect(page.getByRole("button", { name: "Jump to today" })).toBeVisible();
+    await expect(page.getByLabel("Calendar period").getByRole("button", { name: "Day", exact: true })).toBeVisible();
     await expect(page.getByLabel("Calendar period").getByRole("button", { name: "Week", exact: true })).toHaveAttribute(
       "aria-pressed",
       "true",
     );
   });
 
-  test("shows legend in view options", async ({ page }) => {
+  test("view options has network filter without status legend", async ({ page }) => {
     await page.getByLabel("View options").click();
     const drawer = page.locator(".MuiDrawer-paper");
-    await expect(drawer.getByText(/Approved events/i)).toBeVisible();
-    await expect(drawer.getByText(/At risk \/ tentative/i)).toBeVisible();
-    await expect(drawer.getByText(/Archived/i)).toBeVisible();
-    await expect(drawer.getByText(/Masked/i)).toBeVisible();
+    await expect(drawer.getByLabel("Network filter")).toBeVisible();
+    await expect(drawer.getByText(/Approved events/i)).toHaveCount(0);
+    await expect(drawer.getByText(/At risk \/ tentative/i)).toHaveCount(0);
+    await expect(drawer.getByText(/Archived/i)).toHaveCount(0);
+    await expect(drawer.getByText(/Masked/i)).toHaveCount(0);
+  });
+
+  test("switches to day hour grid", async ({ page }) => {
+    await page.getByLabel("Calendar period").getByRole("button", { name: "Day", exact: true }).click();
+    await expect(
+      page.getByLabel("Calendar period").getByRole("button", { name: "Day", exact: true }),
+    ).toHaveAttribute("aria-pressed", "true");
+    await expect(page.getByTestId("schedule-day-view")).toBeVisible();
+    await expect(page.getByText("All day", { exact: true })).toBeVisible();
   });
 
   test("shows resolved and proposed seed events for invitee", async ({ page }) => {

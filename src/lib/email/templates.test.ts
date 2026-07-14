@@ -23,9 +23,9 @@ function prefsWithQuietHours(
 
 describe("email templates", () => {
   it("builds verify email with absolute link", () => {
-    const content = buildVerifyEmailContent("https://example.com/api/verify-email?token=abc");
+    const content = buildVerifyEmailContent("https://example.com/verify-email?token=abc");
     expect(content.subject).toContain("Verify");
-    expect(content.html).toContain("https://example.com/api/verify-email?token=abc");
+    expect(content.html).toContain("https://example.com/verify-email?token=abc");
     expect(content.text).toContain("expires in 24 hours");
   });
 
