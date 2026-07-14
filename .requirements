@@ -215,3 +215,4 @@
 2026-07-14 | e085907 | PC-213 | isolate mobile DB and harden multi-server harness | src/lib/changelog/entries.ts
 2026-07-14 | 1efb338 | PC-213 | wait for group-rename draft navigation | e2e/group-name-proposal-journey.spec.ts
 2026-07-14 | 48f5504 | PC-214 | wrap journeys runner in async main | scripts/e2e-run-journeys.ts
+2026-07-14 | 32bd980 | PC-214 | use regex journey filter on Windows | scripts/e2e-run-journeys.ts
