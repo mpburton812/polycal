@@ -3,12 +3,16 @@
 import { DateCalendar } from "@mui/x-date-pickers/DateCalendar";
 import { PickersDay, type PickersDayProps } from "@mui/x-date-pickers/PickersDay";
 import dayjs, { type Dayjs } from "dayjs";
+import customParseFormat from "dayjs/plugin/customParseFormat";
 import { Box, Stack, TextField, Typography } from "@mui/material";
 import { useMemo, useState } from "react";
 
 import { GARDEN_TOKENS } from "@/theme/tokens";
 
 import { POLY_GREEN } from "./proposalCardTheme";
+import { orderDateRangeInputs } from "./proposalDateRangeUtils";
+
+dayjs.extend(customParseFormat);
 
 interface ProposalDateRangeFieldProps {
   startLabel: string;
@@ -27,7 +31,7 @@ function parseDate(value: string): Dayjs | null {
 }
 
 /**
- * Single calendar that accepts two day clicks for a start/end range (PC-153).
+ * Single calendar that accepts two day clicks for a start/end range (PC-153 / PC-209).
  * Earliest click becomes start; latest becomes end. A third click starts a new range.
  * Compact ISO text fields stay in sync for accessibility and reliable E2E fills.
  */
@@ -54,16 +58,8 @@ export function ProposalDateRangeField({
   }, [start, end]);
 
   function applyOrderedRange(a: string, b: string) {
-    if (!a) {
-      onRangeChange("", "");
-      return;
-    }
-    if (!b || b === a) {
-      onRangeChange(a, "");
-      return;
-    }
-    const [earliest, latest] = a <= b ? [a, b] : [b, a];
-    onRangeChange(earliest, latest);
+    const next = orderDateRangeInputs(a, b);
+    onRangeChange(next.start, next.end);
   }
 
   function handleDaySelect(day: Dayjs | null) {

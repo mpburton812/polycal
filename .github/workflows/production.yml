@@ -68,7 +68,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4]
+        shard: [1, 2, 3, 4, 5]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -90,8 +90,8 @@ jobs:
       - name: Install Playwright browsers
         run: npx playwright install chromium --with-deps
 
-      - name: Run Playwright shard ${{ matrix.shard }}/4
-        run: npm run test:e2e:ci -- --shard=${{ matrix.shard }}/4
+      - name: Run Playwright shard ${{ matrix.shard }}/5
+        run: npm run test:e2e:ci -- --shard=${{ matrix.shard }}/5
         env:
           CI: "1"
           E2E_PARALLEL_WORKERS: "2"
