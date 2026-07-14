@@ -1,12 +1,11 @@
-import { expect, test } from "@playwright/test";
-
 import { E2E_API_SECRET } from "./e2e-env";
 import { login } from "./helpers/auth";
 import { USERS } from "./helpers/constants";
 import { resetE2eDatabase } from "./helpers/db";
+import { emptyStorageState, expect, test } from "./helpers/test";
 
 // Public forgot/reset must start logged out despite project luke storageState (PC-175).
-test.use({ storageState: { cookies: [], origins: [] } });
+test.use({ storageState: emptyStorageState });
 
 /**
  * Forgot / reset password public flow (PC-162).

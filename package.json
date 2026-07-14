@@ -27,6 +27,8 @@
     "test:e2e": "tsx scripts/e2e-prepare.ts && playwright test",
     "test:e2e:ci": "tsx scripts/e2e-prepare.ts && playwright test",
     "test:e2e:ci:build": "npm run build && npm run test:e2e:ci",
+    "test:e2e:cleanup": "tsx scripts/e2e-cleanup.ts",
+    "test:e2e:journeys": "tsx scripts/e2e-run-journeys.ts",
     "verify:schema:turso": "node scripts/verify-turso-schema.mjs",
     "test:e2e:ui": "tsx scripts/e2e-prepare.ts && playwright test --ui",
     "test:e2e:report": "playwright show-report",

@@ -7,18 +7,36 @@ import { resetE2eDatabase } from "./db";
 
 const AUTH_DIR = path.join(__dirname, "..", ".auth");
 
+type WorkerScoped = {
+  baseURL: string;
+  storageState: string | { cookies: []; origins: [] };
+};
+
 /**
- * Resets the E2E database once per test and pins baseURL/storage to the worker origin (PC-176).
+ * Pins baseURL/storage to the Playwright project worker origin (PC-176 / PC-213).
+ * Marked as options so specs can override (e.g. emptyStorageState for public auth flows).
  */
-export const test = base.extend<{ _freshDb: void }>({
-  baseURL: async ({}, use, testInfo) => {
-    const index = dbIndexForProject(testInfo.project.name, testInfo.workerIndex);
-    await use(`http://localhost:${E2E_PORT + index}`);
-  },
-  storageState: async ({}, use, testInfo) => {
-    const index = dbIndexForProject(testInfo.project.name, testInfo.workerIndex);
-    await use(path.join(AUTH_DIR, `luke-w${index}.json`));
-  },
+const workerScoped = base.extend<WorkerScoped>({
+  baseURL: [
+    async ({}, use, testInfo) => {
+      const index = dbIndexForProject(testInfo.project.name, testInfo.workerIndex);
+      await use(`http://localhost:${E2E_PORT + index}`);
+    },
+    { option: true },
+  ],
+  storageState: [
+    async ({}, use, testInfo) => {
+      const index = dbIndexForProject(testInfo.project.name, testInfo.workerIndex);
+      await use(path.join(AUTH_DIR, `luke-w${index}.json`));
+    },
+    { option: true },
+  ],
+});
+
+/**
+ * Default fixture: resets the E2E database once per test (PC-176).
+ */
+export const test = workerScoped.extend<{ _freshDb: void }>({
   _freshDb: [
     async ({ request }, use) => {
       await resetE2eDatabase(request);
@@ -27,6 +45,12 @@ export const test = base.extend<{ _freshDb: void }>({
     { auto: true },
   ],
 });
+
+/**
+ * File-/describe-owned DB — caller resets in `beforeAll` (serial multi-phase journeys).
+ * Avoids wiping shared state between serial tests in the same file (PC-214).
+ */
+export const testManualDb = workerScoped;
 
 export { expect } from "@playwright/test";
 
