@@ -24,7 +24,10 @@ test.describe("Group name proposal journey", () => {
     await configureGroupNameProposals(page, { mode: "Mandatory consensus" });
 
     // —— Phase 2: Propose rename (draft) and deep-link to proposals ——
+    // Wait for post-save router.refresh() to settle so the fill isn't wiped by remount.
+    await expect(page.getByLabel("Proposed new name")).toBeVisible({ timeout: 15_000 });
     await page.getByLabel("Proposed new name").fill(proposedName);
+    await expect(page.getByLabel("Proposed new name")).toHaveValue(proposedName);
     await Promise.all([
       page.waitForURL(/\/proposals\?open=/, { timeout: 30_000 }),
       page.getByRole("button", { name: "Propose name change (draft)" }).click(),
