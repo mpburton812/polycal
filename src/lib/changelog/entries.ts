@@ -26,6 +26,27 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "2026.07.14b",
+    date: "2026-07-14",
+    summary: "All Day End day typing fix; dates/times journey; 5 Playwright shards.",
+    changes: [
+      {
+        type: "fixed",
+        description:
+          "All Day/sleeping date range no longer swaps Day when typing partial End day (PC-209).",
+      },
+      {
+        type: "added",
+        description:
+          "dates-times-journey covers Window/All Day/Poll/Recurring valid and invalid When fields (PC-210).",
+      },
+      {
+        type: "changed",
+        description: "Playwright CI matrix expanded from 4 to 5 shards (PC-211).",
+      },
+    ],
+  },
+  {
     version: "2026.07.14",
     date: "2026-07-14",
     summary: "Branded notification email verification landing.",
