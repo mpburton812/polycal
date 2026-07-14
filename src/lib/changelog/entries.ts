@@ -26,6 +26,28 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "2026.07.14c",
+    date: "2026-07-14",
+    summary: "Harden multi-server e2e isolation; journey speed tooling.",
+    changes: [
+      {
+        type: "fixed",
+        description:
+          "Mobile e2e uses a dedicated DB/port; workers=1 no longer races SAFE with SERIAL on w0 (PC-213).",
+      },
+      {
+        type: "added",
+        description:
+          "E2E_REUSE_SERVER opt-in, cleanup + journeys scripts, parallel prepare, testManualDb (PC-214).",
+      },
+      {
+        type: "changed",
+        description:
+          "Playwright webServer wrap labels unexpected Next process exits (PC-214).",
+      },
+    ],
+  },
+  {
     version: "2026.07.14b",
     date: "2026-07-14",
     summary: "All Day End day typing fix; dates/times journey; 5 Playwright shards.",
