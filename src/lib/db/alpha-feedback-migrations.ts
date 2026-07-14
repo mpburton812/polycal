@@ -77,15 +77,16 @@ async function backfillTicketNumbers(sql: Client): Promise<void> {
     SELECT COALESCE(MAX(ticket_number), 0) AS max_ticket
     FROM alpha_feedback_submissions
   `);
+  // libsql Row is an opaque record; cast via unknown for typed field access.
   let next =
     Number(
-      (maxResult.rows[0] as { max_ticket?: number | string | null } | undefined)
+      (maxResult.rows[0] as unknown as { max_ticket?: number | string | null } | undefined)
         ?.max_ticket ?? 0,
     ) || 0;
 
   for (const row of missing.rows) {
     next += 1;
-    const id = String((row as { id: string }).id);
+    const id = String((row as unknown as { id: string }).id);
     await sql.execute({
       sql: `UPDATE alpha_feedback_submissions SET ticket_number = ? WHERE id = ? AND ticket_number IS NULL`,
       args: [next, id],
