@@ -14,6 +14,7 @@ Playwright config (`playwright.config.ts`): projects `chromium-safe` (SAFE_PARAL
 | `batch-sleeping-journey.spec.ts` | han | No | SAFE_PARALLEL | Yes |
 | `batch-sleeping-partners-journey.spec.ts` | katie, michael (BT) | **Yes** | SAFE_PARALLEL | Yes |
 | `birthday-party-journey.spec.ts` | luke + 7 invitees | No | SERIAL_ONLY (long multi-user, same seed users) | Yes |
+| `dates-times-journey.spec.ts` | luke | No | SAFE_PARALLEL (When field valid/invalid across Window/All Day/Poll/Recurring) | Yes |
 | `death-star-poll-journey.spec.ts` | han, leia, luke | No | SERIAL_ONLY (file-level `beforeAll` reset + serial phases) | Yes |
 | `event-reminder-journey.spec.ts` | luke | No | SAFE_PARALLEL | Yes |
 | `group-name-proposal-journey.spec.ts` | luke, leia, han | No | SERIAL_ONLY | Yes |
@@ -43,7 +44,7 @@ Playwright config (`playwright.config.ts`): projects `chromium-safe` (SAFE_PARAL
 |--------|----------------------|-----------|
 | SAFE_PARALLEL specs | `workers: 2–4` locally | Independent `_freshDb`; low cross-user contention |
 | SERIAL_ONLY specs | Keep `workers: 1` per process | Same users in long flows; avoid intra-worker races |
-| Full `e2e/*journey*.spec.ts` suite | 4-shard CI matrix (current) | Best wall-clock; each shard owns whole spec files |
+| Full `e2e/*journey*.spec.ts` suite | 5-shard CI matrix (current) | Best wall-clock; each shard owns whole spec files |
 | `death-star-poll-journey` | Never split phases across workers | Uses module-level `pollTitle` + `test.describe.configure({ mode: "serial" })` |
 | `mobile-smoke.spec.ts` | `mobile-chrome` project only | Validates responsive shell without duplicating desktop suite |
 

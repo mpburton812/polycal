@@ -10,6 +10,7 @@ export const SAFE_PARALLEL_SPECS = [
   "alert-prefs-journey.spec.ts",
   "batch-sleeping-journey.spec.ts",
   "batch-sleeping-partners-journey.spec.ts",
+  "dates-times-journey.spec.ts",
   "event-icons.spec.ts",
   "event-reminder-journey.spec.ts",
   "multi-day-event-slice-journey.spec.ts",
