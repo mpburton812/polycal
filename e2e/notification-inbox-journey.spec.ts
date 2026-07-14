@@ -7,7 +7,7 @@ import {
   acceptFromInbox,
   declineFromInbox,
   dismissNotification,
-  expectNotificationClearedAfterReload,
+  expectActionableNotificationClearedAfterReload,
   openNotificationInbox,
 } from "./helpers/notifications";
 import {
@@ -17,10 +17,11 @@ import {
   submitProposalDraft,
 } from "./helpers/proposals";
 import { fillProposalDateTimeField } from "./helpers/datePickers";
+import type { Page } from "@playwright/test";
 
 /** Luke proposes a required event for Leia; returns after Leia is logged in. */
 async function proposeEventForLeia(
-  page: import("@playwright/test").Page,
+  page: Page,
   eventTitle: string,
   start: string,
 ): Promise<void> {
@@ -50,7 +51,10 @@ test.describe("Notification inbox journey", () => {
     await expect(page.getByText(eventTitle).first()).toBeVisible({ timeout: 15_000 });
     await acceptFromInbox(page, eventTitle);
     await expect(page.getByText(/Vote recorded/i)).toBeVisible({ timeout: 15_000 });
-    await expect(page.locator("li").filter({ hasText: eventTitle })).toHaveCount(0);
+    // Actionable review row is gone; a resolved notice with the same title may appear.
+    await expect(
+      page.locator("li").filter({ hasText: eventTitle }).getByRole("button", { name: "Accept" }),
+    ).toHaveCount(0);
     await page.getByRole("button", { name: "Close notifications" }).click();
 
     await logout(page);
@@ -103,6 +107,9 @@ test.describe("Notification inbox journey", () => {
     await proposeEventForLeia(page, eventTitle, "2099-12-08T18:00");
     await openNotificationInbox(page);
     await expect(page.getByText(eventTitle).first()).toBeVisible({ timeout: 15_000 });
+    await expect(
+      page.locator("li").filter({ hasText: eventTitle }).getByRole("button", { name: "Accept" }),
+    ).toBeVisible();
     await page.getByRole("button", { name: "Close notifications" }).click();
 
     await goToProposals(page);
@@ -112,7 +119,7 @@ test.describe("Notification inbox journey", () => {
       vote: "Accept",
     });
 
-    await expectNotificationClearedAfterReload(page, eventTitle);
+    await expectActionableNotificationClearedAfterReload(page, eventTitle);
   });
 
   test("bell Accept clears actionable notification after reload (PC-219)", async ({ page }) => {
@@ -125,10 +132,11 @@ test.describe("Notification inbox journey", () => {
     await expect(page.getByText(eventTitle).first()).toBeVisible({ timeout: 15_000 });
     await acceptFromInbox(page, eventTitle);
     await expect(page.getByText(/Vote recorded/i)).toBeVisible({ timeout: 15_000 });
-    await expect(page.locator("li").filter({ hasText: eventTitle })).toHaveCount(0);
-    await page.getByRole("button", { name: "Close notifications" }).click();
+    await expect(
+      page.locator("li").filter({ hasText: eventTitle }).getByRole("button", { name: "Accept" }),
+    ).toHaveCount(0);
 
-    await expectNotificationClearedAfterReload(page, eventTitle);
+    await expectActionableNotificationClearedAfterReload(page, eventTitle);
   });
 
   test("bell Decline clears actionable notification after reload (PC-219)", async ({ page }) => {
@@ -141,9 +149,13 @@ test.describe("Notification inbox journey", () => {
     await expect(page.getByText(eventTitle).first()).toBeVisible({ timeout: 15_000 });
     await declineFromInbox(page, eventTitle);
     await expect(page.getByText(/Vote recorded/i)).toBeVisible({ timeout: 15_000 });
-    await expect(page.locator("li").filter({ hasText: eventTitle })).toHaveCount(0);
-    await page.getByRole("button", { name: "Close notifications" }).click();
+    await expect(
+      page.locator("li").filter({ hasText: eventTitle }).getByRole("button", { name: "Accept" }),
+    ).toHaveCount(0);
+    await expect(
+      page.locator("li").filter({ hasText: eventTitle }).getByRole("button", { name: "Decline" }),
+    ).toHaveCount(0);
 
-    await expectNotificationClearedAfterReload(page, eventTitle);
+    await expectActionableNotificationClearedAfterReload(page, eventTitle);
   });
 });

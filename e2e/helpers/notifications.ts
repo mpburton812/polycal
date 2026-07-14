@@ -62,16 +62,22 @@ export async function expectInAppNotification(
 }
 
 /**
- * Full reload then assert the actionable notification for `message` is gone (PC-219).
- * Also asserts the header badge is not advertising that remaining count for this title.
+ * Full reload then assert no Accept/Decline vote actions remain for `message` (PC-219).
+ * Informational rows (e.g. proposal_resolved) may still mention the title.
  */
-export async function expectNotificationClearedAfterReload(
+export async function expectActionableNotificationClearedAfterReload(
   page: Page,
   message: string | RegExp,
 ): Promise<void> {
   await page.reload();
   await openNotificationInbox(page);
-  await expect(inboxRow(page, message)).toHaveCount(0, { timeout: 15_000 });
+  const row = inboxRow(page, message);
+  await expect(row.getByRole("button", { name: "Accept" })).toHaveCount(0, {
+    timeout: 15_000,
+  });
+  await expect(row.getByRole("button", { name: "Decline" })).toHaveCount(0);
+  // Review invite copy must be gone for this title (resolved copy may remain).
+  await expect(row.filter({ hasText: /needs your review/i })).toHaveCount(0);
   await page.getByRole("button", { name: "Close notifications" }).click();
 }
 
