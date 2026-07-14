@@ -216,3 +216,4 @@
 2026-07-14 | 1efb338 | PC-213 | wait for group-rename draft navigation | e2e/group-name-proposal-journey.spec.ts
 2026-07-14 | 4e6948e | PC-214 | fix journeys npm script under tsx/Windows | scripts/e2e-run-journeys.ts
 2026-07-14 | d6ea653 | PC-217 | clear actionable inbox on proposal vote | src/actions/notifications.ts
+2026-07-14 | 4f9b05b | PC-219 | assert actionable inbox clear after vote, not title | e2e/helpers/notifications.ts
