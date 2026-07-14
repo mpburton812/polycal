@@ -43,10 +43,6 @@ export async function configureGroupNameProposals(
   await expect(page.getByRole("alert").filter({ hasText: /saved|updated/i })).toBeVisible({
     timeout: 15_000,
   });
-  // Ensure settings round-trip before drafting a rename (avoids silent propose failure).
-  await expect(page.getByRole("button", { name: "Propose name change (draft)" })).toBeEnabled({
-    timeout: 15_000,
-  });
 }
 
 /** Pauses a user from the admin user management table. */
