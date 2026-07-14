@@ -43,7 +43,7 @@ export async function deliverLoginCredentials(options: {
 
   const verifyUrl =
     options.includeVerifyLink && options.verifyToken
-      ? `${baseUrl}/api/verify-email?token=${options.verifyToken}`
+      ? `${baseUrl}/verify-email?token=${options.verifyToken}`
       : undefined;
 
   if (!options.toEmail?.trim()) {

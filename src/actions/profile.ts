@@ -462,7 +462,7 @@ export async function updateNotificationEmailAction(
     })
     .where(eq(users.id, session.user.id));
 
-  const verificationUrl = `${getPublicAppUrl()}/api/verify-email?token=${token}`;
+  const verificationUrl = `${getPublicAppUrl()}/verify-email?token=${token}`;
 
   await logUserActivity(
     session.user.id,

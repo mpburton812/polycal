@@ -21,6 +21,17 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- PC-207: Branded `/verify-email` landing for notification email confirmation (Continue to PolyCal); legacy `/api/verify-email` redirects.
+- PC-202: Garden-branded loading splash, streamed app shell, and PWA “Updating PolyCal…” cue after new builds.
+- PC-203: Swipe left/right on main content to move between bottom tabs.
+- PC-204: Schedule Day period with 12a–12a hour grid and all-day strip.
+
+### Changed
+- PC-205: Removed status legend from schedule View options (network filter remains).
+
+## [2026.07.13c] - 2026-07-13
+
+### Added
 - PC-202: Garden-branded loading splash, streamed app shell, and PWA “Updating PolyCal…” cue after new builds.
 - PC-203: Swipe left/right on main content to move between bottom tabs.
 - PC-204: Schedule Day period with 12a–12a hour grid and all-day strip.

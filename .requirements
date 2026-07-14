@@ -209,3 +209,5 @@
 2026-07-13 | e5f1ee9 | PC-199 | remove place members and fix residency self-join UX | src/actions/places.ts
 2026-07-13 | 2572930 | PC-202 | splash, tab swipe, Day schedule view, legend cleanup | src/components/layout/AppShell.tsx
 2026-07-13 | f67e9b8 | PC-202 | disable update overlay under Playwright e2e | src/components/pwa/PwaUpdateGate.tsx
+2026-07-13 | fd9bfd7 | PC-207 | branded verify-email landing and API redirect | src/actions/profile.ts
+2026-07-13 | 1c6e987 | PC-207 | assert verify-email CTAs as links | e2e/verify-email.spec.ts
