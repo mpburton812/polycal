@@ -38,9 +38,13 @@ export async function configureGroupNameProposals(
   if (!(await allowSwitch.isChecked())) {
     await page.getByText("Allow proposals to change group name").click();
   }
-  await selectGroupNameChangeMode(page, options.mode);
+    await selectGroupNameChangeMode(page, options.mode);
   await page.getByRole("button", { name: "Save settings" }).click();
   await expect(page.getByRole("alert").filter({ hasText: /saved|updated/i })).toBeVisible({
+    timeout: 15_000,
+  });
+  // Ensure settings round-trip before drafting a rename (avoids silent propose failure).
+  await expect(page.getByRole("button", { name: "Propose name change (draft)" })).toBeEnabled({
     timeout: 15_000,
   });
 }
