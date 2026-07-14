@@ -211,3 +211,4 @@
 2026-07-13 | f67e9b8 | PC-202 | disable update overlay under Playwright e2e | src/components/pwa/PwaUpdateGate.tsx
 2026-07-13 | fd9bfd7 | PC-207 | branded verify-email landing and API redirect | src/actions/profile.ts
 2026-07-13 | 1c6e987 | PC-207 | assert verify-email CTAs as links | e2e/verify-email.spec.ts
+2026-07-14 | 8cb4638 | PC-209 | stop End day keystrokes overwriting Day | src/components/proposals/ProposalDateRangeField.tsx
