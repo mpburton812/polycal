@@ -213,3 +213,4 @@
 2026-07-13 | 1c6e987 | PC-207 | assert verify-email CTAs as links | e2e/verify-email.spec.ts
 2026-07-14 | 8cb4638 | PC-209 | stop End day keystrokes overwriting Day | src/components/proposals/ProposalDateRangeField.tsx
 2026-07-14 | e085907 | PC-213 | isolate mobile DB and harden multi-server harness | src/lib/changelog/entries.ts
+2026-07-14 | 1efb338 | PC-213 | wait for group-rename draft navigation | e2e/group-name-proposal-journey.spec.ts
