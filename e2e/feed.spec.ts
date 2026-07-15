@@ -25,7 +25,7 @@ test.describe("Feed tab", () => {
     await goToAdmin(page);
     await expandAdminSection(page, "Poly group settings");
     await expect(
-      page.getByRole("combobox", { name: /Sleeping proposals network visibility/i }),
+      page.getByText("Sleeping proposals network visibility", { exact: true }),
     ).toBeVisible({ timeout: 20_000 });
   });
 });

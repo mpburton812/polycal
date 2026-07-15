@@ -37,7 +37,8 @@ export async function completeFirstLoginOnboarding(
   await expect(page.getByRole("button", { name: "OK", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "OK", exact: true }).click();
 
-  // Wait for the feed home page body — AppShell nav is visible during onboarding too.
+  // Soft-landing can race with JWT/onboardingComplete refresh — go home explicitly (PC-225).
+  await page.goto("/feed");
   await expect(page.getByRole("heading", { name: "Feed", level: 1 })).toBeVisible({
     timeout: 30_000,
   });
