@@ -30,6 +30,7 @@ export async function GET(request: Request): Promise<NextResponse> {
   const rows = await db
     .select({
       id: alphaFeedbackSubmissions.id,
+      ticketNumber: alphaFeedbackSubmissions.ticketNumber,
       kind: alphaFeedbackSubmissions.kind,
       title: alphaFeedbackSubmissions.title,
       description: alphaFeedbackSubmissions.description,

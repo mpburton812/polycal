@@ -1,6 +1,7 @@
 export type FeedbackStatus =
   | "not_started"
   | "in_progress"
+  | "ready_for_testing"
   | "deferred"
   | "working_as_designed"
   | "closed";
@@ -8,9 +9,23 @@ export type FeedbackStatus =
 export const STATUS_LABELS: Record<FeedbackStatus, string> = {
   not_started: "Not Started",
   in_progress: "In Progress",
+  ready_for_testing: "Ready For Testing",
   deferred: "Deferred",
   working_as_designed: "Working As Designed",
   closed: "Closed",
+};
+
+/** MUI Chip color mapping for triage statuses (PC-221). */
+export const STATUS_COLORS: Record<
+  FeedbackStatus,
+  "default" | "info" | "warning" | "success" | "error" | "secondary"
+> = {
+  not_started: "default",
+  in_progress: "info",
+  ready_for_testing: "success",
+  deferred: "warning",
+  working_as_designed: "secondary",
+  closed: "error",
 };
 
 export interface FeedbackCommentLogEntry {
@@ -21,6 +36,8 @@ export interface FeedbackCommentLogEntry {
 
 export interface FeedbackListItem {
   id: string;
+  /** Stable human-visible ticket number; displayed as #N (PC-222). */
+  ticketNumber: number | null;
   kind: "bug" | "feature";
   title: string;
   description: string;
@@ -269,4 +286,10 @@ export async function notifySubmitter(
     },
     options,
   );
+}
+
+/** Formats a durable ticket number for display (PC-222). */
+export function formatTicketId(ticketNumber: number | null | undefined): string {
+  if (ticketNumber == null || !Number.isFinite(ticketNumber)) return "—";
+  return `#${ticketNumber}`;
 }

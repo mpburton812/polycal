@@ -42,9 +42,25 @@ export const ALPHA_FEEDBACK_STATUS_LABELS: Record<
 > = {
   not_started: "Not Started",
   in_progress: "In Progress",
+  ready_for_testing: "Ready For Testing",
   deferred: "Deferred",
   working_as_designed: "Working As Designed",
   closed: "Closed",
+};
+
+/**
+ * MUI chip color hints for triage status (tracker + admin UIs) (PC-221).
+ */
+export const ALPHA_FEEDBACK_STATUS_COLORS: Record<
+  (typeof alphaFeedbackStatuses)[number],
+  "default" | "info" | "warning" | "success" | "error" | "secondary"
+> = {
+  not_started: "default",
+  in_progress: "info",
+  ready_for_testing: "success",
+  deferred: "warning",
+  working_as_designed: "secondary",
+  closed: "error",
 };
 
 /** Best-effort OS label from a user-agent string. */
