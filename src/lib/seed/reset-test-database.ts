@@ -26,6 +26,7 @@ export async function resetTestDatabase(): Promise<{
   await runMigrations();
   await client.execute("DELETE FROM alpha_feedback_submissions");
   await client.execute("DELETE FROM proposal_slot_votes");
+  await client.execute("DELETE FROM proposal_comment_images");
   await client.execute("DELETE FROM proposal_comments");
   await client.execute("DELETE FROM proposal_state_log");
   await client.execute("DELETE FROM proposal_time_slots");
@@ -37,6 +38,10 @@ export async function resetTestDatabase(): Promise<{
   await client.execute("DELETE FROM location_residents");
   await client.execute("DELETE FROM sleeping_partnerships");
   // Wipe chat before users — author_id FK blocks DELETE FROM users (PC-224).
+  await client.execute("DELETE FROM feed_image_uploads");
+  await client.execute("DELETE FROM network_chat_comment_images");
+  await client.execute("DELETE FROM network_chat_comments");
+  await client.execute("DELETE FROM network_chat_message_images");
   await client.execute("DELETE FROM network_chat_messages");
   await client.execute("DELETE FROM stored_images");
   await client.execute("DELETE FROM locations");

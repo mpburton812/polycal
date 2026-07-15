@@ -1,11 +1,10 @@
-/** Curated lifecycle actions shown as Feed milestones (PC-226). */
+/** Curated lifecycle actions shown as Feed milestones (PC-226). Archived excluded (PC-232). */
 export const FEED_MILESTONE_ACTIONS = [
   "proposal.submitted",
   "proposal.auto_resolved",
   "proposal.resolved",
   "proposal.at_risk",
   "proposal.cancelled",
-  "proposal.archived",
   "proposal.redrafted",
   "proposal.attendees_updated",
   "proposal.admin_fast_add",
@@ -14,16 +13,20 @@ export const FEED_MILESTONE_ACTIONS = [
 
 export type FeedMilestoneAction = (typeof FEED_MILESTONE_ACTIONS)[number];
 
-export interface FeedMilestoneComment {
+export interface FeedComment {
   id: string;
+  authorId: string;
   authorName: string;
   body: string;
   createdAt: string;
+  imageIds: string[];
+  canDelete: boolean;
 }
 
 export interface FeedMilestone {
   id: string;
   proposalId: string;
+  proposerId: string;
   action: string;
   headline: string;
   actorName: string | null;
@@ -33,7 +36,7 @@ export interface FeedMilestone {
   proposalState: string;
   masked: boolean;
   canComment: boolean;
-  recentComments: FeedMilestoneComment[];
+  comments: FeedComment[];
 }
 
 export interface NetworkChatMessage {
@@ -42,5 +45,16 @@ export interface NetworkChatMessage {
   authorName: string;
   body: string;
   createdAt: string;
+  imageIds: string[];
   canDelete: boolean;
+  comments: FeedComment[];
+}
+
+export type FeedItem =
+  | ({ kind: "milestone" } & FeedMilestone)
+  | ({ kind: "chat" } & NetworkChatMessage);
+
+export interface FeedPage {
+  items: FeedItem[];
+  nextCursor: string | null;
 }

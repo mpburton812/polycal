@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { EVENT_ICON_KEYS } from "@/lib/event-icons/registry";
+import { MAX_FEED_IMAGES } from "@/lib/feed/images";
 import { batchSleepingEntriesSchema } from "@/lib/proposals/batch-sleeping";
 
 export const inviteeInputSchema = z.object({
@@ -43,11 +44,16 @@ export const draftProposalSchema = z.object({
   eventIconKey: z.enum(EVENT_ICON_KEYS).nullable().optional(),
 });
 
-export const commentSchema = z.object({
-  proposalId: z.string().min(1),
-  body: z.string().trim().min(1, "Comment cannot be empty.").max(2000),
-  sliceTag: z.string().trim().max(120).optional().nullable(),
-});
+export const commentSchema = z
+  .object({
+    proposalId: z.string().min(1),
+    body: z.string().trim().max(2000).optional().default(""),
+    sliceTag: z.string().trim().max(120).optional().nullable(),
+    imageIds: z.array(z.string().min(1)).max(MAX_FEED_IMAGES).optional(),
+  })
+  .refine((data) => data.body.length > 0 || (data.imageIds?.length ?? 0) > 0, {
+    message: "Comment cannot be empty.",
+  });
 
 export const voteSchema = z.object({
   proposalId: z.string().min(1),

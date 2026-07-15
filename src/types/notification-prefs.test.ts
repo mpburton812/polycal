@@ -16,6 +16,7 @@ describe("migrateAlertTypes", () => {
       eventProposals: false,
       sleepingPartnerProposals: true,
       reminders: false,
+      feedChatReplies: true,
     });
   });
 });

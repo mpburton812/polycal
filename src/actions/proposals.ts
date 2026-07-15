@@ -30,6 +30,7 @@ export {
   checkProposalConflictsAction,
   cloneProposalAction,
   createDraftProposalAction,
+  deleteProposalCommentAction,
   getProposalDetailAction,
   listAcceptedSleepingPartnerIdsAction,
   listProposalPlaceOptionsAction,
