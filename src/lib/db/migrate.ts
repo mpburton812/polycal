@@ -6,7 +6,7 @@ import { applyProposalsMigrations } from "./proposals-migrations";
 import { applyAlphaFeedbackMigrations } from "./alpha-feedback-migrations";
 
 /** Bump whenever bootstrap DDL or *-migrations.ts modules change (PC-143). */
-export const SCHEMA_VERSION = "23";
+export const SCHEMA_VERSION = "24";
 
 /**
  * True when the stored schema version already matches the app target — skip
