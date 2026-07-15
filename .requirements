@@ -222,3 +222,4 @@
 2026-07-14 | d6ea653 | PC-217 | clear actionable inbox on proposal vote | src/actions/notifications.ts
 2026-07-14 | 4f9b05b | PC-219 | assert actionable inbox clear after vote, not title | e2e/helpers/notifications.ts
 2026-07-15 | 74d19d6 | PC-216 | merge(dev): resolve conflicts after alpha-feedback PR #247 | n/a
+2026-07-15 | c2d4aed | PC-224 | milestones chat and sleeping network visibility | src/actions/admin.ts
