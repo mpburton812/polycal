@@ -37,7 +37,10 @@ export async function completeFirstLoginOnboarding(
   await expect(page.getByRole("button", { name: "OK", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "OK", exact: true }).click();
 
-  // Soft-landing can race with JWT/onboardingComplete refresh — go home explicitly (PC-225).
+  // Wait until the welcome ack leaves the shell (onboardingComplete applied) (PC-156 / PC-225).
+  await expect(page.getByRole("heading", { name: "Welcome!", exact: true })).toBeHidden({
+    timeout: 30_000,
+  });
   await page.goto("/feed");
   await expect(page.getByRole("heading", { name: "Feed", level: 1 })).toBeVisible({
     timeout: 30_000,

@@ -58,7 +58,7 @@ test.describe("Admin user provisioning", () => {
     await login(page, credentials.username, credentials.temporaryPassword);
     await completeFirstLoginOnboarding(page, permanentPassword);
 
-    await expect(page.getByRole("heading", { name: "Feed", level: 1 })).toBeVisible();
+    await expect(page).toHaveURL(/\/feed/);
     await goToPeoplePlaces(page);
     await expect(page.getByText(displayName)).toBeVisible();
   });
