@@ -228,3 +228,4 @@
 2026-07-15 | 9a96da2 | PC-224 | combine Feed tests to avoid mid-serial DB reset flake | e2e/feed.spec.ts
 2026-07-15 | 6cfda98 | PC-224 | harden Feed landing after onboarding | src/actions/onboarding.ts
 2026-07-15 | 781535a | PC-224 | wait for onboarding complete before Feed assert | e2e/admin-create-user.spec.ts
+2026-07-15 | 942b7a8 | PC-224 | hard-navigate to Feed after welcome OK | src/components/onboarding/FirstLoginWizard.tsx
