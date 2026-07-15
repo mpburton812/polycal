@@ -6,7 +6,7 @@ import { expandAdminSection } from "./helpers/admin";
 import { goToAdmin, goToFeed } from "./helpers/navigation";
 
 test.describe("Feed tab", () => {
-  test("shows milestones and chat sections", async ({ page }) => {
+  test("shows milestones, chat, and sleeping visibility admin setting", async ({ page }) => {
     await login(page, USERS.luke.username);
     await expectAuthenticatedShell(page);
     await goToFeed(page);
@@ -21,10 +21,7 @@ test.describe("Feed tab", () => {
     await page.getByLabel("Message the network").fill(stamp);
     await page.getByRole("button", { name: "Send" }).click();
     await expect(page.getByText(stamp)).toBeVisible({ timeout: 15_000 });
-  });
 
-  test("admin can set sleeping proposals network visibility", async ({ page }) => {
-    await login(page, USERS.luke.username);
     await goToAdmin(page);
     await expandAdminSection(page, "Poly group settings");
     await expect(
