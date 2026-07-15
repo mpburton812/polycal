@@ -1,7 +1,16 @@
 import { eq } from "drizzle-orm";
 
 import { getDb } from "@/lib/db/client";
-import { polyGroup, type EventPrivacyLevel, type ProposalState } from "@/lib/db/schema";
+import {
+  polyGroup,
+  type EventPrivacyLevel,
+  type ProposalState,
+  type ProposalType,
+} from "@/lib/db/schema";
+import type {
+  AuditLogVisibility,
+  SleepingNetworkVisibility,
+} from "@/types/poly-group";
 
 export const MASKED_TITLE = "Private event";
 export const MASKED_DESCRIPTION = "Details are hidden for this privacy level.";
@@ -15,6 +24,19 @@ export async function getPrivacyAdminFlags(
     adminCanSeePrivate: group?.adminCanSeePrivate ?? false,
     adminCanSeeSuperPrivate: group?.adminCanSeeSuperPrivate ?? false,
   };
+}
+
+/** Loads sleeping network visibility (everyone vs involved) from poly group (PC-229). */
+export async function getSleepingNetworkVisibility(
+  db: ReturnType<typeof getDb> = getDb(),
+): Promise<SleepingNetworkVisibility> {
+  const [group] = await db
+    .select({ sleepingNetworkVisibility: polyGroup.sleepingNetworkVisibility })
+    .from(polyGroup)
+    .where(eq(polyGroup.id, 1))
+    .limit(1);
+  const value = group?.sleepingNetworkVisibility;
+  return value === "involved" ? "involved" : "everyone";
 }
 
 /**
@@ -76,4 +98,73 @@ export function viewerCanSeeProposal(
   if (context?.state === "resolved" && context.eventPrivacy === "open") return true;
   if (context?.state === "archived" && context.eventPrivacy === "open") return true;
   return false;
+}
+
+/**
+ * Sleeping visibility when `sleepingNetworkVisibility` is `involved`:
+ * only proposer, invitees, and admins — even for open resolved/archived (PC-229).
+ */
+export function viewerCanSeeSleepingProposal(
+  viewerId: string,
+  isAdmin: boolean,
+  proposerId: string,
+  inviteeUserIds: string[],
+  options: {
+    sleepingNetworkVisibility: SleepingNetworkVisibility;
+    state?: ProposalState;
+    eventPrivacy?: EventPrivacyLevel;
+  },
+): boolean {
+  if (options.sleepingNetworkVisibility === "involved") {
+    if (isAdmin) return true;
+    if (proposerId === viewerId) return true;
+    if (inviteeUserIds.includes(viewerId)) return true;
+    return false;
+  }
+  return viewerCanSeeProposal(viewerId, isAdmin, proposerId, inviteeUserIds, {
+    state: options.state,
+    eventPrivacy: options.eventPrivacy,
+  });
+}
+
+/**
+ * Applies standard proposal visibility, with the sleeping network gate when type is sleeping.
+ */
+export function viewerCanSeeProposalWithSleepingGate(
+  viewerId: string,
+  isAdmin: boolean,
+  proposerId: string,
+  inviteeUserIds: string[],
+  options: {
+    proposalType: ProposalType;
+    sleepingNetworkVisibility: SleepingNetworkVisibility;
+    state?: ProposalState;
+    eventPrivacy?: EventPrivacyLevel;
+  },
+): boolean {
+  if (options.proposalType === "sleeping") {
+    return viewerCanSeeSleepingProposal(viewerId, isAdmin, proposerId, inviteeUserIds, {
+      sleepingNetworkVisibility: options.sleepingNetworkVisibility,
+      state: options.state,
+      eventPrivacy: options.eventPrivacy,
+    });
+  }
+  return viewerCanSeeProposal(viewerId, isAdmin, proposerId, inviteeUserIds, {
+    state: options.state,
+    eventPrivacy: options.eventPrivacy,
+  });
+}
+
+/** Whether the viewer may see proposal audit / feed milestone lines (PC-45 / PC-226). */
+export function viewerCanSeeAuditLog(
+  visibility: AuditLogVisibility | string,
+  isAdmin: boolean,
+  isProposer: boolean,
+  isInvitee: boolean,
+): boolean {
+  if (visibility === "everyone") return true;
+  if (visibility === "admin_only") return isAdmin;
+  if (visibility === "proposer_admin") return isAdmin || isProposer;
+  if (visibility === "invitees_proposer_admin") return isAdmin || isProposer || isInvitee;
+  return isAdmin;
 }

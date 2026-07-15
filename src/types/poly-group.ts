@@ -21,6 +21,10 @@ export type AuditLogVisibility = (typeof auditLogVisibilityLevels)[number];
 export const placesMapVisibilityLevels = ["all", "admins", "none"] as const;
 export type PlacesMapVisibility = (typeof placesMapVisibilityLevels)[number];
 
+/** Whether sleeping proposals/arrangements are network-wide or involved-only (PC-229). */
+export const sleepingNetworkVisibilityLevels = ["everyone", "involved"] as const;
+export type SleepingNetworkVisibility = (typeof sleepingNetworkVisibilityLevels)[number];
+
 export interface PolyGroupSettings {
   name: string;
   allowGroupNameProposals: boolean;
@@ -34,6 +38,8 @@ export interface PolyGroupSettings {
   auditLogVisibility: AuditLogVisibility;
   allowUserProvisioning: boolean;
   hideSleepingArrangements: boolean;
+  /** Orthogonal to hideSleepingArrangements — board/schedule/feed visibility for sleeping. */
+  sleepingNetworkVisibility: SleepingNetworkVisibility;
   placesMapVisibility: PlacesMapVisibility;
   logTailLength: number;
   onboardingWelcomeMessage: string;

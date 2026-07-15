@@ -26,6 +26,28 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "2026.07.15b",
+    date: "2026-07-15",
+    summary: "Feed tab (milestones + network chat) and sleeping network visibility.",
+    changes: [
+      {
+        type: "added",
+        description:
+          "Leftmost Feed tab with proposal lifecycle milestones, comments, and network-wide chat (PC-224–PC-228).",
+      },
+      {
+        type: "added",
+        description:
+          "Admin sleepingNetworkVisibility (everyone vs involved) for sleeping proposals/arrangements, orthogonal to calendar hideSleepingArrangements (PC-229).",
+      },
+      {
+        type: "changed",
+        description:
+          "Post-login and unmatched-path defaults land on /feed; SCHEMA_VERSION 25 with network_chat_messages (PC-225).",
+      },
+    ],
+  },
+  {
     version: "2026.07.15",
     date: "2026-07-15",
     summary: "Clear actionable proposal notifications when the invitee votes.",

@@ -23,8 +23,9 @@ import {
 import {
   applyProposalMask,
   getPrivacyAdminFlags,
+  getSleepingNetworkVisibility,
   shouldMaskProposalContent,
-  viewerCanSeeProposal,
+  viewerCanSeeProposalWithSleepingGate,
 } from "@/lib/proposals/access";
 import { buildPartnershipProposalCopy } from "@/lib/partnerships/copy";
 import { formatSleepingDisplayTitle } from "@/lib/proposals/sleeping-display";
@@ -73,6 +74,7 @@ export async function listProposalBoardAction(): Promise<ProposalBoard> {
   const viewerId = session.user.id;
   const isAdmin = await userHasAdminAccess(session.user.role);
   const privacyFlags = await getPrivacyAdminFlags(db);
+  const sleepingNetworkVisibility = await getSleepingNetworkVisibility(db);
   const nowIso = new Date().toISOString();
 
   const viewerInviteeProposalRows = isAdmin
@@ -208,10 +210,14 @@ export async function listProposalBoardAction(): Promise<ProposalBoard> {
       row.state === "resolved" ||
       row.state === "archived"
     ) {
-      if (!viewerCanSeeProposal(viewerId, isAdmin, row.proposerId, inviteeUserIds, {
-        state: row.state,
-        eventPrivacy: row.eventPrivacy,
-      })) {
+      if (
+        !viewerCanSeeProposalWithSleepingGate(viewerId, isAdmin, row.proposerId, inviteeUserIds, {
+          proposalType: row.proposalType,
+          sleepingNetworkVisibility,
+          state: row.state,
+          eventPrivacy: row.eventPrivacy,
+        })
+      ) {
         continue;
       }
     }

@@ -4,6 +4,7 @@ import { login, expectAuthenticatedShell } from "./helpers/auth";
 import { USERS } from "./helpers/constants";
 import {
   goToAdmin,
+  goToFeed,
   goToPeoplePlaces,
   goToProfile,
   goToProposals,
@@ -17,16 +18,24 @@ test.describe("App navigation (admin)", () => {
     await expectAuthenticatedShell(page);
   });
 
-  test("bottom nav includes Schedule, Proposals, People & Places, and Admin for admin", async ({
+  test("bottom nav includes Feed first, then Schedule, Proposals, People & Places, and Admin", async ({
     page,
   }) => {
     const nav = page.getByRole("navigation", { name: "Main navigation" });
+    const links = nav.getByRole("link");
+    await expect(links.nth(0)).toHaveText("Feed");
+    await expect(nav.getByRole("link", { name: "Feed" })).toBeVisible();
     await expect(nav.getByRole("link", { name: "Schedule" })).toBeVisible();
     await expect(nav.getByRole("link", { name: "Proposals" })).toBeVisible();
     await expect(nav.getByRole("link", { name: "People & Places" })).toBeVisible();
     await expect(nav.getByRole("link", { name: "Admin" })).toBeVisible();
     await expect(page.getByText("Rebel Alliance")).toBeVisible();
     await expect(page.getByText("PolyCal", { exact: true })).toBeVisible();
+  });
+
+  test("login lands on Feed as default home tab", async ({ page }) => {
+    await expect(page).toHaveURL(/\/feed/);
+    await expect(page.getByRole("heading", { name: "Feed" })).toBeVisible();
   });
 
   test("profile menu opens settings and logout entries", async ({ page }) => {
@@ -36,6 +45,9 @@ test.describe("App navigation (admin)", () => {
   });
 
   test("navigates to all primary tabs", async ({ page }) => {
+    await goToFeed(page);
+    await expect(page.getByRole("heading", { name: "Feed" })).toBeVisible();
+
     await goToSchedule(page);
     await expect(page.getByRole("heading", { name: "Schedule" })).toBeVisible();
 

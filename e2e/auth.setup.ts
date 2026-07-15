@@ -22,7 +22,7 @@ setup("authenticate luke per worker origin", async ({ browser }) => {
     const context = await browser.newContext({ baseURL });
     const page = await context.newPage();
     await login(page, USERS.luke.username);
-    await page.waitForURL(/\/(schedule|profile|people-places|proposals|admin)/);
+    await page.waitForURL(/\/(feed|schedule|profile|people-places|proposals|admin)/);
     await context.storageState({
       path: path.join(AUTH_DIR, `luke-w${dbIndex}.json`),
     });
