@@ -37,11 +37,8 @@ export async function completeFirstLoginOnboarding(
   await expect(page.getByRole("button", { name: "OK", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "OK", exact: true }).click();
 
-  // Wait until the welcome ack leaves the shell (onboardingComplete applied) (PC-156 / PC-225).
-  await expect(page.getByRole("heading", { name: "Welcome!", exact: true })).toBeHidden({
-    timeout: 30_000,
-  });
-  await page.goto("/feed");
+  // OK triggers a full navigation to /feed after onboarding.complete (PC-225).
+  await expect(page).toHaveURL(/\/feed/, { timeout: 45_000 });
   await expect(page.getByRole("heading", { name: "Feed", level: 1 })).toBeVisible({
     timeout: 30_000,
   });
