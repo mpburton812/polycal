@@ -28,6 +28,7 @@ import {
   groupNameChangeModes,
   placesMapVisibilityLevels,
   powerManagementModes,
+  sleepingNetworkVisibilityLevels,
 } from "@/types/poly-group";
 
 const GROUP_NAME_LABELS: Record<string, string> = {
@@ -48,6 +49,11 @@ const MAP_VISIBILITY_LABELS: Record<string, string> = {
   all: "Everyone",
   admins: "Admins only",
   none: "Hidden",
+};
+
+const SLEEPING_NETWORK_LABELS: Record<string, string> = {
+  everyone: "Visible to whole network (subject to private/super-private)",
+  involved: "Only people involved (proposer, invitees, admins)",
 };
 
 /**
@@ -275,6 +281,26 @@ export function AdminPolyGroupSettingsPanel({
           }
           label="Hide sleeping arrangements from non-sleeping partners on calendar"
         />
+        <FormControl fullWidth>
+          <InputLabel>Sleeping proposals network visibility</InputLabel>
+          <Select
+            label="Sleeping proposals network visibility"
+            value={settings.sleepingNetworkVisibility}
+            onChange={(e) =>
+              setSettings({
+                ...settings,
+                sleepingNetworkVisibility:
+                  e.target.value as PolyGroupSettings["sleepingNetworkVisibility"],
+              })
+            }
+          >
+            {sleepingNetworkVisibilityLevels.map((level) => (
+              <MenuItem key={level} value={level}>
+                {SLEEPING_NETWORK_LABELS[level] ?? level}
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
         <FormControl fullWidth>
           <InputLabel>Sleeping Partners tab visibility</InputLabel>
           <Select

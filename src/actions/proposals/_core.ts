@@ -84,10 +84,12 @@ import { formatSleepingDisplayTitle } from "@/lib/proposals/sleeping-display";
 import {
   applyProposalMask,
   getPrivacyAdminFlags,
+  getSleepingNetworkVisibility,
   MASKED_DESCRIPTION,
   MASKED_TITLE,
   shouldMaskProposalContent,
-  viewerCanSeeProposal,
+  viewerCanSeeAuditLog,
+  viewerCanSeeProposalWithSleepingGate,
 } from "@/lib/proposals/access";
 import { buildPartnershipProposalCopy } from "@/lib/partnerships/copy";
 import type { UserRole } from "@/types/user";
@@ -219,15 +221,17 @@ function filterStateLogForViewer(
   isProposer: boolean,
   isInvitee: boolean,
 ): ProposalStateLogView[] {
-  if (visibility === "everyone") return logRows;
-  if (visibility === "admin_only") return isAdmin ? logRows : [];
-  if (visibility === "proposer_admin") {
-    return isAdmin || isProposer ? logRows : [];
+  if (
+    viewerCanSeeAuditLog(
+      visibility,
+      isAdmin,
+      isProposer,
+      isInvitee,
+    )
+  ) {
+    return logRows;
   }
-  if (visibility === "invitees_proposer_admin") {
-    return isAdmin || isProposer || isInvitee ? logRows : [];
-  }
-  return isAdmin ? logRows : [];
+  return [];
 }
 
 /** Counts slots where every required invitee voted accept/abstain/sub-optimal (PC-40). */
@@ -2249,6 +2253,7 @@ export async function getProposalDetailAction(
   const db = getDb();
   const isAdmin = await userHasAdminAccess(session.user.role);
   const privacyFlags = await getPrivacyAdminFlags(db);
+  const sleepingNetworkVisibility = await getSleepingNetworkVisibility(db);
 
   const [row] = await db
     .select({
@@ -2312,7 +2317,9 @@ export async function getProposalDetailAction(
   }
   if (
     (row.state === "proposed" || row.state === "resolved" || row.state === "archived") &&
-    !viewerCanSeeProposal(session.user.id, isAdmin, row.proposerId, inviteeUserIds, {
+    !viewerCanSeeProposalWithSleepingGate(session.user.id, isAdmin, row.proposerId, inviteeUserIds, {
+      proposalType: row.proposalType,
+      sleepingNetworkVisibility,
       state: row.state,
       eventPrivacy: row.eventPrivacy,
     })
@@ -2592,7 +2599,9 @@ export async function getProposalDetailAction(
         canViewSensitive &&
         row.state !== "draft" &&
         row.state !== "archived" &&
-        viewerCanSeeProposal(session.user.id, isAdmin, row.proposerId, inviteeUserIds, {
+        viewerCanSeeProposalWithSleepingGate(session.user.id, isAdmin, row.proposerId, inviteeUserIds, {
+          proposalType: row.proposalType,
+          sleepingNetworkVisibility,
           state: row.state,
           eventPrivacy: row.eventPrivacy,
         }),

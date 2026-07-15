@@ -22,7 +22,7 @@ export default async function PausedPage() {
     redirect("/login");
   }
   if (liveStatus !== "paused") {
-    redirect("/schedule");
+    redirect("/feed");
   }
 
   async function signOutAction() {

@@ -62,7 +62,7 @@ const AdminTestDataPanel = dynamic(
 export default async function AdminPage() {
   const session = await auth();
   if (!session?.user || !(await userHasAdminAccess(session.user.role))) {
-    redirect("/schedule");
+    redirect("/feed");
   }
 
   const [settings, adminUsers, logEntries] = await Promise.all([
@@ -72,7 +72,7 @@ export default async function AdminPage() {
   ]);
 
   if (!settings) {
-    redirect("/schedule");
+    redirect("/feed");
   }
 
   return (

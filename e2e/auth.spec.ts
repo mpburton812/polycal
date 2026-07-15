@@ -17,11 +17,10 @@ test.describe("Authentication", () => {
     await expect(page.getByRole("button", { name: "Sign in" })).toBeVisible();
   });
 
-  test("admin user signs in and reaches schedule shell", async ({ page }) => {
+  test("admin user signs in and reaches feed shell", async ({ page }) => {
     await login(page, USERS.luke.username);
     await expectAuthenticatedShell(page);
-    await expect(page.getByRole("heading", { name: "Schedule" })).toBeVisible();
-    await expect(page.getByText(/network calendar/i)).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Feed" })).toBeVisible();
   });
 
   test("redirects unauthenticated users to login", async ({ page }) => {

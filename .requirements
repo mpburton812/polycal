@@ -222,3 +222,12 @@
 2026-07-14 | d6ea653 | PC-217 | clear actionable inbox on proposal vote | src/actions/notifications.ts
 2026-07-14 | 4f9b05b | PC-219 | assert actionable inbox clear after vote, not title | e2e/helpers/notifications.ts
 2026-07-15 | 74d19d6 | PC-216 | merge(dev): resolve conflicts after alpha-feedback PR #247 | n/a
+2026-07-15 | c2d4aed | PC-224 | milestones chat and sleeping network visibility | src/actions/admin.ts
+2026-07-15 | e19ba49 | PC-224 | expect Feed as post-login home after tab move | e2e/admin-create-user.spec.ts
+2026-07-15 | 9042168 | PC-224 | navigate to Feed after first-login OK | src/components/onboarding/FirstLoginWizard.tsx
+2026-07-15 | 9a96da2 | PC-224 | combine Feed tests to avoid mid-serial DB reset flake | e2e/feed.spec.ts
+2026-07-15 | 6cfda98 | PC-224 | harden Feed landing after onboarding | src/actions/onboarding.ts
+2026-07-15 | 781535a | PC-224 | wait for onboarding complete before Feed assert | e2e/admin-create-user.spec.ts
+2026-07-15 | 942b7a8 | PC-224 | hard-navigate to Feed after welcome OK | src/components/onboarding/FirstLoginWizard.tsx
+2026-07-15 | a5815a5 | PC-224 | retry database reset under serial worker load | e2e/helpers/db.ts
+2026-07-15 | 4da34af | PC-224 | wipe network_chat_messages before users on reset | src/lib/seed/reset-test-database.ts

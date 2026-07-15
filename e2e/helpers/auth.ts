@@ -28,7 +28,7 @@ export async function login(
   password: string = SEED_PASSWORD,
 ): Promise<void> {
   if (password === SEED_PASSWORD && (await sessionMatchesUser(page, username))) {
-    await page.goto("/schedule");
+    await page.goto("/feed");
     if (!page.url().includes("/login")) {
       return;
     }
@@ -46,13 +46,13 @@ export async function login(
     await page.getByLabel("Password").fill(password);
     await page.getByRole("button", { name: "Sign in" }).click();
     try {
-      await page.waitForURL(/\/(schedule|profile|people-places|proposals|admin|paused)/, {
+      await page.waitForURL(/\/(feed|schedule|profile|people-places|proposals|admin|paused)/, {
         timeout: 60_000,
       });
       if (page.url().includes("/paused")) {
         return;
       }
-      if (page.url().includes("/schedule")) {
+      if (page.url().includes("/feed") || page.url().includes("/schedule")) {
         await page
           .waitForURL(/\/paused/, { timeout: 5_000 })
           .then(() => true)

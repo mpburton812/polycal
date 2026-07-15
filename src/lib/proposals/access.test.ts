@@ -4,6 +4,8 @@ import {
   applyProposalMask,
   shouldMaskProposalContent,
   viewerCanSeeProposal,
+  viewerCanSeeProposalWithSleepingGate,
+  viewerCanSeeSleepingProposal,
 } from "./access";
 
 describe("proposal access helpers", () => {
@@ -60,5 +62,59 @@ describe("proposal access helpers", () => {
     expect(masked.title).toBe("Private event");
     expect(masked.locationName).toBeNull();
     expect(masked.scheduledStartAt).toBeNull();
+  });
+
+  it("involved sleeping visibility hides open resolved from non-participants", () => {
+    expect(
+      viewerCanSeeSleepingProposal("u9", false, "u1", ["u2"], {
+        sleepingNetworkVisibility: "involved",
+        state: "resolved",
+        eventPrivacy: "open",
+      }),
+    ).toBe(false);
+    expect(
+      viewerCanSeeSleepingProposal("u2", false, "u1", ["u2"], {
+        sleepingNetworkVisibility: "involved",
+        state: "resolved",
+        eventPrivacy: "open",
+      }),
+    ).toBe(true);
+    expect(
+      viewerCanSeeSleepingProposal("u9", true, "u1", ["u2"], {
+        sleepingNetworkVisibility: "involved",
+        state: "resolved",
+        eventPrivacy: "open",
+      }),
+    ).toBe(true);
+  });
+
+  it("everyone sleeping visibility still respects private/super_private", () => {
+    expect(
+      viewerCanSeeProposalWithSleepingGate("u9", false, "u1", ["u2"], {
+        proposalType: "sleeping",
+        sleepingNetworkVisibility: "everyone",
+        state: "resolved",
+        eventPrivacy: "private",
+      }),
+    ).toBe(false);
+    expect(
+      viewerCanSeeProposalWithSleepingGate("u9", false, "u1", ["u2"], {
+        proposalType: "sleeping",
+        sleepingNetworkVisibility: "everyone",
+        state: "resolved",
+        eventPrivacy: "open",
+      }),
+    ).toBe(true);
+  });
+
+  it("event proposals ignore sleepingNetworkVisibility gate", () => {
+    expect(
+      viewerCanSeeProposalWithSleepingGate("u9", false, "u1", [], {
+        proposalType: "event",
+        sleepingNetworkVisibility: "involved",
+        state: "resolved",
+        eventPrivacy: "open",
+      }),
+    ).toBe(true);
   });
 });
