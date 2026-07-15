@@ -223,3 +223,4 @@
 2026-07-14 | 4f9b05b | PC-219 | assert actionable inbox clear after vote, not title | e2e/helpers/notifications.ts
 2026-07-15 | 74d19d6 | PC-216 | merge(dev): resolve conflicts after alpha-feedback PR #247 | n/a
 2026-07-15 | c2d4aed | PC-224 | milestones chat and sleeping network visibility | src/actions/admin.ts
+2026-07-15 | e19ba49 | PC-224 | expect Feed as post-login home after tab move | e2e/admin-create-user.spec.ts
