@@ -37,8 +37,8 @@ export async function completeFirstLoginOnboarding(
   await expect(page.getByRole("button", { name: "OK", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "OK", exact: true }).click();
 
-  // Wait for the schedule page body — AppShell nav is visible during onboarding too.
-  await expect(page.getByRole("heading", { name: "Schedule", level: 1 })).toBeVisible({
+  // Wait for the feed home page body — AppShell nav is visible during onboarding too.
+  await expect(page.getByRole("heading", { name: "Feed", level: 1 })).toBeVisible({
     timeout: 30_000,
   });
   await expectAuthenticatedShell(page);

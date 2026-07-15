@@ -59,6 +59,6 @@ test.describe("Passive user journey", () => {
 
     await login(page, credentials.username, credentials.temporaryPassword);
     await completeFirstLoginOnboarding(page, permanentPassword);
-    await expect(page.getByRole("heading", { name: "Schedule", level: 1 })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Feed", level: 1 })).toBeVisible();
   });
 });
