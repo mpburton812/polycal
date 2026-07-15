@@ -26,6 +26,28 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "2026.07.15c",
+    date: "2026-07-15",
+    summary: "Unified Feed timeline with chat comments, images, and reply push.",
+    changes: [
+      {
+        type: "changed",
+        description:
+          "Feed combines milestones and chat in one timeline (Option A styling, bottom composer); archived milestones excluded (PC-231–PC-233).",
+      },
+      {
+        type: "added",
+        description:
+          "Chat comments with delete rules, multi-image messages/comments, lightbox thumbnails, and feed.chat_reply push to message author (PC-234–PC-237).",
+      },
+      {
+        type: "added",
+        description:
+          "Milestone inline comments with proposer delete rule and SCHEMA_VERSION 26 feed tables (PC-235–PC-236).",
+      },
+    ],
+  },
+  {
     version: "2026.07.15b",
     date: "2026-07-15",
     summary: "Feed tab (milestones + network chat) and sleeping network visibility.",

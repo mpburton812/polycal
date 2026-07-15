@@ -369,6 +369,7 @@ export const proposalComments = sqliteTable("proposal_comments", {
   /** Optional slice tag for night/day-scoped comments on parent threads (e.g. slot:id, day:yyyy-MM-dd). */
   sliceTag: text("slice_tag"),
   createdAt: text("created_at").notNull(),
+  deletedAt: text("deleted_at"),
 });
 
 /** Tracks per-user dismissal of system notifications in the activity log (PC-40). */
@@ -458,6 +459,64 @@ export const networkChatMessages = sqliteTable("network_chat_messages", {
   deletedAt: text("deleted_at"),
 });
 
+/** Threaded replies on network chat messages (PC-234). */
+export const networkChatComments = sqliteTable("network_chat_comments", {
+  id: text("id").primaryKey(),
+  messageId: text("message_id")
+    .notNull()
+    .references(() => networkChatMessages.id),
+  authorId: text("author_id")
+    .notNull()
+    .references(() => users.id),
+  body: text("body").notNull().default(""),
+  createdAt: text("created_at").notNull(),
+  deletedAt: text("deleted_at"),
+});
+
+export const networkChatMessageImages = sqliteTable("network_chat_message_images", {
+  id: text("id").primaryKey(),
+  messageId: text("message_id")
+    .notNull()
+    .references(() => networkChatMessages.id),
+  imageId: text("image_id")
+    .notNull()
+    .references(() => storedImages.id),
+  sortOrder: integer("sort_order").notNull().default(0),
+});
+
+export const networkChatCommentImages = sqliteTable("network_chat_comment_images", {
+  id: text("id").primaryKey(),
+  commentId: text("comment_id")
+    .notNull()
+    .references(() => networkChatComments.id),
+  imageId: text("image_id")
+    .notNull()
+    .references(() => storedImages.id),
+  sortOrder: integer("sort_order").notNull().default(0),
+});
+
+export const proposalCommentImages = sqliteTable("proposal_comment_images", {
+  id: text("id").primaryKey(),
+  commentId: text("comment_id")
+    .notNull()
+    .references(() => proposalComments.id),
+  imageId: text("image_id")
+    .notNull()
+    .references(() => storedImages.id),
+  sortOrder: integer("sort_order").notNull().default(0),
+});
+
+/** Tracks pending feed image uploads before attach to a message/comment (PC-236). */
+export const feedImageUploads = sqliteTable("feed_image_uploads", {
+  imageId: text("image_id")
+    .primaryKey()
+    .references(() => storedImages.id),
+  userId: text("user_id")
+    .notNull()
+    .references(() => users.id),
+  createdAt: text("created_at").notNull(),
+});
+
 export const schema = {
   users,
   polyGroup,
@@ -477,4 +536,9 @@ export const schema = {
   sleepingPartnerships,
   locationResidents,
   networkChatMessages,
+  networkChatComments,
+  networkChatMessageImages,
+  networkChatCommentImages,
+  proposalCommentImages,
+  feedImageUploads,
 };

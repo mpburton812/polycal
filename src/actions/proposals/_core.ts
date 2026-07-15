@@ -1,7 +1,7 @@
 "use server";
 
 import { randomUUID } from "node:crypto";
-import { and, asc, eq, inArray, ne, or } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, ne, or } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
@@ -11,9 +11,11 @@ import { logUserActivity } from "@/lib/audit";
 import { getDb } from "@/lib/db/client";
 import { ensureDbReady } from "@/lib/db/ensure-ready";
 import {
+  feedImageUploads,
   locationResidents,
   locations,
   polyGroup,
+  proposalCommentImages,
   proposalComments,
   proposalInvitees,
   proposalSlotVotes,
@@ -2397,7 +2399,7 @@ export async function getProposalDetailAction(
     })
     .from(proposalComments)
     .innerJoin(users, eq(proposalComments.authorId, users.id))
-    .where(eq(proposalComments.proposalId, proposalId))
+    .where(and(eq(proposalComments.proposalId, proposalId), isNull(proposalComments.deletedAt)))
     .orderBy(asc(proposalComments.createdAt));
 
   const logRows = await db
@@ -3536,14 +3538,42 @@ export async function addProposalCommentAction(
   }
 
   const now = new Date().toISOString();
+  const commentId = `pc-${randomUUID()}`;
+
+  const imageIds = parsed.data.imageIds ?? [];
+  if (imageIds.length > 0) {
+    const rows = await db
+      .select({ imageId: feedImageUploads.imageId })
+      .from(feedImageUploads)
+      .where(
+        and(
+          inArray(feedImageUploads.imageId, imageIds),
+          eq(feedImageUploads.userId, session.user.id),
+        ),
+      );
+    if (rows.length !== imageIds.length) {
+      return { ok: false, message: "One or more images are invalid or expired." };
+    }
+  }
+
   await db.insert(proposalComments).values({
-    id: `pc-${randomUUID()}`,
+    id: commentId,
     proposalId: parsed.data.proposalId,
     authorId: session.user.id,
     body: parsed.data.body,
     sliceTag: parsed.data.sliceTag ?? null,
     createdAt: now,
+    deletedAt: null,
   });
+
+  for (let i = 0; i < imageIds.length; i += 1) {
+    await db.insert(proposalCommentImages).values({
+      id: randomUUID(),
+      commentId,
+      imageId: imageIds[i]!,
+      sortOrder: i,
+    });
+  }
 
   await logProposalTransition(
     db,
@@ -3553,8 +3583,69 @@ export async function addProposalCommentAction(
     parsed.data.sliceTag ? JSON.stringify({ sliceTag: parsed.data.sliceTag }) : undefined,
   );
   revalidatePath("/proposals");
+  revalidatePath("/feed");
 
   return { ok: true, message: "Comment added." };
+}
+
+/**
+ * Soft-deletes a proposal comment (author, proposer, or admin) (PC-235).
+ */
+export async function deleteProposalCommentAction(
+  commentId: string,
+): Promise<{ ok: boolean; message: string }> {
+  const session = await auth();
+  if (!session?.user) {
+    return { ok: false, message: "Sign in required." };
+  }
+
+  const id = z.string().min(1).safeParse(commentId);
+  if (!id.success) {
+    return { ok: false, message: "Invalid comment." };
+  }
+
+  await ensureDbReady();
+  const db = getDb();
+  const isAdmin = await userHasAdminAccess(session.user.role);
+
+  const [row] = await db
+    .select({
+      id: proposalComments.id,
+      authorId: proposalComments.authorId,
+      proposalId: proposalComments.proposalId,
+      deletedAt: proposalComments.deletedAt,
+    })
+    .from(proposalComments)
+    .where(eq(proposalComments.id, id.data))
+    .limit(1);
+
+  if (!row || row.deletedAt) {
+    return { ok: false, message: "Comment not found." };
+  }
+
+  const [proposal] = await db
+    .select({ proposerId: proposals.proposerId })
+    .from(proposals)
+    .where(eq(proposals.id, row.proposalId))
+    .limit(1);
+
+  const canDelete =
+    isAdmin ||
+    row.authorId === session.user.id ||
+    proposal?.proposerId === session.user.id;
+
+  if (!canDelete) {
+    return { ok: false, message: "Not allowed to delete this comment." };
+  }
+
+  await db
+    .update(proposalComments)
+    .set({ deletedAt: new Date().toISOString() })
+    .where(eq(proposalComments.id, id.data));
+
+  revalidatePath("/proposals");
+  revalidatePath("/feed");
+  return { ok: true, message: "Comment deleted." };
 }
 
 /**

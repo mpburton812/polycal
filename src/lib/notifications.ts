@@ -81,6 +81,10 @@ function alertTypeAllowed(
   notificationType: string,
   metadata?: Record<string, unknown>,
 ): boolean {
+  if (notificationType === "feed_chat_reply") {
+    return prefs.alertTypes.feedChatReplies;
+  }
+
   if (notificationType === "event_reminder") {
     return prefs.alertTypes.reminders;
   }
@@ -109,6 +113,10 @@ export function resolveNotificationUrl(
 ): string {
   if (typeof metadata?.url === "string" && metadata.url.startsWith("/")) {
     return metadata.url;
+  }
+
+  if (notificationType === "feed_chat_reply") {
+    return "/feed";
   }
 
   if (typeof metadata?.proposalId === "string") {
