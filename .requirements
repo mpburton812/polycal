@@ -224,3 +224,4 @@
 2026-07-15 | 74d19d6 | PC-216 | merge(dev): resolve conflicts after alpha-feedback PR #247 | n/a
 2026-07-15 | c2d4aed | PC-224 | milestones chat and sleeping network visibility | src/actions/admin.ts
 2026-07-15 | e19ba49 | PC-224 | expect Feed as post-login home after tab move | e2e/admin-create-user.spec.ts
+2026-07-15 | 9042168 | PC-224 | navigate to Feed after first-login OK | src/components/onboarding/FirstLoginWizard.tsx
