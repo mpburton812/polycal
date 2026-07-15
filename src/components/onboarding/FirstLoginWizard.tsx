@@ -182,6 +182,8 @@ export function FirstLoginWizard({
         return;
       }
       await update({ user: { onboardingComplete: true } });
+      // Land on Feed (leftmost home tab) after first-login OK (PC-225).
+      router.replace("/feed");
       router.refresh();
     });
   }
