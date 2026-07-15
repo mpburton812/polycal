@@ -1,7 +1,7 @@
 "use server";
 
 import { randomUUID } from "node:crypto";
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, isNull } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
@@ -400,7 +400,7 @@ export async function getProposalSliceDetailAction(
     })
     .from(proposalComments)
     .innerJoin(users, eq(proposalComments.authorId, users.id))
-    .where(eq(proposalComments.proposalId, rootProposalId))
+    .where(and(eq(proposalComments.proposalId, rootProposalId), isNull(proposalComments.deletedAt)))
     .orderBy(asc(proposalComments.createdAt));
 
   const visibleComments = isContentMasked

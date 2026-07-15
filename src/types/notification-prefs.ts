@@ -13,6 +13,7 @@ export interface NotificationPrefs {
     eventProposals: boolean;
     sleepingPartnerProposals: boolean;
     reminders: boolean;
+    feedChatReplies: boolean;
   };
 }
 
@@ -42,6 +43,7 @@ export const DEFAULT_NOTIFICATION_PREFS: NotificationPrefs = {
     eventProposals: true,
     sleepingPartnerProposals: true,
     reminders: true,
+    feedChatReplies: true,
   },
 };
 
@@ -57,6 +59,7 @@ export function migrateAlertTypes(legacy: LegacyAlertTypes): NotificationPrefs["
     eventProposals: proposals,
     sleepingPartnerProposals: partnerships,
     reminders: events,
+    feedChatReplies: true,
   };
 }
 
@@ -100,6 +103,7 @@ function normalizeAlertTypes(
       sleepingPartnerProposals:
         at.sleepingPartnerProposals ?? DEFAULT_NOTIFICATION_PREFS.alertTypes.sleepingPartnerProposals,
       reminders: at.reminders ?? DEFAULT_NOTIFICATION_PREFS.alertTypes.reminders,
+      feedChatReplies: at.feedChatReplies ?? DEFAULT_NOTIFICATION_PREFS.alertTypes.feedChatReplies,
     };
   }
 

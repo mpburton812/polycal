@@ -22,6 +22,7 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 - PC-224 / PC-225–230: Feed bottom tab (leftmost / default landing) with proposal lifecycle milestones, comments, and network chat; admin `sleepingNetworkVisibility` (everyone vs involved) orthogonal to calendar `hideSleepingArrangements`. Change control: `2026.07.15b`.
+- PC-231–PC-238: Unified Feed timeline (milestones + chat), chat comments with push, multi-image messages/comments, Option A styling, bottom composer. Excludes archived milestones. SCHEMA_VERSION 26. Change control: `2026.07.15c`.
 
 ### Fixed
 - PC-216 / PC-217–219: Accepting or declining a proposal (Proposals UI or notification bell) soft-dismisses matching actionable inbox rows so they stay cleared after reload; bell vote rows include Decline.

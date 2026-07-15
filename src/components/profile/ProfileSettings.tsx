@@ -47,7 +47,8 @@ const ALERT_TYPE_LABELS: Record<keyof NotificationPrefs["alertTypes"], string> =
   sleepingProposals: "Sleeping proposals",
   eventProposals: "Event proposals",
   sleepingPartnerProposals: "Sleeping partner proposals",
-  reminders: "Reminders",
+  reminders: "Event reminders",
+  feedChatReplies: "Feed chat replies",
 };
 
 export function ProfileSettings({
