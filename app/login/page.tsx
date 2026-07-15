@@ -28,7 +28,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
     if (liveStatus === "paused") {
       redirect("/paused");
     }
-    redirect("/schedule");
+    redirect("/feed");
   }
 
   const params = await searchParams;
@@ -38,7 +38,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
     "use server";
     const username = String(formData.get("username") ?? "").trim().toLowerCase();
     const password = String(formData.get("password") ?? "");
-    let redirectTo = String(formData.get("callbackUrl") ?? "/schedule");
+    let redirectTo = String(formData.get("callbackUrl") ?? "/feed");
 
     await ensureDbReady();
     const db = getDb();
@@ -108,7 +108,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
           <input
             type="hidden"
             name="callbackUrl"
-            value={params.callbackUrl ?? "/schedule"}
+            value={params.callbackUrl ?? "/feed"}
           />
           <TextField
             name="username"

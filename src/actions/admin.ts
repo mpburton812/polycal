@@ -120,7 +120,7 @@ export async function adminImpersonateUserAction(userId: string): Promise<AdminA
   await signIn("credentials", {
     impersonateUserId: userId,
     impersonateSecret: secret,
-    redirectTo: "/schedule",
+    redirectTo: "/feed",
   });
 
   return { ok: true, message: "Switching user…" };

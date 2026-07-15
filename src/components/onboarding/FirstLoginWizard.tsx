@@ -182,7 +182,8 @@ export function FirstLoginWizard({
         return;
       }
       await update({ user: { onboardingComplete: true } });
-      router.refresh();
+      // Full navigation so layout re-reads onboardingComplete from the session (PC-225).
+      window.location.assign("/feed");
     });
   }
 

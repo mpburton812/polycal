@@ -1,6 +1,7 @@
 "use client";
 
 import AdminPanelSettingsIcon from "@mui/icons-material/AdminPanelSettings";
+import DynamicFeedIcon from "@mui/icons-material/DynamicFeed";
 import EventNoteIcon from "@mui/icons-material/EventNote";
 import GroupsIcon from "@mui/icons-material/Groups";
 import HowToVoteIcon from "@mui/icons-material/HowToVote";
@@ -17,6 +18,7 @@ import { fontFamilies } from "@/theme/fonts";
 import { GARDEN_TOKENS } from "@/theme/tokens";
 
 const tabMeta = {
+  "/feed": { label: "Feed", icon: DynamicFeedIcon },
   "/schedule": { label: "Schedule", icon: EventNoteIcon },
   "/proposals": { label: "Proposals", icon: HowToVoteIcon },
   "/people-places": { label: "People & Places", icon: GroupsIcon },
@@ -33,7 +35,7 @@ export function AppTabs({ isAdmin }: { isAdmin: boolean }) {
   ).map((href) => ({ href, ...tabMeta[href] }));
 
   const current =
-    visibleTabs.find((t) => pathname.startsWith(t.href))?.href ?? "/schedule";
+    visibleTabs.find((t) => pathname.startsWith(t.href))?.href ?? "/feed";
 
   return (
     <Paper

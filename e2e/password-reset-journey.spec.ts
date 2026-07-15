@@ -52,7 +52,7 @@ test.describe("password reset journey", () => {
     await expect(page.getByText(/Password updated/i)).toBeVisible();
 
     await login(page, USERS.luke.username, newPassword);
-    await expect(page).toHaveURL(/\/schedule/);
+    await expect(page).toHaveURL(/\/feed/);
 
     // Restore Star Wars seed so later journeys still use the default password.
     await resetE2eDatabase(request);

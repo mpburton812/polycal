@@ -17,6 +17,7 @@ import {
   groupNameChangeModes,
   placesMapVisibilityLevels,
   powerManagementModes,
+  sleepingNetworkVisibilityLevels,
   type PlacesMapVisibility,
   type PolyGroupSettings,
 } from "@/types/poly-group";
@@ -41,6 +42,7 @@ const settingsSchema = z.object({
   auditLogVisibility: z.enum(auditLogVisibilityLevels),
   allowUserProvisioning: z.boolean(),
   hideSleepingArrangements: z.boolean(),
+  sleepingNetworkVisibility: z.enum(sleepingNetworkVisibilityLevels),
   placesMapVisibility: z.enum(placesMapVisibilityLevels),
   logTailLength: z.number().int().min(0).max(1000),
   onboardingWelcomeMessage: z.string().trim().min(1).max(2000),
@@ -65,6 +67,8 @@ function rowToSettings(row: typeof polyGroup.$inferSelect): PolyGroupSettings {
     auditLogVisibility: row.auditLogVisibility as PolyGroupSettings["auditLogVisibility"],
     allowUserProvisioning: row.allowUserProvisioning,
     hideSleepingArrangements: row.hideSleepingArrangements,
+    sleepingNetworkVisibility:
+      row.sleepingNetworkVisibility === "involved" ? "involved" : "everyone",
     placesMapVisibility:
       (row.placesMapVisibility as PolyGroupSettings["placesMapVisibility"]) ?? "all",
     logTailLength: row.logTailLength,
@@ -233,6 +237,7 @@ export async function updatePolyGroupSettingsAction(
       auditLogVisibility: parsed.data.auditLogVisibility,
       allowUserProvisioning: parsed.data.allowUserProvisioning,
       hideSleepingArrangements: parsed.data.hideSleepingArrangements,
+      sleepingNetworkVisibility: parsed.data.sleepingNetworkVisibility,
       placesMapVisibility: parsed.data.placesMapVisibility,
       logTailLength: parsed.data.logTailLength,
       onboardingWelcomeMessage: parsed.data.onboardingWelcomeMessage,
@@ -254,6 +259,9 @@ export async function updatePolyGroupSettingsAction(
 
   revalidatePath("/admin");
   revalidatePath("/people-places");
+  revalidatePath("/feed");
+  revalidatePath("/proposals");
+  revalidatePath("/schedule");
   return { ok: true, message: "Poly group settings saved." };
 }
 

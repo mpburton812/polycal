@@ -93,6 +93,8 @@ export const polyGroup = sqliteTable("poly_group", {
   hideSleepingArrangements: integer("hide_sleeping_arrangements", { mode: "boolean" })
     .notNull()
     .default(false),
+  /** everyone = normal privacy rules; involved = proposer/invitees/admins only (PC-229). */
+  sleepingNetworkVisibility: text("sleeping_network_visibility").notNull().default("everyone"),
   placesMapVisibility: text("places_map_visibility").notNull().default("all"),
   logTailLength: integer("log_tail_length").notNull().default(100),
   onboardingWelcomeMessage: text("onboarding_welcome_message"),
@@ -445,6 +447,17 @@ export const locationResidents = sqliteTable("location_residents", {
   respondedAt: text("responded_at"),
 });
 
+/** Network-wide chat messages on the Feed tab (PC-228). */
+export const networkChatMessages = sqliteTable("network_chat_messages", {
+  id: text("id").primaryKey(),
+  authorId: text("author_id")
+    .notNull()
+    .references(() => users.id),
+  body: text("body").notNull(),
+  createdAt: text("created_at").notNull(),
+  deletedAt: text("deleted_at"),
+});
+
 export const schema = {
   users,
   polyGroup,
@@ -463,4 +476,5 @@ export const schema = {
   pushSubscriptions,
   sleepingPartnerships,
   locationResidents,
+  networkChatMessages,
 };

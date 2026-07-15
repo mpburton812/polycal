@@ -74,7 +74,7 @@ export function VerifyEmailResult({
           {body}
         </Alert>
         {isSuccess ? (
-          <Button component={Link} href="/schedule" variant="contained" fullWidth>
+          <Button component={Link} href="/feed" variant="contained" fullWidth>
             Continue to PolyCal
           </Button>
         ) : (

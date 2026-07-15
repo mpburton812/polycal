@@ -26,6 +26,6 @@ export async function impersonateUser(userId: string): Promise<void> {
   await signIn("credentials", {
     impersonateUserId: userId,
     impersonateSecret: secret,
-    redirectTo: "/schedule",
+    redirectTo: "/feed",
   });
 }
