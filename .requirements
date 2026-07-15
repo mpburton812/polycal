@@ -229,3 +229,4 @@
 2026-07-15 | 6cfda98 | PC-224 | harden Feed landing after onboarding | src/actions/onboarding.ts
 2026-07-15 | 781535a | PC-224 | wait for onboarding complete before Feed assert | e2e/admin-create-user.spec.ts
 2026-07-15 | 942b7a8 | PC-224 | hard-navigate to Feed after welcome OK | src/components/onboarding/FirstLoginWizard.tsx
+2026-07-15 | a5815a5 | PC-224 | retry database reset under serial worker load | e2e/helpers/db.ts
