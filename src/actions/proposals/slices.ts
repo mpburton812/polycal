@@ -28,7 +28,8 @@ import {
 import {
   applyProposalMask,
   getPrivacyAdminFlags,
-  viewerCanSeeProposal,
+  getSleepingNetworkVisibility,
+  viewerCanSeeProposalWithSleepingGate,
 } from "@/lib/proposals/access";
 import { formatSleepingDisplayTitle } from "@/lib/proposals/sleeping-display";
 import { proposalDescriptionForDisplay } from "@/lib/proposals/special-proposals";
@@ -235,6 +236,7 @@ export async function getProposalSliceDetailAction(
   const db = getDb();
   const isAdmin = await userHasAdminAccess(session.user.role);
   const privacyFlags = await getSlicePrivacyFlags(db);
+  const sleepingNetworkVisibility = await getSleepingNetworkVisibility(db);
   const partnerIds = await acceptedSleepingPartnerIds(db, session.user.id);
   const { rootProposalId, sliceKind, sliceKey } = parsed.data;
   const sliceTag = formatSliceTag(sliceKind, sliceKey);
@@ -284,7 +286,9 @@ export async function getProposalSliceDetailAction(
 
   const inviteeUserIds = inviteeRows.map((invitee) => invitee.userId);
   if (
-    !viewerCanSeeProposal(session.user.id, isAdmin, row.proposerId, inviteeUserIds, {
+    !viewerCanSeeProposalWithSleepingGate(session.user.id, isAdmin, row.proposerId, inviteeUserIds, {
+      proposalType: row.proposalType,
+      sleepingNetworkVisibility,
       state: row.state,
       eventPrivacy: row.eventPrivacy,
     })

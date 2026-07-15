@@ -13,6 +13,10 @@ async function clickBottomNavLink(page: Page, name: string, path: string): Promi
   await expect(page).toHaveURL(new RegExp(`${path.replace("/", "\\/")}`));
 }
 
+export async function goToFeed(page: Page): Promise<void> {
+  await clickBottomNavLink(page, "Feed", "/feed");
+}
+
 export async function goToSchedule(page: Page): Promise<void> {
   await clickBottomNavLink(page, "Schedule", "/schedule");
 }

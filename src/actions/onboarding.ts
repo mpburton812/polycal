@@ -182,6 +182,8 @@ export async function completeOnboardingAction(): Promise<{
 
     await logUserActivity(session.user.id, "onboarding.complete");
     revalidatePath("/");
+    revalidatePath("/feed");
+    revalidatePath("/schedule");
   }
 
   return { ok: true, message: "Onboarding complete.", welcomeMessage };

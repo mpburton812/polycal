@@ -27,7 +27,7 @@ import { formatSleepingDisplayTitle } from "@/lib/proposals/sleeping-display";
 import {
   getPrivacyAdminFlags,
   MASKED_TITLE,
-  viewerCanSeeProposal,
+  viewerCanSeeProposalWithSleepingGate,
 } from "@/lib/proposals/access";
 import { applyScheduleMasking } from "@/lib/schedule/slice-auth";
 
@@ -86,16 +86,26 @@ export interface SchedulePayload {
 
 async function getSchedulePrivacyFlags(
   db: ReturnType<typeof getDb>,
-): Promise<{ adminCanSeePrivate: boolean; adminCanSeeSuperPrivate: boolean; hideSleeping: boolean }> {
+): Promise<{
+  adminCanSeePrivate: boolean;
+  adminCanSeeSuperPrivate: boolean;
+  hideSleeping: boolean;
+  sleepingNetworkVisibility: "everyone" | "involved";
+}> {
   const privacy = await getPrivacyAdminFlags(db);
   const [group] = await db
-    .select({ hideSleepingArrangements: polyGroup.hideSleepingArrangements })
+    .select({
+      hideSleepingArrangements: polyGroup.hideSleepingArrangements,
+      sleepingNetworkVisibility: polyGroup.sleepingNetworkVisibility,
+    })
     .from(polyGroup)
     .where(eq(polyGroup.id, 1))
     .limit(1);
   return {
     ...privacy,
     hideSleeping: group?.hideSleepingArrangements ?? false,
+    sleepingNetworkVisibility:
+      group?.sleepingNetworkVisibility === "involved" ? "involved" : "everyone",
   };
 }
 
@@ -310,10 +320,14 @@ export async function listScheduleEventsAction(
     ];
 
     if (row.state === "proposed" || row.state === "resolved" || row.state === "archived") {
-      if (!viewerCanSeeProposal(viewerId, isAdmin, row.proposerId, inviteeUserIds, {
-        state: row.state,
-        eventPrivacy: row.eventPrivacy,
-      })) {
+      if (
+        !viewerCanSeeProposalWithSleepingGate(viewerId, isAdmin, row.proposerId, inviteeUserIds, {
+          proposalType: row.proposalType,
+          sleepingNetworkVisibility: privacyFlags.sleepingNetworkVisibility,
+          state: row.state,
+          eventPrivacy: row.eventPrivacy,
+        })
+      ) {
         continue;
       }
     }

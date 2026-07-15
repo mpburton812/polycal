@@ -20,6 +20,9 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+- PC-224 / PC-225–230: Feed bottom tab (leftmost / default landing) with proposal lifecycle milestones, comments, and network chat; admin `sleepingNetworkVisibility` (everyone vs involved) orthogonal to calendar `hideSleepingArrangements`. Change control: `2026.07.15b`.
+
 ### Fixed
 - PC-216 / PC-217–219: Accepting or declining a proposal (Proposals UI or notification bell) soft-dismisses matching actionable inbox rows so they stay cleared after reload; bell vote rows include Decline.
 - PC-213: Mobile smoke no longer shares SERIAL w0; workers≤1 serializes SAFE behind serial.

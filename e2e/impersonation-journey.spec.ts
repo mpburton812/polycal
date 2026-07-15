@@ -23,7 +23,7 @@ test.describe("Impersonation journey", () => {
       .getByRole("option", { name: new RegExp(`${USERS.leia.displayName}.*${USERS.leia.username}`, "i") })
       .click();
 
-    await page.waitForURL(/\/schedule/, { timeout: 60_000 });
+    await page.waitForURL(/\/(feed|schedule)/, { timeout: 60_000 });
     await expect(
       page.getByRole("button", { name: new RegExp(`Profile menu for ${USERS.leia.displayName}`, "i") }),
     ).toBeVisible({ timeout: 15_000 });
@@ -37,7 +37,7 @@ test.describe("Impersonation journey", () => {
       .getByRole("button", { name: `Impersonate ${USERS.han.displayName}` })
       .click();
 
-    await page.waitForURL(/\/schedule/, { timeout: 60_000 });
+    await page.waitForURL(/\/(feed|schedule)/, { timeout: 60_000 });
     await expect(
       page.getByRole("button", { name: new RegExp(`Profile menu for ${USERS.han.displayName}`, "i") }),
     ).toBeVisible({ timeout: 15_000 });
