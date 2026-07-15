@@ -231,3 +231,4 @@
 2026-07-15 | 942b7a8 | PC-224 | hard-navigate to Feed after welcome OK | src/components/onboarding/FirstLoginWizard.tsx
 2026-07-15 | a5815a5 | PC-224 | retry database reset under serial worker load | e2e/helpers/db.ts
 2026-07-15 | 4da34af | PC-224 | wipe network_chat_messages before users on reset | src/lib/seed/reset-test-database.ts
+2026-07-15 | d2d8d58 | PC-231 | unified timeline with comments, images, reply push | src/actions/feed.ts
