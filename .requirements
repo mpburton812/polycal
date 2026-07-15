@@ -219,3 +219,6 @@
 2026-07-14 | 7e4128c | PC-223 | capability identifier and icons for MSI build | apps/alpha-feedback-tracker/src-tauri/capabilities/default.json
 2026-07-14 | 17f4018 | PC-223 | append requirements log for tracker MSI fix | n/a
 2026-07-14 | ceae3f8 | PC-222 | cast libsql Row via unknown for ticket backfill | src/lib/db/alpha-feedback-migrations.ts
+2026-07-14 | d6ea653 | PC-217 | clear actionable inbox on proposal vote | src/actions/notifications.ts
+2026-07-14 | 4f9b05b | PC-219 | assert actionable inbox clear after vote, not title | e2e/helpers/notifications.ts
+2026-07-15 | 74d19d6 | PC-216 | merge(dev): resolve conflicts after alpha-feedback PR #247 | n/a

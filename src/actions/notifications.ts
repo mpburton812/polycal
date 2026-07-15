@@ -7,16 +7,11 @@ import { auth } from "@/lib/auth";
 import { getDb } from "@/lib/db/client";
 import { ensureDbReady } from "@/lib/db/ensure-ready";
 import { notificationDismissals, userActivityLog } from "@/lib/db/schema";
-
-/** Internal delivery telemetry — not shown in the user-facing inbox (PC-58). */
-const INBOX_EXCLUDED_NOTIFICATION_TYPES = new Set([
-  "push_sent",
-  "push_failed",
-  "push_skipped",
-  "email_queued",
-  "email_sent",
-  "email_failed",
-]);
+import {
+  INBOX_EXCLUDED_NOTIFICATION_TYPES,
+  isActionableProposalNotification,
+  proposalIdFromNotificationMetadata,
+} from "@/lib/notifications-inbox";
 
 export interface NotificationItem {
   id: number;
@@ -184,4 +179,57 @@ export async function clearAllNotificationsAction(): Promise<{
 
   revalidatePath("/", "layout");
   return { ok: true, message: "All notifications cleared." };
+}
+
+/**
+ * Soft-dismisses actionable inbox rows for a proposal (vote / attendee-update).
+ * Leaves informational notices (e.g. proposal_resolved) intact (PC-217).
+ */
+export async function dismissNotificationsForProposal(
+  userId: string,
+  proposalId: string,
+): Promise<number> {
+  await ensureDbReady();
+  const db = getDb();
+
+  const dismissed = await db
+    .select({ logId: notificationDismissals.logId })
+    .from(notificationDismissals)
+    .where(eq(notificationDismissals.userId, userId));
+  const dismissedIds = dismissed.map((row) => row.logId);
+
+  const baseFilter = and(
+    eq(userActivityLog.userId, userId),
+    eq(userActivityLog.eventType, "system"),
+    like(userActivityLog.action, "notification.%"),
+  );
+
+  const rows =
+    dismissedIds.length > 0
+      ? await db
+          .select()
+          .from(userActivityLog)
+          .where(and(baseFilter, notInArray(userActivityLog.id, dismissedIds)))
+      : await db.select().from(userActivityLog).where(baseFilter);
+
+  const now = new Date().toISOString();
+  let cleared = 0;
+
+  for (const row of rows) {
+    const parsed = parseNotificationDetails(row.action, row.details);
+    if (INBOX_EXCLUDED_NOTIFICATION_TYPES.has(parsed.type)) continue;
+    if (proposalIdFromNotificationMetadata(parsed.metadata) !== proposalId) continue;
+    if (!isActionableProposalNotification(parsed.type, parsed.metadata)) continue;
+
+    await db
+      .insert(notificationDismissals)
+      .values({ userId, logId: row.id, dismissedAt: now })
+      .onConflictDoNothing();
+    cleared += 1;
+  }
+
+  if (cleared > 0) {
+    revalidatePath("/", "layout");
+  }
+  return cleared;
 }
