@@ -17,7 +17,7 @@ import {
   Typography,
 } from "@mui/material";
 import { useRouter } from "next/navigation";
-import { useState, useTransition, type MouseEvent } from "react";
+import { useEffect, useState, useTransition, type MouseEvent } from "react";
 
 import { respondPartnershipAction } from "@/actions/partnerships";
 import { respondResidencyAction } from "@/actions/places";
@@ -26,6 +26,7 @@ import {
   respondAttendeeUpdateAction,
 } from "@/actions/proposals";
 import { buildProposalNotificationDetail } from "@/lib/notifications-detail";
+import { isActionableProposalNotification } from "@/lib/notifications-inbox";
 import { RESIDENCY_CARD_PREFIX } from "@/lib/proposals/constants";
 import {
   clearAllNotificationsAction,
@@ -66,7 +67,7 @@ function canAcceptFromNotification(
 }
 
 /**
- * Header notification bell with dismissible inbox popover (PC-40, PC-43).
+ * Header notification bell with dismissible inbox popover (PC-40, PC-43, PC-218).
  */
 export function NotificationInbox({
   initialCount,
@@ -82,6 +83,12 @@ export function NotificationInbox({
   const [feedback, setFeedback] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
+  // Keep local inbox aligned with RSC props after router.refresh() (PC-218).
+  useEffect(() => {
+    setItems(initialItems);
+    setCount(initialCount);
+  }, [initialItems, initialCount]);
+
   const open = Boolean(anchorEl);
 
   function handleOpen(event: MouseEvent<HTMLElement>) {
@@ -95,6 +102,26 @@ export function NotificationInbox({
   function removeFromList(logId: number) {
     setItems((current) => current.filter((item) => item.id !== logId));
     setCount((current) => Math.max(0, current - 1));
+  }
+
+  /**
+   * Removes every actionable inbox row for a proposal (server also soft-dismisses
+   * them all — local state must not leave stale Accept rows after vote).
+   */
+  function removeActionableForProposal(proposalId: string) {
+    setItems((current) => {
+      const next = current.filter((item) => {
+        const rowProposalId =
+          typeof item.metadata.proposalId === "string" ? item.metadata.proposalId : null;
+        if (rowProposalId !== proposalId) return true;
+        return !isActionableProposalNotification(item.type, item.metadata);
+      });
+      const removed = current.length - next.length;
+      if (removed > 0) {
+        setCount((c) => Math.max(0, c - removed));
+      }
+      return next;
+    });
   }
 
   function dismissOne(logId: number) {
@@ -130,13 +157,13 @@ export function NotificationInbox({
     });
   }
 
-  function acceptProposal(logId: number, proposalId: string) {
+  function voteFromInbox(proposalId: string, vote: "accept" | "decline") {
     startTransition(async () => {
-      const result = await castProposalVoteAction({ proposalId, vote: "accept" });
+      const result = await castProposalVoteAction({ proposalId, vote });
       setFeedback(result.message);
       if (!result.ok) return;
-      await dismissNotificationAction(logId);
-      removeFromList(logId);
+      // Server dismissNotificationsForProposal already cleared durable rows.
+      removeActionableForProposal(proposalId);
       router.refresh();
     });
   }
@@ -145,6 +172,8 @@ export function NotificationInbox({
     startTransition(async () => {
       const result = await respondResidencyAction({ residencyId, accept });
       if (!result.ok) return;
+      // Persist dismiss so SSR props after refresh stay clear (PC-218).
+      await dismissNotificationAction(logId);
       removeFromList(logId);
       router.refresh();
     });
@@ -154,6 +183,7 @@ export function NotificationInbox({
     startTransition(async () => {
       const result = await respondPartnershipAction({ partnershipId, accept });
       if (!result.ok) return;
+      await dismissNotificationAction(logId);
       removeFromList(logId);
       router.refresh();
     });
@@ -166,7 +196,7 @@ export function NotificationInbox({
         response: maintain ? "maintain" : "decline",
       });
       if (!result.ok) return;
-      removeFromList(logId);
+      removeActionableForProposal(proposalId);
       router.refresh();
     });
   }
@@ -363,14 +393,24 @@ export function NotificationInbox({
                       </>
                     )}
                     {showAccept && proposalId && (
-                      <Button
-                        size="small"
-                        variant="contained"
-                        disabled={pending}
-                        onClick={() => acceptProposal(item.id, proposalId)}
-                      >
-                        Accept
-                      </Button>
+                      <>
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          disabled={pending}
+                          onClick={() => voteFromInbox(proposalId, "decline")}
+                        >
+                          Decline
+                        </Button>
+                        <Button
+                          size="small"
+                          variant="contained"
+                          disabled={pending}
+                          onClick={() => voteFromInbox(proposalId, "accept")}
+                        >
+                          Accept
+                        </Button>
+                      </>
                     )}
                     {showOpenProposal && openTarget && (
                       <Button

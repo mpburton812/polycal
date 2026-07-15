@@ -26,6 +26,45 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "2026.07.15",
+    date: "2026-07-15",
+    summary: "Clear actionable proposal notifications when the invitee votes.",
+    changes: [
+      {
+        type: "added",
+        description:
+          "Server soft-dismisses actionable inbox rows for a proposal after vote or attendee response (PC-217).",
+      },
+      {
+        type: "changed",
+        description:
+          "Notification inbox syncs after refresh, adds Decline on vote rows, and clears all matching proposal rows locally (PC-218).",
+      },
+      {
+        type: "added",
+        description:
+          "Unit + journey coverage that Accept/Decline (bell or Proposals UI) stay cleared after reload (PC-219).",
+      },
+    ],
+  },
+  {
+    version: "2026.07.14d",
+    date: "2026-07-14",
+    summary: "Alpha Feedback Ready For Testing status and stable ticket IDs.",
+    changes: [
+      {
+        type: "added",
+        description:
+          "Alpha Feedback status Ready For Testing in schema, API, and tracker UI (PC-221).",
+      },
+      {
+        type: "added",
+        description:
+          "Stable human-visible ticket numbers (#N) with backfill; first column in tracker lists (PC-222).",
+      },
+    ],
+  },
+  {
     version: "2026.07.14c",
     date: "2026-07-14",
     summary: "Harden multi-server e2e isolation; journey speed tooling.",

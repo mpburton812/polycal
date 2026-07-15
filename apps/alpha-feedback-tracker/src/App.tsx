@@ -4,6 +4,7 @@ import {
   AppBar,
   Box,
   Button,
+  Chip,
   Dialog,
   DialogActions,
   DialogContent,
@@ -28,8 +29,10 @@ import {
 import { useMemo, useState } from "react";
 
 import {
+  STATUS_COLORS,
   STATUS_LABELS,
   deleteSubmission,
+  formatTicketId,
   getSubmission,
   listSubmissions,
   loginAdmin,
@@ -57,6 +60,7 @@ const ENV_PRESETS = [
 ];
 
 const COLUMNS: { key: SortKey | "actions"; label: string }[] = [
+  { key: "ticketNumber", label: "ID" },
   { key: "kind", label: "Kind" },
   { key: "title", label: "Title" },
   { key: "status", label: "Status" },
@@ -416,9 +420,19 @@ export function App() {
                   sx={{ cursor: "pointer" }}
                   onClick={() => void openDetail(row.id)}
                 >
+                  <TableCell sx={{ fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>
+                    {formatTicketId(row.ticketNumber)}
+                  </TableCell>
                   <TableCell>{row.kind}</TableCell>
                   <TableCell>{row.title}</TableCell>
-                  <TableCell>{STATUS_LABELS[row.status] ?? row.status}</TableCell>
+                  <TableCell>
+                    <Chip
+                      size="small"
+                      label={STATUS_LABELS[row.status] ?? row.status}
+                      color={STATUS_COLORS[row.status] ?? "default"}
+                      variant={row.status === "not_started" ? "outlined" : "filled"}
+                    />
+                  </TableCell>
                   <TableCell>{row.submitterDisplayName}</TableCell>
                   <TableCell>{row.environment}</TableCell>
                   <TableCell>{row.buildSha?.slice(0, 7)}</TableCell>
@@ -550,7 +564,8 @@ export function App() {
         {detail && (
           <>
             <DialogTitle>
-              {detail.kind.toUpperCase()}: {detail.title}
+              {formatTicketId(detail.ticketNumber)} · {detail.kind.toUpperCase()}:{" "}
+              {detail.title}
             </DialogTitle>
             <DialogContent dividers>
               <Stack spacing={2}>
