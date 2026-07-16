@@ -28,12 +28,22 @@ export const CHANGELOG: ChangelogEntry[] = [
   {
     version: "2026.07.16a",
     date: "2026-07-16",
-    summary: "Silent feed poll and E2E CI dual-trigger skip.",
+    summary: "Feed likes, silent poll, and schedule all-day redraft fix.",
     changes: [
+      {
+        type: "added",
+        description:
+          "Grey/green parrot likes under milestones, chats, and comments; likers popup (PC-239–PC-242).",
+      },
       {
         type: "fixed",
         description:
           "Feed polls via head fingerprint and leaves the timeline alone when unchanged (no 15s spinner flash) (PC-239).",
+      },
+      {
+        type: "fixed",
+        description:
+          "Same-day all-day redraft keeps end=start so moved events stay on the calendar (PC-239).",
       },
       {
         type: "changed",
