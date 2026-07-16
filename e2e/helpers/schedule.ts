@@ -111,7 +111,9 @@ export async function assertEventVisibleInAllScheduleViews(
   titlePattern: RegExp,
   targetDateIso: string,
 ): Promise<void> {
-  await goToSchedule(page);
+  // Hard navigate so redraft → schedule never keeps a stale ScheduleClient tree.
+  await page.goto("/schedule");
+  await expect(page).toHaveURL(/\/schedule/);
   await clearScheduleViewState(page);
 
   for (const selectView of [
@@ -122,24 +124,14 @@ export async function assertEventVisibleInAllScheduleViews(
     await selectView(page);
     await navigateScheduleUntilDateInRange(page, targetDateIso);
     await waitForScheduleReady(page);
-    const locator = eventLocator(page, titlePattern);
-    try {
-      await expect(locator).toBeVisible({ timeout: 20_000 });
-    } catch {
-      // Soft reload once — CI occasionally misses slices after redraft navigation.
-      await page.reload();
-      await waitForScheduleReady(page);
-      await selectView(page);
-      await navigateScheduleUntilDateInRange(page, targetDateIso);
-      await waitForScheduleReady(page);
-      await expect(locator).toBeVisible({ timeout: 20_000 });
-    }
+    await expect(eventLocator(page, titlePattern)).toBeVisible({ timeout: 20_000 });
   }
 }
 
 /** Waits until schedule data has finished loading for the visible range. */
 export async function waitForScheduleReady(page: Page): Promise<void> {
-  await expect(page.getByTestId("schedule-ready")).toHaveAttribute("data-ready", "true", {
+  // Prefer the last marker — soft navigations can briefly leave a stale node in the DOM.
+  await expect(page.getByTestId("schedule-ready").last()).toHaveAttribute("data-ready", "true", {
     timeout: 30_000,
   });
 }
