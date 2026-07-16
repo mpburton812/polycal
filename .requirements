@@ -234,3 +234,4 @@
 2026-07-15 | d2d8d58 | PC-231 | unified timeline with comments, images, reply push | src/actions/feed.ts
 2026-07-15 | 0e62ae3 | PC-231 | add feed-migrations module and requirements log | src/lib/db/feed-migrations.ts
 2026-07-15 | 52c242c | PC-239 | parrot likes on milestones, chats, and comments | src/actions/feed.ts
+2026-07-15 | 3de16d5 | PC-239 | scope likers assertion to dialog | e2e/feed-likes-journey.spec.ts
