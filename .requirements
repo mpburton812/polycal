@@ -242,3 +242,4 @@
 2026-07-16 | 757e15e | PC-239 | promotion entry for likes and silent poll | src/lib/changelog/entries.ts
 2026-07-16 | 1ddf6e1 | PC-239 | use last range marker under strict mode | e2e/helpers/schedule.ts
 2026-07-16 | 4da3896 | PC-244 | six bug-fix batch for limits, logs, passive proxy, images | src/actions/feed.ts
+2026-07-16 | e5fd9ee | PC-245 | assert human-readable admin log labels | e2e/residency-proposal-journey.spec.ts
