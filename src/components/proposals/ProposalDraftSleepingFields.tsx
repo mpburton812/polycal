@@ -22,6 +22,7 @@ import type { ProposalPlaceOption } from "@/actions/proposals";
 import type { PersonSummary } from "@/actions/users";
 import type { BatchSleepingEntry } from "@/lib/proposals/batch-sleeping";
 import type { FastSleepingRow } from "@/lib/proposals/fast-sleeping-plan";
+import { SHORT_TEXT_MAX } from "@/lib/validation/string-limits";
 
 import { FastSleepingPlanGrid } from "./FastSleepingPlanGrid";
 import { ProposalDateRangeField } from "./ProposalDateRangeField";
@@ -290,6 +291,7 @@ export function ProposalDraftSleepingFields({
             fullWidth
             size="small"
             placeholder="Type a location not in the list"
+            inputProps={{ maxLength: SHORT_TEXT_MAX }}
           />
           {bedroomOptions.length > 0 && (
             <FormControl fullWidth size="small">

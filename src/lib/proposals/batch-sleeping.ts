@@ -1,16 +1,22 @@
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 
+import {
+  LONG_TEXT_MAX,
+  SHORT_TEXT_MAX,
+  limitedString,
+} from "@/lib/validation/string-limits";
+
 /** One night within a batch sleeping proposal (embedded mini-proposal). */
 export const batchSleepingEntrySchema = z.object({
   id: z.string().min(1),
   nightDate: z.string().min(1),
   locationId: z.string().optional(),
-  locationText: z.string().optional(),
+  locationText: limitedString("Location", SHORT_TEXT_MAX).optional(),
   bedroomIndex: z.number().int().min(0).optional(),
   intentionalSolo: z.boolean().optional(),
-  /** Optional per-night note stored in batchEntriesJson (PC-59). */
-  comment: z.string().trim().max(500).optional(),
+  /** Optional per-night note stored in batchEntriesJson (PC-59 / PC-244). */
+  comment: limitedString("Comment", LONG_TEXT_MAX).optional(),
   invitees: z
     .array(
       z.object({
@@ -29,7 +35,7 @@ export const batchSleepingEntriesSchema = z.array(batchSleepingEntrySchema).min(
 export const batchSlotMetaSchema = z.object({
   batchEntryId: z.string(),
   locationId: z.string().optional(),
-  locationText: z.string().optional(),
+  locationText: limitedString("Location", SHORT_TEXT_MAX).optional(),
   bedroomIndex: z.number().int().min(0).optional(),
   intentionalSolo: z.boolean().optional(),
   inviteeUserIds: z.array(z.string()).default([]),

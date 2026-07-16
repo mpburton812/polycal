@@ -75,10 +75,8 @@ import {
   updateBatchSleepingDraft,
   validateBatchSleepingEntries,
 } from "@/lib/proposals/fast-sleeping-core";
-import {
-  applyPassiveInviteeAutoAccept,
-  canManageSleepingAttendees,
-} from "@/lib/proposals/passive-auto-accept";
+import { canProxyVoteForPassiveInvitee } from "@/lib/proposals/passive-proxy-vote";
+import { canManageSleepingAttendees } from "@/lib/proposals/passive-auto-accept";
 import { enterAtRiskProposedState } from "@/lib/proposals/services/at-risk";
 import { logProposalTransition } from "@/lib/proposals/services/state-log";
 import { resetInviteeVotes, wipeProposalVotes } from "@/lib/proposals/services/votes";
@@ -751,6 +749,7 @@ async function replaceInvitees(
       userId: invitee.userId,
       role: invitee.role,
       voteStatus: "not_seen",
+      addedByUserId: proposerId,
       createdAt: now,
     });
   }
@@ -1600,7 +1599,6 @@ export async function adminForceResolveProposalAction(
     return { ok: false, message: "Proposal not found." };
   }
 
-  await applyPassiveInviteeAutoAccept(db, proposalId, actorUserId);
   await resolveProposal(db, proposal, actorUserId);
 
   return { ok: true, message: "Proposal resolved." };
@@ -2183,7 +2181,6 @@ export async function submitProposalAction(
     JSON.stringify({ nextState, requiredInviteeCount: requiredCount }),
   );
 
-  await applyPassiveInviteeAutoAccept(db, proposalId, session.user.id);
   if (nextState === "proposed") {
     await evaluateProposalAfterVote(db, proposalId, session.user.id);
   }
@@ -2308,6 +2305,8 @@ export async function getProposalDetailAction(
       voteStatus: proposalInvitees.voteStatus,
       viewedAt: proposalInvitees.viewedAt,
       overlapAcknowledgedAt: proposalInvitees.overlapAcknowledgedAt,
+      userRole: users.role,
+      addedByUserId: proposalInvitees.addedByUserId,
     })
     .from(proposalInvitees)
     .innerJoin(users, eq(proposalInvitees.userId, users.id))
@@ -2537,6 +2536,8 @@ export async function getProposalDetailAction(
             role: invitee.role,
             voteStatus: invitee.voteStatus,
             viewedAt: invitee.viewedAt ?? null,
+            userRole: invitee.userRole,
+            addedByUserId: invitee.addedByUserId ?? null,
           }))
         : [],
       timeSlots: masked
@@ -2766,7 +2767,7 @@ export async function acknowledgeProposalOverlapAction(
 }
 
 /**
- * Records an invitee vote and advances workflow when thresholds are met (PC-40).
+ * Records an invitee vote (or a proxy vote for a passive invitee the actor added) (PC-40 / PC-246).
  */
 export async function castProposalVoteAction(
   input: z.infer<typeof voteSchema>,
@@ -2794,34 +2795,56 @@ export async function castProposalVoteAction(
     return { ok: false, message: "Proposal is not open for voting." };
   }
 
+  const isAdmin = await userHasAdminAccess(session.user.role);
+  const targetUserId = parsed.data.onBehalfOfUserId ?? session.user.id;
+  const isProxy = Boolean(parsed.data.onBehalfOfUserId);
+
   const [invitee] = await db
     .select()
     .from(proposalInvitees)
     .where(
       and(
         eq(proposalInvitees.proposalId, parsed.data.proposalId),
-        eq(proposalInvitees.userId, session.user.id),
+        eq(proposalInvitees.userId, targetUserId),
       ),
     )
     .limit(1);
 
   if (!invitee) {
-    return { ok: false, message: "You are not an invitee on this proposal." };
+    return {
+      ok: false,
+      message: isProxy
+        ? "That person is not an invitee on this proposal."
+        : "You are not an invitee on this proposal.",
+    };
   }
 
-  const isOptionalResolvedVote =
-    proposal.state === "resolved" && invitee.role === "optional" && invitee.voteStatus === "not_seen";
+  let proxyDisplayName: string | null = null;
+  if (isProxy) {
+    const proxyCheck = await canProxyVoteForPassiveInvitee(
+      db,
+      targetUserId,
+      invitee.addedByUserId,
+      session.user.id,
+      isAdmin,
+    );
+    if (!proxyCheck.ok) {
+      return { ok: false, message: proxyCheck.message };
+    }
+    proxyDisplayName = proxyCheck.displayName;
+  }
+
+  const isOptionalResolvedVote = proposal.state === "resolved" && invitee.role === "optional";
   const isAtRiskRequiredVote =
-    proposal.state === "resolved" &&
-    proposal.atRisk &&
-    invitee.role === "required" &&
-    invitee.voteStatus === "not_seen";
+    proposal.state === "resolved" && proposal.atRisk && invitee.role === "required";
   const isPendingRequiredOnResolved =
-    proposal.state === "resolved" &&
-    !proposal.atRisk &&
-    invitee.role === "required" &&
-    invitee.voteStatus === "not_seen";
-  const isProposedVote = proposal.state === "proposed" && invitee.voteStatus === "not_seen";
+    proposal.state === "resolved" && !proposal.atRisk && invitee.role === "required";
+  const isProposedVote = proposal.state === "proposed";
+
+  const alreadyVoted = invitee.voteStatus !== "not_seen";
+  if (alreadyVoted && !isProxy) {
+    return { ok: false, message: "You have already voted on this proposal." };
+  }
 
   if (
     !isOptionalResolvedVote &&
@@ -2843,10 +2866,6 @@ export async function castProposalVoteAction(
     return { ok: false, message: "Use per-slot voting for poll proposals." };
   }
 
-  if (invitee.voteStatus !== "not_seen" && invitee.role === "required") {
-    return { ok: false, message: "You have already voted on this proposal." };
-  }
-
   const now = new Date().toISOString();
   await db
     .update(proposalInvitees)
@@ -2860,8 +2879,18 @@ export async function castProposalVoteAction(
     db,
     proposal.id,
     session.user.id,
-    "proposal.vote_cast",
-    JSON.stringify({ vote: parsed.data.vote, role: invitee.role }),
+    isProxy ? "proposal.passive_proxy_vote" : "proposal.vote_cast",
+    JSON.stringify({
+      vote: parsed.data.vote,
+      role: invitee.role,
+      ...(isProxy
+        ? {
+            onBehalfOfUserId: targetUserId,
+            displayName: proxyDisplayName,
+            message: `Voted ${parsed.data.vote} for ${proxyDisplayName}`,
+          }
+        : {}),
+    }),
   );
 
   await notifyUser(proposal.proposerId, "proposal_vote_cast", `A vote was cast on "${proposal.title}".`, {
@@ -2869,19 +2898,22 @@ export async function castProposalVoteAction(
     voterId: session.user.id,
     vote: parsed.data.vote,
     proposalType: proposal.proposalType,
+    ...(isProxy ? { onBehalfOfUserId: targetUserId } : {}),
   });
 
   if (invitee.role === "required") {
     await evaluateProposalAfterVote(db, proposal.id, session.user.id);
   }
 
-  // Clear invitee's actionable inbox rows for this proposal (Proposals UI + push Accept) (PC-217).
   await dismissNotificationsForProposal(session.user.id, proposal.id);
 
   revalidatePath("/proposals");
   revalidatePath("/schedule");
 
-  return { ok: true, message: "Vote recorded." };
+  return {
+    ok: true,
+    message: isProxy ? `Vote recorded for ${proxyDisplayName}.` : "Vote recorded.",
+  };
 }
 
 /**
@@ -3010,6 +3042,7 @@ export async function updateResolvedAttendeesAction(
   if (!session?.user) {
     return { ok: false, message: "Sign in required." };
   }
+  const actorUserId = session.user.id;
 
   const parsed = attendeeUpdateSchema.safeParse(input);
   if (!parsed.success) {
@@ -3115,6 +3148,7 @@ export async function updateResolvedAttendeesAction(
       userId,
       role,
       voteStatus: "not_seen",
+      addedByUserId: actorUserId,
       createdAt: now,
     });
     attendeesChanged = true;
@@ -3138,7 +3172,6 @@ export async function updateResolvedAttendeesAction(
   }
 
   if (attendeesChanged) {
-    await applyPassiveInviteeAutoAccept(db, proposal.id, session.user.id);
     if (removedRequiredAttendee) {
       const remainingRequired = await db
         .select({ userId: proposalInvitees.userId, voteStatus: proposalInvitees.voteStatus })

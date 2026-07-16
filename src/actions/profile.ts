@@ -18,6 +18,7 @@ import { isUserThemeId, normalizeUserThemeId, type UserThemeId } from "@/lib/con
 import { resolveTimezone } from "@/lib/schedule/timezone";
 import { profileBioSchema } from "@/lib/users/profile-bio";
 import { AVATAR_OPTIONS, isCustomAvatarKey, type AvatarKey } from "@/lib/constants/avatars";
+import { LONG_TEXT_MAX, maxCharsMessage } from "@/lib/validation/string-limits";
 import { isCroppedAvatarLargeEnough } from "@/lib/avatars/crop";
 import { getDb } from "@/lib/db/client";
 import { ensureDbReady } from "@/lib/db/ensure-ready";
@@ -320,7 +321,7 @@ const displayNameSchema = z
   .string()
   .trim()
   .min(1, "Display name is required.")
-  .max(80, "Display name must be 80 characters or fewer.");
+  .max(LONG_TEXT_MAX, maxCharsMessage("Display name", LONG_TEXT_MAX));
 
 /**
  * Updates the signed-in user's display name (PC-9).

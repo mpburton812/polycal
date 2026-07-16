@@ -23,13 +23,28 @@ import { notifyUser } from "@/lib/notifications";
 import { userIsPlaceOwner } from "@/lib/places/membership";
 import type { PlaceRole } from "@/types/relationship";
 import type { UserRole } from "@/types/user";
+import {
+  LONG_TEXT_MAX,
+  SHORT_TEXT_MAX,
+  limitedString,
+  maxCharsMessage,
+  requiredLimitedString,
+} from "@/lib/validation/string-limits";
 
 const placeSchema = z.object({
-  name: z.string().trim().min(1).max(120),
-  address: z.string().trim().max(200).optional(),
+  name: requiredLimitedString("Home name", LONG_TEXT_MAX),
+  address: limitedString("Address", SHORT_TEXT_MAX).optional(),
   bedroomCount: z.number().int().min(0).max(20),
-  bedroomNames: z.array(z.string().trim().min(1).max(60)).optional(),
-  description: z.string().trim().max(500).optional(),
+  bedroomNames: z
+    .array(
+      z
+        .string()
+        .trim()
+        .min(1)
+        .max(LONG_TEXT_MAX, maxCharsMessage("Bedroom name", LONG_TEXT_MAX)),
+    )
+    .optional(),
+  description: limitedString("Description", LONG_TEXT_MAX).optional(),
 });
 
 const respondResidencySchema = z.object({
@@ -990,7 +1005,11 @@ export interface ResidencyProposalDetail {
 
 const residencyCommentSchema = z.object({
   residencyId: z.string().min(1),
-  body: z.string().trim().min(1).max(2000),
+  body: z
+    .string()
+    .trim()
+    .min(1, "Comment is required.")
+    .max(LONG_TEXT_MAX, maxCharsMessage("Comment", LONG_TEXT_MAX)),
 });
 
 /**

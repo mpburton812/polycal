@@ -299,6 +299,8 @@ export const proposalInvitees = sqliteTable(
     /** ISO timestamp when invitee first opened proposal detail (PC-76). */
     viewedAt: text("viewed_at"),
     overlapAcknowledgedAt: text("overlap_acknowledged_at"),
+    /** User who added this invitee — casts proxy votes for passive profiles (PC-246). */
+    addedByUserId: text("added_by_user_id").references(() => users.id),
     createdAt: text("created_at").notNull(),
   },
   (table) => [unique().on(table.proposalId, table.userId)],

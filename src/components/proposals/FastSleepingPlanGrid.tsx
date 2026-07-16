@@ -20,6 +20,7 @@ import {
   formatFastSleepingDayLabel,
   type FastSleepingRow,
 } from "@/lib/proposals/fast-sleeping-plan";
+import { SHORT_TEXT_MAX } from "@/lib/validation/string-limits";
 import { GARDEN_TOKENS } from "@/theme/tokens";
 
 export interface FastSleepingPlanGridProps {
@@ -164,6 +165,7 @@ export function FastSleepingPlanGrid({
                 size="small"
                 placeholder="Optional"
                 disabled={disabled}
+                inputProps={{ maxLength: SHORT_TEXT_MAX }}
               />
             </Box>
           </Box>

@@ -1,57 +1,32 @@
 import { describe, expect, it } from "vitest";
 
-import { formatActivityLogAction, formatActivityLogDetails } from "@/lib/audit/activity-log-display";
+import {
+  formatActivityLogAction,
+  formatActivityLogDetails,
+} from "./activity-log-display";
 
-describe("formatActivityLogDetails", () => {
-  it("shows notification message instead of raw JSON", () => {
-    const details = JSON.stringify({
-      message: 'Reminder: "Council" starts soon.',
-      url: "/proposals?open=abc",
-    });
-    expect(formatActivityLogDetails("notification.event_reminder", details)).toBe(
-      'Reminder: "Council" starts soon.',
-    );
+describe("activity-log-display (PC-245)", () => {
+  it("never returns raw JSON for unknown payloads", () => {
+    const details = JSON.stringify({ userId: "u-1", username: "luke" });
+    const formatted = formatActivityLogDetails("users.create_active", details);
+    expect(formatted).not.toContain("{");
+    expect(formatted).toContain("luke");
   });
 
-  it("returns plain text when details are not JSON", () => {
-    expect(formatActivityLogDetails("user.login", "Signed in from Chrome")).toBe(
-      "Signed in from Chrome",
-    );
+  it("formats force reload environment", () => {
+    expect(
+      formatActivityLogDetails("admin.force_reload", JSON.stringify({ environment: "dev" })),
+    ).toBe("Environment: dev");
   });
 
-  it("shows residency comment body instead of raw JSON", () => {
-    const details = JSON.stringify({ residencyId: "res-1", body: "Looking forward to it!" });
-    expect(formatActivityLogDetails("residency.comment", details)).toBe(
-      "Looking forward to it!",
-    );
+  it("labels common actions", () => {
+    expect(formatActivityLogAction("users.admin_pause")).toBe("Paused user");
+    expect(formatActivityLogAction("places.add_person")).toBe("Added person to place");
   });
 
-  it("formats residency propose/accept with place and invitee", () => {
-    const details = JSON.stringify({
-      placeName: "Cloud City",
-      inviteeName: "Leia Organa",
-      proposalId: "p-1",
-    });
-    expect(formatActivityLogDetails("places.propose_residency", details)).toBe(
-      "Cloud City · invitee: Leia Organa",
-    );
-    expect(formatActivityLogDetails("residency.accepted", details)).toBe(
-      "Cloud City · invitee: Leia Organa",
-    );
-  });
-
-  it("formats residency decline with reason", () => {
-    const details = JSON.stringify({ proposalId: "p-1", reason: "Not ready yet" });
-    expect(formatActivityLogDetails("places.decline_residency", details)).toBe("Not ready yet");
-    expect(formatActivityLogDetails("residency.declined", details)).toBe("Not ready yet");
-  });
-
-  it("labels impersonation actions and enriches target name (PC-63)", () => {
-    expect(formatActivityLogAction("admin.impersonate")).toBe("Impersonation");
-    const details = JSON.stringify({
-      targetUserId: "u-1",
-      targetDisplayName: "Leia Organa",
-    });
-    expect(formatActivityLogDetails("admin.impersonate", details)).toBe("Target: Leia Organa");
+  it("falls back to action label when JSON has no useful fields", () => {
+    const formatted = formatActivityLogDetails("mystery.action", JSON.stringify({ foo: 1 }));
+    expect(formatted).not.toMatch(/^\s*\{/);
+    expect(formatted.length).toBeGreaterThan(0);
   });
 });

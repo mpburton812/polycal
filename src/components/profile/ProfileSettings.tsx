@@ -40,6 +40,7 @@ import {
 } from "@/lib/schedule/timezone";
 import type { NotificationPrefs } from "@/types/notification-prefs";
 import { PROFILE_BIO_MAX_LENGTH } from "@/lib/users/profile-bio";
+import { LONG_TEXT_MAX } from "@/lib/validation/string-limits";
 import { subscribeToWebPush } from "@/lib/push-client";
 import { brutalPaperSx, brutalSectionTitleSx } from "@/theme/brutalUi";
 
@@ -303,6 +304,7 @@ export function ProfileSettings({
             value={displayName}
             onChange={(e) => setDisplayName(e.target.value)}
             fullWidth
+            inputProps={{ maxLength: LONG_TEXT_MAX }}
           />
           <Button variant="contained" onClick={handleDisplayNameSave} disabled={namePending}>
             Save

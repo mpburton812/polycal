@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import type { BatchSleepingEntry } from "@/lib/proposals/batch-sleeping";
 import { newBatchEntryId } from "@/lib/proposals/batch-sleeping-client";
+import { SHORT_TEXT_MAX, limitedString } from "@/lib/validation/string-limits";
 
 /** Number of nights shown in the shared fast sleeping plan grid. */
 export const FAST_SLEEPING_GRID_DAYS = 14;
@@ -11,7 +12,7 @@ export const fastSleepingRowSchema = z.object({
   nightDate: z.string().min(1, "Night date is required."),
   inviteeUserIds: z.array(z.string().min(1)).default([]),
   locationId: z.string().optional(),
-  locationText: z.string().trim().optional(),
+  locationText: limitedString("Location", SHORT_TEXT_MAX).optional(),
   intentionalSolo: z.boolean().optional(),
 });
 

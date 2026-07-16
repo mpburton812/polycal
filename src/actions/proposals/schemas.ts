@@ -3,6 +3,13 @@ import { z } from "zod";
 import { EVENT_ICON_KEYS } from "@/lib/event-icons/registry";
 import { MAX_FEED_IMAGES } from "@/lib/feed/images";
 import { batchSleepingEntriesSchema } from "@/lib/proposals/batch-sleeping";
+import {
+  LONG_TEXT_MAX,
+  SHORT_TEXT_MAX,
+  limitedString,
+  maxCharsMessage,
+  requiredLimitedString,
+} from "@/lib/validation/string-limits";
 
 export const inviteeInputSchema = z.object({
   userId: z.string().min(1),
@@ -12,7 +19,7 @@ export const inviteeInputSchema = z.object({
 export const timeSlotInputSchema = z.object({
   startAt: z.string().min(1),
   endAt: z.string().optional(),
-  label: z.string().trim().max(120).optional(),
+  label: limitedString("Slot label", LONG_TEXT_MAX).optional(),
   isAllDay: z.boolean().optional(),
 });
 
@@ -23,12 +30,12 @@ export const recurrenceRuleSchema = z.object({
 });
 
 export const draftProposalSchema = z.object({
-  title: z.string().trim().min(1, "Title is required.").max(200),
-  description: z.string().trim().max(2000).optional(),
+  title: requiredLimitedString("Title", LONG_TEXT_MAX),
+  description: limitedString("Description", LONG_TEXT_MAX).optional(),
   proposalType: z.enum(["event", "sleeping"]),
   locationId: z.string().optional(),
-  locationText: z.string().trim().max(200).optional(),
-  notes: z.string().trim().max(500).optional(),
+  locationText: limitedString("Location", SHORT_TEXT_MAX).optional(),
+  notes: limitedString("Notes", LONG_TEXT_MAX).optional(),
   intentionalSolo: z.boolean().optional(),
   isPoll: z.boolean().optional(),
   isAllDay: z.boolean().optional(),
@@ -47,8 +54,13 @@ export const draftProposalSchema = z.object({
 export const commentSchema = z
   .object({
     proposalId: z.string().min(1),
-    body: z.string().trim().max(2000).optional().default(""),
-    sliceTag: z.string().trim().max(120).optional().nullable(),
+    body: z
+      .string()
+      .trim()
+      .max(LONG_TEXT_MAX, maxCharsMessage("Comment", LONG_TEXT_MAX))
+      .optional()
+      .default(""),
+    sliceTag: limitedString("Slice tag", LONG_TEXT_MAX).optional().nullable(),
     imageIds: z.array(z.string().min(1)).max(MAX_FEED_IMAGES).optional(),
   })
   .refine((data) => data.body.length > 0 || (data.imageIds?.length ?? 0) > 0, {
@@ -58,12 +70,16 @@ export const commentSchema = z
 export const voteSchema = z.object({
   proposalId: z.string().min(1),
   vote: z.enum(["accept", "abstain", "decline", "accept_suboptimal"]),
+  /** When set, cast this vote on behalf of a passive invitee the actor added (PC-246). */
+  onBehalfOfUserId: z.string().min(1).optional(),
 });
 
 export const slotVoteSchema = z.object({
   proposalId: z.string().min(1),
   timeSlotId: z.string().min(1),
   vote: z.enum(["accept", "abstain", "decline", "accept_suboptimal"]),
+  /** When set, cast this slot vote on behalf of a passive invitee (PC-246). */
+  onBehalfOfUserId: z.string().min(1).optional(),
 });
 
 export const attendeeUpdateSchema = z.object({

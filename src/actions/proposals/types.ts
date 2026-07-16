@@ -84,6 +84,10 @@ export interface ProposalInviteeView {
   role: InviteeRole;
   voteStatus: InviteeVoteStatus;
   viewedAt: string | null;
+  /** RBAC role of the invitee user (e.g. passive) (PC-246). */
+  userRole: string;
+  /** Who added this invitee — used for passive proxy voting (PC-246). */
+  addedByUserId: string | null;
 }
 
 export interface ProposalTimeSlotView {

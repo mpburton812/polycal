@@ -38,8 +38,30 @@ import { brutalPopoverPaperSx } from "@/theme/brutalUi";
 import { fontFamilies } from "@/theme/fonts";
 import { GARDEN_TOKENS } from "@/theme/tokens";
 
+const NOTIFICATION_TYPE_LABELS: Record<string, string> = {
+  proposal_submitted: "Proposal submitted",
+  proposal_resolved: "Proposal resolved",
+  proposal_at_risk: "Proposal at risk",
+  proposal_redrafted: "Proposal returned to draft",
+  proposal_attendee_added: "Added to proposal",
+  proposal_attendee_removed: "Removed from proposal",
+  proposal_comment: "Proposal comment",
+  residency_proposed: "Residency request",
+  residency_accepted: "Residency accepted",
+  residency_declined: "Residency declined",
+  partnership_proposed: "Partnership proposed",
+  partnership_accepted: "Partnership accepted",
+  partnership_declined: "Partnership declined",
+  alpha_feedback_update: "Feedback update",
+};
+
 function formatNotificationType(type: string): string {
-  return type.replaceAll("_", " ");
+  if (NOTIFICATION_TYPE_LABELS[type]) return NOTIFICATION_TYPE_LABELS[type];
+  return type
+    .split("_")
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
 }
 
 function isProposalOpenAction(
