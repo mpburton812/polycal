@@ -42,6 +42,7 @@ import { LONG_TEXT_MAX } from "@/lib/validation/string-limits";
 import { handleCommentEnterKey } from "@/lib/ui/comment-keydown";
 import { brutalPageTitleSx } from "@/theme/brutalUi";
 import { GARDEN_TOKENS } from "@/theme/tokens";
+import { ADMIN_ONLY_FEED_COMMENT_BG } from "@/components/proposals/proposalCardTheme";
 
 const ProposalDetailDialog = dynamic(
   () =>
@@ -233,6 +234,7 @@ function CommentBlock({
   onOpenImage,
   pending,
   previewById,
+  adminOnlyVisibility = false,
 }: {
   comment: FeedComment;
   commentTargetType: Extract<FeedLikeTargetType, "chat_comment" | "proposal_comment">;
@@ -240,10 +242,21 @@ function CommentBlock({
   onOpenImage: (ids: string[], index: number) => void;
   pending: boolean;
   previewById?: Record<string, string>;
+  /** Yellow highlight when the comment is only visible because the viewer is an admin (PC-250). */
+  adminOnlyVisibility?: boolean;
 }) {
   const isOptimistic = comment.id.startsWith("optimistic-");
   return (
-    <Box sx={{ pl: 1, borderLeft: `2px solid ${GARDEN_TOKENS.inkMuted}` }}>
+    <Box
+      sx={{
+        pl: 1,
+        pr: adminOnlyVisibility ? 1 : 0,
+        py: adminOnlyVisibility ? 0.75 : 0,
+        borderLeft: `2px solid ${GARDEN_TOKENS.inkMuted}`,
+        bgcolor: adminOnlyVisibility ? ADMIN_ONLY_FEED_COMMENT_BG : "transparent",
+        borderRadius: adminOnlyVisibility ? 1 : 0,
+      }}
+    >
       <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
         <Typography variant="body2" sx={{ opacity: isOptimistic ? 0.85 : 1 }}>
           <strong>{comment.authorName}</strong>
@@ -766,6 +779,7 @@ export function FeedClient({
                   commentTargetType="proposal_comment"
                   pending={pending}
                   previewById={blobPreviewById}
+                  adminOnlyVisibility={item.visibleViaAdminOnly}
                   onDelete={deleteMilestoneComment}
                   onOpenImage={(ids, index) => setLightbox({ ids, index })}
                 />

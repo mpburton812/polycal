@@ -13,6 +13,15 @@ export const PAST_SCHEDULE_BG = "#FDF3D6";
 export const PAST_SCHEDULE_TEXT = "#4A3800";
 export const PAST_SCHEDULE_ICON = GARDEN_TOKENS.mustard;
 
+/** Peach tint when an admin is viewing someone else’s proposal card (PC-196). */
+export const ADMIN_OVERSIGHT_BG = "#FFE8D6";
+
+/**
+ * Yellow tint for feed comments visible only because the viewer is an admin
+ * (e.g. sleeping arrangements under involved-only network visibility) (PC-250).
+ */
+export const ADMIN_ONLY_FEED_COMMENT_BG = "#FFF59D";
+
 export function formatTimeRange(
   start: string | null,
   end: string | null,
@@ -88,9 +97,6 @@ export const proposalCardSx = {
   borderRadius: ORGANIC_RADIUS,
   boxShadow: "none",
 } as const;
-
-/** Soft orange fill when an admin views someone else's proposal (PC-196). */
-export const ADMIN_OVERSIGHT_BG = "#FFE8D6";
 
 /**
  * True when the viewer is an app admin looking at a proposal they did not propose.
@@ -176,4 +182,4 @@ export const outlinedButtonSx = {
     boxShadow: "none",
   },
 } as const;
-
+

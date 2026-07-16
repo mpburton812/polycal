@@ -20,6 +20,9 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+- PC-250: Feed comments visible only to admins (e.g. sleeping arrangements under involved-only network visibility) show a yellow background. Change control: `2026.07.16c`.
+
 ### Changed
 - PC-243 / PC-244–249: Character limits (256/1024), human-readable activity logs, passive proxy voting, feed comment image reliability, hide Open-only Event Privacy, feedback FAB position/z-index. SCHEMA_VERSION 28. Change control: `2026.07.16b`.
 
