@@ -26,6 +26,18 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "2026.07.16c",
+    date: "2026-07-16",
+    summary: "Yellow highlight for feed comments only visible to admins.",
+    changes: [
+      {
+        type: "added",
+        description:
+          "Feed proposal comments visible only because the viewer is an admin (e.g. sleeping arrangements under involved-only visibility) use a yellow background (PC-250).",
+      },
+    ],
+  },
+  {
     version: "2026.07.16b",
     date: "2026-07-16",
     summary:

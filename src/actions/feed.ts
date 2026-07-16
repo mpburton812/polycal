@@ -38,6 +38,7 @@ import {
   type NetworkChatMessage,
 } from "@/lib/feed/types";
 import { buildFeedUpdateToken } from "@/lib/feed/update-token";
+import { isFeedMilestoneVisibleViaAdminOnly } from "@/lib/feed/admin-only-visibility";
 import { notifyUser } from "@/lib/notifications";
 import {
   applyProposalMask,
@@ -328,13 +329,14 @@ async function loadMilestoneBatch(
       if (row.state === "draft" || row.state === "archived") continue;
 
       const inviteeUserIds = inviteesByProposal.get(row.proposalId) ?? [];
+      const gateOptions = {
+        proposalType: row.proposalType,
+        sleepingNetworkVisibility,
+        state: row.state,
+        eventPrivacy: row.eventPrivacy,
+      };
       if (
-        !viewerCanSeeProposalWithSleepingGate(viewerId, isAdmin, row.proposerId, inviteeUserIds, {
-          proposalType: row.proposalType,
-          sleepingNetworkVisibility,
-          state: row.state,
-          eventPrivacy: row.eventPrivacy,
-        })
+        !viewerCanSeeProposalWithSleepingGate(viewerId, isAdmin, row.proposerId, inviteeUserIds, gateOptions)
       ) {
         continue;
       }
@@ -342,6 +344,24 @@ async function loadMilestoneBatch(
       const isProposer = row.proposerId === viewerId;
       const isInvitee = inviteeUserIds.includes(viewerId);
       if (!viewerCanSeeAuditLog(auditVisibility, isAdmin, isProposer, isInvitee)) continue;
+
+      // Admin sees this milestone, but a non-admin in the same seat would not (PC-250).
+      const visibleViaAdminOnly = isFeedMilestoneVisibleViaAdminOnly({
+        isAdmin,
+        nonAdminWouldSeeProposal: viewerCanSeeProposalWithSleepingGate(
+          viewerId,
+          false,
+          row.proposerId,
+          inviteeUserIds,
+          gateOptions,
+        ),
+        nonAdminWouldSeeAudit: viewerCanSeeAuditLog(
+          auditVisibility,
+          false,
+          isProposer,
+          isInvitee,
+        ),
+      });
 
       const masked = shouldMaskProposalContent(
         viewerId,
@@ -384,6 +404,7 @@ async function loadMilestoneBatch(
         proposalType: row.proposalType,
         proposalState: row.state,
         masked,
+        visibleViaAdminOnly,
         canComment: canCommentOnProposal({
           viewerId,
           isAdmin,
