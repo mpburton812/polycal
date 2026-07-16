@@ -236,3 +236,4 @@
 2026-07-15 | 52c242c | PC-239 | parrot likes on milestones, chats, and comments | src/actions/feed.ts
 2026-07-15 | 3de16d5 | PC-239 | scope likers assertion to dialog | e2e/feed-likes-journey.spec.ts
 2026-07-15 | 7dedd60 | PC-239 | retry event visibility after reload | e2e/helpers/schedule.ts
+2026-07-16 | 8fb3f42 | PC-239 | hard-navigate schedule views helper | e2e/helpers/schedule.ts
