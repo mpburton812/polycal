@@ -14,7 +14,37 @@ on:
       - "feature/**"
 
 jobs:
+  # Skip feature push E2E when an open PR already covers the same head (PC-239).
+  decide:
+    runs-on: ubuntu-latest
+    outputs:
+      run_e2e: ${{ steps.decide.outputs.run_e2e }}
+    steps:
+      - id: decide
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            echo "run_e2e=true" >> "$GITHUB_OUTPUT"
+            echo "PR event — run E2E"
+            exit 0
+          fi
+          # push to feature/** — skip if an open PR from this branch exists
+          COUNT=$(gh api \
+            "repos/${{ github.repository }}/pulls?head=${{ github.repository_owner }}:${{ github.ref_name }}&state=open" \
+            --jq 'length')
+          if [ "$COUNT" -gt 0 ]; then
+            echo "run_e2e=false" >> "$GITHUB_OUTPUT"
+            echo "Open PR covers ${{ github.ref_name }} — skip push E2E"
+          else
+            echo "run_e2e=true" >> "$GITHUB_OUTPUT"
+            echo "No open PR — run E2E on push"
+          fi
+
   build:
+    needs: decide
+    if: needs.decide.outputs.run_e2e == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -48,7 +78,8 @@ jobs:
           retention-days: 1
 
   playwright:
-    needs: build
+    needs: [decide, build]
+    if: needs.decide.outputs.run_e2e == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:

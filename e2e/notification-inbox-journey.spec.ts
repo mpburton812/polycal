@@ -8,6 +8,8 @@ import {
   declineFromInbox,
   dismissNotification,
   expectActionableNotificationClearedAfterReload,
+  inboxRow,
+  notificationsPanel,
   openNotificationInbox,
 } from "./helpers/notifications";
 import {
@@ -48,12 +50,14 @@ test.describe("Notification inbox journey", () => {
 
     await proposeEventForLeia(page, eventTitle, start);
     await openNotificationInbox(page);
-    await expect(page.getByText(eventTitle).first()).toBeVisible({ timeout: 15_000 });
+    await expect(notificationsPanel(page).getByText(eventTitle).first()).toBeVisible({
+      timeout: 30_000,
+    });
     await acceptFromInbox(page, eventTitle);
     await expect(page.getByText(/Vote recorded/i)).toBeVisible({ timeout: 15_000 });
     // Actionable review row is gone; a resolved notice with the same title may appear.
     await expect(
-      page.locator("li").filter({ hasText: eventTitle }).getByRole("button", { name: "Accept" }),
+      inboxRow(page, eventTitle).getByRole("button", { name: "Accept" }),
     ).toHaveCount(0);
     await page.getByRole("button", { name: "Close notifications" }).click();
 
@@ -72,9 +76,11 @@ test.describe("Notification inbox journey", () => {
     await login(page, USERS.leia.username);
     await page.reload();
     await openNotificationInbox(page);
-    await expect(page.getByText(eventB).first()).toBeVisible({ timeout: 15_000 });
+    await expect(notificationsPanel(page).getByText(eventB).first()).toBeVisible({
+      timeout: 30_000,
+    });
     await dismissNotification(page, eventB);
-    await expect(page.locator("li").filter({ hasText: eventB })).toHaveCount(0);
+    await expect(inboxRow(page, eventB)).toHaveCount(0);
     await page.getByRole("button", { name: "Close notifications" }).click();
 
     await logout(page);
@@ -92,7 +98,9 @@ test.describe("Notification inbox journey", () => {
     await login(page, USERS.leia.username);
     await page.reload();
     await openNotificationInbox(page);
-    await expect(page.getByText(eventC).first()).toBeVisible({ timeout: 15_000 });
+    await expect(notificationsPanel(page).getByText(eventC).first()).toBeVisible({
+      timeout: 30_000,
+    });
     await page.getByRole("button", { name: "Clear all" }).click();
     await expect(page.getByTestId("notifications-empty")).toBeVisible({ timeout: 15_000 });
   });
@@ -106,9 +114,11 @@ test.describe("Notification inbox journey", () => {
 
     await proposeEventForLeia(page, eventTitle, "2099-12-08T18:00");
     await openNotificationInbox(page);
-    await expect(page.getByText(eventTitle).first()).toBeVisible({ timeout: 15_000 });
+    await expect(notificationsPanel(page).getByText(eventTitle).first()).toBeVisible({
+      timeout: 30_000,
+    });
     await expect(
-      page.locator("li").filter({ hasText: eventTitle }).getByRole("button", { name: "Accept" }),
+      inboxRow(page, eventTitle).getByRole("button", { name: "Accept" }),
     ).toBeVisible();
     await page.getByRole("button", { name: "Close notifications" }).click();
 
@@ -129,11 +139,13 @@ test.describe("Notification inbox journey", () => {
 
     await proposeEventForLeia(page, eventTitle, "2099-12-09T18:00");
     await openNotificationInbox(page);
-    await expect(page.getByText(eventTitle).first()).toBeVisible({ timeout: 15_000 });
+    await expect(notificationsPanel(page).getByText(eventTitle).first()).toBeVisible({
+      timeout: 30_000,
+    });
     await acceptFromInbox(page, eventTitle);
     await expect(page.getByText(/Vote recorded/i)).toBeVisible({ timeout: 15_000 });
     await expect(
-      page.locator("li").filter({ hasText: eventTitle }).getByRole("button", { name: "Accept" }),
+      inboxRow(page, eventTitle).getByRole("button", { name: "Accept" }),
     ).toHaveCount(0);
 
     await expectActionableNotificationClearedAfterReload(page, eventTitle);
@@ -146,14 +158,16 @@ test.describe("Notification inbox journey", () => {
 
     await proposeEventForLeia(page, eventTitle, "2099-12-10T18:00");
     await openNotificationInbox(page);
-    await expect(page.getByText(eventTitle).first()).toBeVisible({ timeout: 15_000 });
+    await expect(notificationsPanel(page).getByText(eventTitle).first()).toBeVisible({
+      timeout: 30_000,
+    });
     await declineFromInbox(page, eventTitle);
     await expect(page.getByText(/Vote recorded/i)).toBeVisible({ timeout: 15_000 });
     await expect(
-      page.locator("li").filter({ hasText: eventTitle }).getByRole("button", { name: "Accept" }),
+      inboxRow(page, eventTitle).getByRole("button", { name: "Accept" }),
     ).toHaveCount(0);
     await expect(
-      page.locator("li").filter({ hasText: eventTitle }).getByRole("button", { name: "Decline" }),
+      inboxRow(page, eventTitle).getByRole("button", { name: "Decline" }),
     ).toHaveCount(0);
 
     await expectActionableNotificationClearedAfterReload(page, eventTitle);

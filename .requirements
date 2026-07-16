@@ -233,3 +233,10 @@
 2026-07-15 | 4da34af | PC-224 | wipe network_chat_messages before users on reset | src/lib/seed/reset-test-database.ts
 2026-07-15 | d2d8d58 | PC-231 | unified timeline with comments, images, reply push | src/actions/feed.ts
 2026-07-15 | 0e62ae3 | PC-231 | add feed-migrations module and requirements log | src/lib/db/feed-migrations.ts
+2026-07-15 | 52c242c | PC-239 | parrot likes on milestones, chats, and comments | src/actions/feed.ts
+2026-07-15 | 3de16d5 | PC-239 | scope likers assertion to dialog | e2e/feed-likes-journey.spec.ts
+2026-07-15 | 7dedd60 | PC-239 | retry event visibility after reload | e2e/helpers/schedule.ts
+2026-07-16 | 8fb3f42 | PC-239 | hard-navigate schedule views helper | e2e/helpers/schedule.ts
+2026-07-16 | 986090d | PC-239 | silent poll fingerprint and CI harden | src/actions/feed.ts
+2026-07-16 | 3970426 | PC-239 | keep all-day end date on redraft move | e2e/event-schedule-views-journey.spec.ts
+2026-07-16 | 757e15e | PC-239 | promotion entry for likes and silent poll | src/lib/changelog/entries.ts

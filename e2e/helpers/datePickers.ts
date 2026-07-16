@@ -104,7 +104,8 @@ export async function fillProposalDateRange(
     await startField.click();
     await startField.fill(startIso);
     await startField.press("Tab");
-    const endValue = endIso && endIso !== startIso ? endIso : "";
+    // Same-day all-day must keep end=start. Clearing end on redraft drops the event off the calendar (PC-239).
+    const endValue = endIso && endIso !== startIso ? endIso : startIso;
     await endField.click();
     await endField.fill(endValue);
     await endField.press("Tab");
