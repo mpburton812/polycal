@@ -22,6 +22,7 @@ import {
   updatePolyGroupSettingsAction,
 } from "@/actions/poly-group";
 import { AdminCollapsibleSection } from "@/components/admin/AdminCollapsibleSection";
+import { LONG_TEXT_MAX } from "@/lib/validation/string-limits";
 import type { PolyGroupSettings } from "@/types/poly-group";
 import {
   auditLogVisibilityLevels,
@@ -114,6 +115,7 @@ export function AdminPolyGroupSettingsPanel({
           value={settings.name}
           onChange={(e) => setSettings({ ...settings, name: e.target.value })}
           fullWidth
+          inputProps={{ maxLength: LONG_TEXT_MAX }}
           helperText={
             settings.allowGroupNameProposals
               ? "Direct saves update immediately; use “Propose name change” for consensus workflow."
@@ -127,6 +129,7 @@ export function AdminPolyGroupSettingsPanel({
               value={proposedName}
               onChange={(e) => setProposedName(e.target.value)}
               fullWidth
+              inputProps={{ maxLength: LONG_TEXT_MAX }}
             />
             <Button
               variant="outlined"
@@ -342,6 +345,7 @@ export function AdminPolyGroupSettingsPanel({
           multiline
           minRows={4}
           fullWidth
+          inputProps={{ maxLength: LONG_TEXT_MAX }}
           helperText="Shown to users when they finish first-login onboarding."
         />
         <Typography variant="subtitle2" sx={{ pt: 1 }}>

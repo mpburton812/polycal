@@ -244,3 +244,4 @@
 2026-07-16 | 4da3896 | PC-244 | six bug-fix batch for limits, logs, passive proxy, images | src/actions/feed.ts
 2026-07-16 | e5fd9ee | PC-245 | assert human-readable admin log labels | e2e/residency-proposal-journey.spec.ts
 2026-07-16 | 7c9adf0 | PC-250 | yellow background for admin-only-visible comments | src/actions/feed.ts
+2026-07-16 | 0ede5bd | PC-252 | wrap, Code Status, proxy vote expand, Passive→Proxy | src/actions/admin-fast-sleeping.ts

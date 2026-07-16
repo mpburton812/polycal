@@ -23,21 +23,21 @@ test.describe("Passive user journey", () => {
 
     await page.getByRole("button", { name: "Add person" }).click();
     const createDialog = page.getByRole("dialog", { name: "Add person" });
-    await createDialog.getByRole("tab", { name: "Passive profile" }).click();
+    await createDialog.getByRole("tab", { name: "Proxy profile" }).click();
     await createDialog.getByLabel("Display name").fill(displayName);
     await createDialog.getByRole("button", { name: "Create" }).click();
-    await expect(createDialog.getByText(/Created passive profile/i)).toBeVisible({
+    await expect(createDialog.getByText(/Created proxy profile/i)).toBeVisible({
       timeout: 15_000,
     });
     await createDialog.getByRole("button", { name: "Close" }).click();
     await expect(page.getByText(displayName)).toBeVisible();
-    await expect(page.getByText("passive", { exact: true }).first()).toBeVisible();
+    await expect(page.getByText("Proxy", { exact: true }).first()).toBeVisible();
 
     await goToAdmin(page);
     await expandAdminSection(page, "User management");
     await page.getByRole("button", { name: `Activate ${displayName}` }).click();
 
-    const activateDialog = page.getByRole("dialog", { name: "Activate passive user" });
+    const activateDialog = page.getByRole("dialog", { name: "Activate proxy user" });
     await activateDialog.getByLabel("Username").fill(username);
     await activateDialog.getByLabel("Username").blur();
     await expect(activateDialog.getByText("Username is available")).toBeVisible({

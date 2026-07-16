@@ -658,7 +658,7 @@ export async function createPassiveUserAction(
 
   return {
     ok: true,
-    message: `Created passive profile ${parsed.data.displayName}.`,
+    message: `Created proxy profile ${parsed.data.displayName}.`,
     userId,
   };
   });
@@ -1038,7 +1038,7 @@ export async function activatePassiveUserAction(
     .limit(1);
 
   if (!user || user.role !== "passive" || user.status !== "active") {
-    return { ok: false, message: "Passive profile not found." };
+    return { ok: false, message: "Proxy profile not found." };
   }
 
   const username = parsed.data.username.toLowerCase();

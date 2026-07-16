@@ -55,6 +55,7 @@ import {
 } from "@/actions/places";
 import { AdminCollapsibleSection } from "@/components/admin/AdminCollapsibleSection";
 import { AVATAR_OPTIONS, avatarSrcForKey } from "@/lib/constants/avatars";
+import { formatUserRole } from "@/lib/users/role-labels";
 import { LONG_TEXT_MAX, SHORT_TEXT_MAX } from "@/lib/validation/string-limits";
 import { brutalPersonRowSx } from "@/theme/brutalUi";
 
@@ -247,7 +248,7 @@ function CreateUserDialog({
             }}
           >
             <Tab label="Active user" value="active" />
-            <Tab label="Passive profile" value="passive" />
+            <Tab label="Proxy profile" value="passive" />
           </Tabs>
           {mode === "active" && (
             <TextField
@@ -1151,7 +1152,7 @@ export function PeoplePlacesClient({
                     <Typography fontWeight={600} sx={{ overflowWrap: "anywhere" }}>
                       {person.displayName}
                     </Typography>
-                    <Chip size="small" label={person.role} variant="outlined" />
+                    <Chip size="small" label={formatUserRole(person.role)} variant="outlined" />
                   </Stack>
                   {person.profileBio ? (
                     <Typography

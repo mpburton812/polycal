@@ -100,7 +100,7 @@ export function SleepingPartnerCreateDialog({
       <DialogTitle>Sleeping Partner Proposal</DialogTitle>
       <DialogContent>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-          Choose someone to propose a sleeping partnership with. Passive profiles auto-accept;
+          Choose someone to propose a sleeping partnership with. Proxy profiles auto-accept;
           people you already partner with or have a pending proposal with are unavailable.
         </Typography>
         {loading ? (
@@ -120,7 +120,7 @@ export function SleepingPartnerCreateDialog({
                   : partnership?.status === "proposed"
                     ? "Proposal pending"
                     : person.role === "passive"
-                      ? "Passive — auto-accepts"
+                      ? "Proxy — auto-accepts"
                       : undefined;
 
               return (

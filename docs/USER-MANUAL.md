@@ -32,7 +32,7 @@ Approved proposals appear on the **Schedule** tab. Color coding:
 |------|-------------|
 | **Admin** | Full access to the **Admin** tab: user lifecycle, poly group settings, enforcement timers, audit log, and (when enabled) all-user admin mode. |
 | **User** | Standard member: schedule, proposals, people & places, profile. |
-| **Passive** | Schedulable profile without login. Admins can add passive people to proposals; they can be upgraded to User later. |
+| **Proxy** | Schedulable profile without login. Admins can add proxy people to proposals; they can be upgraded to User later. |
 
 **Power management** (Admin → Poly Group Settings) can temporarily grant every active user Admin access. When turned off, prior roles are restored.
 

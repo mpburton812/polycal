@@ -58,6 +58,7 @@ import { useToast } from "@/components/providers/ToastProvider";
 import type { InviteeVoteStatus } from "@/lib/db/schema";
 import type { PersonSummary } from "@/actions/users";
 import { handleCommentEnterKey } from "@/lib/ui/comment-keydown";
+import { formatUserRole } from "@/lib/users/role-labels";
 import { LONG_TEXT_MAX } from "@/lib/validation/string-limits";
 
 import {
@@ -870,17 +871,19 @@ export function ProposalDetailDialog({
                 <Stack spacing={1}>
                   {detail.invitees.map((invitee) => {
                     const isPassive = invitee.userRole === "passive";
-                    const canProxyVote =
-                      isPassive &&
-                      (detail.state === "proposed" || detail.state === "resolved") &&
-                      (invitee.addedByUserId === currentUserId || isAdmin);
+                    const canProxyVote = Boolean(invitee.canProxyVote);
                     return (
                       <Stack key={invitee.userId} spacing={0.5}>
                         <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
                           <Typography variant="body2">{invitee.displayName}</Typography>
                           <Chip size="small" label={invitee.role} variant="outlined" />
                           {isPassive && (
-                            <Chip size="small" label="Passive" color="secondary" variant="outlined" />
+                            <Chip
+                              size="small"
+                              label={formatUserRole("passive")}
+                              color="secondary"
+                              variant="outlined"
+                            />
                           )}
                           <Chip
                             size="small"

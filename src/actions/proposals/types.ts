@@ -84,10 +84,12 @@ export interface ProposalInviteeView {
   role: InviteeRole;
   voteStatus: InviteeVoteStatus;
   viewedAt: string | null;
-  /** RBAC role of the invitee user (e.g. passive) (PC-246). */
+  /** RBAC role of the invitee user (`passive` in DB = Proxy in UI) (PC-246 / PC-256). */
   userRole: string;
-  /** Who added this invitee — used for passive proxy voting (PC-246). */
+  /** Who added this invitee (audit). */
   addedByUserId: string | null;
+  /** Viewer may cast a proxy vote for this invitee (PC-255). */
+  canProxyVote: boolean;
 }
 
 export interface ProposalTimeSlotView {
