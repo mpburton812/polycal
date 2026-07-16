@@ -183,8 +183,9 @@ export async function forceWeekLayout(page: Page): Promise<void> {
 }
 
 async function readVisibleRange(page: Page): Promise<{ start: string; end: string }> {
-  const start = await page.getByTestId("schedule-range-start").getAttribute("data-value");
-  const end = await page.getByTestId("schedule-range-end").getAttribute("data-value");
+  // Prefer .last() — soft navigations / remounts can leave a stale range marker in the DOM.
+  const start = await page.getByTestId("schedule-range-start").last().getAttribute("data-value");
+  const end = await page.getByTestId("schedule-range-end").last().getAttribute("data-value");
   if (!start || !end) {
     throw new Error("Schedule range attributes missing.");
   }
