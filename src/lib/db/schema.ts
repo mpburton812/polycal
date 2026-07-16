@@ -517,6 +517,29 @@ export const feedImageUploads = sqliteTable("feed_image_uploads", {
   createdAt: text("created_at").notNull(),
 });
 
+/** Likes on feed milestones, chats, and comments (PC-239). */
+export const feedLikeTargetTypes = [
+  "milestone",
+  "chat",
+  "chat_comment",
+  "proposal_comment",
+] as const;
+export type FeedLikeTargetType = (typeof feedLikeTargetTypes)[number];
+
+export const feedLikes = sqliteTable(
+  "feed_likes",
+  {
+    id: text("id").primaryKey(),
+    targetType: text("target_type").notNull(),
+    targetId: text("target_id").notNull(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id),
+    createdAt: text("created_at").notNull(),
+  },
+  (table) => [unique().on(table.targetType, table.targetId, table.userId)],
+);
+
 export const schema = {
   users,
   polyGroup,
@@ -541,4 +564,5 @@ export const schema = {
   networkChatCommentImages,
   proposalCommentImages,
   feedImageUploads,
+  feedLikes,
 };

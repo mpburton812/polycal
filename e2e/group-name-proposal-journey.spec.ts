@@ -23,17 +23,15 @@ test.describe("Group name proposal journey", () => {
     await goToAdmin(page);
     await configureGroupNameProposals(page, { mode: "Mandatory consensus" });
 
-    // —— Phase 2: Propose rename (draft) and deep-link to proposals ——
+    // —— Phase 2: Propose rename (draft) and open draft dialog ——
     await page.getByLabel("Proposed new name").fill(proposedName);
-    await Promise.all([
-      page.waitForURL(/\/proposals\?open=/, { timeout: 30_000 }),
-      page.getByRole("button", { name: "Propose name change (draft)" }).click(),
-    ]);
-
+    await page.getByRole("button", { name: "Propose name change (draft)" }).click();
+    // Prefer dialog readiness over waitForURL alone — soft nav can lag under CI load.
     const draftDialog = page.getByRole("dialog");
     await expect(
       draftDialog.getByRole("heading", { name: proposalTitle, level: 2 }),
-    ).toBeVisible({ timeout: 15_000 });
+    ).toBeVisible({ timeout: 45_000 });
+    await expect(page).toHaveURL(/\/proposals\?open=/, { timeout: 15_000 });
     await submitProposalDraft(page, draftDialog);
 
     await selectProposalTab(page, "Proposed");

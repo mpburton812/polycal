@@ -222,6 +222,7 @@ export function NotificationInbox({
         transformOrigin={{ vertical: "top", horizontal: "right" }}
         slotProps={{ paper: { sx: { ...brutalPopoverPaperSx, width: 360, maxWidth: "95vw" } } }}
       >
+        <Box data-testid="notifications-panel">
         <Box sx={{ px: 2, py: 1.5, display: "flex", alignItems: "center", gap: 1 }}>
           <Typography
             variant="subtitle1"
@@ -428,6 +429,7 @@ export function NotificationInbox({
             })}
           </List>
         )}
+        </Box>
       </Popover>
     </>
   );
