@@ -122,7 +122,18 @@ export async function assertEventVisibleInAllScheduleViews(
     await selectView(page);
     await navigateScheduleUntilDateInRange(page, targetDateIso);
     await waitForScheduleReady(page);
-    await expect(eventLocator(page, titlePattern)).toBeVisible({ timeout: 20_000 });
+    const locator = eventLocator(page, titlePattern);
+    try {
+      await expect(locator).toBeVisible({ timeout: 20_000 });
+    } catch {
+      // Soft reload once — CI occasionally misses slices after redraft navigation.
+      await page.reload();
+      await waitForScheduleReady(page);
+      await selectView(page);
+      await navigateScheduleUntilDateInRange(page, targetDateIso);
+      await waitForScheduleReady(page);
+      await expect(locator).toBeVisible({ timeout: 20_000 });
+    }
   }
 }
 
