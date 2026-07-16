@@ -71,12 +71,14 @@ export function AdminPolyGroupSettingsPanel({
   const [error, setError] = useState<string | null>(null);
   const [proposedName, setProposedName] = useState("");
   const [proposalMessage, setProposalMessage] = useState<string | null>(null);
-  const [pending, startTransition] = useTransition();
+  // Separate transitions so Save's router.refresh() does not keep Propose disabled (PC-252 e2e).
+  const [savePending, startSaveTransition] = useTransition();
+  const [proposePending, startProposeTransition] = useTransition();
 
   function save() {
     setMessage(null);
     setError(null);
-    startTransition(async () => {
+    startSaveTransition(async () => {
       const result = await updatePolyGroupSettingsAction(settings);
       if (!result.ok) {
         setError(result.message);
@@ -90,7 +92,7 @@ export function AdminPolyGroupSettingsPanel({
   function proposeNameChange() {
     setProposalMessage(null);
     setError(null);
-    startTransition(async () => {
+    startProposeTransition(async () => {
       const result = await proposeGroupNameChangeAction({ proposedName });
       if (!result.ok) {
         setError(result.message);
@@ -134,7 +136,7 @@ export function AdminPolyGroupSettingsPanel({
             <Button
               variant="outlined"
               onClick={proposeNameChange}
-              disabled={pending || !proposedName.trim()}
+              disabled={proposePending || !proposedName.trim()}
             >
               Propose name change (draft)
             </Button>
@@ -416,8 +418,8 @@ export function AdminPolyGroupSettingsPanel({
           }
           helperText="Resolved events hold calendar this long when all required invitees are removed"
         />
-        <Button variant="contained" onClick={save} disabled={pending}>
-          {pending ? "Saving…" : "Save settings"}
+        <Button variant="contained" onClick={save} disabled={savePending}>
+          {savePending ? "Saving…" : "Save settings"}
         </Button>
       </Stack>
     </AdminCollapsibleSection>
