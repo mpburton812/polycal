@@ -38,6 +38,7 @@ export async function resetTestDatabase(): Promise<{
   await client.execute("DELETE FROM location_residents");
   await client.execute("DELETE FROM sleeping_partnerships");
   // Wipe chat before users — author_id FK blocks DELETE FROM users (PC-224).
+  await client.execute("DELETE FROM feed_likes");
   await client.execute("DELETE FROM feed_image_uploads");
   await client.execute("DELETE FROM network_chat_comment_images");
   await client.execute("DELETE FROM network_chat_comments");

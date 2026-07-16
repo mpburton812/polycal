@@ -21,6 +21,8 @@ export interface FeedComment {
   createdAt: string;
   imageIds: string[];
   canDelete: boolean;
+  likeCount: number;
+  likedByMe: boolean;
 }
 
 export interface FeedMilestone {
@@ -37,6 +39,8 @@ export interface FeedMilestone {
   masked: boolean;
   canComment: boolean;
   comments: FeedComment[];
+  likeCount: number;
+  likedByMe: boolean;
 }
 
 export interface NetworkChatMessage {
@@ -48,6 +52,8 @@ export interface NetworkChatMessage {
   imageIds: string[];
   canDelete: boolean;
   comments: FeedComment[];
+  likeCount: number;
+  likedByMe: boolean;
 }
 
 export type FeedItem =

@@ -26,6 +26,22 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "2026.07.15d",
+    date: "2026-07-15",
+    summary: "Feed likes with parrot toggle and likers popup.",
+    changes: [
+      {
+        type: "added",
+        description:
+          "Grey/green parrot likes under milestones, chats, and comments; count opens likers list (PC-239–PC-242).",
+      },
+      {
+        type: "changed",
+        description: "SCHEMA_VERSION 27 with feed_likes table (PC-240).",
+      },
+    ],
+  },
+  {
     version: "2026.07.15c",
     date: "2026-07-15",
     summary: "Unified Feed timeline with chat comments, images, and reply push.",

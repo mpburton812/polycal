@@ -1,51 +1,52 @@
 import { expect, test } from "./helpers/test";
+import type { Page } from "@playwright/test";
 
 import { login, expectAuthenticatedShell } from "./helpers/auth";
 import { USERS } from "./helpers/constants";
 import { goToFeed } from "./helpers/navigation";
 
+/** Visible composer textarea — MUI multiline also mounts a hidden sizer (PC-239). */
+function feedComposer(page: Page) {
+  return page.getByTestId("feed-composer").getByRole("textbox", { name: "Message the network" });
+}
+
+/** Posts a network chat message via bottom composer (PC-231/PC-239). */
+async function postFeedChat(page: Page, stamp: string) {
+  const composer = feedComposer(page);
+  await composer.click();
+  await composer.fill(stamp);
+  await expect(page.getByTestId("feed-send")).toBeEnabled();
+  await page.getByTestId("feed-send").click();
+  await expect(composer).toHaveValue("", { timeout: 30_000 });
+}
+
 test.describe("Feed tab", () => {
   test("unified feed with bottom composer and chat reply", async ({ page }) => {
     test.setTimeout(120_000);
-
-    const consoleErrors: string[] = [];
-    page.on("console", (msg) => {
-      if (msg.type() === "error") consoleErrors.push(msg.text());
-    });
-    page.on("pageerror", (err) => consoleErrors.push(String(err)));
 
     await login(page, USERS.luke.username);
     await expectAuthenticatedShell(page);
     await goToFeed(page);
 
     await expect(page.getByRole("heading", { name: "Feed" })).toBeVisible();
-    await expect(page.getByLabel("Message the network")).toBeVisible();
+    await expect(feedComposer(page)).toBeVisible();
 
     const stamp = `feed-chat-${Date.now()}`;
-    const composer = page.getByLabel("Message the network");
-    await composer.fill(stamp);
-    await expect(page.getByTestId("feed-send")).toBeEnabled();
-    await page.getByTestId("feed-send").click();
-    // Enter posts when click is swallowed by overlays (PC-231).
-    if ((await composer.inputValue()) === stamp) {
-      await composer.focus();
-      await composer.press("Enter");
-    }
+    await postFeedChat(page, stamp);
 
-    const card = page.getByTestId("feed-chat-card").first();
-    const errorAlert = page.locator('[role="alert"]').filter({ hasNotText: "" });
+    const card = page.getByTestId("feed-chat-card").filter({ hasText: stamp }).first();
+    await expect(card).toBeVisible({ timeout: 30_000 });
 
-    try {
-      await card.waitFor({ state: "visible", timeout: 30_000 });
-    } catch {
-      const alertText = (await errorAlert.allInnerTexts()).join(" | ");
-      throw new Error(
-        `Chat card not visible after send. alert=[${alertText}] console=[${consoleErrors.join(" | ")}]`,
-      );
-    }
-
-    await expect(page.getByLabel("Message the network")).toHaveValue("");
-    await expect(card.getByText(stamp)).toBeVisible();
+    await card.getByRole("button", { name: "Like", exact: true }).click();
+    await expect(card.getByRole("button", { name: "Unlike", exact: true })).toBeVisible({
+      timeout: 15_000,
+    });
+    await expect(card.getByRole("button", { name: /1 likes/ })).toBeVisible();
+    await card.getByRole("button", { name: "Unlike", exact: true }).click();
+    await expect(card.getByRole("button", { name: "Like", exact: true })).toBeVisible({
+      timeout: 15_000,
+    });
+    await expect(card.getByRole("button", { name: /0 likes/ })).toBeVisible();
 
     const reply = `feed-reply-${Date.now()}`;
     await page.getByPlaceholder("Reply…").first().fill(reply);

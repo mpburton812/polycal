@@ -57,6 +57,20 @@ export async function applyFeedMigrations(sql: Client): Promise<void> {
   `);
 
   await ensureColumn(sql, "proposal_comments", "deleted_at", "TEXT");
+
+  await sql.execute(`
+    CREATE TABLE IF NOT EXISTS feed_likes (
+      id TEXT PRIMARY KEY NOT NULL,
+      target_type TEXT NOT NULL,
+      target_id TEXT NOT NULL,
+      user_id TEXT NOT NULL REFERENCES users(id),
+      created_at TEXT NOT NULL,
+      UNIQUE (target_type, target_id, user_id)
+    )
+  `);
+  await sql.execute(
+    `CREATE INDEX IF NOT EXISTS idx_feed_likes_target ON feed_likes(target_type, target_id)`,
+  );
 }
 
 async function ensureColumn(

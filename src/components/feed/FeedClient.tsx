@@ -31,9 +31,11 @@ import {
   addProposalCommentAction,
   deleteProposalCommentAction,
 } from "@/actions/proposals";
-import type { FeedComment, FeedItem } from "@/lib/feed/types";
-import { feedImageUrl, MAX_FEED_IMAGES } from "@/lib/feed/images";
 import type { PersonSummary } from "@/actions/users";
+import { FeedLikeRow } from "@/components/feed/FeedLikeControl";
+import { feedImageUrl, MAX_FEED_IMAGES } from "@/lib/feed/images";
+import type { FeedLikeTargetType } from "@/lib/feed/likes";
+import type { FeedComment, FeedItem } from "@/lib/feed/types";
 import { handleCommentEnterKey } from "@/lib/ui/comment-keydown";
 import { brutalPageTitleSx } from "@/theme/brutalUi";
 import { GARDEN_TOKENS } from "@/theme/tokens";
@@ -87,11 +89,13 @@ function FeedImageStrip({
 
 function CommentBlock({
   comment,
+  commentTargetType,
   onDelete,
   onOpenImage,
   pending,
 }: {
   comment: FeedComment;
+  commentTargetType: Extract<FeedLikeTargetType, "chat_comment" | "proposal_comment">;
   onDelete: (id: string) => void;
   onOpenImage: (ids: string[], index: number) => void;
   pending: boolean;
@@ -115,6 +119,12 @@ function CommentBlock({
         ) : null}
       </Stack>
       <FeedImageStrip imageIds={comment.imageIds} onOpen={onOpenImage} />
+      <FeedLikeRow
+        targetType={commentTargetType}
+        targetId={comment.id}
+        likeCount={comment.likeCount}
+        likedByMe={comment.likedByMe}
+      />
     </Box>
   );
 }
@@ -138,6 +148,7 @@ export function FeedClient({
   const [loadingMore, setLoadingMore] = useState(false);
   const [chatDraft, setChatDraft] = useState("");
   const [pending, startTransition] = useTransition();
+  const [sending, setSending] = useState(false);
   const [selectedProposalId, setSelectedProposalId] = useState<string | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
   const [commentDrafts, setCommentDrafts] = useState<Record<string, string>>({});
@@ -148,6 +159,7 @@ export function FeedClient({
   const [lightbox, setLightbox] = useState<{ ids: string[]; index: number } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const commentFileTargetRef = useRef<string | null>(null);
+  const sendInFlightRef = useRef(false);
 
   const loadFeed = useCallback(async (cursor?: string | null, append = false) => {
     if (append) setLoadingMore(true);
@@ -168,11 +180,12 @@ export function FeedClient({
   }, [loadFeed]);
 
   useEffect(() => {
+    if (pending || sending) return;
     const timer = window.setInterval(() => {
       void loadFeed();
     }, 15_000);
     return () => window.clearInterval(timer);
-  }, [loadFeed]);
+  }, [loadFeed, pending, sending]);
 
   function openDetail(proposalId: string) {
     setSelectedProposalId(proposalId);
@@ -244,8 +257,11 @@ export function FeedClient({
   function sendChat() {
     const body = chatDraft.trim();
     if (!body && pendingImages.length === 0) return;
+    if (sendInFlightRef.current) return;
+    sendInFlightRef.current = true;
     setError(null);
-    startTransition(async () => {
+    setSending(true);
+    void (async () => {
       try {
         const result = await postNetworkChatMessageAction({
           body,
@@ -265,8 +281,11 @@ export function FeedClient({
         }
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to send message.");
+      } finally {
+        sendInFlightRef.current = false;
+        setSending(false);
       }
-    });
+    })();
   }
 
   function postChatComment(messageId: string) {
@@ -330,6 +349,12 @@ export function FeedClient({
           <Button size="small" onClick={() => openDetail(item.proposalId)}>
             Open proposal
           </Button>
+          <FeedLikeRow
+            targetType="milestone"
+            targetId={item.id}
+            likeCount={item.likeCount}
+            likedByMe={item.likedByMe}
+          />
 
           {!item.masked && item.comments.length > 0 ? (
             <Stack spacing={1} sx={{ mt: 1.5 }}>
@@ -337,6 +362,7 @@ export function FeedClient({
                 <CommentBlock
                   key={comment.id}
                   comment={comment}
+                  commentTargetType="proposal_comment"
                   pending={pending}
                   onDelete={deleteMilestoneComment}
                   onOpenImage={(ids, index) => setLightbox({ ids, index })}
@@ -459,12 +485,20 @@ export function FeedClient({
           ) : null}
         </Stack>
 
+        <FeedLikeRow
+          targetType="chat"
+          targetId={item.id}
+          likeCount={item.likeCount}
+          likedByMe={item.likedByMe}
+        />
+
         {item.comments.length > 0 ? (
           <Stack spacing={1} sx={{ mt: 1.5 }}>
             {item.comments.map((comment) => (
               <CommentBlock
                 key={comment.id}
                 comment={comment}
+                commentTargetType="chat_comment"
                 pending={pending}
                 onDelete={deleteChatComment}
                 onOpenImage={(ids, index) => setLightbox({ ids, index })}
@@ -616,7 +650,7 @@ export function FeedClient({
               commentFileTargetRef.current = null;
               fileInputRef.current?.click();
             }}
-            disabled={pending || pendingImages.length >= MAX_FEED_IMAGES}
+            disabled={pending || sending || pendingImages.length >= MAX_FEED_IMAGES}
           >
             <AttachFileIcon />
           </IconButton>
@@ -628,13 +662,13 @@ export function FeedClient({
             label="Message the network"
             value={chatDraft}
             onChange={(e) => setChatDraft(e.target.value)}
-            onKeyDown={(e) => handleCommentEnterKey(e, sendChat, !pending)}
+            onKeyDown={(e) => handleCommentEnterKey(e, sendChat, !pending && !sending)}
           />
           <Button
             type="button"
             variant="contained"
             data-testid="feed-send"
-            disabled={pending || (!chatDraft.trim() && pendingImages.length === 0)}
+            disabled={pending || sending || (!chatDraft.trim() && pendingImages.length === 0)}
             onClick={sendChat}
           >
             Send

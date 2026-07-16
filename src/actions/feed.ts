@@ -1,7 +1,7 @@
 "use server";
 
 import { randomUUID } from "node:crypto";
-import { and, asc, desc, eq, inArray, isNull, lt, or } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull, lt } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
@@ -13,6 +13,7 @@ import {
   networkChatMessageImages,
   networkChatMessages,
   feedImageUploads,
+  feedLikes,
   polyGroup,
   proposalCommentImages,
   proposalComments,
@@ -23,6 +24,12 @@ import {
   users,
 } from "@/lib/db/schema";
 import { MAX_FEED_IMAGES } from "@/lib/feed/images";
+import {
+  emptyLikeSummary,
+  FEED_LIKE_TARGET_TYPES,
+  type FeedLikeTargetType,
+  type FeedLiker,
+} from "@/lib/feed/likes";
 import {
   FEED_MILESTONE_ACTIONS,
   type FeedComment,
@@ -142,6 +149,38 @@ async function loadImageIdsByParent(
     const list = result.get(row.commentId) ?? [];
     list.push(row.imageId);
     result.set(row.commentId, list);
+  }
+  return result;
+}
+
+/**
+ * Batches like counts + likedByMe for a set of target ids of one type (PC-239).
+ */
+async function loadLikeSummaries(
+  db: Parameters<Parameters<typeof withDb>[0]>[0],
+  targetType: FeedLikeTargetType,
+  targetIds: string[],
+  viewerId: string,
+): Promise<Map<string, { likeCount: number; likedByMe: boolean }>> {
+  const result = new Map<string, { likeCount: number; likedByMe: boolean }>();
+  for (const id of targetIds) {
+    result.set(id, emptyLikeSummary());
+  }
+  if (targetIds.length === 0) return result;
+
+  const rows = await db
+    .select({
+      targetId: feedLikes.targetId,
+      userId: feedLikes.userId,
+    })
+    .from(feedLikes)
+    .where(and(eq(feedLikes.targetType, targetType), inArray(feedLikes.targetId, targetIds)));
+
+  for (const row of rows) {
+    const current = result.get(row.targetId) ?? emptyLikeSummary();
+    current.likeCount += 1;
+    if (row.userId === viewerId) current.likedByMe = true;
+    result.set(row.targetId, current);
   }
   return result;
 }
@@ -327,7 +366,21 @@ async function loadMilestoneBatch(
           isContentMasked: masked,
         }),
         comments: [],
+        likeCount: 0,
+        likedByMe: false,
       });
+    }
+
+    const milestoneLikes = await loadLikeSummaries(
+      db,
+      "milestone",
+      milestones.map((m) => m.id),
+      viewerId,
+    );
+    for (const milestone of milestones) {
+      const likes = milestoneLikes.get(milestone.id) ?? emptyLikeSummary();
+      milestone.likeCount = likes.likeCount;
+      milestone.likedByMe = likes.likedByMe;
     }
 
     const commentProposalIds = milestones.filter((m) => !m.masked).map((m) => m.proposalId);
@@ -355,10 +408,12 @@ async function loadMilestoneBatch(
       const proposerByProposal = new Map(milestones.map((m) => [m.proposalId, m.proposerId]));
       const commentIds = commentRows.map((c) => c.id);
       const imagesByComment = await loadImageIdsByParent(db, "proposalComment", commentIds);
+      const commentLikes = await loadLikeSummaries(db, "proposal_comment", commentIds, viewerId);
       const commentsByProposal = new Map<string, FeedComment[]>();
 
       for (const comment of commentRows) {
         const proposerId = proposerByProposal.get(comment.proposalId) ?? "";
+        const likes = commentLikes.get(comment.id) ?? emptyLikeSummary();
         const list = commentsByProposal.get(comment.proposalId) ?? [];
         list.push({
           id: comment.id,
@@ -371,6 +426,8 @@ async function loadMilestoneBatch(
             isAdmin ||
             comment.authorId === viewerId ||
             proposerId === viewerId,
+          likeCount: likes.likeCount,
+          likedByMe: likes.likedByMe,
         });
         commentsByProposal.set(comment.proposalId, list);
       }
@@ -438,11 +495,14 @@ async function loadChatBatch(
 
     const commentIds = commentRows.map((c) => c.id);
     const imagesByComment = await loadImageIdsByParent(db, "chatComment", commentIds);
+    const chatLikes = await loadLikeSummaries(db, "chat", messageIds, viewerId);
+    const chatCommentLikes = await loadLikeSummaries(db, "chat_comment", commentIds, viewerId);
     const commentsByMessage = new Map<string, FeedComment[]>();
     const messageAuthorById = new Map(rows.map((r) => [r.id, r.authorId]));
 
     for (const comment of commentRows) {
       const messageAuthorId = messageAuthorById.get(comment.messageId) ?? "";
+      const likes = chatCommentLikes.get(comment.id) ?? emptyLikeSummary();
       const list = commentsByMessage.get(comment.messageId) ?? [];
       list.push({
         id: comment.id,
@@ -455,20 +515,27 @@ async function loadChatBatch(
           isAdmin ||
           comment.authorId === viewerId ||
           messageAuthorId === viewerId,
+        likeCount: likes.likeCount,
+        likedByMe: likes.likedByMe,
       });
       commentsByMessage.set(comment.messageId, list);
     }
 
-    const messages: NetworkChatMessage[] = rows.map((row) => ({
-      id: row.id,
-      authorId: row.authorId,
-      authorName: row.authorName,
-      body: row.body,
-      createdAt: row.createdAt,
-      imageIds: imagesByMessage.get(row.id) ?? [],
-      canDelete: isAdmin || row.authorId === viewerId,
-      comments: commentsByMessage.get(row.id) ?? [],
-    }));
+    const messages: NetworkChatMessage[] = rows.map((row) => {
+      const likes = chatLikes.get(row.id) ?? emptyLikeSummary();
+      return {
+        id: row.id,
+        authorId: row.authorId,
+        authorName: row.authorName,
+        body: row.body,
+        createdAt: row.createdAt,
+        imageIds: imagesByMessage.get(row.id) ?? [],
+        canDelete: isAdmin || row.authorId === viewerId,
+        comments: commentsByMessage.get(row.id) ?? [],
+        likeCount: likes.likeCount,
+        likedByMe: likes.likedByMe,
+      };
+    });
 
     return messages.map((m) => ({ kind: "chat" as const, ...m }));
   }
@@ -552,13 +619,14 @@ export async function postNetworkChatMessageAction(
   }
 
   return withDb(async (db) => {
-    const owned = await assertOwnedImageIds(db, parsed.data.imageIds, sessionResult.user.id);
+    const owned = await assertOwnedImageIds(db, parsed.data.imageIds ?? [], sessionResult.user.id);
     if (!owned) {
       return { ok: false, message: "One or more images are invalid or expired." };
     }
 
     const now = new Date().toISOString();
     const id = randomUUID();
+    const imageIds = parsed.data.imageIds ?? [];
     await db.insert(networkChatMessages).values({
       id,
       authorId: sessionResult.user.id,
@@ -567,11 +635,11 @@ export async function postNetworkChatMessageAction(
       deletedAt: null,
     });
 
-    for (let i = 0; i < parsed.data.imageIds.length; i += 1) {
+    for (let i = 0; i < imageIds.length; i += 1) {
       await db.insert(networkChatMessageImages).values({
         id: randomUUID(),
         messageId: id,
-        imageId: parsed.data.imageIds[i]!,
+        imageId: imageIds[i]!,
         sortOrder: i,
       });
     }
@@ -582,7 +650,9 @@ export async function postNetworkChatMessageAction(
       .where(eq(users.id, sessionResult.user.id))
       .limit(1);
 
-    revalidatePath("/feed");
+    // Skip revalidatePath here — client optimistically prepends the item.
+    // revalidatePath + useTransition can leave the action promise unsettled in next
+    // dev under Playwright (composer stuck pending). Poll/reload refreshes peers.
     return {
       ok: true,
       message: "Message sent.",
@@ -592,9 +662,11 @@ export async function postNetworkChatMessageAction(
         authorName: author?.displayName ?? "Member",
         body: parsed.data.body,
         createdAt: now,
-        imageIds: parsed.data.imageIds,
+        imageIds,
         canDelete: true,
         comments: [],
+        likeCount: 0,
+        likedByMe: false,
       },
     };
   });
@@ -684,6 +756,8 @@ export async function postNetworkChatCommentAction(
         createdAt: now,
         imageIds: parsed.data.imageIds,
         canDelete: true,
+        likeCount: 0,
+        likedByMe: false,
       },
     };
   });
@@ -806,3 +880,160 @@ export async function listNetworkChatMessagesAction(
   const chat = result.items.filter((i) => i.kind === "chat") as NetworkChatMessage[];
   return { ok: true, message: "OK", items: chat };
 }
+
+const likeTargetSchema = z.object({
+  targetType: z.enum(FEED_LIKE_TARGET_TYPES),
+  targetId: z.string().min(1).max(80),
+});
+
+/**
+ * Verifies the like target still exists (and is not soft-deleted) (PC-239).
+ */
+async function feedLikeTargetExists(
+  db: Parameters<Parameters<typeof withDb>[0]>[0],
+  targetType: FeedLikeTargetType,
+  targetId: string,
+): Promise<boolean> {
+  if (targetType === "milestone") {
+    const [row] = await db
+      .select({ id: proposalStateLog.id })
+      .from(proposalStateLog)
+      .where(eq(proposalStateLog.id, targetId))
+      .limit(1);
+    return Boolean(row);
+  }
+  if (targetType === "chat") {
+    const [row] = await db
+      .select({ id: networkChatMessages.id, deletedAt: networkChatMessages.deletedAt })
+      .from(networkChatMessages)
+      .where(eq(networkChatMessages.id, targetId))
+      .limit(1);
+    return Boolean(row && !row.deletedAt);
+  }
+  if (targetType === "chat_comment") {
+    const [row] = await db
+      .select({ id: networkChatComments.id, deletedAt: networkChatComments.deletedAt })
+      .from(networkChatComments)
+      .where(eq(networkChatComments.id, targetId))
+      .limit(1);
+    return Boolean(row && !row.deletedAt);
+  }
+  const [row] = await db
+    .select({ id: proposalComments.id, deletedAt: proposalComments.deletedAt })
+    .from(proposalComments)
+    .where(eq(proposalComments.id, targetId))
+    .limit(1);
+  return Boolean(row && !row.deletedAt);
+}
+
+/**
+ * Toggles the viewer’s like on a feed target (PC-239).
+ */
+export async function toggleFeedLikeAction(
+  input: z.infer<typeof likeTargetSchema>,
+): Promise<{
+  ok: boolean;
+  message: string;
+  likeCount?: number;
+  likedByMe?: boolean;
+}> {
+  const sessionResult = await requireSession();
+  if (!sessionResult.ok) return sessionResult;
+
+  const parsed = likeTargetSchema.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, message: parsed.error.issues[0]?.message ?? "Invalid like target." };
+  }
+
+  return withDb(async (db) => {
+    const exists = await feedLikeTargetExists(db, parsed.data.targetType, parsed.data.targetId);
+    if (!exists) {
+      return { ok: false, message: "Item not found." };
+    }
+
+    const [existing] = await db
+      .select({ id: feedLikes.id })
+      .from(feedLikes)
+      .where(
+        and(
+          eq(feedLikes.targetType, parsed.data.targetType),
+          eq(feedLikes.targetId, parsed.data.targetId),
+          eq(feedLikes.userId, sessionResult.user.id),
+        ),
+      )
+      .limit(1);
+
+    if (existing) {
+      await db.delete(feedLikes).where(eq(feedLikes.id, existing.id));
+    } else {
+      await db.insert(feedLikes).values({
+        id: randomUUID(),
+        targetType: parsed.data.targetType,
+        targetId: parsed.data.targetId,
+        userId: sessionResult.user.id,
+        createdAt: new Date().toISOString(),
+      });
+    }
+
+    const summary = await loadLikeSummaries(
+      db,
+      parsed.data.targetType,
+      [parsed.data.targetId],
+      sessionResult.user.id,
+    );
+    const likes = summary.get(parsed.data.targetId) ?? emptyLikeSummary();
+    revalidatePath("/feed");
+    return {
+      ok: true,
+      message: likes.likedByMe ? "Liked." : "Like removed.",
+      likeCount: likes.likeCount,
+      likedByMe: likes.likedByMe,
+    };
+  });
+}
+
+/**
+ * Lists people who liked a feed target (PC-239).
+ */
+export async function listFeedLikersAction(
+  input: z.infer<typeof likeTargetSchema>,
+): Promise<{ ok: boolean; message: string; likers?: FeedLiker[] }> {
+  const sessionResult = await requireSession();
+  if (!sessionResult.ok) return sessionResult;
+
+  const parsed = likeTargetSchema.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, message: parsed.error.issues[0]?.message ?? "Invalid like target." };
+  }
+
+  return withDb(async (db) => {
+    const rows = await db
+      .select({
+        userId: feedLikes.userId,
+        displayName: users.displayName,
+        avatarKey: users.avatarKey,
+        likedAt: feedLikes.createdAt,
+      })
+      .from(feedLikes)
+      .innerJoin(users, eq(feedLikes.userId, users.id))
+      .where(
+        and(
+          eq(feedLikes.targetType, parsed.data.targetType),
+          eq(feedLikes.targetId, parsed.data.targetId),
+        ),
+      )
+      .orderBy(asc(feedLikes.createdAt));
+
+    return {
+      ok: true,
+      message: "OK",
+      likers: rows.map((row) => ({
+        userId: row.userId,
+        displayName: row.displayName,
+        avatarKey: row.avatarKey,
+        likedAt: row.likedAt,
+      })),
+    };
+  });
+}
+
