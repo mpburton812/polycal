@@ -19,6 +19,7 @@ import {
 } from "@mui/material";
 
 import type { EventIconKey } from "@/lib/event-icons/registry";
+import { LONG_TEXT_MAX } from "@/lib/validation/string-limits";
 import { GARDEN_TOKENS } from "@/theme/tokens";
 
 import { EventIconPicker } from "./EventIconPicker";
@@ -70,6 +71,9 @@ export function ProposalDraftMoreOptions({
   reminderUnit,
   onReminderUnitChange,
 }: ProposalDraftMoreOptionsProps) {
+  const showPrivacyControl =
+    privacyAvailability.private || privacyAvailability.superPrivate;
+
   return (
     <Accordion
       disableGutters
@@ -101,28 +105,31 @@ export function ProposalDraftMoreOptions({
             multiline
             minRows={2}
             size="small"
+            inputProps={{ maxLength: LONG_TEXT_MAX }}
           />
-          <FormControl fullWidth size="small">
-            <InputLabel id="proposal-privacy-label">Privacy</InputLabel>
-            <Select
-              labelId="proposal-privacy-label"
-              label="Privacy"
-              value={eventPrivacy}
-              onChange={(event) =>
-                onEventPrivacyChange(event.target.value as "open" | "private" | "super_private")
-              }
-            >
-              {privacyAvailability.open && <MenuItem value="open">Open</MenuItem>}
-              {privacyAvailability.private && <MenuItem value="private">Private</MenuItem>}
-              {privacyAvailability.superPrivate && (
-                <MenuItem value="super_private">Super private</MenuItem>
-              )}
-            </Select>
-            <FormHelperText>
-              Open: network visibility rules. Private: proposer, invitees, sleeping partners, and
-              optionally admins. Super private: proposer and invitees only (admins optional).
-            </FormHelperText>
-          </FormControl>
+          {showPrivacyControl && (
+            <FormControl fullWidth size="small">
+              <InputLabel id="proposal-privacy-label">Privacy</InputLabel>
+              <Select
+                labelId="proposal-privacy-label"
+                label="Privacy"
+                value={eventPrivacy}
+                onChange={(event) =>
+                  onEventPrivacyChange(event.target.value as "open" | "private" | "super_private")
+                }
+              >
+                {privacyAvailability.open && <MenuItem value="open">Open</MenuItem>}
+                {privacyAvailability.private && <MenuItem value="private">Private</MenuItem>}
+                {privacyAvailability.superPrivate && (
+                  <MenuItem value="super_private">Super private</MenuItem>
+                )}
+              </Select>
+              <FormHelperText>
+                Open: network visibility rules. Private: proposer, invitees, sleeping partners, and
+                optionally admins. Super private: proposer and invitees only (admins optional).
+              </FormHelperText>
+            </FormControl>
+          )}
           <TextField
             label="Notes (optional)"
             value={notes}
@@ -131,6 +138,7 @@ export function ProposalDraftMoreOptions({
             multiline
             minRows={2}
             size="small"
+            inputProps={{ maxLength: LONG_TEXT_MAX }}
             helperText="Shared with invitees"
           />
           {proposalType === "event" && (

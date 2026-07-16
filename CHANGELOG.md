@@ -20,10 +20,8 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
-### Added
-- PC-224 / PC-225–230: Feed bottom tab (leftmost / default landing) with proposal lifecycle milestones, comments, and network chat; admin `sleepingNetworkVisibility` (everyone vs involved) orthogonal to calendar `hideSleepingArrangements`. Change control: `2026.07.15b`.
-- PC-231–PC-238: Unified Feed timeline (milestones + chat), chat comments with push, multi-image messages/comments, Option A styling, bottom composer. Excludes archived milestones. SCHEMA_VERSION 26. Change control: `2026.07.15c`.
-- PC-239–PC-242: Feed likes — grey/green parrot toggle under milestones, chats, and comments; count opens likers popup. SCHEMA_VERSION 27. Change control: `2026.07.15d`.
+### Changed
+- PC-243 / PC-244–249: Character limits (256/1024), human-readable activity logs, passive proxy voting, feed comment image reliability, hide Open-only Event Privacy, feedback FAB position/z-index. SCHEMA_VERSION 28. Change control: `2026.07.16b`.
 
 ### Fixed
 - PC-239: Feed background poll uses a head fingerprint and only refreshes when content changes (no 15s loading spinner flash); E2E skips feature-push runs when an open PR already covers the branch; same-day all-day redraft keeps end=start so moved events stay visible.

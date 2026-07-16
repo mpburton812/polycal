@@ -28,6 +28,7 @@ import type { ScheduleSliceKind } from "@/lib/schedule/slice-types";
 import { useToast } from "@/components/providers/ToastProvider";
 import { formatEventTime } from "@/lib/schedule/dates";
 import { handleCommentEnterKey } from "@/lib/ui/comment-keydown";
+import { LONG_TEXT_MAX } from "@/lib/validation/string-limits";
 import { primaryButtonSx } from "@/components/proposals/proposalCardTheme";
 
 interface SliceDetailDialogProps {
@@ -242,6 +243,7 @@ export function SliceDetailDialog({
                 minRows={2}
                 fullWidth
                 disabled={pending}
+                inputProps={{ maxLength: LONG_TEXT_MAX }}
               />
             ) : null}
           </Stack>
