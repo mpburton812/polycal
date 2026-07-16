@@ -33,8 +33,8 @@ function formatActionLabel(action: string): string {
     "proposal.child_detached": "Child detached",
     "proposal.detached_from_parent": "Detached from parent",
     "proposal.recurrence_child_created": "Series occurrence created",
-    "proposal.passive_auto_accept": "Passive auto-accept",
-    "proposal.passive_proxy_vote": "Passive proxy vote",
+    "proposal.passive_auto_accept": "Proxy auto-accept",
+    "proposal.passive_proxy_vote": "Proxy vote",
     "draft.created": "Draft created",
   };
   return labels[action] ?? action.replaceAll(".", " · ").replaceAll("_", " ");

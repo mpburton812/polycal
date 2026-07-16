@@ -26,6 +26,39 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "2026.07.16d",
+    date: "2026-07-16",
+    summary:
+      "Feed text wrap, Code Status for everyone, expanded proxy voting, Passive→Proxy labels.",
+    changes: [
+      {
+        type: "fixed",
+        description:
+          "Feed chat and comment bodies wrap unbroken long strings so cards no longer overflow (PC-253).",
+      },
+      {
+        type: "added",
+        description:
+          "Code Status panel on Feed for all users; Check for Update skips admin force-reload audit for non-admins (PC-254).",
+      },
+      {
+        type: "changed",
+        description:
+          "Proxy-profile votes may be cast by the proposer or an accepted sleeping partner of that proxy (admins unchanged) (PC-255).",
+      },
+      {
+        type: "changed",
+        description:
+          "User-facing role label Passive renamed to Proxy; DB role value remains passive (PC-256).",
+      },
+      {
+        type: "fixed",
+        description:
+          "Remaining admin TextFields use HTML maxLength so over-length entry is blocked, not truncated in app code (PC-252).",
+      },
+    ],
+  },
+  {
     version: "2026.07.16c",
     date: "2026-07-16",
     summary: "Yellow highlight for feed comments only visible to admins.",

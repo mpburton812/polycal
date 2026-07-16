@@ -127,7 +127,7 @@ export async function adminFastAddSleepingPlanAction(
       return { ok: false, message: "Target user not found." };
     }
     if (targetUser.role === "passive") {
-      return { ok: false, message: "Cannot fast-add sleeping plans for passive users." };
+      return { ok: false, message: "Cannot fast-add sleeping plans for proxy users." };
     }
 
     const validation = await validateBatchSleepingEntries(db, {
