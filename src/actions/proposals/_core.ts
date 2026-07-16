@@ -75,7 +75,7 @@ import {
   updateBatchSleepingDraft,
   validateBatchSleepingEntries,
 } from "@/lib/proposals/fast-sleeping-core";
-import { canProxyVoteForPassiveInvitee } from "@/lib/proposals/passive-proxy-vote";
+import { canProxyVoteForPassiveInvitee, actorCanProxyVoteSync } from "@/lib/proposals/passive-proxy-vote";
 import { canManageSleepingAttendees } from "@/lib/proposals/passive-auto-accept";
 import { enterAtRiskProposedState } from "@/lib/proposals/services/at-risk";
 import { logProposalTransition } from "@/lib/proposals/services/state-log";
@@ -2343,6 +2343,17 @@ export async function getProposalDetailAction(
     ? null
     : proposalDescriptionForDisplay(row.description);
 
+  // Preload sleeping partners for each proxy (passive) invitee so UI can show vote controls (PC-255).
+  const proxyPartnerIdsByUser = new Map<string, Set<string>>();
+  for (const invitee of inviteeRows) {
+    if (invitee.userRole !== "passive") continue;
+    if (proxyPartnerIdsByUser.has(invitee.userId)) continue;
+    proxyPartnerIdsByUser.set(
+      invitee.userId,
+      await getAcceptedSleepingPartnerIds(db, invitee.userId),
+    );
+  }
+
   const slotRows = await db
     .select()
     .from(proposalTimeSlots)
@@ -2538,6 +2549,15 @@ export async function getProposalDetailAction(
             viewedAt: invitee.viewedAt ?? null,
             userRole: invitee.userRole,
             addedByUserId: invitee.addedByUserId ?? null,
+            canProxyVote:
+              invitee.userRole === "passive" &&
+              (row.state === "proposed" || row.state === "resolved") &&
+              actorCanProxyVoteSync({
+                isAdmin,
+                actorUserId: session.user.id,
+                proposerId: row.proposerId,
+                sleepingPartnerIds: proxyPartnerIdsByUser.get(invitee.userId) ?? new Set(),
+              }),
           }))
         : [],
       timeSlots: masked
@@ -2821,13 +2841,12 @@ export async function castProposalVoteAction(
 
   let proxyDisplayName: string | null = null;
   if (isProxy) {
-    const proxyCheck = await canProxyVoteForPassiveInvitee(
-      db,
-      targetUserId,
-      invitee.addedByUserId,
-      session.user.id,
+    const proxyCheck = await canProxyVoteForPassiveInvitee(db, {
+      inviteeUserId: targetUserId,
+      actorUserId: session.user.id,
       isAdmin,
-    );
+      proposerId: proposal.proposerId,
+    });
     if (!proxyCheck.ok) {
       return { ok: false, message: proxyCheck.message };
     }

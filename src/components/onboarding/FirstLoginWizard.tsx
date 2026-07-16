@@ -343,7 +343,7 @@ export function FirstLoginWizard({
       {activeStep === 2 && (
         <Stack spacing={2}>
           <Typography variant="body2" color="text.secondary">
-            Select sleeping partners to propose relationships with. Passive profiles are
+            Select sleeping partners to propose relationships with. Proxy profiles are
             established automatically; active users receive a proposal.
           </Typography>
           <FormGroup>

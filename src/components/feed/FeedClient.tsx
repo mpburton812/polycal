@@ -34,15 +34,18 @@ import {
 } from "@/actions/proposals";
 import type { PersonSummary } from "@/actions/users";
 import { FeedLikeRow } from "@/components/feed/FeedLikeControl";
+import { CodeStatusPanel } from "@/components/layout/CodeStatusPanel";
+import { ADMIN_ONLY_FEED_COMMENT_BG } from "@/components/proposals/proposalCardTheme";
 import { feedImageUrl, MAX_FEED_IMAGES } from "@/lib/feed/images";
 import type { FeedLikeTargetType } from "@/lib/feed/likes";
 import type { FeedComment, FeedItem } from "@/lib/feed/types";
 import { buildFeedUpdateToken } from "@/lib/feed/update-token";
+import type { ChangelogEntry } from "@/lib/changelog/entries";
+import type { BuildInfo } from "@/lib/env";
 import { LONG_TEXT_MAX } from "@/lib/validation/string-limits";
 import { handleCommentEnterKey } from "@/lib/ui/comment-keydown";
 import { brutalPageTitleSx } from "@/theme/brutalUi";
 import { GARDEN_TOKENS } from "@/theme/tokens";
-import { ADMIN_ONLY_FEED_COMMENT_BG } from "@/components/proposals/proposalCardTheme";
 
 const ProposalDetailDialog = dynamic(
   () =>
@@ -258,7 +261,15 @@ function CommentBlock({
       }}
     >
       <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
-        <Typography variant="body2" sx={{ opacity: isOptimistic ? 0.85 : 1 }}>
+        <Typography
+          variant="body2"
+          sx={{
+            opacity: isOptimistic ? 0.85 : 1,
+            minWidth: 0,
+            overflowWrap: "anywhere",
+            wordBreak: "break-word",
+          }}
+        >
           <strong>{comment.authorName}</strong>
           {comment.body ? `: ${comment.body}` : ""}
           {isOptimistic ? (
@@ -302,10 +313,16 @@ export function FeedClient({
   currentUserId,
   isAdmin,
   people,
+  buildInfo,
+  changelog,
+  latestChangelogEntry,
 }: {
   currentUserId: string;
   isAdmin: boolean;
   people: PersonSummary[];
+  buildInfo: BuildInfo;
+  changelog: ChangelogEntry[];
+  latestChangelogEntry: ChangelogEntry | null;
 }) {
   const [items, setItems] = useState<FeedItem[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
@@ -882,7 +899,17 @@ export function FeedClient({
               {new Date(item.createdAt).toLocaleString()}
             </Typography>
             {item.body ? (
-              <Typography sx={{ mt: 0.5, whiteSpace: "pre-wrap" }}>{item.body}</Typography>
+              <Typography
+                sx={{
+                  mt: 0.5,
+                  whiteSpace: "pre-wrap",
+                  minWidth: 0,
+                  overflowWrap: "anywhere",
+                  wordBreak: "break-word",
+                }}
+              >
+                {item.body}
+              </Typography>
             ) : null}
             <FeedImageStrip
               imageIds={item.imageIds}
@@ -998,6 +1025,12 @@ export function FeedClient({
       <Typography sx={{ mb: 2, color: GARDEN_TOKENS.inkMuted }}>
         Proposal milestones and network chat in one timeline.
       </Typography>
+
+      <CodeStatusPanel
+        buildInfo={buildInfo}
+        changelog={changelog}
+        latestEntry={latestChangelogEntry}
+      />
 
       {error ? (
         <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>

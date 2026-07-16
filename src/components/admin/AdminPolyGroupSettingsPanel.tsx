@@ -22,6 +22,7 @@ import {
   updatePolyGroupSettingsAction,
 } from "@/actions/poly-group";
 import { AdminCollapsibleSection } from "@/components/admin/AdminCollapsibleSection";
+import { LONG_TEXT_MAX } from "@/lib/validation/string-limits";
 import type { PolyGroupSettings } from "@/types/poly-group";
 import {
   auditLogVisibilityLevels,
@@ -70,12 +71,14 @@ export function AdminPolyGroupSettingsPanel({
   const [error, setError] = useState<string | null>(null);
   const [proposedName, setProposedName] = useState("");
   const [proposalMessage, setProposalMessage] = useState<string | null>(null);
-  const [pending, startTransition] = useTransition();
+  // Separate transitions so Save's router.refresh() does not keep Propose disabled (PC-252 e2e).
+  const [savePending, startSaveTransition] = useTransition();
+  const [proposePending, startProposeTransition] = useTransition();
 
   function save() {
     setMessage(null);
     setError(null);
-    startTransition(async () => {
+    startSaveTransition(async () => {
       const result = await updatePolyGroupSettingsAction(settings);
       if (!result.ok) {
         setError(result.message);
@@ -89,7 +92,7 @@ export function AdminPolyGroupSettingsPanel({
   function proposeNameChange() {
     setProposalMessage(null);
     setError(null);
-    startTransition(async () => {
+    startProposeTransition(async () => {
       const result = await proposeGroupNameChangeAction({ proposedName });
       if (!result.ok) {
         setError(result.message);
@@ -114,6 +117,7 @@ export function AdminPolyGroupSettingsPanel({
           value={settings.name}
           onChange={(e) => setSettings({ ...settings, name: e.target.value })}
           fullWidth
+          inputProps={{ maxLength: LONG_TEXT_MAX }}
           helperText={
             settings.allowGroupNameProposals
               ? "Direct saves update immediately; use “Propose name change” for consensus workflow."
@@ -127,11 +131,12 @@ export function AdminPolyGroupSettingsPanel({
               value={proposedName}
               onChange={(e) => setProposedName(e.target.value)}
               fullWidth
+              inputProps={{ maxLength: LONG_TEXT_MAX }}
             />
             <Button
               variant="outlined"
               onClick={proposeNameChange}
-              disabled={pending || !proposedName.trim()}
+              disabled={proposePending || !proposedName.trim()}
             >
               Propose name change (draft)
             </Button>
@@ -342,6 +347,7 @@ export function AdminPolyGroupSettingsPanel({
           multiline
           minRows={4}
           fullWidth
+          inputProps={{ maxLength: LONG_TEXT_MAX }}
           helperText="Shown to users when they finish first-login onboarding."
         />
         <Typography variant="subtitle2" sx={{ pt: 1 }}>
@@ -412,8 +418,8 @@ export function AdminPolyGroupSettingsPanel({
           }
           helperText="Resolved events hold calendar this long when all required invitees are removed"
         />
-        <Button variant="contained" onClick={save} disabled={pending}>
-          {pending ? "Saving…" : "Save settings"}
+        <Button variant="contained" onClick={save} disabled={savePending}>
+          {savePending ? "Saving…" : "Save settings"}
         </Button>
       </Stack>
     </AdminCollapsibleSection>

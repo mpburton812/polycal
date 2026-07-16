@@ -64,7 +64,7 @@ Shared helpers: `src/lib/actions/context.ts` (`requireSession`, `requireAdminAcc
 | Auth | Auth.js credentials provider, HttpOnly JWT cookies, `sessionVersion` invalidation |
 | Database | libSQL — `file:local.db` (local), Turso (`polycal-dev` / `polycal-test` / `polycal-prod`) |
 | Hosting | Vercel (+ Render cron for dev/test enforcement) |
-| Identity roles | Admin, User (active), Passive (schedulable, upgrade path to User) |
+| Identity roles | Admin, User (active), Proxy (schedulable, upgrade path to User; DB role `passive`) |
 
 ## Admin capability matrix
 
