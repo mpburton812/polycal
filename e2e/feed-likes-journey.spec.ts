@@ -43,7 +43,8 @@ test.describe("Feed likes journey", () => {
     await expect(leiaCard).toBeVisible({ timeout: 30_000 });
     await expect(leiaCard.getByRole("button", { name: /1 likes/ })).toBeVisible();
     await leiaCard.getByRole("button", { name: /1 likes/ }).click();
-    await expect(page.getByRole("heading", { name: "Liked by" })).toBeVisible();
-    await expect(page.getByText(USERS.luke.displayName)).toBeVisible();
+    const likersDialog = page.getByRole("dialog").filter({ hasText: "Liked by" });
+    await expect(likersDialog).toBeVisible();
+    await expect(likersDialog.getByText(USERS.luke.displayName)).toBeVisible();
   });
 });
