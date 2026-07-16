@@ -620,7 +620,9 @@ export async function moveResolvedEventByRedraft(
   });
 
   if (options.allDay) {
-    await fillProposalDateRange(draftDialog, options.start.slice(0, 10), options.end?.slice(0, 10));
+    const day = options.start.slice(0, 10);
+    // Single-day all-day moves must keep end=start — clearing end drops the event off the calendar.
+    await fillProposalDateRange(draftDialog, day, options.end?.slice(0, 10) ?? day);
   } else {
     await fillProposalDateTimeField(draftDialog.getByLabel("Start").first(), options.start);
     if (options.end) {

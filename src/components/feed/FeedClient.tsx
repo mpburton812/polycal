@@ -22,6 +22,7 @@ import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import {
   deleteNetworkChatCommentAction,
   deleteNetworkChatMessageAction,
+  getFeedUpdateTokenAction,
   listFeedItemsAction,
   postNetworkChatCommentAction,
   postNetworkChatMessageAction,
@@ -31,9 +32,12 @@ import {
   addProposalCommentAction,
   deleteProposalCommentAction,
 } from "@/actions/proposals";
-import type { FeedComment, FeedItem } from "@/lib/feed/types";
-import { feedImageUrl, MAX_FEED_IMAGES } from "@/lib/feed/images";
 import type { PersonSummary } from "@/actions/users";
+import { FeedLikeRow } from "@/components/feed/FeedLikeControl";
+import { feedImageUrl, MAX_FEED_IMAGES } from "@/lib/feed/images";
+import type { FeedLikeTargetType } from "@/lib/feed/likes";
+import type { FeedComment, FeedItem } from "@/lib/feed/types";
+import { buildFeedUpdateToken } from "@/lib/feed/update-token";
 import { handleCommentEnterKey } from "@/lib/ui/comment-keydown";
 import { brutalPageTitleSx } from "@/theme/brutalUi";
 import { GARDEN_TOKENS } from "@/theme/tokens";
@@ -87,11 +91,13 @@ function FeedImageStrip({
 
 function CommentBlock({
   comment,
+  commentTargetType,
   onDelete,
   onOpenImage,
   pending,
 }: {
   comment: FeedComment;
+  commentTargetType: Extract<FeedLikeTargetType, "chat_comment" | "proposal_comment">;
   onDelete: (id: string) => void;
   onOpenImage: (ids: string[], index: number) => void;
   pending: boolean;
@@ -115,6 +121,12 @@ function CommentBlock({
         ) : null}
       </Stack>
       <FeedImageStrip imageIds={comment.imageIds} onOpen={onOpenImage} />
+      <FeedLikeRow
+        targetType={commentTargetType}
+        targetId={comment.id}
+        likeCount={comment.likeCount}
+        likedByMe={comment.likedByMe}
+      />
     </Box>
   );
 }
@@ -138,6 +150,7 @@ export function FeedClient({
   const [loadingMore, setLoadingMore] = useState(false);
   const [chatDraft, setChatDraft] = useState("");
   const [pending, startTransition] = useTransition();
+  const [sending, setSending] = useState(false);
   const [selectedProposalId, setSelectedProposalId] = useState<string | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
   const [commentDrafts, setCommentDrafts] = useState<Record<string, string>>({});
@@ -148,31 +161,61 @@ export function FeedClient({
   const [lightbox, setLightbox] = useState<{ ids: string[]; index: number } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const commentFileTargetRef = useRef<string | null>(null);
+  const sendInFlightRef = useRef(false);
+  /** Last known first-page fingerprint — skip silent reload when unchanged. */
+  const updateTokenRef = useRef<string | null>(null);
 
-  const loadFeed = useCallback(async (cursor?: string | null, append = false) => {
-    if (append) setLoadingMore(true);
-    else setLoading(true);
-    const result = await listFeedItemsAction({ cursor: cursor ?? null, limit: 20 });
-    if (!result.ok || !result.items) {
-      setError(result.message);
-    } else {
-      setItems((prev) => (append ? [...prev, ...result.items!] : result.items!));
-      setNextCursor(result.nextCursor ?? null);
+  const loadFeed = useCallback(
+    async (
+      cursor?: string | null,
+      options?: { append?: boolean; silent?: boolean },
+    ) => {
+      const append = options?.append ?? false;
+      const silent = options?.silent ?? false;
+      if (append) setLoadingMore(true);
+      else if (!silent) setLoading(true);
+      const result = await listFeedItemsAction({ cursor: cursor ?? null, limit: 20 });
+      if (!result.ok || !result.items) {
+        setError(result.message);
+      } else {
+        setItems((prev) => (append ? [...prev, ...result.items!] : result.items!));
+        setNextCursor(result.nextCursor ?? null);
+        if (!append) {
+          updateTokenRef.current = buildFeedUpdateToken(result.items);
+        }
+      }
+      if (!silent || append) {
+        setLoading(false);
+        setLoadingMore(false);
+      } else {
+        setLoadingMore(false);
+      }
+    },
+    [],
+  );
+
+  /** Background head-check: leave the active list alone when nothing changed. */
+  const pollFeedUpdates = useCallback(async () => {
+    if (document.visibilityState === "hidden") return;
+    const head = await getFeedUpdateTokenAction();
+    if (!head.ok || head.token === undefined) return;
+    if (updateTokenRef.current !== null && head.token === updateTokenRef.current) {
+      return;
     }
-    setLoading(false);
-    setLoadingMore(false);
-  }, []);
+    await loadFeed(null, { silent: true });
+  }, [loadFeed]);
 
   useEffect(() => {
     void loadFeed();
   }, [loadFeed]);
 
   useEffect(() => {
+    if (pending || sending) return;
     const timer = window.setInterval(() => {
-      void loadFeed();
+      void pollFeedUpdates();
     }, 15_000);
     return () => window.clearInterval(timer);
-  }, [loadFeed]);
+  }, [pollFeedUpdates, pending, sending]);
 
   function openDetail(proposalId: string) {
     setSelectedProposalId(proposalId);
@@ -229,7 +272,7 @@ export function FeedClient({
       }
       setCommentDrafts((prev) => ({ ...prev, [draftKey]: "" }));
       clearCommentImages(draftKey);
-      await loadFeed();
+      await loadFeed(null, { silent: true });
     });
   }
 
@@ -237,15 +280,18 @@ export function FeedClient({
     startTransition(async () => {
       const result = await deleteProposalCommentAction(commentId);
       if (!result.ok) setError(result.message);
-      else await loadFeed();
+      else await loadFeed(null, { silent: true });
     });
   }
 
   function sendChat() {
     const body = chatDraft.trim();
     if (!body && pendingImages.length === 0) return;
+    if (sendInFlightRef.current) return;
+    sendInFlightRef.current = true;
     setError(null);
-    startTransition(async () => {
+    setSending(true);
+    void (async () => {
       try {
         const result = await postNetworkChatMessageAction({
           body,
@@ -260,13 +306,17 @@ export function FeedClient({
         setPendingImages([]);
         if (result.item) {
           setItems((prev) => [{ kind: "chat", ...result.item! }, ...prev]);
+          updateTokenRef.current = null;
         } else {
-          await loadFeed();
+          await loadFeed(null, { silent: true });
         }
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to send message.");
+      } finally {
+        sendInFlightRef.current = false;
+        setSending(false);
       }
-    });
+    })();
   }
 
   function postChatComment(messageId: string) {
@@ -283,7 +333,7 @@ export function FeedClient({
       }
       setCommentDrafts((prev) => ({ ...prev, [draftKey]: "" }));
       clearCommentImages(draftKey);
-      await loadFeed();
+      await loadFeed(null, { silent: true });
     });
   }
 
@@ -291,7 +341,7 @@ export function FeedClient({
     startTransition(async () => {
       const result = await deleteNetworkChatMessageAction(messageId);
       if (!result.ok) setError(result.message);
-      else await loadFeed();
+      else await loadFeed(null, { silent: true });
     });
   }
 
@@ -299,7 +349,7 @@ export function FeedClient({
     startTransition(async () => {
       const result = await deleteNetworkChatCommentAction(commentId);
       if (!result.ok) setError(result.message);
-      else await loadFeed();
+      else await loadFeed(null, { silent: true });
     });
   }
 
@@ -330,6 +380,12 @@ export function FeedClient({
           <Button size="small" onClick={() => openDetail(item.proposalId)}>
             Open proposal
           </Button>
+          <FeedLikeRow
+            targetType="milestone"
+            targetId={item.id}
+            likeCount={item.likeCount}
+            likedByMe={item.likedByMe}
+          />
 
           {!item.masked && item.comments.length > 0 ? (
             <Stack spacing={1} sx={{ mt: 1.5 }}>
@@ -337,6 +393,7 @@ export function FeedClient({
                 <CommentBlock
                   key={comment.id}
                   comment={comment}
+                  commentTargetType="proposal_comment"
                   pending={pending}
                   onDelete={deleteMilestoneComment}
                   onOpenImage={(ids, index) => setLightbox({ ids, index })}
@@ -459,12 +516,20 @@ export function FeedClient({
           ) : null}
         </Stack>
 
+        <FeedLikeRow
+          targetType="chat"
+          targetId={item.id}
+          likeCount={item.likeCount}
+          likedByMe={item.likedByMe}
+        />
+
         {item.comments.length > 0 ? (
           <Stack spacing={1} sx={{ mt: 1.5 }}>
             {item.comments.map((comment) => (
               <CommentBlock
                 key={comment.id}
                 comment={comment}
+                commentTargetType="chat_comment"
                 pending={pending}
                 onDelete={deleteChatComment}
                 onOpenImage={(ids, index) => setLightbox({ ids, index })}
@@ -541,7 +606,7 @@ export function FeedClient({
       <Stack spacing={2}>
         {loading ? (
           <Box sx={{ display: "flex", justifyContent: "center", py: 4 }}>
-            <CircularProgress aria-label="Loading feed" />
+            <CircularProgress aria-label="Loading feed" data-testid="feed-loading" />
           </Box>
         ) : items.length === 0 ? (
           <Typography color="text.secondary">No feed activity yet.</Typography>
@@ -549,7 +614,7 @@ export function FeedClient({
           items.map(renderItem)
         )}
         {nextCursor ? (
-          <Button disabled={loadingMore} onClick={() => void loadFeed(nextCursor, true)}>
+          <Button disabled={loadingMore} onClick={() => void loadFeed(nextCursor, { append: true })}>
             {loadingMore ? "Loading…" : "Load more"}
           </Button>
         ) : null}
@@ -616,7 +681,7 @@ export function FeedClient({
               commentFileTargetRef.current = null;
               fileInputRef.current?.click();
             }}
-            disabled={pending || pendingImages.length >= MAX_FEED_IMAGES}
+            disabled={pending || sending || pendingImages.length >= MAX_FEED_IMAGES}
           >
             <AttachFileIcon />
           </IconButton>
@@ -628,13 +693,13 @@ export function FeedClient({
             label="Message the network"
             value={chatDraft}
             onChange={(e) => setChatDraft(e.target.value)}
-            onKeyDown={(e) => handleCommentEnterKey(e, sendChat, !pending)}
+            onKeyDown={(e) => handleCommentEnterKey(e, sendChat, !pending && !sending)}
           />
           <Button
             type="button"
             variant="contained"
             data-testid="feed-send"
-            disabled={pending || (!chatDraft.trim() && pendingImages.length === 0)}
+            disabled={pending || sending || (!chatDraft.trim() && pendingImages.length === 0)}
             onClick={sendChat}
           >
             Send
@@ -700,7 +765,7 @@ export function FeedClient({
           onClose={() => {
             setDetailOpen(false);
             setSelectedProposalId(null);
-            void loadFeed();
+            void loadFeed(null, { silent: true });
           }}
           currentUserId={currentUserId}
           isAdmin={isAdmin}

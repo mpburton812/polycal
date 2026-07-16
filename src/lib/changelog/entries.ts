@@ -26,6 +26,49 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "2026.07.16a",
+    date: "2026-07-16",
+    summary: "Feed likes, silent poll, and schedule all-day redraft fix.",
+    changes: [
+      {
+        type: "added",
+        description:
+          "Grey/green parrot likes under milestones, chats, and comments; likers popup (PC-239–PC-242).",
+      },
+      {
+        type: "fixed",
+        description:
+          "Feed polls via head fingerprint and leaves the timeline alone when unchanged (no 15s spinner flash) (PC-239).",
+      },
+      {
+        type: "fixed",
+        description:
+          "Same-day all-day redraft keeps end=start so moved events stay on the calendar (PC-239).",
+      },
+      {
+        type: "changed",
+        description:
+          "E2E workflow skips feature-push runs when an open PR already covers the branch (PC-239).",
+      },
+    ],
+  },
+  {
+    version: "2026.07.15d",
+    date: "2026-07-15",
+    summary: "Feed likes with parrot toggle and likers popup.",
+    changes: [
+      {
+        type: "added",
+        description:
+          "Grey/green parrot likes under milestones, chats, and comments; count opens likers list (PC-239–PC-242).",
+      },
+      {
+        type: "changed",
+        description: "SCHEMA_VERSION 27 with feed_likes table (PC-240).",
+      },
+    ],
+  },
+  {
     version: "2026.07.15c",
     date: "2026-07-15",
     summary: "Unified Feed timeline with chat comments, images, and reply push.",

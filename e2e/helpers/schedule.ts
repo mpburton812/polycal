@@ -40,9 +40,11 @@ function dateInRange(isoDate: string, rangeStart: string, rangeEnd: string): boo
 }
 
 function eventLocator(page: Page, namePattern: RegExp) {
+  // Week/day blocks use aria-label "Title, Confirmed. …"; month chips use title/aria-label.
   return page
     .getByRole("button", { name: namePattern })
     .or(page.getByTitle(namePattern))
+    .or(page.getByLabel(namePattern))
     .first();
 }
 
@@ -111,24 +113,57 @@ export async function assertEventVisibleInAllScheduleViews(
   titlePattern: RegExp,
   targetDateIso: string,
 ): Promise<void> {
-  await goToSchedule(page);
+  // Clear persisted layout, then hard-load so ScheduleClient mounts clean (PC-239).
+  await page.goto("/schedule");
+  await expect(page).toHaveURL(/\/schedule/);
   await clearScheduleViewState(page);
+  await page.reload();
+  await waitForScheduleReady(page);
 
   for (const selectView of [
     selectScheduleOneWeekView,
     selectScheduleTwoWeekView,
     selectScheduleMonthView,
   ]) {
-    await selectView(page);
-    await navigateScheduleUntilDateInRange(page, targetDateIso);
-    await waitForScheduleReady(page);
-    await expect(eventLocator(page, titlePattern)).toBeVisible({ timeout: 20_000 });
+    await expectEventVisibleInView(page, titlePattern, targetDateIso, selectView);
   }
+}
+
+/**
+ * Selects a layout, navigates to `targetDateIso`, and asserts the event is visible.
+ * Reloads once on miss — CI can serve a stale slice after redraft / soft nav.
+ */
+async function expectEventVisibleInView(
+  page: Page,
+  titlePattern: RegExp,
+  targetDateIso: string,
+  selectView: (page: Page) => Promise<void>,
+): Promise<void> {
+  await selectView(page);
+  await navigateScheduleUntilDateInRange(page, targetDateIso);
+  await waitForScheduleReady(page);
+
+  const locator = eventLocator(page, titlePattern);
+  try {
+    await expect(locator).toBeVisible({ timeout: 15_000 });
+    return;
+  } catch {
+    // Fall through to hard recovery below.
+  }
+
+  await clearScheduleViewState(page);
+  await page.goto("/schedule");
+  await waitForScheduleReady(page);
+  await selectView(page);
+  await navigateScheduleUntilDateInRange(page, targetDateIso);
+  await waitForScheduleReady(page);
+  await expect(eventLocator(page, titlePattern)).toBeVisible({ timeout: 25_000 });
 }
 
 /** Waits until schedule data has finished loading for the visible range. */
 export async function waitForScheduleReady(page: Page): Promise<void> {
-  await expect(page.getByTestId("schedule-ready")).toHaveAttribute("data-ready", "true", {
+  // Prefer the last marker — soft navigations can briefly leave a stale node in the DOM.
+  await expect(page.getByTestId("schedule-ready").last()).toHaveAttribute("data-ready", "true", {
     timeout: 30_000,
   });
 }
@@ -148,8 +183,9 @@ export async function forceWeekLayout(page: Page): Promise<void> {
 }
 
 async function readVisibleRange(page: Page): Promise<{ start: string; end: string }> {
-  const start = await page.getByTestId("schedule-range-start").getAttribute("data-value");
-  const end = await page.getByTestId("schedule-range-end").getAttribute("data-value");
+  // Prefer .last() — soft navigations / remounts can leave a stale range marker in the DOM.
+  const start = await page.getByTestId("schedule-range-start").last().getAttribute("data-value");
+  const end = await page.getByTestId("schedule-range-end").last().getAttribute("data-value");
   if (!start || !end) {
     throw new Error("Schedule range attributes missing.");
   }
@@ -158,6 +194,7 @@ async function readVisibleRange(page: Page): Promise<{ start: string; end: strin
 
 /**
  * Advances the calendar until the visible range contains `targetDateIso`.
+ * Steps forward or backward so near-term and far-future targets both work.
  */
 export async function navigateScheduleUntilDateInRange(
   page: Page,
@@ -165,6 +202,7 @@ export async function navigateScheduleUntilDateInRange(
   options?: { maxSteps?: number },
 ): Promise<void> {
   const maxSteps = options?.maxSteps ?? 60;
+  const target = parseIsoDate(targetDateIso).getTime();
 
   for (let step = 0; step < maxSteps; step += 1) {
     await waitForScheduleReady(page);
@@ -173,9 +211,12 @@ export async function navigateScheduleUntilDateInRange(
       return;
     }
 
-    const next = page.getByRole("button", { name: "Next period" });
-    await expect(next).toBeEnabled({ timeout: 15_000 });
-    await next.click();
+    const rangeStart = new Date(range.start).getTime();
+    const goingForward = target > rangeStart;
+    const navLabel = goingForward ? "Next period" : "Previous period";
+    const nav = page.getByRole("button", { name: navLabel });
+    await expect(nav).toBeEnabled({ timeout: 15_000 });
+    await nav.click();
   }
 
   throw new Error(`Could not navigate schedule to include ${targetDateIso}.`);

@@ -77,6 +77,7 @@ test.describe("Event schedule views journey", () => {
 
     await moveResolvedEventByRedraft(page, title, {
       start: movedDay,
+      end: movedDay,
       allDay: true,
     });
     await expectResolvedProposal(page, title);
