@@ -240,3 +240,4 @@
 2026-07-16 | 986090d | PC-239 | silent poll fingerprint and CI harden | src/actions/feed.ts
 2026-07-16 | 3970426 | PC-239 | keep all-day end date on redraft move | e2e/event-schedule-views-journey.spec.ts
 2026-07-16 | 757e15e | PC-239 | promotion entry for likes and silent poll | src/lib/changelog/entries.ts
+2026-07-16 | 1ddf6e1 | PC-239 | use last range marker under strict mode | e2e/helpers/schedule.ts
