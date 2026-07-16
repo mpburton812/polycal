@@ -53,4 +53,23 @@ test.describe("Feed tab", () => {
     await page.getByRole("button", { name: "Reply" }).first().click();
     await expect(page.getByText(reply)).toBeVisible({ timeout: 30_000 });
   });
+
+  test("background poll does not flash loading spinner when feed is unchanged", async ({
+    page,
+  }) => {
+    test.setTimeout(90_000);
+
+    await login(page, USERS.luke.username);
+    await expectAuthenticatedShell(page);
+    await goToFeed(page);
+
+    await expect(feedComposer(page)).toBeVisible();
+    await expect(page.getByTestId("feed-loading")).toHaveCount(0, { timeout: 30_000 });
+
+    // Poll interval is 15s — wait past one tick and assert the timeline stayed mounted.
+    await page.waitForTimeout(16_500);
+    await expect(page.getByTestId("feed-loading")).toHaveCount(0);
+    await expect(feedComposer(page)).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Feed" })).toBeVisible();
+  });
 });

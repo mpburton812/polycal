@@ -22,6 +22,7 @@ import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import {
   deleteNetworkChatCommentAction,
   deleteNetworkChatMessageAction,
+  getFeedUpdateTokenAction,
   listFeedItemsAction,
   postNetworkChatCommentAction,
   postNetworkChatMessageAction,
@@ -36,6 +37,7 @@ import { FeedLikeRow } from "@/components/feed/FeedLikeControl";
 import { feedImageUrl, MAX_FEED_IMAGES } from "@/lib/feed/images";
 import type { FeedLikeTargetType } from "@/lib/feed/likes";
 import type { FeedComment, FeedItem } from "@/lib/feed/types";
+import { buildFeedUpdateToken } from "@/lib/feed/update-token";
 import { handleCommentEnterKey } from "@/lib/ui/comment-keydown";
 import { brutalPageTitleSx } from "@/theme/brutalUi";
 import { GARDEN_TOKENS } from "@/theme/tokens";
@@ -160,20 +162,48 @@ export function FeedClient({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const commentFileTargetRef = useRef<string | null>(null);
   const sendInFlightRef = useRef(false);
+  /** Last known first-page fingerprint — skip silent reload when unchanged. */
+  const updateTokenRef = useRef<string | null>(null);
 
-  const loadFeed = useCallback(async (cursor?: string | null, append = false) => {
-    if (append) setLoadingMore(true);
-    else setLoading(true);
-    const result = await listFeedItemsAction({ cursor: cursor ?? null, limit: 20 });
-    if (!result.ok || !result.items) {
-      setError(result.message);
-    } else {
-      setItems((prev) => (append ? [...prev, ...result.items!] : result.items!));
-      setNextCursor(result.nextCursor ?? null);
+  const loadFeed = useCallback(
+    async (
+      cursor?: string | null,
+      options?: { append?: boolean; silent?: boolean },
+    ) => {
+      const append = options?.append ?? false;
+      const silent = options?.silent ?? false;
+      if (append) setLoadingMore(true);
+      else if (!silent) setLoading(true);
+      const result = await listFeedItemsAction({ cursor: cursor ?? null, limit: 20 });
+      if (!result.ok || !result.items) {
+        setError(result.message);
+      } else {
+        setItems((prev) => (append ? [...prev, ...result.items!] : result.items!));
+        setNextCursor(result.nextCursor ?? null);
+        if (!append) {
+          updateTokenRef.current = buildFeedUpdateToken(result.items);
+        }
+      }
+      if (!silent || append) {
+        setLoading(false);
+        setLoadingMore(false);
+      } else {
+        setLoadingMore(false);
+      }
+    },
+    [],
+  );
+
+  /** Background head-check: leave the active list alone when nothing changed. */
+  const pollFeedUpdates = useCallback(async () => {
+    if (document.visibilityState === "hidden") return;
+    const head = await getFeedUpdateTokenAction();
+    if (!head.ok || head.token === undefined) return;
+    if (updateTokenRef.current !== null && head.token === updateTokenRef.current) {
+      return;
     }
-    setLoading(false);
-    setLoadingMore(false);
-  }, []);
+    await loadFeed(null, { silent: true });
+  }, [loadFeed]);
 
   useEffect(() => {
     void loadFeed();
@@ -182,10 +212,10 @@ export function FeedClient({
   useEffect(() => {
     if (pending || sending) return;
     const timer = window.setInterval(() => {
-      void loadFeed();
+      void pollFeedUpdates();
     }, 15_000);
     return () => window.clearInterval(timer);
-  }, [loadFeed, pending, sending]);
+  }, [pollFeedUpdates, pending, sending]);
 
   function openDetail(proposalId: string) {
     setSelectedProposalId(proposalId);
@@ -242,7 +272,7 @@ export function FeedClient({
       }
       setCommentDrafts((prev) => ({ ...prev, [draftKey]: "" }));
       clearCommentImages(draftKey);
-      await loadFeed();
+      await loadFeed(null, { silent: true });
     });
   }
 
@@ -250,7 +280,7 @@ export function FeedClient({
     startTransition(async () => {
       const result = await deleteProposalCommentAction(commentId);
       if (!result.ok) setError(result.message);
-      else await loadFeed();
+      else await loadFeed(null, { silent: true });
     });
   }
 
@@ -276,8 +306,9 @@ export function FeedClient({
         setPendingImages([]);
         if (result.item) {
           setItems((prev) => [{ kind: "chat", ...result.item! }, ...prev]);
+          updateTokenRef.current = null;
         } else {
-          await loadFeed();
+          await loadFeed(null, { silent: true });
         }
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to send message.");
@@ -302,7 +333,7 @@ export function FeedClient({
       }
       setCommentDrafts((prev) => ({ ...prev, [draftKey]: "" }));
       clearCommentImages(draftKey);
-      await loadFeed();
+      await loadFeed(null, { silent: true });
     });
   }
 
@@ -310,7 +341,7 @@ export function FeedClient({
     startTransition(async () => {
       const result = await deleteNetworkChatMessageAction(messageId);
       if (!result.ok) setError(result.message);
-      else await loadFeed();
+      else await loadFeed(null, { silent: true });
     });
   }
 
@@ -318,7 +349,7 @@ export function FeedClient({
     startTransition(async () => {
       const result = await deleteNetworkChatCommentAction(commentId);
       if (!result.ok) setError(result.message);
-      else await loadFeed();
+      else await loadFeed(null, { silent: true });
     });
   }
 
@@ -575,7 +606,7 @@ export function FeedClient({
       <Stack spacing={2}>
         {loading ? (
           <Box sx={{ display: "flex", justifyContent: "center", py: 4 }}>
-            <CircularProgress aria-label="Loading feed" />
+            <CircularProgress aria-label="Loading feed" data-testid="feed-loading" />
           </Box>
         ) : items.length === 0 ? (
           <Typography color="text.secondary">No feed activity yet.</Typography>
@@ -583,7 +614,7 @@ export function FeedClient({
           items.map(renderItem)
         )}
         {nextCursor ? (
-          <Button disabled={loadingMore} onClick={() => void loadFeed(nextCursor, true)}>
+          <Button disabled={loadingMore} onClick={() => void loadFeed(nextCursor, { append: true })}>
             {loadingMore ? "Loading…" : "Load more"}
           </Button>
         ) : null}
@@ -734,7 +765,7 @@ export function FeedClient({
           onClose={() => {
             setDetailOpen(false);
             setSelectedProposalId(null);
-            void loadFeed();
+            void loadFeed(null, { silent: true });
           }}
           currentUserId={currentUserId}
           isAdmin={isAdmin}

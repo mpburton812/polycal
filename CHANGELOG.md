@@ -26,6 +26,7 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - PC-239–PC-242: Feed likes — grey/green parrot toggle under milestones, chats, and comments; count opens likers popup. SCHEMA_VERSION 27. Change control: `2026.07.15d`.
 
 ### Fixed
+- PC-239: Feed background poll uses a head fingerprint and only refreshes when content changes (no 15s loading spinner flash); E2E skips feature-push runs when an open PR already covers the branch.
 - PC-216 / PC-217–219: Accepting or declining a proposal (Proposals UI or notification bell) soft-dismisses matching actionable inbox rows so they stay cleared after reload; bell vote rows include Decline.
 - PC-213: Mobile smoke no longer shares SERIAL w0; workers≤1 serializes SAFE behind serial.
 - PC-209: All Day / sleeping End day typing no longer lexicographically swaps into Day until both values are valid ISO dates.

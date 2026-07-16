@@ -37,6 +37,7 @@ import {
   type FeedMilestone,
   type NetworkChatMessage,
 } from "@/lib/feed/types";
+import { buildFeedUpdateToken } from "@/lib/feed/update-token";
 import { notifyUser } from "@/lib/notifications";
 import {
   applyProposalMask,
@@ -228,6 +229,22 @@ export async function listFeedItemsAction(
 
     return { ok: true, message: "OK", items, nextCursor };
   });
+}
+
+/**
+ * Cheap first-page fingerprint so the Feed client can skip full reloads when
+ * the head is unchanged (PC-239 silent poll).
+ */
+export async function getFeedUpdateTokenAction(): Promise<{
+  ok: boolean;
+  message: string;
+  token?: string;
+}> {
+  const result = await listFeedItemsAction({ cursor: null, limit: 20 });
+  if (!result.ok || !result.items) {
+    return { ok: false, message: result.message };
+  }
+  return { ok: true, message: "OK", token: buildFeedUpdateToken(result.items) };
 }
 
 async function loadMilestoneBatch(
