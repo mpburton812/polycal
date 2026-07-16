@@ -71,13 +71,13 @@ test.describe("Residency proposal journey", () => {
     await expandPlace(page, PLACE);
     await expect(page.getByText(USERS.leia.displayName)).toBeVisible({ timeout: 15_000 });
 
-    // —— Phase 5: Admin activity log ——
+    // —— Phase 5: Admin activity log (human-readable action labels, PC-245) ——
     await goToAdmin(page);
     await expandAdminSection(page, "System administrator log");
-    await expect(page.getByText("places.add_person").first()).toBeVisible({
+    await expect(page.getByText("Added person to place").first()).toBeVisible({
       timeout: 15_000,
     });
-    await expect(page.getByText("places.propose_residency").first()).toBeVisible();
-    await expect(page.getByText("places.accept_residency").first()).toBeVisible();
+    await expect(page.getByText("Proposed residency").first()).toBeVisible();
+    await expect(page.getByText("Accepted residency").first()).toBeVisible();
   });
 });
