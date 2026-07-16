@@ -51,6 +51,7 @@ import { formatProposalLogLine } from "@/lib/proposals/state-log-format";
 import { canCommentOnProposal } from "@/lib/schedule/slice-auth";
 import { readFeedImageUploads } from "@/lib/feed/images";
 import type { AuditLogVisibility } from "@/types/poly-group";
+import { LONG_TEXT_MAX, maxCharsMessage } from "@/lib/validation/string-limits";
 
 const listFeedSchema = z.object({
   cursor: z.string().optional().nullable(),
@@ -58,13 +59,23 @@ const listFeedSchema = z.object({
 });
 
 const chatPostSchema = z.object({
-  body: z.string().trim().max(2000).optional().default(""),
+  body: z
+    .string()
+    .trim()
+    .max(LONG_TEXT_MAX, maxCharsMessage("Message", LONG_TEXT_MAX))
+    .optional()
+    .default(""),
   imageIds: z.array(z.string().min(1)).max(MAX_FEED_IMAGES).optional().default([]),
 });
 
 const chatCommentSchema = z.object({
   messageId: z.string().min(1),
-  body: z.string().trim().max(2000).optional().default(""),
+  body: z
+    .string()
+    .trim()
+    .max(LONG_TEXT_MAX, maxCharsMessage("Comment", LONG_TEXT_MAX))
+    .optional()
+    .default(""),
   imageIds: z.array(z.string().min(1)).max(MAX_FEED_IMAGES).optional().default([]),
 });
 
@@ -594,13 +605,23 @@ export async function uploadFeedImageAction(
   });
 }
 
+/** How long an uploaded feed image may sit unused before post (PC-247). */
+const FEED_IMAGE_FRESHNESS_MS = 30 * 60 * 1000;
+
+const FEED_IMAGE_INVALID_MESSAGE =
+  "One or more images are invalid or expired. Re-attach the images and try again.";
+
+/**
+ * Confirms imageIds belong to the uploader and were uploaded within the freshness window.
+ * Returns true when ownership + freshness checks pass (PC-236/PC-247).
+ */
 async function assertOwnedImageIds(
   db: Parameters<Parameters<typeof withDb>[0]>[0],
   imageIds: string[],
   uploaderId: string,
 ): Promise<boolean> {
   if (imageIds.length === 0) return true;
-  const cutoff = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+  const cutoff = new Date(Date.now() - FEED_IMAGE_FRESHNESS_MS).toISOString();
   const rows = await db
     .select({ imageId: feedImageUploads.imageId })
     .from(feedImageUploads)
@@ -638,7 +659,7 @@ export async function postNetworkChatMessageAction(
   return withDb(async (db) => {
     const owned = await assertOwnedImageIds(db, parsed.data.imageIds ?? [], sessionResult.user.id);
     if (!owned) {
-      return { ok: false, message: "One or more images are invalid or expired." };
+      return { ok: false, message: FEED_IMAGE_INVALID_MESSAGE };
     }
 
     const now = new Date().toISOString();
@@ -723,7 +744,7 @@ export async function postNetworkChatCommentAction(
 
     const owned = await assertOwnedImageIds(db, parsed.data.imageIds, sessionResult.user.id);
     if (!owned) {
-      return { ok: false, message: "One or more images are invalid or expired." };
+      return { ok: false, message: FEED_IMAGE_INVALID_MESSAGE };
     }
 
     const now = new Date().toISOString();

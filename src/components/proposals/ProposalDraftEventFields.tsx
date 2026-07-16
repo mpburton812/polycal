@@ -19,6 +19,7 @@ import {
 
 import type { ProposalPlaceOption } from "@/actions/proposals";
 import type { PersonSummary } from "@/actions/users";
+import { LONG_TEXT_MAX, SHORT_TEXT_MAX } from "@/lib/validation/string-limits";
 
 import { ProposalDraftSectionHeader } from "./ProposalDraftSectionHeader";
 import { ProposalDateRangeField } from "./ProposalDateRangeField";
@@ -93,6 +94,7 @@ export function ProposalDraftEventFields({
         fullWidth
         size="small"
         placeholder="Untitled Proposal"
+        inputProps={{ maxLength: LONG_TEXT_MAX }}
       />
 
       <ProposalDraftSectionHeader
@@ -126,6 +128,7 @@ export function ProposalDraftEventFields({
               }}
               fullWidth
               size="small"
+              inputProps={{ maxLength: LONG_TEXT_MAX }}
               sx={{ mb: 1 }}
             />
           )}
@@ -323,6 +326,7 @@ export function ProposalDraftEventFields({
         fullWidth
         size="small"
         placeholder="Type a location not in the list"
+        inputProps={{ maxLength: SHORT_TEXT_MAX }}
       />
     </Stack>
   );

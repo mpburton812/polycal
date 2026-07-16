@@ -47,6 +47,16 @@ export async function applyProposalsMigrations(sql: Client): Promise<void> {
   await ensureColumn(sql, "proposal_invitees", "vote_status", "TEXT NOT NULL DEFAULT 'not_seen'");
   await ensureColumn(sql, "proposal_invitees", "overlap_acknowledged_at", "TEXT");
   await ensureColumn(sql, "proposal_invitees", "viewed_at", "TEXT");
+  await ensureColumn(sql, "proposal_invitees", "added_by_user_id", "TEXT");
+
+  // Backfill adder to proposer when missing (PC-246).
+  await sql.execute(`
+    UPDATE proposal_invitees
+    SET added_by_user_id = (
+      SELECT proposer_id FROM proposals WHERE proposals.id = proposal_invitees.proposal_id
+    )
+    WHERE added_by_user_id IS NULL
+  `);
 
   await ensureColumn(sql, "poly_group", "proposed_max_hours", "INTEGER NOT NULL DEFAULT 0");
   await ensureColumn(sql, "poly_group", "at_risk_ttl_hours", "INTEGER NOT NULL DEFAULT 168");

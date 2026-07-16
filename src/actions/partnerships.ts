@@ -14,6 +14,7 @@ import { sleepingPartnerships, users } from "@/lib/db/schema";
 import { canonicalUserPair } from "@/lib/users/pair";
 import { notifyUser } from "@/lib/notifications";
 import { notifySleepingNetworkOfPartnershipChange } from "@/lib/partnerships/network-notify";
+import { LONG_TEXT_MAX, limitedString } from "@/lib/validation/string-limits";
 
 export interface PartnershipView {
   id: string;
@@ -28,7 +29,7 @@ export interface PartnershipView {
 const respondSchema = z.object({
   partnershipId: z.string().min(1),
   accept: z.boolean(),
-  comment: z.string().trim().max(2000).optional(),
+  comment: limitedString("Comment", LONG_TEXT_MAX).optional(),
 });
 
 /**

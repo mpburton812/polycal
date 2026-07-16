@@ -26,6 +26,44 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "2026.07.16b",
+    date: "2026-07-16",
+    summary:
+      "Character limits, human logs, passive proxy votes, comment images, privacy & feedback FAB.",
+    changes: [
+      {
+        type: "changed",
+        description:
+          "Location and About Me capped at 256 characters; other free-text fields at 1024 with HTML maxLength and clearer errors (PC-244).",
+      },
+      {
+        type: "fixed",
+        description:
+          "Activity and proposal logs never show raw JSON; notification types use readable labels (PC-245).",
+      },
+      {
+        type: "changed",
+        description:
+          "Passive invitees no longer auto-accept; the person who added them votes on their behalf (PC-246). SCHEMA_VERSION 28.",
+      },
+      {
+        type: "fixed",
+        description:
+          "Feed comment images show immediate previews, optimistic posts, and retry on load failure (PC-247).",
+      },
+      {
+        type: "changed",
+        description:
+          "Event Privacy control hidden on drafts when only Open is enabled site-wide (PC-248).",
+      },
+      {
+        type: "fixed",
+        description:
+          "Feedback FAB raised ~50px and above dialogs so Issue Submit works over cards (PC-249).",
+      },
+    ],
+  },
+  {
     version: "2026.07.16a",
     date: "2026-07-16",
     summary: "Feed likes, silent poll, and schedule all-day redraft fix.",
