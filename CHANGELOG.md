@@ -25,6 +25,7 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - PC-250: Feed comments visible only to admins (e.g. sleeping arrangements under involved-only network visibility) show a yellow background. Change control: `2026.07.16c`.
 
 ### Changed
+- Feed Code Status panel is minimized by default; click the chevron header to expand. Change control: `2026.07.17`.
 - PC-251 / PC-252–256: Feed unbroken-text wrap; expanded proxy voting (proposer or sleeping partners); Passive→Proxy user-facing labels; maxLength gap fill on admin fields. Change control: `2026.07.16d`.
 - PC-243 / PC-244–249: Character limits (256/1024), human-readable activity logs, passive proxy voting, feed comment image reliability, hide Open-only Event Privacy, feedback FAB position/z-index. SCHEMA_VERSION 28. Change control: `2026.07.16b`.
 

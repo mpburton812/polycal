@@ -13,6 +13,7 @@ export const SAFE_PARALLEL_SPECS = [
   "dates-times-journey.spec.ts",
   "event-icons.spec.ts",
   "event-reminder-journey.spec.ts",
+  "feed-code-status-journey.spec.ts",
   "multi-day-event-slice-journey.spec.ts",
   "navigation.spec.ts",
   "people-places.spec.ts",
