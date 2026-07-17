@@ -53,7 +53,7 @@ test.describe("Feed Code Status journey", () => {
     await expandCodeStatus(page);
     await expect(page.getByTestId("code-status-build-number")).toBeVisible();
 
-    await page.getByRole("button", { name: "Collapse Code Status" }).click();
+    await page.getByRole("button", { name: "Collapse Code Status", exact: true }).click();
     await expect(page.getByTestId("code-status-build-number")).toBeHidden();
   });
 });
