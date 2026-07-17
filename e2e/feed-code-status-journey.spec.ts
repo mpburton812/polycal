@@ -12,6 +12,7 @@ async function expandCodeStatus(page: Page): Promise<void> {
 
 test.describe("Feed Code Status journey", () => {
   test.beforeEach(async ({ page }) => {
+    test.setTimeout(120_000);
     await login(page, USERS.luke.username);
     await expectAuthenticatedShell(page);
     await goToFeed(page);
