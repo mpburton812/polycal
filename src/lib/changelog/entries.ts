@@ -26,6 +26,18 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "2026.07.17",
+    date: "2026-07-17",
+    summary: "Feed Code Status panel collapses by default; expand via chevron.",
+    changes: [
+      {
+        type: "changed",
+        description:
+          "Feed Code Status is minimized by default and expands when the chevron header is clicked.",
+      },
+    ],
+  },
+  {
     version: "2026.07.16d",
     date: "2026-07-16",
     summary:
