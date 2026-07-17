@@ -4,20 +4,25 @@ import {
   alphaFeedbackKinds,
   alphaFeedbackStatuses,
 } from "@/lib/db/schema";
+import {
+  LONG_TEXT_MAX,
+  maxCharsMessage,
+  requiredLimitedString,
+} from "@/lib/validation/string-limits";
 
 /** Max JPEG screenshot payload accepted from the client (~1.5 MB). */
 export const ALPHA_FEEDBACK_MAX_SCREENSHOT_BYTES = 1_500_000;
 
 export const alphaFeedbackSubmitSchema = z.object({
   kind: z.enum(alphaFeedbackKinds),
-  title: z.string().trim().min(1).max(200),
-  description: z.string().trim().min(1).max(4000),
-  pagePath: z.string().trim().max(500).optional(),
+  title: requiredLimitedString("Title", LONG_TEXT_MAX),
+  description: requiredLimitedString("Description", LONG_TEXT_MAX),
+  pagePath: z.string().trim().max(LONG_TEXT_MAX).optional(),
   viewportWidth: z.number().int().positive().optional(),
   viewportHeight: z.number().int().positive().optional(),
-  userAgent: z.string().trim().max(1000).optional(),
-  osLabel: z.string().trim().max(120).optional(),
-  consoleLogTail: z.array(z.string().max(500)).max(5).optional(),
+  userAgent: z.string().trim().max(LONG_TEXT_MAX).optional(),
+  osLabel: z.string().trim().max(LONG_TEXT_MAX).optional(),
+  consoleLogTail: z.array(z.string().max(LONG_TEXT_MAX)).max(5).optional(),
   /** Base64 JPEG/PNG without data-URL prefix. */
   screenshotBase64: z.string().max(2_500_000).optional(),
   screenshotMimeType: z.enum(["image/jpeg", "image/png", "image/webp"]).optional(),
@@ -27,8 +32,18 @@ export type AlphaFeedbackSubmitInput = z.infer<typeof alphaFeedbackSubmitSchema>
 
 export const alphaFeedbackPatchSchema = z.object({
   status: z.enum(alphaFeedbackStatuses).optional(),
-  internalComment: z.string().trim().max(4000).nullable().optional(),
-  submitterComment: z.string().trim().max(4000).nullable().optional(),
+  internalComment: z
+    .string()
+    .trim()
+    .max(LONG_TEXT_MAX, maxCharsMessage("Comment", LONG_TEXT_MAX))
+    .nullable()
+    .optional(),
+  submitterComment: z
+    .string()
+    .trim()
+    .max(LONG_TEXT_MAX, maxCharsMessage("Comment", LONG_TEXT_MAX))
+    .nullable()
+    .optional(),
   /** When true, archives the submission; when false, restores to the active list (PC-136). */
   archived: z.boolean().optional(),
 });

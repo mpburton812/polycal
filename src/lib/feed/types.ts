@@ -37,6 +37,12 @@ export interface FeedMilestone {
   proposalType: "event" | "sleeping";
   proposalState: string;
   masked: boolean;
+  /**
+   * True when this milestone (and its comments) are visible only because the
+   * viewer is an admin — e.g. sleeping arrangements with involved-only network
+   * visibility (PC-250).
+   */
+  visibleViaAdminOnly: boolean;
   canComment: boolean;
   comments: FeedComment[];
   likeCount: number;

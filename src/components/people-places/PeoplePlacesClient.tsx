@@ -55,6 +55,8 @@ import {
 } from "@/actions/places";
 import { AdminCollapsibleSection } from "@/components/admin/AdminCollapsibleSection";
 import { AVATAR_OPTIONS, avatarSrcForKey } from "@/lib/constants/avatars";
+import { formatUserRole } from "@/lib/users/role-labels";
+import { LONG_TEXT_MAX, SHORT_TEXT_MAX } from "@/lib/validation/string-limits";
 import { brutalPersonRowSx } from "@/theme/brutalUi";
 
 interface PeoplePlacesClientProps {
@@ -246,7 +248,7 @@ function CreateUserDialog({
             }}
           >
             <Tab label="Active user" value="active" />
-            <Tab label="Passive profile" value="passive" />
+            <Tab label="Proxy profile" value="passive" />
           </Tabs>
           {mode === "active" && (
             <TextField
@@ -275,6 +277,7 @@ function CreateUserDialog({
             required
             fullWidth
             disabled={formLocked}
+            inputProps={{ maxLength: LONG_TEXT_MAX }}
           />
           {mode === "active" && (
             <TextField
@@ -792,12 +795,14 @@ function PlaceDetail({
               error={Boolean(editNameWarning)}
               helperText={editNameWarning ?? undefined}
               fullWidth
+              inputProps={{ maxLength: LONG_TEXT_MAX }}
             />
             <TextField
               label="Address (optional)"
               value={editAddress}
               onChange={(event) => setEditAddress(event.target.value)}
               fullWidth
+              inputProps={{ maxLength: SHORT_TEXT_MAX }}
             />
             <TextField
               label="Bedrooms"
@@ -826,6 +831,7 @@ function PlaceDetail({
                       setEditBedroomLabels(next);
                     }}
                     fullWidth
+                    inputProps={{ maxLength: LONG_TEXT_MAX }}
                   />
                 ))}
               </Stack>
@@ -983,12 +989,14 @@ function CreatePlaceDialog({
             error={Boolean(placeNameWarning)}
             helperText={placeNameWarning ?? undefined}
             fullWidth
+            inputProps={{ maxLength: LONG_TEXT_MAX }}
           />
           <TextField
             label="Address (optional)"
             value={placeAddress}
             onChange={(event) => setPlaceAddress(event.target.value)}
             fullWidth
+            inputProps={{ maxLength: SHORT_TEXT_MAX }}
           />
           <TextField
             label="Bedrooms"
@@ -1017,6 +1025,7 @@ function CreatePlaceDialog({
                     setBedroomLabels(next);
                   }}
                   fullWidth
+                  inputProps={{ maxLength: LONG_TEXT_MAX }}
                 />
               ))}
             </Stack>
@@ -1143,7 +1152,7 @@ export function PeoplePlacesClient({
                     <Typography fontWeight={600} sx={{ overflowWrap: "anywhere" }}>
                       {person.displayName}
                     </Typography>
-                    <Chip size="small" label={person.role} variant="outlined" />
+                    <Chip size="small" label={formatUserRole(person.role)} variant="outlined" />
                   </Stack>
                   {person.profileBio ? (
                     <Typography

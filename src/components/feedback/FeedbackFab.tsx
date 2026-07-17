@@ -29,6 +29,7 @@ import {
 } from "@/lib/alpha-feedback/console-capture";
 import { parseOsLabel } from "@/lib/alpha-feedback/schema";
 import { captureViewportScreenshot } from "@/lib/alpha-feedback/screenshot";
+import { LONG_TEXT_MAX } from "@/lib/validation/string-limits";
 import { GARDEN_TOKENS } from "@/theme/tokens";
 
 type FeedbackKind = "bug" | "feature";
@@ -120,9 +121,12 @@ export function FeedbackFab() {
         disabled={capturing}
         sx={{
           position: "fixed",
-          bottom: 88,
+          bottom: 138,
           left: 24,
-          zIndex: 1200,
+          // Above MUI Dialogs/cards so feedback works while a card is open (PC-249).
+          zIndex: (theme) => theme.zIndex.modal + 1,
+          // Hide while our own dialog is open so we stay under the feedback form.
+          visibility: open ? "hidden" : "visible",
           bgcolor: GARDEN_TOKENS.terracotta,
           color: GARDEN_TOKENS.surface,
           border: `3px solid ${GARDEN_TOKENS.ink}`,
@@ -136,7 +140,13 @@ export function FeedbackFab() {
         {capturing ? <CircularProgress size={22} color="inherit" /> : <FeedbackIcon />}
       </Fab>
 
-      <Dialog open={open} onClose={handleClose} fullWidth maxWidth="sm">
+      <Dialog
+        open={open}
+        onClose={handleClose}
+        fullWidth
+        maxWidth="sm"
+        sx={{ zIndex: (theme) => theme.zIndex.modal + 2 }}
+      >
         <DialogTitle>Send feedback</DialogTitle>
         <DialogContent>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
@@ -163,7 +173,7 @@ export function FeedbackFab() {
             fullWidth
             required
             margin="dense"
-            inputProps={{ maxLength: 200 }}
+            inputProps={{ maxLength: LONG_TEXT_MAX }}
           />
           <TextField
             label="Description"
@@ -174,7 +184,7 @@ export function FeedbackFab() {
             margin="dense"
             multiline
             minRows={4}
-            inputProps={{ maxLength: 4000 }}
+            inputProps={{ maxLength: LONG_TEXT_MAX }}
           />
 
           {previewUrl ? (

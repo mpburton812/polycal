@@ -30,7 +30,7 @@ Use this checklist before opening or merging a **`test` → `production`** PR. H
 
 - [ ] Admin actions use `userHasAdminAccess` (not raw role string alone)
 - [ ] Proposal reads use `viewerCanSeeProposal` / schedule masking
-- [ ] Passive users cannot access admin surfaces
+- [ ] Proxy users cannot access admin surfaces
 
 ## Data and secrets
 

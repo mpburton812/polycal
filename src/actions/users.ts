@@ -33,6 +33,7 @@ import {
   buildLoginInstructions,
   generateTemporaryPassword,
 } from "@/lib/users/credentials";
+import { LONG_TEXT_MAX, maxCharsMessage } from "@/lib/validation/string-limits";
 
 /** Shared username rules for provisioned active accounts. */
 const usernameSchema = z
@@ -56,7 +57,7 @@ const activeUserSchema = z.object({
     .string()
     .trim()
     .min(1, "Display name is required.")
-    .max(80, "Display name must be 80 characters or fewer."),
+    .max(LONG_TEXT_MAX, maxCharsMessage("Display name", LONG_TEXT_MAX)),
   role: z.enum(["admin", "user"]),
   avatarKey: z.string().optional(),
   notificationEmail: optionalNotificationEmailSchema,
@@ -67,7 +68,7 @@ const passiveUserSchema = z.object({
     .string()
     .trim()
     .min(1, "Display name is required.")
-    .max(80, "Display name must be 80 characters or fewer."),
+    .max(LONG_TEXT_MAX, maxCharsMessage("Display name", LONG_TEXT_MAX)),
   avatarKey: z.string().optional(),
 });
 
@@ -657,7 +658,7 @@ export async function createPassiveUserAction(
 
   return {
     ok: true,
-    message: `Created passive profile ${parsed.data.displayName}.`,
+    message: `Created proxy profile ${parsed.data.displayName}.`,
     userId,
   };
   });
@@ -669,7 +670,7 @@ const adminUpdateUserSchema = z.object({
     .string()
     .trim()
     .min(1, "Display name is required.")
-    .max(80, "Display name must be 80 characters or fewer."),
+    .max(LONG_TEXT_MAX, maxCharsMessage("Display name", LONG_TEXT_MAX)),
   avatarKey: z.string().optional(),
   role: z.enum(["admin", "user"]).optional(),
   username: usernameSchema.optional(),
@@ -1037,7 +1038,7 @@ export async function activatePassiveUserAction(
     .limit(1);
 
   if (!user || user.role !== "passive" || user.status !== "active") {
-    return { ok: false, message: "Passive profile not found." };
+    return { ok: false, message: "Proxy profile not found." };
   }
 
   const username = parsed.data.username.toLowerCase();

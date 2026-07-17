@@ -26,6 +26,89 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "2026.07.16d",
+    date: "2026-07-16",
+    summary:
+      "Feed text wrap, Code Status for everyone, expanded proxy voting, Passive→Proxy labels.",
+    changes: [
+      {
+        type: "fixed",
+        description:
+          "Feed chat and comment bodies wrap unbroken long strings so cards no longer overflow (PC-253).",
+      },
+      {
+        type: "added",
+        description:
+          "Code Status panel on Feed for all users; Check for Update skips admin force-reload audit for non-admins (PC-254).",
+      },
+      {
+        type: "changed",
+        description:
+          "Proxy-profile votes may be cast by the proposer or an accepted sleeping partner of that proxy (admins unchanged) (PC-255).",
+      },
+      {
+        type: "changed",
+        description:
+          "User-facing role label Passive renamed to Proxy; DB role value remains passive (PC-256).",
+      },
+      {
+        type: "fixed",
+        description:
+          "Remaining admin TextFields use HTML maxLength so over-length entry is blocked, not truncated in app code (PC-252).",
+      },
+    ],
+  },
+  {
+    version: "2026.07.16c",
+    date: "2026-07-16",
+    summary: "Yellow highlight for feed comments only visible to admins.",
+    changes: [
+      {
+        type: "added",
+        description:
+          "Feed proposal comments visible only because the viewer is an admin (e.g. sleeping arrangements under involved-only visibility) use a yellow background (PC-250).",
+      },
+    ],
+  },
+  {
+    version: "2026.07.16b",
+    date: "2026-07-16",
+    summary:
+      "Character limits, human logs, passive proxy votes, comment images, privacy & feedback FAB.",
+    changes: [
+      {
+        type: "changed",
+        description:
+          "Location and About Me capped at 256 characters; other free-text fields at 1024 with HTML maxLength and clearer errors (PC-244).",
+      },
+      {
+        type: "fixed",
+        description:
+          "Activity and proposal logs never show raw JSON; notification types use readable labels (PC-245).",
+      },
+      {
+        type: "changed",
+        description:
+          "Passive invitees no longer auto-accept; the person who added them votes on their behalf (PC-246). SCHEMA_VERSION 28.",
+      },
+      {
+        type: "fixed",
+        description:
+          "Feed comment images show immediate previews, optimistic posts, and retry on load failure (PC-247).",
+      },
+      {
+        type: "changed",
+        description:
+          "Event Privacy control hidden on drafts when only Open is enabled site-wide (PC-248).",
+      },
+      {
+        type: "fixed",
+        description:
+          "Feedback FAB raised ~50px and above dialogs so Issue Submit works over cards (PC-249).",
+      },
+    ],
+  },
+  {
     version: "2026.07.16a",
     date: "2026-07-16",
     summary: "Feed likes, silent poll, and schedule all-day redraft fix.",

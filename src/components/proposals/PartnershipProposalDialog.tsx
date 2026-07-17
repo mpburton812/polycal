@@ -20,6 +20,7 @@ import {
 } from "@/actions/partnerships";
 import type { ProposalCard } from "@/actions/proposals";
 import { useToast } from "@/components/providers/ToastProvider";
+import { LONG_TEXT_MAX } from "@/lib/validation/string-limits";
 
 import { primaryButtonSx } from "./proposalCardTheme";
 
@@ -104,6 +105,7 @@ export function PartnershipProposalDialog({
               placeholder="Add a comment (optional)…"
               value={commentText}
               onChange={(event) => setCommentText(event.target.value)}
+              inputProps={{ maxLength: LONG_TEXT_MAX }}
             />
           )}
         </Stack>

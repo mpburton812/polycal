@@ -50,6 +50,8 @@ import {
   updateUserAction,
 } from "@/actions/users";
 import { AVATAR_OPTIONS } from "@/lib/constants/avatars";
+import { formatUserRole } from "@/lib/users/role-labels";
+import { LONG_TEXT_MAX } from "@/lib/validation/string-limits";
 import { GARDEN_TOKENS, ORGANIC_RADIUS, STROKE_DEFAULT } from "@/theme/tokens";
 
 /**
@@ -347,7 +349,7 @@ export function AdminUserManagementPanel({
                   >
                     {[
                       user.gender ?? "—",
-                      user.role,
+                      formatUserRole(user.role),
                       user.lastLoginAt
                         ? `Last login ${new Date(user.lastLoginAt).toLocaleString()}`
                         : "Never logged in",
@@ -380,7 +382,7 @@ export function AdminUserManagementPanel({
                     {user.displayName}
                   </TableCell>
                   <TableCell sx={{ overflowWrap: "anywhere" }}>{user.gender ?? "—"}</TableCell>
-                  <TableCell sx={{ overflowWrap: "anywhere" }}>{user.role}</TableCell>
+                  <TableCell sx={{ overflowWrap: "anywhere" }}>{formatUserRole(user.role)}</TableCell>
                   <TableCell>{statusChip(user)}</TableCell>
                   <TableCell sx={{ overflowWrap: "anywhere", wordBreak: "break-word" }}>
                     {user.lastLoginAt
@@ -434,6 +436,7 @@ export function AdminUserManagementPanel({
               onChange={(e) => setEditDisplayName(e.target.value)}
               fullWidth
               required
+              inputProps={{ maxLength: LONG_TEXT_MAX }}
             />
             <TextField
               label="Gender"
@@ -441,6 +444,7 @@ export function AdminUserManagementPanel({
               onChange={(e) => setEditGender(e.target.value)}
               fullWidth
               helperText="Optional — shown in admin user list."
+              inputProps={{ maxLength: 40 }}
             />
             {editUser?.role !== "passive" && (
               <>
@@ -532,7 +536,7 @@ export function AdminUserManagementPanel({
         fullWidth
         maxWidth="sm"
       >
-        <DialogTitle>Activate passive user</DialogTitle>
+        <DialogTitle>Activate proxy user</DialogTitle>
         <DialogContent>
           <Stack spacing={2} sx={{ mt: 1 }}>
             <TextField

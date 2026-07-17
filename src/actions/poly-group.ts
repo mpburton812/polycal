@@ -21,6 +21,11 @@ import {
   type PlacesMapVisibility,
   type PolyGroupSettings,
 } from "@/types/poly-group";
+import {
+  LONG_TEXT_MAX,
+  maxCharsMessage,
+  requiredLimitedString,
+} from "@/lib/validation/string-limits";
 
 export type { PlacesMapVisibility };
 
@@ -30,7 +35,7 @@ export interface PolyGroupActionResult {
 }
 
 const settingsSchema = z.object({
-  name: z.string().trim().min(1).max(80),
+  name: requiredLimitedString("Poly group name", LONG_TEXT_MAX),
   allowGroupNameProposals: z.boolean(),
   groupNameChangeMode: z.enum(groupNameChangeModes),
   powerManagementMode: z.enum(powerManagementModes),
@@ -45,7 +50,11 @@ const settingsSchema = z.object({
   sleepingNetworkVisibility: z.enum(sleepingNetworkVisibilityLevels),
   placesMapVisibility: z.enum(placesMapVisibilityLevels),
   logTailLength: z.number().int().min(0).max(1000),
-  onboardingWelcomeMessage: z.string().trim().min(1).max(2000),
+  onboardingWelcomeMessage: z
+    .string()
+    .trim()
+    .min(1, "Welcome message is required.")
+    .max(LONG_TEXT_MAX, maxCharsMessage("Welcome message", LONG_TEXT_MAX)),
   proposedMaxHours: z.number().int().min(0).max(8760),
   atRiskTtlHours: z.number().int().min(1).max(8760),
   archiveGraceHours: z.number().int().min(0).max(8760),
@@ -266,7 +275,7 @@ export async function updatePolyGroupSettingsAction(
 }
 
 const groupNameProposalSchema = z.object({
-  proposedName: z.string().trim().min(1).max(80),
+  proposedName: requiredLimitedString("Proposed name", LONG_TEXT_MAX),
 });
 
 /**

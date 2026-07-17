@@ -58,6 +58,8 @@ import { useToast } from "@/components/providers/ToastProvider";
 import type { InviteeVoteStatus } from "@/lib/db/schema";
 import type { PersonSummary } from "@/actions/users";
 import { handleCommentEnterKey } from "@/lib/ui/comment-keydown";
+import { formatUserRole } from "@/lib/users/role-labels";
+import { LONG_TEXT_MAX } from "@/lib/validation/string-limits";
 
 import {
   ADMIN_OVERSIGHT_BG,
@@ -114,6 +116,16 @@ const SLOT_VOTE_LABELS: Record<"accept" | "accept_suboptimal" | "decline", strin
   accept: "Accept",
   accept_suboptimal: "Sub-opt",
   decline: "Decline",
+};
+
+const PROXY_VOTE_LABELS: Record<
+  "accept" | "abstain" | "decline" | "accept_suboptimal",
+  string
+> = {
+  accept: "Accept",
+  abstain: "Abstain",
+  decline: "Decline",
+  accept_suboptimal: "Sub-opt",
 };
 
 const SLOT_VOTE_OPTIONS = ["accept", "accept_suboptimal", "decline"] as const;
@@ -216,6 +228,20 @@ export function ProposalDetailDialog({
     if (!proposalId) return;
     startTransition(async () => {
       const result = await castProposalVoteAction({ proposalId, vote });
+      notifyResult(result);
+      if (!result.ok) return;
+      reloadDetail(proposalId);
+      router.refresh();
+    });
+  }
+
+  function handleProxyVote(
+    onBehalfOfUserId: string,
+    vote: "accept" | "abstain" | "decline" | "accept_suboptimal",
+  ) {
+    if (!proposalId) return;
+    startTransition(async () => {
+      const result = await castProposalVoteAction({ proposalId, vote, onBehalfOfUserId });
       notifyResult(result);
       if (!result.ok) return;
       reloadDetail(proposalId);
@@ -843,26 +869,60 @@ export function ProposalDetailDialog({
                 </Typography>
               ) : (
                 <Stack spacing={1}>
-                  {detail.invitees.map((invitee) => (
-                    <Stack key={invitee.userId} direction="row" spacing={1} alignItems="center">
-                      <Typography variant="body2">{invitee.displayName}</Typography>
-                      <Chip size="small" label={invitee.role} variant="outlined" />
-                      <Chip
-                        size="small"
-                        label={inviteeDisplayLabel(invitee.voteStatus, invitee.viewedAt)}
-                      />
-                      {detail.canManageAttendees && (
-                        <Button
-                          size="small"
-                          color="error"
-                          onClick={() => handleRemoveAttendee(invitee.userId)}
-                          disabled={pending}
-                        >
-                          Remove
-                        </Button>
-                      )}
-                    </Stack>
-                  ))}
+                  {detail.invitees.map((invitee) => {
+                    const isPassive = invitee.userRole === "passive";
+                    const canProxyVote = Boolean(invitee.canProxyVote);
+                    return (
+                      <Stack key={invitee.userId} spacing={0.5}>
+                        <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+                          <Typography variant="body2">{invitee.displayName}</Typography>
+                          <Chip size="small" label={invitee.role} variant="outlined" />
+                          {isPassive && (
+                            <Chip
+                              size="small"
+                              label={formatUserRole("passive")}
+                              color="secondary"
+                              variant="outlined"
+                            />
+                          )}
+                          <Chip
+                            size="small"
+                            label={inviteeDisplayLabel(invitee.voteStatus, invitee.viewedAt)}
+                          />
+                          {detail.canManageAttendees && (
+                            <Button
+                              size="small"
+                              color="error"
+                              onClick={() => handleRemoveAttendee(invitee.userId)}
+                              disabled={pending}
+                            >
+                              Remove
+                            </Button>
+                          )}
+                        </Stack>
+                        {canProxyVote && (
+                          <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap>
+                            <Typography variant="caption" color="text.secondary" sx={{ mr: 0.5 }}>
+                              Vote for {invitee.displayName}:
+                            </Typography>
+                            {(
+                              ["accept", "abstain", "decline", "accept_suboptimal"] as const
+                            ).map((vote) => (
+                              <Button
+                                key={vote}
+                                size="small"
+                                variant={invitee.voteStatus === vote ? "contained" : "outlined"}
+                                disabled={pending}
+                                onClick={() => handleProxyVote(invitee.userId, vote)}
+                              >
+                                {PROXY_VOTE_LABELS[vote]}
+                              </Button>
+                            ))}
+                          </Stack>
+                        )}
+                      </Stack>
+                    );
+                  })}
                 </Stack>
               )}
 
@@ -990,6 +1050,7 @@ export function ProposalDetailDialog({
                           Boolean(commentText.trim()) && !pending,
                         )
                       }
+                      inputProps={{ maxLength: LONG_TEXT_MAX }}
                     />
                     <Button
                       variant="outlined"
