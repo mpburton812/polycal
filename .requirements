@@ -246,3 +246,6 @@
 2026-07-16 | 7c9adf0 | PC-250 | yellow background for admin-only-visible comments | src/actions/feed.ts
 2026-07-16 | 0ede5bd | PC-252 | wrap, Code Status, proxy vote expand, Passive→Proxy | src/actions/admin-fast-sleeping.ts
 2026-07-16 | d57ce81 | PC-252 | isolate propose pending from save refresh | src/components/admin/AdminPolyGroupSettingsPanel.tsx
+2026-07-17 | a374076 | PC-257 | collapse Code Status by default with chevron expand | src/components/feed/FeedClient.tsx
+2026-07-17 | 308cff2 | PC-257 | fix Code Status collapse chevron selector | e2e/feed-code-status-journey.spec.ts
+2026-07-17 | 2d6b7cf | PC-257 | raise Code Status journey timeout for suite load | e2e/feed-code-status-journey.spec.ts

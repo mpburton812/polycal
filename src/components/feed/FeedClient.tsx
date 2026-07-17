@@ -34,7 +34,7 @@ import {
 } from "@/actions/proposals";
 import type { PersonSummary } from "@/actions/users";
 import { FeedLikeRow } from "@/components/feed/FeedLikeControl";
-import { CodeStatusPanel } from "@/components/layout/CodeStatusPanel";
+import { FeedCodeStatusPanel } from "@/components/feed/FeedCodeStatusPanel";
 import { ADMIN_ONLY_FEED_COMMENT_BG } from "@/components/proposals/proposalCardTheme";
 import { feedImageUrl, MAX_FEED_IMAGES } from "@/lib/feed/images";
 import type { FeedLikeTargetType } from "@/lib/feed/likes";
@@ -1026,7 +1026,7 @@ export function FeedClient({
         Proposal milestones and network chat in one timeline.
       </Typography>
 
-      <CodeStatusPanel
+      <FeedCodeStatusPanel
         buildInfo={buildInfo}
         changelog={changelog}
         latestEntry={latestChangelogEntry}
