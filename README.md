@@ -11,7 +11,7 @@ PolyCal uses a **Jira-first, git-audited** workflow:
 3. **Log** — `.requirements` append-only delivery log (automatic via git hooks)
 4. **Merge** — PR to `dev` on GitHub; CI validates; merge triggers **Done**
 
-**Promoting to dev:** [docs/DEV-PROMOTION.md](docs/DEV-PROMOTION.md) — always use `gh pr create --base dev`, never direct push.
+**Promoting to dev:** [docs/DEV-PROMOTION.md](docs/DEV-PROMOTION.md) — agents run `npm run merge-feature -- --merge` (create PR + wait for CI + merge); never direct push; never leave PR create/merge to the GitHub UI.
 
 **Full documentation:** [docs/REQUIREMENTS-WORKFLOW.md](docs/REQUIREMENTS-WORKFLOW.md)
 

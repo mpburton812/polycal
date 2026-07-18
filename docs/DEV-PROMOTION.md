@@ -2,6 +2,8 @@
 
 All promotion from `feature/*` to `dev` **must use a GitHub Pull Request**. Direct pushes or local merges to `dev` are not allowed.
 
+**Agents own the PR lifecycle** — create the PR, wait for CI, and merge via CLI. Do **not** ask the user to open or merge a PR in the GitHub web UI.
+
 ## Why PRs are required
 
 - Triggers **In Review** Jira sync (`jira-sync-on-pr`)
@@ -11,18 +13,20 @@ All promotion from `feature/*` to `dev` **must use a GitHub Pull Request**. Dire
 
 ## Agent / developer workflow
 
-### Shortcut: `merge feature` (recommended)
+### Shortcut: `merge feature --merge` (recommended for agents)
 
-From the repo root:
+From the repo root — **default agent path** when the user asks to promote to `dev`:
 
 ```bash
-npm run merge-feature
+npm run merge-feature -- --merge
 ```
+
+That creates the PR, waits for required checks, and merges. Do not stop after PR creation and hand off to the user.
 
 Or install the PowerShell shortcut once (see below), then from any directory:
 
 ```powershell
-merge feature          # push + open PR to dev
+merge feature          # push + open PR to dev (human-only; agents should use -Merge)
 merge feature -Merge   # push + open PR + wait for CI + merge to dev
 ```
 
@@ -33,15 +37,16 @@ The shortcut runs:
 3. Jira key validation (`origin/dev...HEAD`)
 4. `git push -u origin HEAD`
 5. `gh pr create --base dev --fill` (skips if PR already open)
+6. With `--merge` / `-Merge`: wait for required checks, then `gh pr merge`
 
-### Manual steps
+### Equivalent CLI steps (agent-run, not GitHub UI)
 
 ```bash
 # 1. Finish work on feature branch
 git checkout feature/your-branch
 git push -u origin HEAD
 
-# 2. Open PR to dev (required — do not skip)
+# 2. Open PR to dev (required — do not skip; agent runs this)
 gh pr create --base dev --title "feat(scope): summary PC-xxx" --body "$(cat <<'EOF'
 ## Summary
 - ...
@@ -54,7 +59,7 @@ gh pr create --base dev --title "feat(scope): summary PC-xxx" --body "$(cat <<'E
 EOF
 )"
 
-# 3. After CI passes, merge the PR (squash or merge commit per team preference)
+# 3. Wait for CI, then merge (agent runs this — do not ask the user to click Merge)
 gh pr merge --merge   # or --squash
 ```
 
@@ -79,6 +84,7 @@ history visible per environment.
 - `git checkout dev && git merge feature/... && git push` (bypasses PR checks and Jira In Review)
 - `git push origin dev` from a feature branch
 - Promote without adding a change control log entry (see above)
+- Ask the user to create or merge the PR in the GitHub web UI (agents must use CLI / `merge-feature --merge`)
 
 ## GitHub branch protection (recommended)
 
