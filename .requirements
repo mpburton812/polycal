@@ -251,3 +251,4 @@
 2026-07-17 | 2d6b7cf | PC-257 | raise Code Status journey timeout for suite load | e2e/feed-code-status-journey.spec.ts
 2026-07-20 | f4b1802 | PC-258 | six-item batch — month spans, feed image, parrot, drafts, batch, conflicts | src/actions/admin-fast-sleeping.ts
 2026-07-20 | a685cf5 | PC-261 | remove sync re-exports from use server notifications | src/actions/notifications.ts
+2026-07-20 | 6579fb2 | PC-261 | scope inbox title and expect draft-return copy | e2e/batch-sleeping-partners-journey.spec.ts
