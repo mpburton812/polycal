@@ -3,8 +3,10 @@ import { type Page, expect } from "@playwright/test";
 /** Opens the header notification bell and waits for the inbox popover. */
 export async function openNotificationInbox(page: Page): Promise<void> {
   await page.getByRole("button", { name: /notifications/i }).click();
-  await expect(page.getByTestId("notifications-panel")).toBeVisible({ timeout: 15_000 });
-  await expect(page.getByText("Notifications").first()).toBeVisible();
+  const panel = page.getByTestId("notifications-panel");
+  await expect(panel).toBeVisible({ timeout: 15_000 });
+  // Scope + exact: changelog copy can contain the substring "notifications" (PC-261).
+  await expect(panel.getByText("Notifications", { exact: true })).toBeVisible();
 }
 
 /** Inbox panel root (popover content). */

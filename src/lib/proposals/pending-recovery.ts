@@ -5,6 +5,10 @@ import { and, eq } from "drizzle-orm";
 import { getDb } from "@/lib/db/client";
 import { notifyUser } from "@/lib/notifications";
 import {
+  dismissAllNotificationsForProposal,
+  formatDraftReturnNotification,
+} from "@/lib/notifications-draft-return";
+import {
   loadEnforcementSettings,
   type EnforcementSettings,
 } from "@/lib/proposals/enforcement";
@@ -108,13 +112,13 @@ export async function enterPendingRecoveryIfNeeded(
     .where(eq(proposalInvitees.proposalId, proposalId));
 
   const notifyIds = new Set<string>([proposal.proposerId, ...invitees.map((row) => row.userId)]);
+  await dismissAllNotificationsForProposal(proposalId);
+  const message = formatDraftReturnNotification(proposal.title, reason);
   for (const notifyId of notifyIds) {
-    await notifyUser(
-      notifyId,
-      "proposal_reverted_to_draft",
-      `Proposal "${proposal.title}" was moved back to drafts.`,
-      { proposalId, reason },
-    );
+    await notifyUser(notifyId, "proposal_reverted_to_draft", message, {
+      proposalId,
+      reason,
+    });
   }
   return "draft";
 }
