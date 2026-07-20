@@ -1,4 +1,5 @@
 import { localDateKey } from "@/lib/schedule/dates";
+import { DEFAULT_VIEWER_TIMEZONE } from "@/lib/schedule/timezone";
 import type { ScheduleSlice, ScheduleSliceKind } from "@/lib/schedule/slice-types";
 
 export interface RawScheduleWindow {
@@ -27,41 +28,59 @@ export interface ScheduleSlotRow {
 }
 
 /**
- * True when an all-day interval spans more than one calendar day (UTC keys).
+ * True when an all-day interval spans more than one calendar day in the given timezone.
  */
 export function isMultiDayAllDaySpan(
   startAt: string,
   endAt: string | null,
   isAllDay: boolean,
+  timeZone: string = DEFAULT_VIEWER_TIMEZONE,
 ): boolean {
   if (!isAllDay || !endAt) return false;
-  return localDateKey(startAt) !== localDateKey(endAt);
+  return localDateKey(startAt, timeZone) !== localDateKey(endAt, timeZone);
 }
 
 /**
- * Inclusive UTC date keys from start through end for multi-day all-day spans.
+ * Advances a YYYY-MM-DD calendar key by one UTC day.
  */
-export function expandAllDayDateKeys(startAt: string, endAt: string | null): string[] {
-  const endKey = localDateKey(endAt ?? startAt);
+function addOneUtcDateKey(dateKey: string): string {
+  const [y, m, d] = dateKey.split("-").map(Number);
+  const cursor = new Date(Date.UTC(y!, m! - 1, d!));
+  cursor.setUTCDate(cursor.getUTCDate() + 1);
+  return cursor.toISOString().slice(0, 10);
+}
+
+/**
+ * Inclusive calendar date keys from start through end for multi-day all-day spans.
+ * Uses the viewer timezone so local end-of-day instants do not add an extra UTC day (PC-258).
+ */
+export function expandAllDayDateKeys(
+  startAt: string,
+  endAt: string | null,
+  timeZone: string = DEFAULT_VIEWER_TIMEZONE,
+): string[] {
+  const startKey = localDateKey(startAt, timeZone);
+  const endKey = localDateKey(endAt ?? startAt, timeZone);
   const keys: string[] = [];
-  const cursor = new Date(startAt);
-  cursor.setUTCHours(0, 0, 0, 0);
+  let cursor = startKey;
 
   for (let guard = 0; guard < 366; guard += 1) {
-    const key = localDateKey(cursor.toISOString());
-    keys.push(key);
-    if (key >= endKey) break;
-    cursor.setUTCDate(cursor.getUTCDate() + 1);
+    keys.push(cursor);
+    if (cursor >= endKey) break;
+    cursor = addOneUtcDateKey(cursor);
   }
 
   return keys;
 }
 
-/** Midnight-to-end-of-day ISO bounds for one all-day calendar key. */
+/**
+ * Noon-UTC bounds for one all-day calendar key so start/end share one local date
+ * in US timezones (avoids false 2-day month bars) (PC-258).
+ */
 export function allDayBoundsForDateKey(dateKey: string): { startAt: string; endAt: string } {
   return {
-    startAt: `${dateKey}T00:00:00.000Z`,
-    endAt: `${dateKey}T23:59:59.999Z`,
+    startAt: `${dateKey}T12:00:00.000Z`,
+    endAt: `${dateKey}T12:00:00.000Z`,
   };
 }
 
@@ -166,6 +185,7 @@ export function buildScheduleWindows(
   row: ScheduleRowSliceContext,
   slots: ScheduleSlotRow[],
   scheduled: { startAt: string; endAt: string | null } | null,
+  timeZone: string = DEFAULT_VIEWER_TIMEZONE,
 ): RawScheduleWindow[] {
   const activeSlots = slots.filter((slot) => !slot.isDetached);
   const windows: RawScheduleWindow[] = [];
@@ -191,7 +211,7 @@ export function buildScheduleWindows(
     if (
       row.isBatchSleeping ||
       row.parentProposalId ||
-      !isMultiDayAllDaySpan(startAt, endAt, row.isAllDay)
+      !isMultiDayAllDaySpan(startAt, endAt, row.isAllDay, timeZone)
     ) {
       pushWindow(windows, row, {
         startAt,
@@ -203,7 +223,7 @@ export function buildScheduleWindows(
       return;
     }
 
-    for (const dateKey of expandAllDayDateKeys(startAt, endAt)) {
+    for (const dateKey of expandAllDayDateKeys(startAt, endAt, timeZone)) {
       const bounds = allDayBoundsForDateKey(dateKey);
       pushWindow(windows, row, {
         startAt: bounds.startAt,

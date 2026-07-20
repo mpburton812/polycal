@@ -591,7 +591,7 @@ async function loadChatBatch(
 }
 
 /**
- * Stores a feed image blob for later attach to a message/comment (PC-236).
+ * Stores a feed image blob for later attach to a message/comment (PC-236 / PC-259).
  */
 export async function uploadFeedImageAction(
   formData: FormData,
@@ -609,21 +609,29 @@ export async function uploadFeedImageAction(
   const imageId = randomUUID();
   const now = new Date().toISOString();
 
-  return withDb(async (db) => {
-    const buffer = Buffer.from(await file.arrayBuffer());
-    await db.insert(storedImages).values({
-      id: imageId,
-      mimeType: file.type,
-      data: buffer,
-      createdAt: now,
+  try {
+    return await withDb(async (db) => {
+      const buffer = Buffer.from(await file.arrayBuffer());
+      await db.insert(storedImages).values({
+        id: imageId,
+        mimeType: file.type,
+        data: buffer,
+        createdAt: now,
+      });
+      await db.insert(feedImageUploads).values({
+        imageId,
+        userId: sessionResult.user.id,
+        createdAt: now,
+      });
+      return { ok: true, message: "Image uploaded.", imageId };
     });
-    await db.insert(feedImageUploads).values({
-      imageId,
-      userId: sessionResult.user.id,
-      createdAt: now,
-    });
-    return { ok: true, message: "Image uploaded.", imageId };
-  });
+  } catch (error) {
+    console.error("[feed] uploadFeedImageAction failed", error);
+    return {
+      ok: false,
+      message: "Image upload failed. Try a smaller image or try again.",
+    };
+  }
 }
 
 /** How long an uploaded feed image may sit unused before post (PC-247). */

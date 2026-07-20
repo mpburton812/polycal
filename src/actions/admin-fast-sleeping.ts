@@ -25,6 +25,7 @@ import {
   adminFastSleepingPlanSchema,
   type AdminFastSleepingPlanInput,
 } from "@/lib/proposals/fast-sleeping-plan";
+import { formatConflictMessage } from "@/lib/proposals/conflict-message";
 import {
   createBatchSleepingDraft,
   getAcceptedSleepingPartnerIds,
@@ -158,7 +159,7 @@ export async function adminFastAddSleepingPlanAction(
         await deleteDraftProposal(db, proposalId);
         return {
           ok: false,
-          message: "Schedule conflicts detected. Review warnings and confirm to submit.",
+          message: formatConflictMessage(conflictCheck.warnings),
           warnings: conflictCheck.warnings,
         };
       }

@@ -1,7 +1,6 @@
 "use client";
 
 import AdminPanelSettingsIcon from "@mui/icons-material/AdminPanelSettings";
-import DynamicFeedIcon from "@mui/icons-material/DynamicFeed";
 import EventNoteIcon from "@mui/icons-material/EventNote";
 import GroupsIcon from "@mui/icons-material/Groups";
 import HowToVoteIcon from "@mui/icons-material/HowToVote";
@@ -12,18 +11,43 @@ import {
 } from "@mui/material";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import type { ElementType } from "react";
 
 import { MAIN_TAB_HREFS } from "@/components/layout/mainTabs";
 import { fontFamilies } from "@/theme/fonts";
 import { GARDEN_TOKENS } from "@/theme/tokens";
 
-const tabMeta = {
-  "/feed": { label: "Feed", icon: DynamicFeedIcon },
+const FEED_TAB_HREF = "/feed" as const;
+
+type TabMeta = {
+  label: string;
+  icon?: ElementType;
+};
+
+const tabMeta: Record<(typeof MAIN_TAB_HREFS)[number], TabMeta> = {
+  "/feed": { label: "Feed" },
   "/schedule": { label: "Schedule", icon: EventNoteIcon },
   "/proposals": { label: "Proposals", icon: HowToVoteIcon },
   "/people-places": { label: "People & Places", icon: GroupsIcon },
   "/admin": { label: "Admin", icon: AdminPanelSettingsIcon },
-} as const;
+};
+
+/**
+ * Feed tab parrot at 1.5× default nav icon size (36px vs ~24px) (PC-260).
+ */
+function FeedParrotIcon({ selected }: { selected: boolean }) {
+  return (
+    // Decorative; BottomNavigationAction label provides accessible name.
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={selected ? "/avatars/bird_green.png" : "/avatars/bird_blue.png"}
+      width={36}
+      height={36}
+      alt=""
+      style={{ display: "block" }}
+    />
+  );
+}
 
 /**
  * Bottom tab navigation with ink border and flat fill (Garden Brutalism).
@@ -72,13 +96,20 @@ export function AppTabs({ isAdmin }: { isAdmin: boolean }) {
         }}
       >
         {visibleTabs.map((tab) => {
+          const isFeed = tab.href === FEED_TAB_HREF;
           const Icon = tab.icon;
           return (
             <BottomNavigationAction
               key={tab.href}
               label={tab.label}
               value={tab.href}
-              icon={<Icon />}
+              icon={
+                isFeed ? (
+                  <FeedParrotIcon selected={current === FEED_TAB_HREF} />
+                ) : Icon ? (
+                  <Icon />
+                ) : undefined
+              }
               component={Link}
               href={tab.href}
             />

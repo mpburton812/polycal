@@ -21,6 +21,7 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Changed
+- PC-258–263: Six-item UX batch — month all-day span merge/TZ bounds; feed image 4MB limit + error handling; Feed parrot nav icon 1.5×; draft-return notification revoke+replace; hide batch Reschedule; conflict messages list overlaps. Change control: `2026.07.20`.
 - PC-257: Feed Code Status starts minimized and expands via chevron (same collapsible pattern as Admin). Change control: `2026.07.17`.
 
 ### Added
@@ -32,6 +33,8 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - PC-243 / PC-244–249: Character limits (256/1024), human-readable activity logs, passive proxy voting, feed comment image reliability, hide Open-only Event Privacy, feedback FAB position/z-index. SCHEMA_VERSION 28. Change control: `2026.07.16b`.
 
 ### Fixed
+- PC-258: Multi-day all-day events no longer render as overlapping 2-day month bars in US timezones.
+- PC-259: Feed picture upload no longer throws digest-only Server Action errors for images up to 4MB.
 - PC-253: Feed chat/comment Typography wraps long unbroken strings.
 - PC-239: Feed background poll uses a head fingerprint and only refreshes when content changes (no 15s loading spinner flash); E2E skips feature-push runs when an open PR already covers the branch; same-day all-day redraft keeps end=start so moved events stay visible.
 - PC-216 / PC-217–219: Accepting or declining a proposal (Proposals UI or notification bell) soft-dismisses matching actionable inbox rows so they stay cleared after reload; bell vote rows include Decline.
