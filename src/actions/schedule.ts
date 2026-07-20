@@ -22,6 +22,7 @@ import {
 import { eventInRange, intervalsOverlap } from "@/lib/schedule/dates";
 import { buildScheduleWindows } from "@/lib/schedule/schedule-slices";
 import type { ScheduleSliceKind } from "@/lib/schedule/slice-types";
+import { resolveTimezone } from "@/lib/schedule/timezone";
 import { parseBatchSlotMeta } from "@/lib/proposals/batch-sleeping";
 import { formatSleepingDisplayTitle } from "@/lib/proposals/sleeping-display";
 import {
@@ -197,6 +198,12 @@ export async function listScheduleEventsAction(
   return withDb(async (db) => {
   const viewerId = sessionResult.user.id;
   const isAdmin = await userHasAdminAccess(sessionResult.user.role);
+  const [viewerRow] = await db
+    .select({ timezone: users.timezone })
+    .from(users)
+    .where(eq(users.id, viewerId))
+    .limit(1);
+  const viewerTimeZone = resolveTimezone(viewerRow?.timezone);
   const privacyFlags = await getSchedulePrivacyFlags(db);
   const partnerIds = await acceptedSleepingPartnerIds(db, viewerId);
   const { rangeStart, rangeEnd } = parsed.data;
@@ -432,7 +439,7 @@ export async function listScheduleEventsAction(
       row.state === "archived" ||
       row.state === "proposed"
     ) {
-      for (const raw of buildScheduleWindows(sliceContext, slotsForWindows, scheduled)) {
+      for (const raw of buildScheduleWindows(sliceContext, slotsForWindows, scheduled, viewerTimeZone)) {
         windows.push({
           startAt: raw.startAt,
           endAt: raw.endAt,

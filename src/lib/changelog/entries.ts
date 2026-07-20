@@ -26,6 +26,44 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "2026.07.20",
+    date: "2026-07-20",
+    summary:
+      "Month all-day bars, feed image uploads, Feed parrot, draft-return notifs, batch Reschedule, conflict lists.",
+    changes: [
+      {
+        type: "fixed",
+        description:
+          "Multi-day all-day month bars merge virtual day slices and use TZ-safe noon bounds so US timezones no longer show overlapping 2-day fragments (PC-258).",
+      },
+      {
+        type: "fixed",
+        description:
+          "Feed image Server Action body limit raised to 4MB with try/catch and client size precheck (PC-259).",
+      },
+      {
+        type: "changed",
+        description:
+          "Feed bottom-nav icon is the parrot asset at 36×36 (1.5×) (PC-260).",
+      },
+      {
+        type: "changed",
+        description:
+          "Returning a proposal to drafts dismisses prior proposal notifications and sends one informational notice with reason (PC-261).",
+      },
+      {
+        type: "changed",
+        description:
+          "Reschedule is hidden for batch sleeping proposals (PC-262).",
+      },
+      {
+        type: "changed",
+        description:
+          "Conflict check/submit messages list each overlapping person/place and title (PC-263).",
+      },
+    ],
+  },
+  {
     version: "2026.07.17",
     date: "2026-07-17",
     summary: "Feed Code Status starts minimized and expands via chevron.",

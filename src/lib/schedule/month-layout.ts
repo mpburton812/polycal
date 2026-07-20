@@ -81,6 +81,41 @@ export function isMultiDayMonthSpan(event: ScheduleEvent, timeZone: string): boo
 }
 
 /**
+ * Merges consecutive virtual_span_day windows for the same proposal into one display event
+ * so month view shows a continuous bar (week-split only), not N false 2-day fragments (PC-258).
+ */
+export function mergeVirtualSpanDayEvents(events: ScheduleEvent[]): ScheduleEvent[] {
+  const groups = new Map<string, ScheduleEvent[]>();
+  const others: ScheduleEvent[] = [];
+
+  for (const event of events) {
+    if (event.sliceKind !== "virtual_span_day") {
+      others.push(event);
+      continue;
+    }
+    const list = groups.get(event.rootProposalId) ?? [];
+    list.push(event);
+    groups.set(event.rootProposalId, list);
+  }
+
+  const merged: ScheduleEvent[] = [];
+  for (const [, list] of groups) {
+    const sorted = [...list].sort((a, b) => a.sliceKey.localeCompare(b.sliceKey));
+    const first = sorted[0]!;
+    const last = sorted[sorted.length - 1]!;
+    merged.push({
+      ...first,
+      id: `${first.rootProposalId}:month-span`,
+      startAt: `${first.sliceKey}T12:00:00.000Z`,
+      endAt: `${last.sliceKey}T12:00:00.000Z`,
+      sliceKey: first.sliceKey,
+    });
+  }
+
+  return [...others, ...merged];
+}
+
+/**
  * Resolves grid span and display mode for one schedule event.
  */
 export function monthEventSpan(
@@ -211,6 +246,7 @@ function variantForEvent(event: ScheduleEvent): ScheduleBlockVariant {
 
 /**
  * Builds Outlook-style month layout: week-split spans, stacked lanes, per-day chips.
+ * Merges virtual_span_day slices of the same proposal into one continuous bar (PC-258).
  */
 export function buildMonthLayout(
   grid: Date[],
@@ -221,7 +257,7 @@ export function buildMonthLayout(
   const spans: MonthEventSpan[] = [];
   const seen = new Set<string>();
 
-  for (const event of events) {
+  for (const event of mergeVirtualSpanDayEvents(events)) {
     const span = monthEventSpan(grid, event, timeZone);
     if (!span) continue;
     const dedupeKey = `${event.id}:${span.startIndex}:${span.endIndex}:${span.displayMode}`;

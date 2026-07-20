@@ -24,6 +24,10 @@ import {
   type UserRole,
 } from "@/lib/db/schema";
 import { notifyUser } from "@/lib/notifications";
+import {
+  dismissAllNotificationsForProposal,
+  formatDraftReturnNotification,
+} from "@/lib/notifications-draft-return";
 import { enterPendingRecoveryIfNeeded } from "@/lib/proposals/pending-recovery";
 import {
   deliverLoginCredentials,
@@ -368,13 +372,16 @@ async function pauseUserProposalSideEffects(
       .where(eq(proposalInvitees.proposalId, proposalId));
 
     const notifyIds = new Set<string>([proposal.proposerId, ...invitees.map((i) => i.userId)]);
+    await dismissAllNotificationsForProposal(proposalId);
+    const message = formatDraftReturnNotification(
+      proposal.title,
+      "no required invitees remain after a participant was paused",
+    );
     for (const notifyId of notifyIds) {
-      await notifyUser(
-        notifyId,
-        "proposal_reverted_to_draft",
-        `Proposal "${proposal.title}" was moved back to drafts.`,
-        { proposalId, reason: "participant paused" },
-      );
+      await notifyUser(notifyId, "proposal_reverted_to_draft", message, {
+        proposalId,
+        reason: "participant paused",
+      });
     }
   }
 }

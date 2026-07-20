@@ -4,6 +4,10 @@ import { and, asc, desc, eq, inArray } from "drizzle-orm";
 
 import { getDb } from "@/lib/db/client";
 import { notifyUser } from "@/lib/notifications";
+import {
+  dismissAllNotificationsForProposal,
+  formatDraftReturnNotification,
+} from "@/lib/notifications-draft-return";
 import { expirePendingRecoveryProposals } from "@/lib/proposals/pending-recovery";
 import { sleepingCalendarDayEnd } from "@/lib/proposals/sleeping-schedule";
 import {
@@ -205,10 +209,11 @@ async function expireProposedProposals(db: Db, settings: EnforcementSettings): P
 
     await logSystemTransition(db, proposal.id, "proposal.proposed_expired", reason);
 
+    await dismissAllNotificationsForProposal(proposal.id);
     await notifyUser(
       proposal.proposerId,
       "proposal_expired",
-      `Proposal "${proposal.title}" expired and was moved to your drafts.`,
+      formatDraftReturnNotification(proposal.title, reason),
       { proposalId: proposal.id, action: "edit" },
     );
   }
