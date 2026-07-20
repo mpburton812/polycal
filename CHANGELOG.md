@@ -20,6 +20,9 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Changed
+- PC-257: Feed Code Status starts minimized and expands via chevron (same collapsible pattern as Admin). Change control: `2026.07.17`.
+
 ### Added
 - PC-254: Code Status panel on Feed for all users (shared with Admin). Change control: `2026.07.16d`.
 - PC-250: Feed comments visible only to admins (e.g. sleeping arrangements under involved-only network visibility) show a yellow background. Change control: `2026.07.16c`.
