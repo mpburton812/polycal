@@ -68,7 +68,7 @@ test.describe("Death Star poll journey", () => {
 
     await logout(page);
     await login(page, USERS.han.username);
-    await expectInAppNotification(page, /moved back to drafts/i);
+    await expectInAppNotification(page, /sent back to drafts/i);
     await goToProposals(page);
     await selectProposalTab(page, "Drafts");
     const hanDraft = await openDraftForEdit(page, pollTitle);
