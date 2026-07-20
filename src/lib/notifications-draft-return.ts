@@ -61,6 +61,7 @@ export async function dismissAllNotificationsForProposal(
   let cleared = 0;
 
   for (const row of rows) {
+    if (!row.userId) continue;
     const parsed = parseNotificationDetails(row.action, row.details);
     if (INBOX_EXCLUDED_NOTIFICATION_TYPES.has(parsed.type)) continue;
     if (proposalIdFromNotificationMetadata(parsed.metadata) !== proposalId) continue;

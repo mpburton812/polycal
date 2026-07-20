@@ -181,16 +181,6 @@ export async function clearAllNotificationsAction(): Promise<{
   return { ok: true, message: "All notifications cleared." };
 }
 
-import {
-  dismissAllNotificationsForProposal,
-  formatDraftReturnNotification,
-} from "@/lib/notifications-draft-return";
-
-export {
-  dismissAllNotificationsForProposal,
-  formatDraftReturnNotification,
-} from "@/lib/notifications-draft-return";
-
 /**
  * Soft-dismisses actionable inbox rows for a proposal (vote / attendee-update).
  * Leaves informational notices (e.g. proposal_resolved) intact (PC-217).
