@@ -45,6 +45,13 @@ import {
   type FeedMilestone,
   type NetworkChatMessage,
 } from "@/lib/feed/types";
+import {
+  loadLinkPreviewsById,
+  resolvePreviewForBody,
+  ensureLinkPreview,
+} from "@/lib/feed/link-preview-store";
+import { extractFirstUrl, normalizeLinkUrl } from "@/lib/feed/link-preview";
+import { checkRateLimit } from "@/lib/rate-limit";
 import { buildFeedUpdateToken } from "@/lib/feed/update-token";
 import { isFeedMilestoneVisibleViaAdminOnly } from "@/lib/feed/admin-only-visibility";
 import { notifyUser } from "@/lib/notifications";
@@ -569,6 +576,7 @@ async function loadMilestoneBatch(
           authorId: proposalComments.authorId,
           body: proposalComments.body,
           createdAt: proposalComments.createdAt,
+          linkPreviewId: proposalComments.linkPreviewId,
           authorName: users.displayName,
         })
         .from(proposalComments)
@@ -586,6 +594,10 @@ async function loadMilestoneBatch(
       const commentIds = commentRows.map((c) => c.id);
       const imagesByComment = await loadImageIdsByParent(db, "proposalComment", commentIds);
       const commentLikes = await loadLikeSummaries(db, "proposal_comment", commentIds, viewerId);
+      const previewById = await loadLinkPreviewsById(
+        db,
+        commentRows.map((c) => c.linkPreviewId).filter((id): id is string => Boolean(id)),
+      );
       const commentsByProposal = new Map<string, FeedComment[]>();
 
       for (const comment of commentRows) {
@@ -605,6 +617,9 @@ async function loadMilestoneBatch(
             proposerId === viewerId,
           likeCount: likes.likeCount,
           likedByMe: likes.likedByMe,
+          linkPreview: comment.linkPreviewId
+            ? previewById.get(comment.linkPreviewId) ?? null
+            : null,
         });
         commentsByProposal.set(comment.proposalId, list);
       }
@@ -639,6 +654,7 @@ async function loadChatBatch(
         authorId: networkChatMessages.authorId,
         body: networkChatMessages.body,
         createdAt: networkChatMessages.createdAt,
+        linkPreviewId: networkChatMessages.linkPreviewId,
         authorName: users.displayName,
       })
       .from(networkChatMessages)
@@ -666,6 +682,7 @@ async function loadChatBatch(
               authorId: networkChatComments.authorId,
               body: networkChatComments.body,
               createdAt: networkChatComments.createdAt,
+              linkPreviewId: networkChatComments.linkPreviewId,
               authorName: users.displayName,
             })
             .from(networkChatComments)
@@ -683,6 +700,10 @@ async function loadChatBatch(
     const imagesByComment = await loadImageIdsByParent(db, "chatComment", commentIds);
     const chatLikes = await loadLikeSummaries(db, "chat", messageIds, viewerId);
     const chatCommentLikes = await loadLikeSummaries(db, "chat_comment", commentIds, viewerId);
+    const previewById = await loadLinkPreviewsById(db, [
+      ...filteredRows.map((r) => r.linkPreviewId).filter((id): id is string => Boolean(id)),
+      ...commentRows.map((c) => c.linkPreviewId).filter((id): id is string => Boolean(id)),
+    ]);
     const commentsByMessage = new Map<string, FeedComment[]>();
     const messageAuthorById = new Map(filteredRows.map((r) => [r.id, r.authorId]));
 
@@ -703,6 +724,9 @@ async function loadChatBatch(
           messageAuthorId === viewerId,
         likeCount: likes.likeCount,
         likedByMe: likes.likedByMe,
+        linkPreview: comment.linkPreviewId
+          ? previewById.get(comment.linkPreviewId) ?? null
+          : null,
       });
       commentsByMessage.set(comment.messageId, list);
     }
@@ -720,6 +744,7 @@ async function loadChatBatch(
         comments: commentsByMessage.get(row.id) ?? [],
         likeCount: likes.likeCount,
         likedByMe: likes.likedByMe,
+        linkPreview: row.linkPreviewId ? previewById.get(row.linkPreviewId) ?? null : null,
       };
     });
 
@@ -831,12 +856,14 @@ export async function postNetworkChatMessageAction(
     const now = new Date().toISOString();
     const id = randomUUID();
     const imageIds = parsed.data.imageIds ?? [];
+    const { linkPreviewId, linkPreview } = await resolvePreviewForBody(db, parsed.data.body);
     await db.insert(networkChatMessages).values({
       id,
       authorId: sessionResult.user.id,
       body: parsed.data.body,
       createdAt: now,
       deletedAt: null,
+      linkPreviewId,
     });
 
     for (let i = 0; i < imageIds.length; i += 1) {
@@ -871,6 +898,7 @@ export async function postNetworkChatMessageAction(
         comments: [],
         likeCount: 0,
         likedByMe: false,
+        linkPreview,
       },
     };
   });
@@ -915,6 +943,7 @@ export async function postNetworkChatCommentAction(
 
     const now = new Date().toISOString();
     const commentId = randomUUID();
+    const { linkPreviewId, linkPreview } = await resolvePreviewForBody(db, parsed.data.body);
     await db.insert(networkChatComments).values({
       id: commentId,
       messageId: parsed.data.messageId,
@@ -922,6 +951,7 @@ export async function postNetworkChatCommentAction(
       body: parsed.data.body,
       createdAt: now,
       deletedAt: null,
+      linkPreviewId,
     });
 
     for (let i = 0; i < parsed.data.imageIds.length; i += 1) {
@@ -962,7 +992,44 @@ export async function postNetworkChatCommentAction(
         canDelete: true,
         likeCount: 0,
         likedByMe: false,
+        linkPreview,
       },
+    };
+  });
+}
+
+/**
+ * Debounced composer helper: unfurls a URL for a Facebook-style preview card (PC-279).
+ * Rate-limited per user to limit SSRF / egress abuse.
+ */
+export async function previewFeedLinkAction(
+  input: { url: string },
+): Promise<{ ok: boolean; message: string; preview?: import("@/lib/feed/types").FeedLinkPreview | null }> {
+  const sessionResult = await requireSession();
+  if (!sessionResult.ok) return sessionResult;
+
+  const parsed = z
+    .object({ url: z.string().trim().min(1).max(2048) })
+    .safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, message: "Invalid URL." };
+  }
+
+  const normalized = normalizeLinkUrl(parsed.data.url) ?? normalizeLinkUrl(extractFirstUrl(parsed.data.url) ?? "");
+  if (!normalized) {
+    return { ok: false, message: "URL must be http(s)." };
+  }
+
+  if (!checkRateLimit(`feed-link-preview:${sessionResult.user.id}`, 20, 60_000)) {
+    return { ok: false, message: "Too many preview requests. Try again shortly." };
+  }
+
+  return withDb(async (db) => {
+    const preview = await ensureLinkPreview(db, normalized);
+    return {
+      ok: true,
+      message: preview ? "Preview ready." : "No preview available.",
+      preview,
     };
   });
 }

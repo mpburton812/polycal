@@ -16,6 +16,7 @@ function chatItem(overrides: Partial<FeedItem & { kind: "chat" }> = {}): FeedIte
     comments: [],
     likeCount: 0,
     likedByMe: false,
+    linkPreview: null,
     ...overrides,
   };
 }
@@ -47,6 +48,7 @@ describe("buildFeedUpdateToken", () => {
             canDelete: false,
             likeCount: 0,
             likedByMe: false,
+            linkPreview: null,
           },
         ],
       }),

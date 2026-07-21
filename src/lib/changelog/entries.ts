@@ -26,6 +26,18 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "2026.07.21f",
+    date: "2026-07-21",
+    summary: "Feed URL embeds with Facebook-style link previews.",
+    changes: [
+      {
+        type: "added",
+        description:
+          "Chat and comment bodies linkify http(s) URLs and attach Open Graph preview cards (cached, SSRF-hardened unfurl). Composer shows a debounced preview (PC-279). SCHEMA_VERSION 31.",
+      },
+    ],
+  },
+  {
     version: "2026.07.21e",
     date: "2026-07-21",
     summary:

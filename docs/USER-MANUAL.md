@@ -22,6 +22,8 @@ Approved proposals appear on the **Schedule** tab. Color coding:
 - **Blue** — approved sleeping arrangements
 - **Red / warning** — conflicts or **at risk** status
 
+The **Feed** tab is a shared network timeline (milestones + chat). When you include an `https` URL in a chat message or comment, PolyCal linkifies it and may show a Facebook-style preview card (title, description, image) from the page’s Open Graph metadata.
+
 ---
 
 ## 2. Roles

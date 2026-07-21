@@ -272,6 +272,7 @@ function requiredCompletedPollMatrix(
 }
 
 import { optionalInviteeVotesPending } from "@/lib/proposals/poll-utils";
+import { resolvePreviewForBody } from "@/lib/feed/link-preview-store";
 function advanceOccurrenceDate(date: Date, pattern: RecurrencePattern, interval: number): Date {
   const next = new Date(date);
   switch (pattern) {
@@ -3629,6 +3630,7 @@ export async function addProposalCommentAction(
     sliceTag: parsed.data.sliceTag ?? null,
     createdAt: now,
     deletedAt: null,
+    linkPreviewId: (await resolvePreviewForBody(db, parsed.data.body)).linkPreviewId,
   });
 
   for (let i = 0; i < imageIds.length; i += 1) {
