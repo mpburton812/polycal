@@ -26,6 +26,19 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "2026.07.21b",
+    date: "2026-07-21",
+    summary:
+      "Feed nav parrot matches sibling tab icons; like birds are half that size.",
+    changes: [
+      {
+        type: "changed",
+        description:
+          "Bottom FEED parrot restored to 24×24 (same as other nav icons); feed like birds set to 12×12 (half) via shared constants (PC-270).",
+      },
+    ],
+  },
+  {
     version: "2026.07.21",
     date: "2026-07-21",
     summary:
