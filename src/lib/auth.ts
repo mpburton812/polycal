@@ -1,7 +1,9 @@
 import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
+import { getToken } from "next-auth/jwt";
 import { compare } from "bcryptjs";
 import { eq } from "drizzle-orm";
+import { cookies } from "next/headers";
 import { z } from "zod";
 
 import { recordSuccessfulLogin } from "@/lib/audit";
@@ -10,12 +12,50 @@ import { authConfig } from "../../auth.config";
 import { getDb } from "@/lib/db/client";
 import { ensureDbReady } from "@/lib/db/ensure-ready";
 import { users, type UserRole } from "@/lib/db/schema";
-import { checkRateLimit } from "@/lib/rate-limit";
+import { checkRateLimitPersistent } from "@/lib/rate-limit";
 
 const credentialsSchema = z.object({
   username: z.string().min(1).max(64),
   password: z.string().min(1).max(128),
 });
+
+/**
+ * Builds a Cookie request header from the current Next.js cookie store so
+ * `getToken` can decode the existing Auth.js session JWT (PC-282).
+ */
+async function sessionCookieHeader(): Promise<string> {
+  const store = await cookies();
+  return store
+    .getAll()
+    .map((cookie) => `${cookie.name}=${cookie.value}`)
+    .join("; ");
+}
+
+/**
+ * True when the current request already carries an admin JWT session.
+ * Impersonation must not succeed with the secret alone (PC-282).
+ */
+async function hasAdminSessionJwt(): Promise<boolean> {
+  const secret = process.env.AUTH_SECRET;
+  if (!secret) return false;
+
+  const cookieHeader = await sessionCookieHeader();
+  if (!cookieHeader) return false;
+
+  // Try both cookie name prefixes — AUTH_URL may be unset while cookies are
+  // already `__Secure-authjs.session-token` on HTTPS deployments.
+  for (const secureCookie of [true, false] as const) {
+    const token = await getToken({
+      req: { headers: { cookie: cookieHeader } },
+      secret,
+      secureCookie,
+    });
+    if (token?.role === "admin") {
+      return true;
+    }
+  }
+  return false;
+}
 
 /**
  * Auth.js entry — JWT sessions in HttpOnly cookies (no localStorage tokens).
@@ -42,6 +82,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             raw.impersonateSecret === impersonationSecret;
 
           if (!secretOk) {
+            return null;
+          }
+
+          // Secret alone is insufficient — require an existing admin JWT (e2e/admin
+          // flows sign in as admin first, then call signIn with impersonate fields).
+          if (!(await hasAdminSessionJwt())) {
             return null;
           }
 
@@ -73,7 +119,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         if (!parsed.success) return null;
 
         const loginKey = `login:${parsed.data.username.toLowerCase()}`;
-        if (!checkRateLimit(loginKey, 10, 60_000)) {
+        if (!(await checkRateLimitPersistent(loginKey, 10, 60_000))) {
           return null;
         }
 

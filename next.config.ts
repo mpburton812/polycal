@@ -39,8 +39,10 @@ const nextConfig: NextConfig = {
       },
       {
         key: "Content-Security-Policy",
+        // img-src https: allows Open Graph preview images from arbitrary hosts (PC-282).
+        // connect-src may need expansion later for Web Push / third-party endpoints.
         value:
-          "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
+          "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
       },
     ];
 

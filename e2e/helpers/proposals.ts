@@ -87,17 +87,22 @@ export async function openSleepingPartnerProposal(page: Page): Promise<Locator> 
   return dialog;
 }
 
-/** Builds inclusive YYYY-MM-DD dates from start through end. */
+/** Builds inclusive YYYY-MM-DD dates from start through end (civil arithmetic). */
 function inclusiveNightDates(rangeStart: string, rangeEnd: string): string[] {
   const dates: string[] = [];
-  const cursor = new Date(`${rangeStart}T00:00:00`);
-  const end = new Date(`${rangeEnd}T00:00:00`);
-  while (cursor <= end) {
-    const pad = (value: number) => String(value).padStart(2, "0");
+  const startParts = rangeStart.split("-").map(Number);
+  const endParts = rangeEnd.split("-").map(Number);
+  if (startParts.length !== 3 || endParts.length !== 3) return dates;
+  const [sy, sm, sd] = startParts as [number, number, number];
+  const [ey, em, ed] = endParts as [number, number, number];
+  const cursor = new Date(Date.UTC(sy, sm - 1, sd));
+  const end = new Date(Date.UTC(ey, em - 1, ed));
+  const pad = (value: number) => String(value).padStart(2, "0");
+  while (cursor.getTime() <= end.getTime()) {
     dates.push(
-      `${cursor.getFullYear()}-${pad(cursor.getMonth() + 1)}-${pad(cursor.getDate())}`,
+      `${cursor.getUTCFullYear()}-${pad(cursor.getUTCMonth() + 1)}-${pad(cursor.getUTCDate())}`,
     );
-    cursor.setDate(cursor.getDate() + 1);
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
   }
   return dates;
 }

@@ -64,6 +64,5 @@ test.describe("Schedule placeholder", () => {
     await login(page, USERS.luke.username);
     await page.getByRole("link", { name: "Schedule" }).click();
     await expect(page.getByRole("heading", { name: "Schedule", level: 1 })).toBeVisible();
-    await expect(page.getByText(/network calendar/i)).toBeVisible();
   });
 });

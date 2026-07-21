@@ -72,6 +72,25 @@ export async function applyFeedMigrations(sql: Client): Promise<void> {
   await sql.execute(
     `CREATE INDEX IF NOT EXISTS idx_feed_likes_target ON feed_likes(target_type, target_id)`,
   );
+
+  // PC-279: Facebook-style link previews for Feed chat / comments.
+  await sql.execute(`
+    CREATE TABLE IF NOT EXISTS feed_link_previews (
+      id TEXT PRIMARY KEY NOT NULL,
+      normalized_url TEXT NOT NULL UNIQUE,
+      canonical_url TEXT NOT NULL,
+      title TEXT,
+      description TEXT,
+      image_url TEXT,
+      site_name TEXT,
+      status TEXT NOT NULL DEFAULT 'ok',
+      fetched_at TEXT NOT NULL,
+      error_code TEXT
+    )
+  `);
+  await ensureColumn(sql, "network_chat_messages", "link_preview_id", "TEXT");
+  await ensureColumn(sql, "network_chat_comments", "link_preview_id", "TEXT");
+  await ensureColumn(sql, "proposal_comments", "link_preview_id", "TEXT");
 }
 
 async function ensureColumn(

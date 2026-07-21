@@ -15,21 +15,18 @@ import {
   users,
 } from "@/lib/db/schema";
 import { PARTNERSHIP_CARD_PREFIX } from "@/lib/proposals/constants";
-import { optionalPollVotesPending } from "@/lib/proposals/poll-utils";
+import { optionalInviteeVotesPending } from "@/lib/proposals/poll-utils";
 import {
   getProposalSpecialKind,
   proposalDescriptionForDisplay,
 } from "@/lib/proposals/special-proposals";
 import {
-  applyProposalMask,
   getAdminCanSeeUninvolved,
-  getPrivacyAdminFlags,
-  getSleepingNetworkVisibility,
-  shouldMaskProposalContent,
   viewerCanSeeProposalWithSleepingGate,
 } from "@/lib/proposals/access";
 import { buildPartnershipProposalCopy } from "@/lib/partnerships/copy";
 import { formatSleepingDisplayTitle } from "@/lib/proposals/sleeping-display";
+import { sleepingCalendarDayEnd } from "@/lib/proposals/sleeping-schedule";
 import { proposalHasSchedulableWindows } from "@/lib/schedule/schedule-slices";
 
 import type { ProposalBoard, ProposalCard } from "./types";
@@ -74,8 +71,6 @@ export async function listProposalBoardAction(): Promise<ProposalBoard> {
   await bridgeLegacyResidencyProposals(db);
   const viewerId = session.user.id;
   const isAdmin = await userHasAdminAccess(session.user.role);
-  const privacyFlags = await getPrivacyAdminFlags(db);
-  const sleepingNetworkVisibility = await getSleepingNetworkVisibility(db);
   const adminCanSeeUninvolved = await getAdminCanSeeUninvolved(db);
   const adminSeesAll = isAdmin && adminCanSeeUninvolved;
   const nowIso = new Date().toISOString();
@@ -99,10 +94,7 @@ export async function listProposalBoardAction(): Promise<ProposalBoard> {
             viewerInviteeProposalIds.length > 0
               ? inArray(proposals.id, viewerInviteeProposalIds)
               : eq(proposals.id, "__none__"),
-            and(
-              inArray(proposals.state, ["resolved", "archived"]),
-              eq(proposals.eventPrivacy, "open"),
-            ),
+            inArray(proposals.state, ["resolved", "archived"]),
           ),
         ),
       );
@@ -123,7 +115,6 @@ export async function listProposalBoardAction(): Promise<ProposalBoard> {
       atRisk: proposals.atRisk,
       isPoll: proposals.isPoll,
       isAllDay: proposals.isAllDay,
-      eventPrivacy: proposals.eventPrivacy,
       intentionalSolo: proposals.intentionalSolo,
       isBatchSleeping: proposals.isBatchSleeping,
       isRecurrenceParent: proposals.isRecurrenceParent,
@@ -162,24 +153,6 @@ export async function listProposalBoardAction(): Promise<ProposalBoard> {
     inviteesByProposal.set(row.proposalId, list);
   }
 
-  const pollSlotCountRows =
-    visibleProposalIds.length > 0
-      ? await db
-          .select({
-            proposalId: proposalTimeSlots.proposalId,
-          })
-          .from(proposalTimeSlots)
-          .innerJoin(proposals, eq(proposalTimeSlots.proposalId, proposals.id))
-          .where(
-            and(eq(proposals.isPoll, true), inArray(proposals.id, visibleProposalIds)),
-          )
-      : [];
-
-  const pollSlotCounts = new Map<string, number>();
-  for (const slotRow of pollSlotCountRows) {
-    pollSlotCounts.set(slotRow.proposalId, (pollSlotCounts.get(slotRow.proposalId) ?? 0) + 1);
-  }
-
   const slotDetailRows =
     visibleProposalIds.length > 0
       ? await db
@@ -216,9 +189,7 @@ export async function listProposalBoardAction(): Promise<ProposalBoard> {
       if (
         !viewerCanSeeProposalWithSleepingGate(viewerId, isAdmin, row.proposerId, inviteeUserIds, {
           proposalType: row.proposalType,
-          sleepingNetworkVisibility,
           state: row.state,
-          eventPrivacy: row.eventPrivacy,
           adminCanSeeUninvolved,
         })
       ) {
@@ -226,21 +197,12 @@ export async function listProposalBoardAction(): Promise<ProposalBoard> {
       }
     }
 
-    const masked = shouldMaskProposalContent(
-      viewerId,
-      isAdmin,
-      row.proposerId,
-      inviteeUserIds,
-      row.eventPrivacy,
-      privacyFlags.adminCanSeePrivate,
-      privacyFlags.adminCanSeeSuperPrivate,
-      row.state,
-    );
-    const display = applyProposalMask(row, masked);
+    // Privacy-level masking was removed (PC-280) — all proposals are "open".
+    const masked = false;
+    const display = row;
 
     const viewerInvitee = invitees.find((invitee) => invitee.userId === viewerId);
-    const pollSlotCount = pollSlotCounts.get(row.id) ?? 0;
-    const optionalPollPending = optionalPollVotesPending(row, viewerInvitee, pollSlotCount);
+    const optionalRsvpPending = optionalInviteeVotesPending(row, viewerInvitee);
     const respondedCount = invitees.filter((inv) => inv.voteStatus !== "not_seen").length;
     const needsViewerAction =
       !masked &&
@@ -249,10 +211,17 @@ export async function listProposalBoardAction(): Promise<ProposalBoard> {
       (row.state === "proposed" ||
         (row.state === "resolved" && row.atRisk && viewerInvitee.role === "required") ||
         (row.state === "resolved" && !row.atRisk && viewerInvitee.role === "required") ||
-        optionalPollPending);
+        optionalRsvpPending);
 
     const scheduleEnd = display.scheduledEndAt ?? display.scheduledStartAt;
-    const isPastSchedule = Boolean(scheduleEnd && scheduleEnd < nowIso);
+    // Sleeping nights are calendar-date-only — compare against end of the calendar
+    // day rather than the raw (often midnight) timestamp (PC-280).
+    const isPastSchedule = Boolean(
+      scheduleEnd &&
+        (row.proposalType === "sleeping"
+          ? sleepingCalendarDayEnd(scheduleEnd).toISOString()
+          : scheduleEnd) < nowIso,
+    );
 
     let cardTitle = display.title;
     if (!masked && row.proposalType === "sleeping") {
@@ -271,7 +240,7 @@ export async function listProposalBoardAction(): Promise<ProposalBoard> {
       title: cardTitle,
       description: masked ? display.description : proposalDescriptionForDisplay(row.description),
       proposalType: row.proposalType,
-      state: optionalPollPending ? "proposed" : row.state,
+      state: optionalRsvpPending ? "proposed" : row.state,
       proposerId: row.proposerId,
       proposerName: row.proposerName,
       locationName: display.locationName ?? display.locationText ?? null,
@@ -280,7 +249,6 @@ export async function listProposalBoardAction(): Promise<ProposalBoard> {
       atRisk: row.atRisk,
       isPoll: row.isPoll,
       isAllDay: row.isAllDay,
-      eventPrivacy: row.eventPrivacy,
       isContentMasked: masked,
       needsViewerAction,
       inviteeCount: invitees.length,
@@ -317,7 +285,7 @@ export async function listProposalBoardAction(): Promise<ProposalBoard> {
       specialKind: getProposalSpecialKind(row.description) ?? undefined,
     };
 
-    const column: keyof ProposalBoard = optionalPollPending
+    const column: keyof ProposalBoard = optionalRsvpPending
       ? "proposed"
       : (row.state as keyof ProposalBoard);
     empty[column].push(card);
@@ -388,7 +356,6 @@ export async function listProposalBoardAction(): Promise<ProposalBoard> {
         atRisk: false,
         isPoll: false,
         isAllDay: false,
-        eventPrivacy: "open",
         isContentMasked: false,
         needsViewerAction: copy.needsViewerAction,
         inviteeCount: 1,

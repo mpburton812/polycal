@@ -76,6 +76,12 @@ export const polyGroup = sqliteTable("poly_group", {
   allowUserProvisioning: integer("allow_user_provisioning", { mode: "boolean" })
     .notNull()
     .default(false),
+  /**
+   * Retired columns (PC-280): group name proposals, power management ("all admin"),
+   * and per-level event privacy toggles were removed from the app. Columns are kept
+   * (not dropped) to avoid risky SQLite ALTER TABLE DROP COLUMN migrations — the
+   * pc280-migrations backfill normalizes their values and the app no longer reads them.
+   */
   allowGroupNameProposals: integer("allow_group_name_proposals", { mode: "boolean" })
     .notNull()
     .default(false),
@@ -102,7 +108,10 @@ export const polyGroup = sqliteTable("poly_group", {
   hideSleepingArrangements: integer("hide_sleeping_arrangements", { mode: "boolean" })
     .notNull()
     .default(false),
-  /** everyone = normal privacy rules; involved = proposer/invitees/admins only (PC-229). */
+  /**
+   * Retired (PC-280): sleeping visibility is hard-defaulted to "involved" in app code
+   * regardless of this column's stored value; kept only to avoid a column drop.
+   */
   sleepingNetworkVisibility: text("sleeping_network_visibility").notNull().default("everyone"),
   placesMapVisibility: text("places_map_visibility").notNull().default("all"),
   logTailLength: integer("log_tail_length").notNull().default(100),
@@ -235,7 +244,8 @@ export const inviteeVoteStatuses = [
 ] as const;
 export type InviteeVoteStatus = (typeof inviteeVoteStatuses)[number];
 
-export const eventPrivacyLevels = ["open", "private", "super_private"] as const;
+/** Privacy levels were removed (PC-280) — every proposal is "open"; column kept for migration backfill. */
+export const eventPrivacyLevels = ["open"] as const;
 export type EventPrivacyLevel = (typeof eventPrivacyLevels)[number];
 
 /**
@@ -387,6 +397,8 @@ export const proposalComments = sqliteTable("proposal_comments", {
   sliceTag: text("slice_tag"),
   createdAt: text("created_at").notNull(),
   deletedAt: text("deleted_at"),
+  /** Cached Open Graph preview for the first URL in body (PC-279). */
+  linkPreviewId: text("link_preview_id"),
 });
 
 /** Tracks per-user dismissal of system notifications in the activity log (PC-40). */
@@ -474,6 +486,8 @@ export const networkChatMessages = sqliteTable("network_chat_messages", {
   body: text("body").notNull(),
   createdAt: text("created_at").notNull(),
   deletedAt: text("deleted_at"),
+  /** Cached Open Graph preview for the first URL in body (PC-279). */
+  linkPreviewId: text("link_preview_id"),
 });
 
 /** Threaded replies on network chat messages (PC-234). */
@@ -488,6 +502,8 @@ export const networkChatComments = sqliteTable("network_chat_comments", {
   body: text("body").notNull().default(""),
   createdAt: text("created_at").notNull(),
   deletedAt: text("deleted_at"),
+  /** Cached Open Graph preview for the first URL in body (PC-279). */
+  linkPreviewId: text("link_preview_id"),
 });
 
 export const networkChatMessageImages = sqliteTable("network_chat_message_images", {
@@ -510,6 +526,21 @@ export const networkChatCommentImages = sqliteTable("network_chat_comment_images
     .notNull()
     .references(() => storedImages.id),
   sortOrder: integer("sort_order").notNull().default(0),
+});
+
+/** Shared Open Graph / link-preview cache for Feed posts (PC-279). */
+export const feedLinkPreviews = sqliteTable("feed_link_previews", {
+  id: text("id").primaryKey(),
+  normalizedUrl: text("normalized_url").notNull().unique(),
+  canonicalUrl: text("canonical_url").notNull(),
+  title: text("title"),
+  description: text("description"),
+  imageUrl: text("image_url"),
+  siteName: text("site_name"),
+  /** ok | failed */
+  status: text("status").notNull().default("ok"),
+  fetchedAt: text("fetched_at").notNull(),
+  errorCode: text("error_code"),
 });
 
 export const proposalCommentImages = sqliteTable("proposal_comment_images", {
@@ -582,4 +613,5 @@ export const schema = {
   proposalCommentImages,
   feedImageUploads,
   feedLikes,
+  feedLinkPreviews,
 };

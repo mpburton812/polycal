@@ -26,6 +26,80 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "2026.07.21h",
+    date: "2026-07-21",
+    summary: "Post-280 audit: TZ sleeping dates, security hardenings, perf, Playwright.",
+    changes: [
+      {
+        type: "fixed",
+        description:
+          "Sleeping civil dates and day-end expiry/archive use the viewer's IANA timezone (default America/New_York) instead of the host process locale — fixes Vercel UTC midnight shifts (PC-282).",
+      },
+      {
+        type: "changed",
+        description:
+          "Masked sleeping copy is now \"Busy\" / Hidden (not \"Private event\"). Feed image downloads require attachment membership; Credentials impersonation requires an existing admin JWT; rate limits persist in SCHEMA 33; production alpha-feedback CORS is allowlisted; CSP img-src allows https OG images (PC-282).",
+      },
+      {
+        type: "changed",
+        description:
+          "Schedule overlap marking uses day buckets for large weeks; notification revalidation is scoped to shell tabs; People & Places loads via next/dynamic (PC-282).",
+      },
+    ],
+  },
+  {
+    version: "2026.07.21g",
+    date: "2026-07-21",
+    summary: "UX cleanup batch: removals, privacy purge, polish, sleeping-past fixes.",
+    changes: [
+      {
+        type: "changed",
+        description:
+          "Removed Planning drawer from Schedule, Clone proposal, group-name-change proposals, and admin power management (\"all admins\" toggle) — impersonation is unaffected. Sleeping proposal network visibility is now hard-defaulted to \"involved\" everywhere; the admin toggle is gone (PC-280).",
+      },
+      {
+        type: "changed",
+        description:
+          "Private/super-private event privacy levels are removed entirely — every proposal (including events) is always open, admin privacy toggles are gone, and masking logic was simplified accordingly. SCHEMA_VERSION 32 backfills existing proposals to open and normalizes retired poly_group columns (PC-280).",
+      },
+      {
+        type: "changed",
+        description:
+          "Removed descriptive tab blurbs from Feed, Schedule, Proposals, and People & Places, and Admin (Profile's \"Signed in as\" is unchanged). Draft Delete/Exit and proposal detail dialog footer actions now use the same pill outlined/contained button styling as Save/Submit. Feed composers default to 2 rows and Enter now inserts a newline instead of submitting (PC-280).",
+      },
+      {
+        type: "fixed",
+        description:
+          "Sleeping proposals no longer show as \"past\" until the whole calendar day elapses (board and proposal cards), and the Schedule overlap/red-conflict check no longer flags a sleeping arrangement against an event on the same night, matching PC-59 parity (PC-280).",
+      },
+    ],
+  },
+  {
+    version: "2026.07.21f",
+    date: "2026-07-21",
+    summary: "Feed URL embeds with Facebook-style link previews.",
+    changes: [
+      {
+        type: "added",
+        description:
+          "Chat and comment bodies linkify http(s) URLs and attach Open Graph preview cards (cached, SSRF-hardened unfurl). Composer shows a debounced preview (PC-279). SCHEMA_VERSION 31.",
+      },
+    ],
+  },
+  {
+    version: "2026.07.21e",
+    date: "2026-07-21",
+    summary:
+      "Optional invitees stay visible after required attendees resolve (extend PC-49).",
+    changes: [
+      {
+        type: "added",
+        description:
+          "Unfinished optional invitees keep Proposed-board visibility, a detail Alert, and an actionable resolve notification until they RSVP; optional still does not block schedule resolution (PC-278).",
+      },
+    ],
+  },
+  {
     version: "2026.07.21d",
     date: "2026-07-21",
     summary: "Feed like bird enlarged to 36×36 (3× prior size).",

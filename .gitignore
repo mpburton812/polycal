@@ -24,9 +24,9 @@ e2e.db
 e2e.db-*
 e2e-w*.db
 e2e-w*.db-*
-db
-db-wal
-db-shm
+/db
+/db-wal
+/db-shm
 
 # OS / editor
 .DS_Store

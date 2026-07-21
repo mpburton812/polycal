@@ -15,11 +15,10 @@ import {
   proposals,
   sleepingPartnerships,
   users,
-  type EventPrivacyLevel,
-  type ProposalState,
   type ProposalType,
 } from "@/lib/db/schema";
-import { eventInRange, intervalsOverlap } from "@/lib/schedule/dates";
+import { eventInRange } from "@/lib/schedule/dates";
+import { markOverlaps } from "@/lib/schedule/overlaps";
 import { buildScheduleWindows } from "@/lib/schedule/schedule-slices";
 import type { ScheduleSliceKind } from "@/lib/schedule/slice-types";
 import { resolveTimezone } from "@/lib/schedule/timezone";
@@ -27,8 +26,6 @@ import { parseBatchSlotMeta } from "@/lib/proposals/batch-sleeping";
 import { formatSleepingDisplayTitle } from "@/lib/proposals/sleeping-display";
 import {
   getAdminCanSeeUninvolved,
-  getPrivacyAdminFlags,
-  MASKED_TITLE,
   viewerCanSeeProposalWithSleepingGate,
 } from "@/lib/proposals/access";
 import { applyScheduleMasking } from "@/lib/schedule/slice-auth";
@@ -72,44 +69,26 @@ export interface ScheduleEvent {
   eventIconKey: string | null;
 }
 
-export interface SchedulePlanningItem {
-  id: string;
-  title: string;
-  state: ProposalState;
-  proposalType: ProposalType;
-  scheduledStartAt: string | null;
-  eventIconKey: string | null;
-}
-
 export interface SchedulePayload {
   events: ScheduleEvent[];
-  planningItems: SchedulePlanningItem[];
 }
 
 async function getSchedulePrivacyFlags(
   db: ReturnType<typeof getDb>,
 ): Promise<{
-  adminCanSeePrivate: boolean;
-  adminCanSeeSuperPrivate: boolean;
   hideSleeping: boolean;
-  sleepingNetworkVisibility: "everyone" | "involved";
   adminCanSeeUninvolved: boolean;
 }> {
-  const privacy = await getPrivacyAdminFlags(db);
   const adminCanSeeUninvolved = await getAdminCanSeeUninvolved(db);
   const [group] = await db
     .select({
       hideSleepingArrangements: polyGroup.hideSleepingArrangements,
-      sleepingNetworkVisibility: polyGroup.sleepingNetworkVisibility,
     })
     .from(polyGroup)
     .where(eq(polyGroup.id, 1))
     .limit(1);
   return {
-    ...privacy,
     hideSleeping: group?.hideSleepingArrangements ?? false,
-    sleepingNetworkVisibility:
-      group?.sleepingNetworkVisibility === "involved" ? "involved" : "everyone",
     adminCanSeeUninvolved,
   };
 }
@@ -157,24 +136,6 @@ async function acceptedSleepingPartnerIds(
   return partnerIds;
 }
 
-function markOverlaps(events: ScheduleEvent[]): ScheduleEvent[] {
-  const flagged = events.map((event) => ({ ...event }));
-  for (let i = 0; i < flagged.length; i += 1) {
-    for (let j = i + 1; j < flagged.length; j += 1) {
-      const a = flagged[i];
-      const b = flagged[j];
-      if (
-        intervalsOverlap(a.startAt, a.endAt, b.startAt, b.endAt) &&
-        a.participantIds.some((id) => b.participantIds.includes(id))
-      ) {
-        flagged[i].hasOverlap = true;
-        flagged[j].hasOverlap = true;
-      }
-    }
-  }
-  return flagged;
-}
-
 /**
  * Loads calendar blocks for proposed, resolved, and archived proposals in a date range (PC-42).
  */
@@ -186,7 +147,7 @@ export async function listScheduleEventsAction(
     return {
       ok: false,
       message: sessionResult.message,
-      payload: { events: [], planningItems: [] },
+      payload: { events: [] },
     };
   }
 
@@ -195,7 +156,7 @@ export async function listScheduleEventsAction(
     return {
       ok: false,
       message: parsed.error.issues[0]?.message ?? "Invalid range.",
-      payload: { events: [], planningItems: [] },
+      payload: { events: [] },
     };
   }
 
@@ -255,7 +216,6 @@ export async function listScheduleEventsAction(
       atRisk: proposals.atRisk,
       isPoll: proposals.isPoll,
       isAllDay: proposals.isAllDay,
-      eventPrivacy: proposals.eventPrivacy,
       isBatchSleeping: proposals.isBatchSleeping,
       parentProposalId: proposals.parentProposalId,
       isRecurrenceParent: proposals.isRecurrenceParent,
@@ -319,7 +279,6 @@ export async function listScheduleEventsAction(
   const locationNameById = new Map(locationRows.map((row) => [row.id, row.name]));
 
   const events: ScheduleEvent[] = [];
-  const planningItems: SchedulePlanningItem[] = [];
 
   for (const row of rows) {
     const invitees = inviteesByProposal.get(row.id) ?? [];
@@ -334,9 +293,7 @@ export async function listScheduleEventsAction(
       if (
         !viewerCanSeeProposalWithSleepingGate(viewerId, isAdmin, row.proposerId, inviteeUserIds, {
           proposalType: row.proposalType,
-          sleepingNetworkVisibility: privacyFlags.sleepingNetworkVisibility,
           state: row.state,
-          eventPrivacy: row.eventPrivacy,
           adminCanSeeUninvolved: privacyFlags.adminCanSeeUninvolved,
         })
       ) {
@@ -344,63 +301,14 @@ export async function listScheduleEventsAction(
       }
     }
 
-    const { privacyMasked, sleepingMasked, isContentMasked } = applyScheduleMasking({
+    const { isContentMasked } = applyScheduleMasking({
       viewerId,
-      isAdmin,
       proposerId: row.proposerId,
       inviteeUserIds,
-      eventPrivacy: row.eventPrivacy,
-      proposalState: row.state,
       proposalType: row.proposalType,
       privacyFlags,
       acceptedPartnerIds: partnerIds,
     });
-
-    if (row.state === "proposed") {
-      const proposedTitle =
-        row.proposalType === "sleeping" && !privacyMasked && !sleepingMasked
-          ? formatSleepingDisplayTitle({
-              proposerName: row.proposerName,
-              inviteeNames: invitees.map((invitee) => invitee.displayName),
-              intentionalSolo: row.intentionalSolo,
-              locationName: row.locationName ?? row.locationText ?? null,
-              state: "proposed",
-              atRisk: row.atRisk,
-            })
-          : row.title;
-      planningItems.push({
-        id: row.id,
-        title: proposedTitle,
-        state: row.state,
-        proposalType: row.proposalType,
-        scheduledStartAt: row.scheduledStartAt,
-        eventIconKey:
-          privacyMasked || row.proposalType !== "event" ? null : row.eventIconKey ?? null,
-      });
-    }
-
-    if (row.state === "resolved") {
-      const resolvedTitle =
-        row.proposalType === "sleeping" && !privacyMasked && !sleepingMasked
-          ? formatSleepingDisplayTitle({
-              proposerName: row.proposerName,
-              inviteeNames: invitees.map((invitee) => invitee.displayName),
-              intentionalSolo: row.intentionalSolo,
-              locationName: row.locationName ?? row.locationText ?? null,
-              state: "resolved",
-              atRisk: row.atRisk,
-            })
-          : row.title;
-      planningItems.push({
-        id: row.id,
-        title: resolvedTitle,
-        state: row.state,
-        proposalType: row.proposalType,
-        scheduledStartAt: row.scheduledStartAt,
-        eventIconKey:
-          privacyMasked || row.proposalType !== "event" ? null : row.eventIconKey ?? null,
-      });
-    }
 
     const windows: {
       startAt: string;
@@ -462,9 +370,8 @@ export async function listScheduleEventsAction(
     for (const window of windows) {
       if (!eventInRange(window.startAt, window.endAt, rangeStart, rangeEnd)) continue;
 
-      const maskedTitle = sleepingMasked
-        ? HIDDEN_SLEEPING_TITLE
-        : MASKED_TITLE;
+      // Only sleeping-network masking remains (privacy levels removed PC-280).
+      const maskedTitle = HIDDEN_SLEEPING_TITLE;
 
       let windowParticipantIds = participantIds;
       let windowParticipantNames = participantNames;
@@ -541,36 +448,11 @@ export async function listScheduleEventsAction(
     }
   }
 
-  const draftRows = await db
-    .select({
-      id: proposals.id,
-      title: proposals.title,
-      proposalType: proposals.proposalType,
-      state: proposals.state,
-      proposerId: proposals.proposerId,
-      scheduledStartAt: proposals.scheduledStartAt,
-      eventIconKey: proposals.eventIconKey,
-    })
-    .from(proposals)
-    .where(and(eq(proposals.state, "draft"), eq(proposals.proposerId, viewerId)));
-
-  for (const draft of draftRows) {
-    planningItems.push({
-      id: draft.id,
-      title: draft.title,
-      state: draft.state,
-      proposalType: draft.proposalType,
-      scheduledStartAt: draft.scheduledStartAt,
-      eventIconKey: draft.proposalType === "event" ? draft.eventIconKey ?? null : null,
-    });
-  }
-
   return {
     ok: true,
     message: "Schedule loaded.",
     payload: {
       events: markOverlaps(events),
-      planningItems,
     },
   };
   });

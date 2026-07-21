@@ -3,7 +3,6 @@
 import AddIcon from "@mui/icons-material/Add";
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
-import EventNoteIcon from "@mui/icons-material/EventNote";
 import FilterListIcon from "@mui/icons-material/FilterList";
 import TodayIcon from "@mui/icons-material/Today";
 import {
@@ -35,7 +34,6 @@ import {
   type SchedulePayload,
 } from "@/actions/schedule";
 import type { PersonSummary } from "@/actions/users";
-import { PlanningModeDrawer } from "@/components/schedule/PlanningModeDrawer";
 import { ScheduleAgendaView } from "@/components/schedule/ScheduleAgendaView";
 import { ScheduleDaySheet } from "@/components/schedule/ScheduleDaySheet";
 import { ScheduleDayView } from "@/components/schedule/ScheduleDayView";
@@ -375,11 +373,6 @@ export function ScheduleClient({
     ],
   );
 
-  const eventIdsOnCalendar = useMemo(
-    () => new Set(filteredEvents.map((event) => event.proposalId)),
-    [filteredEvents],
-  );
-
   function shiftPeriod(delta: number) {
     if (isMonthLayout) {
       const next = new Date(monthAnchor);
@@ -566,24 +559,6 @@ export function ScheduleClient({
             >
               <FilterListIcon />
             </IconButton>
-
-            <ToggleButton
-              value="planning"
-              selected={viewState.planningOpen}
-              size="small"
-              aria-label="Planning"
-              aria-pressed={viewState.planningOpen}
-              onClick={() =>
-                setViewState((current) => ({
-                  ...current,
-                  planningOpen: !current.planningOpen,
-                }))
-              }
-              sx={{ textTransform: "none" }}
-            >
-              <EventNoteIcon sx={{ mr: 0.5, fontSize: 18 }} />
-              Planning
-            </ToggleButton>
           </Stack>
         </Stack>
       </Box>
@@ -753,17 +728,6 @@ export function ScheduleClient({
         onOpenInWeek={openWeekForDay}
         onCreateEvent={(day) => createForDay(day, "event")}
         onCreateSleeping={(day) => createForDay(day, "sleeping")}
-      />
-
-      <PlanningModeDrawer
-        open={viewState.planningOpen}
-        items={payload.planningItems}
-        eventIdsOnCalendar={eventIdsOnCalendar}
-        onClose={() => setViewState((current) => ({ ...current, planningOpen: false }))}
-        onSelect={(id) => {
-          openRelatedProposal(id);
-          setViewState((current) => ({ ...current, planningOpen: false }));
-        }}
       />
 
       <SeriesOccurrenceChooserDialog

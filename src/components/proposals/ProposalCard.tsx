@@ -141,9 +141,6 @@ export function ProposalCard({
     }
     // Keep At risk visible when Action needed is the emphasis chip (PC-124).
     if (proposal.atRisk && status?.label !== "At risk") sparseBadges.push("At risk");
-    if (proposal.eventPrivacy === "private" || proposal.eventPrivacy === "super_private") {
-      sparseBadges.push("Private");
-    }
     if (proposal.isRecurring) sparseBadges.push("Recurring");
     if (proposal.isPastSchedule) sparseBadges.push("Past");
   } else {
@@ -222,15 +219,6 @@ export function ProposalCard({
             Place residency — no date or time required.
           </Typography>
         )}
-        {proposal.specialKind === "group_name" && (
-          <Typography
-            variant="caption"
-            sx={{ display: "block", mb: 0.5, color: GARDEN_TOKENS.inkMuted }}
-          >
-            Poly group rename — consensus required before applying.
-          </Typography>
-        )}
-
         {/* What */}
         <Stack direction="row" spacing={0.75} alignItems="center" sx={{ mb: 0.5 }}>
           <Box sx={{ flex: 1, minWidth: 0 }}>

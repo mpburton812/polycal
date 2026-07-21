@@ -260,3 +260,9 @@
 2026-07-20 | bdc3b27 | PC-273 | add Jira ticket script for proposal enforcement UX | scripts/create-pc-proposal-enforcement-ux.mjs
 2026-07-20 | 0b9501f | PC-273 | assert Proposal enforcement heading exactly | e2e/admin-schedule.spec.ts
 2026-07-20 | 5eaed09 | PC-277 | enlarge like bird to 3x prior size | src/components/feed/feedIconSizes.test.ts
+2026-07-21 | b20413e | PC-278 | keep optional invitees visible after resolve | src/actions/proposals/_core.ts
+2026-07-21 | b544c2c | PC-279 | Facebook-style URL link previews | src/actions/feed.ts
+2026-07-21 | e730a3c | PC-280 | cleanup batch — removals, privacy purge, sleeping fixes | src/actions/feed.ts
+2026-07-21 | b7ef68d | PC-280 | drop tab blurb assert; sleeping archive is involved-only | e2e/admin-schedule.spec.ts
+2026-07-21 | 5adf633 | PC-282 | post-280 cleanup — TZ sleeping, security, perf, Playwright | src/actions/feed.ts
+2026-07-21 | 980ee97 | PC-282 | allow newline after Enter in feed composer assert | e2e/feed.spec.ts

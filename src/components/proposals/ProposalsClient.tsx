@@ -88,10 +88,10 @@ const TAB_EMPTY: Record<
   },
 };
 
-/** Event/sleeping drafts edited via ProposalDraftDialog — not residency or group rename. */
+/** Event/sleeping drafts edited via ProposalDraftDialog — not residency. */
 function isStandardDraftProposal(proposal: ProposalCardData): boolean {
   if (proposal.state !== "draft") return false;
-  if (proposal.specialKind === "residency" || proposal.specialKind === "group_name") {
+  if (proposal.specialKind === "residency") {
     return false;
   }
   const kind = proposal.cardKind ?? "proposal";

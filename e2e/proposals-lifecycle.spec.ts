@@ -19,19 +19,6 @@ test.describe("Resolved proposal actions", () => {
     await selectProposalTab(page, "Resolved");
   });
 
-  test("proposer can clone a resolved proposal into a new draft", async ({ page }) => {
-    await openProposalCard(page, DEMO.resolvedCelebration);
-    await page.getByRole("dialog").getByRole("button", { name: "Clone" }).click();
-    const draftDialog = page.getByRole("dialog");
-    await expect(draftDialog.getByRole("button", { name: "Submit" })).toBeVisible({
-      timeout: 15_000,
-    });
-    await expect(draftDialog.getByLabel("Title")).toHaveValue(/\(copy\)/);
-    await draftDialog.getByRole("button", { name: "Exit" }).click();
-    await selectProposalTab(page, "Drafts");
-    await expect(proposalCard(page, `${DEMO.resolvedCelebration} (copy)`)).toBeVisible();
-  });
-
   test("proposer can re-draft a resolved proposal", async ({ page }) => {
     page.once("dialog", (dialog) => dialog.accept());
     await openProposalCard(page, DEMO.resolvedCelebration);

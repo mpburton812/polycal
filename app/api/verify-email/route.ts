@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { checkRateLimit } from "@/lib/rate-limit";
+import { checkRateLimitPersistent } from "@/lib/rate-limit";
 
 /**
  * Legacy mail links hit this API — redirect to the branded landing page (PC-207).
@@ -14,7 +14,7 @@ export async function GET(request: Request) {
     request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
     request.headers.get("x-real-ip") ??
     "unknown";
-  if (!checkRateLimit(`verify-email-api:${clientIp}`, 20, 60_000)) {
+  if (!(await checkRateLimitPersistent(`verify-email-api:${clientIp}`, 20, 60_000))) {
     const landing = new URL("/verify-email", url.origin);
     if (token) landing.searchParams.set("token", token);
     return NextResponse.redirect(landing, 302);

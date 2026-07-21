@@ -144,8 +144,9 @@ type ProposalScheduleRow = {
 };
 
 /**
- * Resolves when a proposed item is treated as "past start" for expiry (PC-46).
+ * Resolves when a proposed item is treated as "past start" for expiry (PC-46 / PC-282).
  * Batch sleeping uses the latest night so earlier nights can still be voted on.
+ * Sleeping nights expire at calendar day-end (parity with archive / board past).
  */
 async function getProposedExpirationInstant(
   db: Db,
@@ -157,13 +158,20 @@ async function getProposedExpirationInstant(
     .where(eq(proposalTimeSlots.proposalId, proposal.id))
     .orderBy(asc(proposalTimeSlots.startAt));
 
+  let anchor: string | null = null;
   if (proposal.isBatchSleeping) {
-    const lastSlot = slots[slots.length - 1]?.startAt;
-    return lastSlot ?? proposal.scheduledEndAt ?? proposal.scheduledStartAt;
+    anchor = slots[slots.length - 1]?.startAt ?? proposal.scheduledEndAt ?? proposal.scheduledStartAt;
+  } else if (proposal.scheduledStartAt) {
+    anchor = proposal.scheduledStartAt;
+  } else {
+    anchor = slots[0]?.startAt ?? null;
   }
 
-  if (proposal.scheduledStartAt) return proposal.scheduledStartAt;
-  return slots[0]?.startAt ?? null;
+  if (!anchor) return null;
+  if (proposal.proposalType === "sleeping") {
+    return sleepingCalendarDayEnd(anchor).toISOString();
+  }
+  return anchor;
 }
 
 /**

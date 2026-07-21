@@ -9,7 +9,6 @@ import {
   Checkbox,
   FormControl,
   FormControlLabel,
-  FormHelperText,
   InputLabel,
   MenuItem,
   Select,
@@ -29,14 +28,6 @@ export interface ProposalDraftMoreOptionsProps {
   proposalType: "event" | "sleeping";
   description: string;
   onDescriptionChange: (value: string) => void;
-  eventPrivacy: "open" | "private" | "super_private";
-  onEventPrivacyChange: (value: "open" | "private" | "super_private") => void;
-  /** Which privacy MenuItems to show (from poly group settings) (PC-134). */
-  privacyAvailability: {
-    open: boolean;
-    private: boolean;
-    superPrivate: boolean;
-  };
   notes: string;
   onNotesChange: (value: string) => void;
   eventIconKey: EventIconKey | null;
@@ -57,9 +48,6 @@ export function ProposalDraftMoreOptions({
   proposalType,
   description,
   onDescriptionChange,
-  eventPrivacy,
-  onEventPrivacyChange,
-  privacyAvailability,
   notes,
   onNotesChange,
   eventIconKey,
@@ -71,9 +59,6 @@ export function ProposalDraftMoreOptions({
   reminderUnit,
   onReminderUnitChange,
 }: ProposalDraftMoreOptionsProps) {
-  const showPrivacyControl =
-    privacyAvailability.private || privacyAvailability.superPrivate;
-
   return (
     <Accordion
       disableGutters
@@ -107,29 +92,6 @@ export function ProposalDraftMoreOptions({
             size="small"
             inputProps={{ maxLength: LONG_TEXT_MAX }}
           />
-          {showPrivacyControl && (
-            <FormControl fullWidth size="small">
-              <InputLabel id="proposal-privacy-label">Privacy</InputLabel>
-              <Select
-                labelId="proposal-privacy-label"
-                label="Privacy"
-                value={eventPrivacy}
-                onChange={(event) =>
-                  onEventPrivacyChange(event.target.value as "open" | "private" | "super_private")
-                }
-              >
-                {privacyAvailability.open && <MenuItem value="open">Open</MenuItem>}
-                {privacyAvailability.private && <MenuItem value="private">Private</MenuItem>}
-                {privacyAvailability.superPrivate && (
-                  <MenuItem value="super_private">Super private</MenuItem>
-                )}
-              </Select>
-              <FormHelperText>
-                Open: network visibility rules. Private: proposer, invitees, sleeping partners, and
-                optionally admins. Super private: proposer and invitees only (admins optional).
-              </FormHelperText>
-            </FormControl>
-          )}
           <TextField
             label="Notes (optional)"
             value={notes}

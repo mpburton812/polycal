@@ -217,7 +217,7 @@ test.describe("Event schedule views journey", () => {
     await goToProposals(page);
     await castInviteeVote(page, {
       title,
-      tab: "Resolved",
+      tab: "Proposed",
       vote: "Accept",
       comment: COMMENT,
     });
@@ -315,7 +315,7 @@ test.describe("Event schedule views journey", () => {
     await goToProposals(page);
     await castInviteeVote(page, {
       title,
-      tab: "Resolved",
+      tab: "Proposed",
       vote: "Abstain",
       comment: COMMENT,
     });

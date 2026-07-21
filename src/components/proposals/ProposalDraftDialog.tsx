@@ -34,10 +34,6 @@ import {
   type ProposalDetail,
   type ProposalPlaceOption,
 } from "@/actions/proposals";
-import {
-  getEventPrivacyAvailabilityAction,
-  type EventPrivacyAvailability,
-} from "@/actions/poly-group";
 import type { PersonSummary } from "@/actions/users";
 import { useToast } from "@/components/providers/ToastProvider";
 import {
@@ -144,12 +140,6 @@ export function ProposalDraftDialog({
   const [sleepingLocationOptions, setSleepingLocationOptions] = useState<ProposalPlaceOption[]>(
     [],
   );
-  const [eventPrivacy, setEventPrivacy] = useState<"open" | "private" | "super_private">("open");
-  const [privacyAvailability, setPrivacyAvailability] = useState<EventPrivacyAvailability>({
-    open: true,
-    private: true,
-    superPrivate: true,
-  });
   const [eventIconKey, setEventIconKey] = useState<EventIconKey | null>(null);
   const [isRecurring, setIsRecurring] = useState(false);
   const [recurrencePattern, setRecurrencePattern] = useState<
@@ -251,22 +241,6 @@ export function ProposalDraftDialog({
   }, [open]);
 
   useEffect(() => {
-    if (!open) return;
-    void getEventPrivacyAvailabilityAction().then((availability) => {
-      setPrivacyAvailability(availability);
-      setEventPrivacy((current) => {
-        if (current === "private" && !availability.private) return "open";
-        if (current === "super_private" && !availability.superPrivate) return "open";
-        if (current === "open" && !availability.open) {
-          if (availability.private) return "private";
-          if (availability.superPrivate) return "super_private";
-        }
-        return current;
-      });
-    });
-  }, [open]);
-
-  useEffect(() => {
     if (!open || proposalType !== "sleeping" || batchMode) {
       return;
     }
@@ -301,7 +275,7 @@ export function ProposalDraftDialog({
     proposalType,
     proposalType === "event" && allDay,
   );
-  const showPastWarning = isPastSchedule(previewStartIso);
+  const showPastWarning = isPastSchedule(previewStartIso, proposalType);
 
   useEffect(() => {
     if (!open) return;
@@ -332,7 +306,6 @@ export function ProposalDraftDialog({
       setSoloEvent(initialDetail.proposalType === "event" && initialDetail.intentionalSolo);
       setIsPoll(initialDetail.isPoll);
       setAllDay(initialDetail.proposalType === "event" && initialDetail.isAllDay);
-      setEventPrivacy(initialDetail.eventPrivacy);
       setEventIconKey(
         isEventIconKey(initialDetail.eventIconKey) ? initialDetail.eventIconKey : null,
       );
@@ -385,7 +358,6 @@ export function ProposalDraftDialog({
       setBatchMode(false);
       setFastPlanRows(buildEmptyGridRows());
       setBatchLocationOptions([]);
-      setEventPrivacy("open");
       setIsRecurring(false);
       setRecurrencePattern("weekly");
       setRecurrenceCount(4);
@@ -433,7 +405,6 @@ export function ProposalDraftDialog({
     setSoloEvent(detail.proposalType === "event" && detail.intentionalSolo);
     setIsPoll(detail.isPoll);
     setAllDay(detail.proposalType === "event" && detail.isAllDay);
-    setEventPrivacy(detail.eventPrivacy);
     setEventIconKey(isEventIconKey(detail.eventIconKey) ? detail.eventIconKey : null);
     setIsRecurring(detail.isRecurrenceParent);
     if (detail.recurrenceRule) {
@@ -571,7 +542,6 @@ export function ProposalDraftDialog({
       intentionalSolo: batchMode ? false : isSoloProposal,
       isPoll: proposalType === "event" ? isPoll : false,
       isAllDay: proposalType === "event" ? allDay : false,
-      eventPrivacy,
       eventIconKey: proposalType === "event" ? eventIconKey : null,
       isRecurring: !batchMode && isRecurring,
       recurrenceRule:
@@ -914,9 +884,6 @@ export function ProposalDraftDialog({
             proposalType={proposalType}
             description={description}
             onDescriptionChange={setDescription}
-            eventPrivacy={eventPrivacy}
-            onEventPrivacyChange={setEventPrivacy}
-            privacyAvailability={privacyAvailability}
             notes={notes}
             onNotesChange={setNotes}
             eventIconKey={eventIconKey}
@@ -932,11 +899,17 @@ export function ProposalDraftDialog({
 
         <CardActions sx={{ px: 2, pb: 2, pt: 0, justifyContent: "flex-end", gap: 1, flexShrink: 0 }}>
           {isEdit && (
-            <Button color="error" onClick={handleDelete} disabled={pending} sx={{ mr: "auto" }}>
+            <Button
+              color="error"
+              variant="outlined"
+              onClick={handleDelete}
+              disabled={pending}
+              sx={{ ...outlinedButtonSx, mr: "auto" }}
+            >
               Delete
             </Button>
           )}
-          <Button onClick={handleClose} color="inherit">
+          <Button variant="outlined" onClick={handleClose} sx={outlinedButtonSx}>
             Exit
           </Button>
           <Button

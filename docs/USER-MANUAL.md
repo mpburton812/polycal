@@ -22,6 +22,8 @@ Approved proposals appear on the **Schedule** tab. Color coding:
 - **Blue** — approved sleeping arrangements
 - **Red / warning** — conflicts or **at risk** status
 
+The **Feed** tab is a shared network timeline (milestones + chat). When you include an `https` URL in a chat message or comment, PolyCal linkifies it and may show a Facebook-style preview card (title, description, image) from the page’s Open Graph metadata.
+
 ---
 
 ## 2. Roles
@@ -30,25 +32,23 @@ Approved proposals appear on the **Schedule** tab. Color coding:
 
 | Role | Description |
 |------|-------------|
-| **Admin** | Full access to the **Admin** tab: user lifecycle, poly group settings, enforcement timers, audit log, and (when enabled) all-user admin mode. |
+| **Admin** | Full access to the **Admin** tab: user lifecycle, poly group settings, enforcement timers, and audit log. Admins can also **impersonate** another user to act on their behalf. |
 | **User** | Standard member: schedule, proposals, people & places, profile. |
 | **Proxy** | Schedulable profile without login. Admins can add proxy people to proposals; they can be upgraded to User later. |
-
-**Power management** (Admin → Poly Group Settings) can temporarily grant every active user Admin access. When turned off, prior roles are restored.
 
 ### Roles on a specific proposal
 
 | Role | Meaning |
 |------|---------|
-| **Proposer** | Created the proposal. Can edit drafts, submit, re-draft, cancel, clone, and manage invitees (within rules below). |
+| **Proposer** | Created the proposal. Can edit drafts, submit, re-draft, cancel, and manage invitees (within rules below). |
 | **Required invitee** | Must respond before the proposal can finalize. Unanimous approval (Accept, Accept Sub-optimal, or Abstain) is required among required invitees. |
-| **Optional invitee** | May vote; their response is logged but does not block resolution. Optional invitees can still vote after an item is resolved. |
+| **Optional invitee** | May vote; their response is logged but does not block resolution. After required attendees resolve an item, unfinished optional invitees keep it on **Proposed** with a needs-action highlight and an actionable notification until they Accept or Decline (polls: complete slot votes). Optional RSVP still does not change the schedule. |
 
 When adding people to a draft, each person is marked **Required**, **Optional**, or **None** (not invited).
 
 ### Sleeping partnerships (separate from proposals)
 
-Under **People & Places**, members can **propose sleeping partnerships** with each other. Pending partnership requests also appear as cards on the **Proposed** tab. Accepting a partnership affects who can see **private** sleeping details on the schedule—not the same thing as a sleeping *proposal*, but related to privacy.
+Under **People & Places**, members can **propose sleeping partnerships** with each other. Pending partnership requests also appear as cards on the **Proposed** tab. Sleeping arrangement details on the schedule are visible to the proposer, invitees, and admins (the "involved" network) — not the same thing as a sleeping *proposal*, but related to who can see sleeping details.
 
 ---
 
@@ -63,13 +63,7 @@ A **time block** involving group members (meetings, dates, appointments, etc.).
 - **Poll (multi-slot)** — the proposer offers several time options (Slot A, B, C…). Required invitees vote on **each slot**. When everyone has finished, the system picks a mutually agreeable winning slot—or returns the proposal to Drafts if none exist.
 - **Solo event** — only the proposer is involved. Can skip the voting queue and go straight to Resolved when submitted (same idea as intentional solo for sleeping).
 
-**Privacy** (when enabled by admins):
-
-| Level | Who can see details |
-|-------|---------------------|
-| **Open** | Everyone in the group (default). |
-| **Private** | Invitees, the proposer, sleeping partners, and optionally admins (if admin override is on). |
-| **Super private** | Invitees and proposer only (plus optionally admins). |
+Event details are visible to everyone in the group once resolved — there are no private or super-private event levels.
 
 ### Sleeping proposals
 
@@ -79,10 +73,6 @@ An **overnight stay** at a place (from People & Places) or a free-text location.
 - **Recurring** — same invitee list and location for every occurrence.
 - **Intentional solo** — set at creation; only the proposer is invited. On submit, sleeping proposals with intentional solo **auto-approve** and go directly to Resolved (no Proposed queue).
 - **Bedroom / place locking** — sleeping proposals can target a specific bedroom at a registered place when configured.
-
-### Group name change proposals
-
-When enabled in Admin settings, an admin can propose renaming the poly group. That creates a normal **Proposed** item sent to all active users for approval. If approved, the group name updates automatically.
 
 ---
 
@@ -106,8 +96,8 @@ flowchart LR
 
 **What happens here:**
 
-- Fill the happy path first: **events** — title, when (digital time), invitees (Required/Optional), location; **sleeping** — who (partners), night of / last night, place and bedroom. Use **More options** for description, privacy, notes, poll, recurrence, reminder, and icons.
-- Privacy: Open follows network rules; Private is proposer/invitees/partners (+ optional admins); Super private is proposer/invitees only (+ optional admins). Notes are shared with invitees.
+- Fill the happy path first: **events** — title, when (digital time), invitees (Required/Optional), location; **sleeping** — who (partners), night of / last night, place and bedroom. Use **More options** for description, notes, poll, recurrence, reminder, and icons.
+- Notes are shared with invitees.
 - Save anytime (keeps a draft); Submit sends it for approval. Nothing is on the shared calendar until resolved.
 - **Conflict warnings** may appear if invitees already have overlapping events. You can still save and submit; reviewers see the same warnings.
 
@@ -131,7 +121,7 @@ Vote options:
 | **Abstain** | Counts as approval for threshold purposes (“no preference / available”). In polls, completes your row as available for all slots. |
 | **Decline** | **Non-poll:** returns proposal to **Drafts** (proposer can remove decliner and resubmit). **Poll:** stays Proposed until all required rows are in; if no slot works for everyone, goes to Drafts. |
 
-**Resolution rule:** When every **required** invitee has responded and all responses are Accept, Accept sub-optimal, or Abstain, the proposal becomes **Resolved** and the winning time is written to the schedule.
+**Resolution rule:** When every **required** invitee has responded and all responses are Accept, Accept sub-optimal, or Abstain, the proposal becomes **Resolved** and the winning time is written to the schedule. Unfinished **optional** invitees still see the card on **Proposed** (with a needs-action prompt and actionable notification) until they RSVP; their vote does not reopen or block the schedule.
 
 **While Proposed:**
 
@@ -143,14 +133,13 @@ Vote options:
 
 ### Phase 3 — Resolved
 
-**Who sees it:** On the **Schedule** (and Resolved tab). Visibility follows privacy rules.
+**Who sees it:** On the **Schedule** (and Resolved tab). Events are visible to everyone in the group; sleeping arrangement details are visible to the proposer, invitees, and admins.
 
 **What it means:** The event is **confirmed** on the calendar with a fixed start/end (or winning poll slot).
 
 **After resolution, the proposer or admin can:**
 
 - **Cancel** — removes from calendar; notifications go out.
-- **Clone** — new Draft copied from this proposal.
 - **Re-draft** — returns to Drafts but keeps a calendar hold marked **At risk** until re-submitted and re-approved.
 
 **Changing attendees on a resolved event:**
@@ -248,7 +237,7 @@ Admins can also toggle **Admins can see proposals they are not involved in** (de
 | Someone sent you a proposal | Proposals → **Proposed** → open → vote |
 | Event approved but needs changes | Open on Schedule or Resolved → **Re-draft** |
 | Wrong people on an approved event | Proposer: attendee controls on resolved detail |
-| Can’t see event details | May be private/super private—you’re not an invitee or sleeping partner |
+| Can’t see sleeping details | You’re not the proposer, an invitee, or an admin |
 | Proposal vanished from Proposed | Check **Drafts** (declined/expired) or **Resolved** (approved while you were away) |
 
 ---
@@ -258,4 +247,4 @@ Admins can also toggle **Admins can see proposals they are not involved in** (de
 - [ARCHITECTURE.md](./ARCHITECTURE.md) — technical environment map  
 - [REQUIREMENTS-WORKFLOW.md](./REQUIREMENTS-WORKFLOW.md) — development & Jira process (for builders)
 
-*Last updated for PC-160–162 (Resend email, credential delivery, self-service password reset).*
+*Last updated for PC-282 (post-280 audit: timezone-safe sleeping nights, feed-image ACL, impersonation admin gate, Playwright accuracy). Builds on PC-280 removals (Planning, Clone, group-name, power management, private/super-private; sleeping involved-only).*

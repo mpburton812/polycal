@@ -21,12 +21,18 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- PC-279: Feed URL embeds — linkify chat/comment bodies and show Facebook-style Open Graph preview cards (SSRF-safe cache). Change control: `2026.07.21f`. SCHEMA_VERSION 31.
+- PC-278: Optional invitees keep Proposed visibility + actionable resolve notification after required attendees resolve (extend PC-49 to non-polls). Change control: `2026.07.21e`.
 - **Production release `2026.07.21-prod` (PC-271):** Consolidated Code Status entry for this promote — Feed Controls (PC-264–268), six-item UX batch (PC-258–263), FEED/like parrot sizing (PC-270; supersedes interim PC-260/269 sizes), brace-expansion/js-yaml audit patches (PC-258).
 
 ### Changed
+- PC-280: UX cleanup batch — removed Planning drawer, Clone proposal, group-name-change proposals, and admin power management ("all admins" toggle, impersonation unaffected); sleeping network visibility hard-defaulted to "involved" (admin toggle removed); private/super-private event privacy removed entirely (every proposal always open, admin privacy toggles removed, masking simplified); removed descriptive tab blurbs (Feed/Schedule/Proposals/People & Places/Admin; Profile "Signed in as" kept); draft Delete/Exit and proposal detail footer actions use pill outlined/contained styling; Feed composers default to 2 rows with Enter = newline. SCHEMA_VERSION 32 (privacy backfill, power-management + sleeping-visibility column cleanup). Change control: `2026.07.21g`.
 - PC-277: Feed like bird enlarged to 36×36 (3× the prior 12×12). Change control: `2026.07.21d`.
 - PC-273–PC-276: Proposal enforcement days units + sleeping-partner auto-delete TTL; admin draft delete + uninvolved visibility toggle; peach oversight only when uninvolved; higher-quality event icon watermarks on kanban; GitHub Actions bumped to Node 24 runtimes (`@v5`). SCHEMA_VERSION 30. Change control: `2026.07.21c`.
 - PC-270: Bottom FEED parrot matches sibling nav icons (24×24); feed like birds half that (12×12). Change control: `2026.07.21b`.
+
+### Fixed
+- PC-280: Sleeping proposals no longer show as "past" until the whole calendar day elapses (board + proposal cards); Schedule overlap/red-conflict check no longer flags a sleeping arrangement against an event on the same night (PC-59 parity). Change control: `2026.07.21g`.
 
 ### Added
 - PC-264–PC-268: Feed Controls — Settings cog, presets, Detailed Tweaking (Who/What), account-persisted feed prefs, server-side filter, votes milestones. Change control: `2026.07.21`.

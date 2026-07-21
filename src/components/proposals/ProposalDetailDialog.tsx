@@ -42,7 +42,6 @@ import {
   cancelProposalAction,
   castProposalVoteAction,
   castSlotVoteAction,
-  cloneProposalAction,
   deleteDraftProposalAction,
   getProposalDetailAction,
   redraftProposalAction,
@@ -65,6 +64,7 @@ import {
   ADMIN_OVERSIGHT_BG,
   formatTimeRange,
   isAdminOversightView,
+  outlinedButtonSx,
   POLY_GREEN,
   primaryButtonSx,
   proposalCardSx,
@@ -313,23 +313,6 @@ export function ProposalDetailDialog({
     handleCancel("occurrence");
   }
 
-  function handleClone() {
-    if (!proposalId) return;
-    startTransition(async () => {
-      const result = await cloneProposalAction(proposalId);
-      notifyResult(result);
-      if (!result.ok || !result.newProposalId) return;
-      const detailResult = await getProposalDetailAction(result.newProposalId);
-      if (detailResult.ok && detailResult.detail) {
-        onClose();
-        onEdit(detailResult.detail);
-        router.refresh();
-        return;
-      }
-      router.refresh();
-    });
-  }
-
   function handleRevokeAcceptance() {
     if (!proposalId || !window.confirm("Revoke your acceptance? The event will be flagged at risk.")) {
       return;
@@ -503,10 +486,11 @@ export function ProposalDetailDialog({
         }}
       >
         <CardContent sx={{ pb: 1, overflowY: "auto", flex: 1 }}>
-          {detail?.optionalPollPending && (
+          {detail?.optionalRsvpPending && (
             <Alert severity="success" sx={{ mb: 2 }}>
-              This proposal was approved by all required attendees and scheduled. Please complete
-              your poll votes below.
+              {detail.isPoll
+                ? "This proposal was approved by all required attendees and scheduled. Please complete your poll votes below."
+                : "This proposal was approved by all required attendees and scheduled. Please Accept or Decline below."}
             </Alert>
           )}
           {detail?.atRisk && detail.state === "resolved" && (
@@ -535,7 +519,7 @@ export function ProposalDetailDialog({
           )}
           {detail?.isContentMasked && (
             <Alert severity="warning" sx={{ mb: 2 }}>
-              This is a private event. Details are hidden because you are not an invitee.
+              This sleeping arrangement is hidden. Details are only visible to people involved.
             </Alert>
           )}
           {detail?.hasOverlapWarning && (
@@ -682,9 +666,6 @@ export function ProposalDetailDialog({
                   <Chip size="small" label="Batch" variant="outlined" />
                 )}
                 {detail.isRecurring && <Chip size="small" label="Recurring" variant="outlined" />}
-                {(detail.eventPrivacy === "private" || detail.eventPrivacy === "super_private") && (
-                  <Chip size="small" label="Private" variant="outlined" />
-                )}
                 {detail.isPoll && detail.winningSlotId && (
                   <Chip size="small" label="Winning slot" sx={{ bgcolor: POLY_GREEN, color: "#fff" }} />
                 )}
@@ -721,10 +702,6 @@ export function ProposalDetailDialog({
                   <Typography variant="body2" color="text.secondary">{detail.notes}</Typography>
                 </Stack>
               )}
-
-              <Stack direction="row" spacing={1} flexWrap="wrap" sx={{ mt: 1 }}>
-                <Chip size="small" label={detail.eventPrivacy} variant="outlined" />
-              </Stack>
 
               {isPollMatrix && (
                 <>
@@ -1088,26 +1065,21 @@ export function ProposalDetailDialog({
         {(!detailLoading || detail) && (
           <CardActions sx={{ px: 2, pb: 2, pt: 0, flexWrap: "wrap", gap: 1 }}>
             {detail?.canCancel && (
-              <Button color="error" onClick={handleCancelClick} disabled={pending}>
+              <Button color="error" variant="outlined" onClick={handleCancelClick} disabled={pending} sx={outlinedButtonSx}>
                 Cancel
               </Button>
             )}
-            {detail?.canClone && (
-              <Button onClick={handleClone} disabled={pending}>
-                Clone
-              </Button>
-            )}
             {detail?.canRedraft && (
-              <Button onClick={handleRedraft} disabled={pending}>
+              <Button variant="outlined" onClick={handleRedraft} disabled={pending} sx={outlinedButtonSx}>
                 Re-draft
               </Button>
             )}
             {detail?.canEdit && (
               <>
-                <Button color="error" onClick={handleDelete} disabled={pending}>
+                <Button color="error" variant="outlined" onClick={handleDelete} disabled={pending} sx={outlinedButtonSx}>
                   Delete
                 </Button>
-                <Button onClick={() => onEdit(detail)} disabled={pending}>
+                <Button variant="outlined" onClick={() => onEdit(detail)} disabled={pending} sx={outlinedButtonSx}>
                   Edit
                 </Button>
                 <Button
@@ -1121,11 +1093,13 @@ export function ProposalDetailDialog({
               </>
             )}
             {detail?.canReschedule && (
-              <Button onClick={openRescheduleDialog} disabled={pending}>
+              <Button variant="outlined" onClick={openRescheduleDialog} disabled={pending} sx={outlinedButtonSx}>
                 Reschedule
               </Button>
             )}
-            <Button onClick={onClose}>Close</Button>
+            <Button variant="outlined" onClick={onClose} sx={outlinedButtonSx}>
+              Close
+            </Button>
           </CardActions>
         )}
       </Card>
@@ -1138,8 +1112,10 @@ export function ProposalDetailDialog({
         </Typography>
       </DialogContent>
       <DialogActions>
-        <Button onClick={() => setCancelScopeOpen(false)}>Back</Button>
-        <Button color="error" onClick={() => handleCancel("occurrence")} disabled={pending}>
+        <Button variant="outlined" onClick={() => setCancelScopeOpen(false)} sx={outlinedButtonSx}>
+          Back
+        </Button>
+        <Button color="error" variant="outlined" onClick={() => handleCancel("occurrence")} disabled={pending} sx={outlinedButtonSx}>
           This occurrence only
         </Button>
         <Button color="error" variant="contained" onClick={() => handleCancel("series")} disabled={pending}>
@@ -1176,8 +1152,10 @@ export function ProposalDetailDialog({
         </Stack>
       </DialogContent>
       <DialogActions>
-        <Button onClick={() => setRescheduleOpen(false)}>Cancel</Button>
-        <Button variant="contained" onClick={handleReschedule} disabled={pending || !rescheduleStart}>
+        <Button variant="outlined" onClick={() => setRescheduleOpen(false)} sx={outlinedButtonSx}>
+          Cancel
+        </Button>
+        <Button variant="contained" onClick={handleReschedule} disabled={pending || !rescheduleStart} sx={primaryButtonSx}>
           Save
         </Button>
       </DialogActions>
