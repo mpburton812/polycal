@@ -13,6 +13,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ElementType } from "react";
 
+import { BOTTOM_NAV_ICON_PX } from "@/components/feed/feedIconSizes";
 import { MAIN_TAB_HREFS } from "@/components/layout/mainTabs";
 import { fontFamilies } from "@/theme/fonts";
 import { GARDEN_TOKENS } from "@/theme/tokens";
@@ -33,7 +34,7 @@ const tabMeta: Record<(typeof MAIN_TAB_HREFS)[number], TabMeta> = {
 };
 
 /**
- * Feed tab parrot at 1.5× default nav icon size (36px vs ~24px) (PC-260).
+ * Feed tab parrot sized to match sibling MUI bottom-nav icons (PC-270).
  */
 function FeedParrotIcon({ selected }: { selected: boolean }) {
   return (
@@ -41,8 +42,8 @@ function FeedParrotIcon({ selected }: { selected: boolean }) {
     // eslint-disable-next-line @next/next/no-img-element
     <img
       src={selected ? "/avatars/bird_green.png" : "/avatars/bird_blue.png"}
-      width={36}
-      height={36}
+      width={BOTTOM_NAV_ICON_PX}
+      height={BOTTOM_NAV_ICON_PX}
       alt=""
       style={{ display: "block" }}
     />

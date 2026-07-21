@@ -20,6 +20,9 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Changed
+- PC-270: Bottom FEED parrot matches sibling nav icons (24×24); feed like birds half that (12×12). Change control: `2026.07.21b`.
+
 ### Added
 - PC-264–PC-268: Feed Controls — Settings cog, presets, Detailed Tweaking (Who/What), account-persisted feed prefs, server-side filter, votes milestones. Change control: `2026.07.21`.
 
