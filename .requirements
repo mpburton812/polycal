@@ -258,3 +258,4 @@
 2026-07-20 | c93f061 | PC-271 | consolidated production release notes | src/lib/changelog/entries.ts
 2026-07-20 | d3f5608 | PC-273 | proposal enforcement days, sleeping TTL, admin visibility | src/actions/feed.ts
 2026-07-20 | bdc3b27 | PC-273 | add Jira ticket script for proposal enforcement UX | scripts/create-pc-proposal-enforcement-ux.mjs
+2026-07-20 | 0b9501f | PC-273 | assert Proposal enforcement heading exactly | e2e/admin-schedule.spec.ts
