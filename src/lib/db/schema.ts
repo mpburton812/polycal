@@ -387,6 +387,8 @@ export const proposalComments = sqliteTable("proposal_comments", {
   sliceTag: text("slice_tag"),
   createdAt: text("created_at").notNull(),
   deletedAt: text("deleted_at"),
+  /** Cached Open Graph preview for the first URL in body (PC-279). */
+  linkPreviewId: text("link_preview_id"),
 });
 
 /** Tracks per-user dismissal of system notifications in the activity log (PC-40). */
@@ -474,6 +476,8 @@ export const networkChatMessages = sqliteTable("network_chat_messages", {
   body: text("body").notNull(),
   createdAt: text("created_at").notNull(),
   deletedAt: text("deleted_at"),
+  /** Cached Open Graph preview for the first URL in body (PC-279). */
+  linkPreviewId: text("link_preview_id"),
 });
 
 /** Threaded replies on network chat messages (PC-234). */
@@ -488,6 +492,8 @@ export const networkChatComments = sqliteTable("network_chat_comments", {
   body: text("body").notNull().default(""),
   createdAt: text("created_at").notNull(),
   deletedAt: text("deleted_at"),
+  /** Cached Open Graph preview for the first URL in body (PC-279). */
+  linkPreviewId: text("link_preview_id"),
 });
 
 export const networkChatMessageImages = sqliteTable("network_chat_message_images", {
@@ -510,6 +516,21 @@ export const networkChatCommentImages = sqliteTable("network_chat_comment_images
     .notNull()
     .references(() => storedImages.id),
   sortOrder: integer("sort_order").notNull().default(0),
+});
+
+/** Shared Open Graph / link-preview cache for Feed posts (PC-279). */
+export const feedLinkPreviews = sqliteTable("feed_link_previews", {
+  id: text("id").primaryKey(),
+  normalizedUrl: text("normalized_url").notNull().unique(),
+  canonicalUrl: text("canonical_url").notNull(),
+  title: text("title"),
+  description: text("description"),
+  imageUrl: text("image_url"),
+  siteName: text("site_name"),
+  /** ok | failed */
+  status: text("status").notNull().default("ok"),
+  fetchedAt: text("fetched_at").notNull(),
+  errorCode: text("error_code"),
 });
 
 export const proposalCommentImages = sqliteTable("proposal_comment_images", {
@@ -582,4 +603,5 @@ export const schema = {
   proposalCommentImages,
   feedImageUploads,
   feedLikes,
+  feedLinkPreviews,
 };

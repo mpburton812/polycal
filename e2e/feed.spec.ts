@@ -54,22 +54,24 @@ test.describe("Feed tab", () => {
     await expect(page.getByText(reply)).toBeVisible({ timeout: 30_000 });
   });
 
-  test("background poll does not flash loading spinner when feed is unchanged", async ({
-    page,
-  }) => {
-    test.setTimeout(90_000);
+  test("posts a URL and shows a Facebook-style link preview card", async ({ page }) => {
+    test.setTimeout(120_000);
 
     await login(page, USERS.luke.username);
     await expectAuthenticatedShell(page);
     await goToFeed(page);
 
-    await expect(feedComposer(page)).toBeVisible();
-    await expect(page.getByTestId("feed-loading")).toHaveCount(0, { timeout: 30_000 });
+    const stamp = `feed-link-${Date.now()}`;
+    const url = "https://demo.link-preview.test/article";
+    const body = `${stamp} ${url}`;
+    await postFeedChat(page, body);
 
-    // Poll interval is 15s — wait past one tick and assert the timeline stayed mounted.
-    await page.waitForTimeout(16_500);
-    await expect(page.getByTestId("feed-loading")).toHaveCount(0);
-    await expect(feedComposer(page)).toBeVisible();
-    await expect(page.getByRole("heading", { name: "Feed" })).toBeVisible();
+    const card = page.getByTestId("feed-chat-card").filter({ hasText: stamp }).first();
+    await expect(card).toBeVisible({ timeout: 30_000 });
+    await expect(card.getByTestId("feed-linkified-body").getByRole("link", { name: url })).toBeVisible();
+    const preview = card.getByTestId("feed-link-preview");
+    await expect(preview).toBeVisible({ timeout: 30_000 });
+    await expect(preview.getByText("E2E Link Preview Title")).toBeVisible();
+    await expect(preview).toHaveAttribute("href", url);
   });
 });

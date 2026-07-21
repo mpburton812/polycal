@@ -26,6 +26,7 @@ import {
   listFeedItemsAction,
   postNetworkChatCommentAction,
   postNetworkChatMessageAction,
+  previewFeedLinkAction,
   uploadFeedImageAction,
 } from "@/actions/feed";
 import {
@@ -39,10 +40,12 @@ import {
   FeedControlsButton,
   FeedControlsDrawer,
 } from "@/components/feed/FeedControlsDrawer";
+import { FeedLinkifiedBody, FeedLinkPreviewCard } from "@/components/feed/FeedLinkPreview";
 import { ADMIN_ONLY_FEED_COMMENT_BG } from "@/components/proposals/proposalCardTheme";
 import { feedImageUrl, MAX_FEED_IMAGE_BYTES, MAX_FEED_IMAGES } from "@/lib/feed/images";
 import type { FeedLikeTargetType } from "@/lib/feed/likes";
-import type { FeedComment, FeedItem } from "@/lib/feed/types";
+import type { FeedComment, FeedItem, FeedLinkPreview } from "@/lib/feed/types";
+import { extractFirstUrl } from "@/lib/feed/link-preview-core";
 import { buildFeedUpdateToken } from "@/lib/feed/update-token";
 import type { ChangelogEntry } from "@/lib/changelog/entries";
 import type { BuildInfo } from "@/lib/env";
@@ -265,23 +268,32 @@ function CommentBlock({
       }}
     >
       <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
-        <Typography
-          variant="body2"
-          sx={{
-            opacity: isOptimistic ? 0.85 : 1,
-            minWidth: 0,
-            overflowWrap: "anywhere",
-            wordBreak: "break-word",
-          }}
-        >
-          <strong>{comment.authorName}</strong>
-          {comment.body ? `: ${comment.body}` : ""}
-          {isOptimistic ? (
-            <Typography component="span" variant="caption" sx={{ ml: 1, color: GARDEN_TOKENS.inkMuted }}>
-              posting…
-            </Typography>
+        <Box sx={{ minWidth: 0, flex: 1 }}>
+          <Typography
+            variant="body2"
+            component="div"
+            sx={{
+              opacity: isOptimistic ? 0.85 : 1,
+              minWidth: 0,
+              overflowWrap: "anywhere",
+              wordBreak: "break-word",
+            }}
+          >
+            <strong>{comment.authorName}</strong>
+            {comment.body ? ": " : ""}
+            {comment.body ? (
+              <FeedLinkifiedBody body={comment.body} inline sx={{ whiteSpace: "pre-wrap" }} />
+            ) : null}
+            {isOptimistic ? (
+              <Typography component="span" variant="caption" sx={{ ml: 1, color: GARDEN_TOKENS.inkMuted }}>
+                posting…
+              </Typography>
+            ) : null}
+          </Typography>
+          {comment.linkPreview?.status === "ok" ? (
+            <FeedLinkPreviewCard preview={comment.linkPreview} />
           ) : null}
-        </Typography>
+        </Box>
         {comment.canDelete && !isOptimistic ? (
           <IconButton
             aria-label="Delete comment"
@@ -335,6 +347,7 @@ export function FeedClient({
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [chatDraft, setChatDraft] = useState("");
+  const [composerLinkPreview, setComposerLinkPreview] = useState<FeedLinkPreview | null>(null);
   const [pending, startTransition] = useTransition();
   const [sending, setSending] = useState(false);
   const [selectedProposalId, setSelectedProposalId] = useState<string | null>(null);
@@ -407,6 +420,30 @@ export function FeedClient({
     }, 15_000);
     return () => window.clearInterval(timer);
   }, [pollFeedUpdates, pending, sending]);
+
+  // Debounced Open Graph preview while composing (PC-279).
+  useEffect(() => {
+    const firstUrl = extractFirstUrl(chatDraft);
+    if (!firstUrl) {
+      setComposerLinkPreview(null);
+      return;
+    }
+    let cancelled = false;
+    const timer = window.setTimeout(() => {
+      void previewFeedLinkAction({ url: firstUrl }).then((result) => {
+        if (cancelled) return;
+        if (result.ok && result.preview?.status === "ok") {
+          setComposerLinkPreview(result.preview);
+        } else {
+          setComposerLinkPreview(null);
+        }
+      });
+    }, 400);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [chatDraft]);
 
   function openDetail(proposalId: string) {
     setSelectedProposalId(proposalId);
@@ -577,6 +614,7 @@ export function FeedClient({
       canDelete: true,
       likeCount: 0,
       likedByMe: false,
+      linkPreview: null,
     };
   }
 
@@ -666,6 +704,7 @@ export function FeedClient({
           return;
         }
         setChatDraft("");
+        setComposerLinkPreview(null);
         // Blob URLs kept in blobPreviewById for the optimistic/server item strip.
         setPendingImages([]);
         if (result.item) {
@@ -912,7 +951,8 @@ export function FeedClient({
               {new Date(item.createdAt).toLocaleString()}
             </Typography>
             {item.body ? (
-              <Typography
+              <FeedLinkifiedBody
+                body={item.body}
                 sx={{
                   mt: 0.5,
                   whiteSpace: "pre-wrap",
@@ -920,9 +960,10 @@ export function FeedClient({
                   overflowWrap: "anywhere",
                   wordBreak: "break-word",
                 }}
-              >
-                {item.body}
-              </Typography>
+              />
+            ) : null}
+            {item.linkPreview?.status === "ok" ? (
+              <FeedLinkPreviewCard preview={item.linkPreview} />
             ) : null}
             <FeedImageStrip
               imageIds={item.imageIds}
@@ -1103,6 +1144,11 @@ export function FeedClient({
               />
             ))}
           </Stack>
+        ) : null}
+        {composerLinkPreview ? (
+          <Box sx={{ mb: 1, maxWidth: 480 }}>
+            <FeedLinkPreviewCard preview={composerLinkPreview} />
+          </Box>
         ) : null}
         <Stack direction="row" spacing={1} alignItems="flex-end">
           <input
