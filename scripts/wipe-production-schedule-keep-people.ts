@@ -267,6 +267,21 @@ async function runWipe(client: Client, dryRun: boolean): Promise<void> {
   await execDelete(client, dryRun, "feed_image_uploads", `DELETE FROM feed_image_uploads`);
 
   // 9) Proposal / chat / partnership / residency notifications
+  // Dismissals reference user_activity_log — delete matching dismissals first.
+  await execDelete(
+    client,
+    dryRun,
+    "notification_dismissals (proposal/chat/partnership/residency/event)",
+    `DELETE FROM notification_dismissals WHERE log_id IN (
+      SELECT id FROM user_activity_log WHERE
+        action LIKE 'notification.proposal%'
+        OR action LIKE 'notification.partnership%'
+        OR action LIKE 'notification.residency%'
+        OR action LIKE 'notification.event_%'
+        OR action LIKE 'notification.feed_chat%'
+        OR action LIKE 'proposal.%'
+    )`,
+  );
   await execDelete(
     client,
     dryRun,
@@ -280,7 +295,7 @@ async function runWipe(client: Client, dryRun: boolean): Promise<void> {
       OR action LIKE 'proposal.%'`,
   );
 
-  // 10) Orphan notification dismissals
+  // 10) Orphan notification dismissals (any leftover dangling log_id)
   await execDelete(
     client,
     dryRun,
