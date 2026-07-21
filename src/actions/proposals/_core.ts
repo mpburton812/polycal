@@ -33,6 +33,11 @@ import {
 import { notifyUser } from "@/lib/notifications";
 import { dismissNotificationsForProposal } from "@/actions/notifications";
 import {
+  dismissAllNotificationsForProposal,
+  formatDraftReturnNotification,
+} from "@/lib/notifications-draft-return";
+import { formatConflictMessage } from "@/lib/proposals/conflict-message";
+import {
   atRiskExpiresAtIso,
   computeAtRiskExpiresAt,
   detectViewerOverlapWarning,
@@ -833,14 +838,16 @@ async function revertProposalToDraft(
     .from(proposalInvitees)
     .where(eq(proposalInvitees.proposalId, proposal.id));
 
+  await dismissAllNotificationsForProposal(proposal.id);
+
   const notifyIds = new Set<string>([proposal.proposerId, ...invitees.map((row) => row.userId)]);
+  const message = formatDraftReturnNotification(proposal.title, reason);
   for (const userId of notifyIds) {
-    await notifyUser(
-      userId,
-      "proposal_reverted_to_draft",
-      `Proposal "${proposal.title}" was moved back to drafts.`,
-      { proposalId: proposal.id, reason, proposalType: proposal.proposalType },
-    );
+    await notifyUser(userId, "proposal_reverted_to_draft", message, {
+      proposalId: proposal.id,
+      reason,
+      proposalType: proposal.proposalType,
+    });
   }
 }
 
@@ -1540,7 +1547,7 @@ export async function checkProposalConflictsAction(
 
   return {
     ok: true,
-    message: warnings.length > 0 ? "Schedule conflicts detected." : "No conflicts.",
+    message: formatConflictMessage(warnings),
     warnings,
   };
 }
@@ -1573,7 +1580,7 @@ export async function adminCheckProposalConflictsAction(
 
   return {
     ok: true,
-    message: warnings.length > 0 ? "Schedule conflicts detected." : "No conflicts.",
+    message: formatConflictMessage(warnings),
     warnings,
   };
 }
@@ -2030,7 +2037,7 @@ export async function submitProposalAction(
     if (conflictCheck.warnings.length > 0) {
       return {
         ok: false,
-        message: "Schedule conflicts detected. Review warnings and confirm to submit.",
+        message: formatConflictMessage(conflictCheck.warnings),
         warnings: conflictCheck.warnings,
       };
     }
@@ -2636,7 +2643,8 @@ export async function getProposalDetailAction(
       canReschedule:
         isAdmin &&
         canViewSensitive &&
-        (row.state === "proposed" || row.state === "resolved"),
+        (row.state === "proposed" || row.state === "resolved") &&
+        !row.isBatchSleeping,
       canRevokeAcceptance:
         !masked &&
         viewerInvitee?.role === "required" &&
@@ -3954,11 +3962,12 @@ export async function redraftProposalAction(
 
   await resetInviteeVotes(db, proposalId);
   await logProposalTransition(db, proposalId, session.user.id, "proposal.redrafted");
+  await dismissAllNotificationsForProposal(proposalId);
   await notifyProposalStakeholders(
     db,
     proposal,
     "proposal_redrafted",
-    `Proposal "${proposal.title}" was moved back to drafts for editing.`,
+    formatDraftReturnNotification(proposal.title, "Moved back for editing"),
   );
 
   revalidatePath("/proposals");

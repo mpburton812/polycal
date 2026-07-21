@@ -57,6 +57,7 @@ export async function applyFeedMigrations(sql: Client): Promise<void> {
   `);
 
   await ensureColumn(sql, "proposal_comments", "deleted_at", "TEXT");
+  await ensureColumn(sql, "users", "feed_prefs_json", "TEXT");
 
   await sql.execute(`
     CREATE TABLE IF NOT EXISTS feed_likes (

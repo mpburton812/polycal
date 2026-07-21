@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { buildScheduleWindows, expandAllDayDateKeys, isMultiDayAllDaySpan } from "./schedule-slices";
+import {
+  allDayBoundsForDateKey,
+  buildScheduleWindows,
+  expandAllDayDateKeys,
+  isMultiDayAllDaySpan,
+} from "./schedule-slices";
 
 const baseRow = {
   id: "prop-parent",
@@ -52,13 +57,12 @@ describe("schedule-slices", () => {
         "2026-07-01T00:00:00.000Z",
         "2026-07-03T23:59:59.999Z",
         true,
+        "UTC",
       ),
     ).toBe(true);
-    expect(expandAllDayDateKeys("2026-07-01T00:00:00.000Z", "2026-07-03T23:59:59.999Z")).toEqual([
-      "2026-07-01",
-      "2026-07-02",
-      "2026-07-03",
-    ]);
+    expect(
+      expandAllDayDateKeys("2026-07-01T00:00:00.000Z", "2026-07-03T23:59:59.999Z", "UTC"),
+    ).toEqual(["2026-07-01", "2026-07-02", "2026-07-03"]);
 
     const windows = buildScheduleWindows(
       { ...baseRow, isAllDay: true },
@@ -67,6 +71,7 @@ describe("schedule-slices", () => {
         startAt: "2026-07-01T00:00:00.000Z",
         endAt: "2026-07-03T23:59:59.999Z",
       },
+      "UTC",
     );
     expect(windows).toHaveLength(3);
     expect(windows.map((w) => w.slice.sliceKind)).toEqual([
@@ -75,6 +80,25 @@ describe("schedule-slices", () => {
       "virtual_span_day",
     ]);
     expect(windows[1]?.slice.sliceKey).toBe("2026-07-02");
+    expect(windows[0]?.startAt).toBe("2026-07-01T12:00:00.000Z");
+  });
+
+  it("does not add an extra day when local end-of-day crosses UTC midnight (NY)", () => {
+    // Jul 20 23:59:59.999 EDT → 2026-07-21T03:59:59.999Z
+    const startAt = "2026-07-17T04:00:00.000Z"; // Jul 17 00:00 EDT
+    const endAt = "2026-07-21T03:59:59.999Z";
+    expect(expandAllDayDateKeys(startAt, endAt, "America/New_York")).toEqual([
+      "2026-07-17",
+      "2026-07-18",
+      "2026-07-19",
+      "2026-07-20",
+    ]);
+  });
+
+  it("uses noon-UTC bounds so NY local date is a single day", () => {
+    const { startAt, endAt } = allDayBoundsForDateKey("2026-07-18");
+    expect(startAt).toBe("2026-07-18T12:00:00.000Z");
+    expect(endAt).toBe("2026-07-18T12:00:00.000Z");
   });
 
   it("tags recurrence children as recurrence_occurrence", () => {

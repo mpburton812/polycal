@@ -26,6 +26,112 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "2026.07.21-prod",
+    date: "2026-07-21",
+    summary:
+      "Production: Feed Controls, six-item UX batch, nav/like parrot sizing, audit patches.",
+    changes: [
+      {
+        type: "added",
+        description:
+          "Feed Controls — Settings cog with presets and Detailed Tweaking (Who/What); prefs persist on the account; server-side list filter; vote milestones when Votes content is enabled (PC-264–PC-268). SCHEMA_VERSION 29.",
+      },
+      {
+        type: "fixed",
+        description:
+          "Month all-day bars no longer fragment in US timezones; feed image uploads tolerate up to 4MB with clear errors (PC-258–PC-259).",
+      },
+      {
+        type: "changed",
+        description:
+          "Draft-return notifications revoke+replace with reason; Reschedule hidden for batch sleeping; conflict messages list each overlap (PC-261–PC-263).",
+      },
+      {
+        type: "changed",
+        description:
+          "Bottom FEED parrot matches sibling nav icons (24×24); feed like birds are half that (12×12) via shared constants (PC-270). Supersedes interim 36×36 nav / 40×40 like sizes from PC-260 / PC-269.",
+      },
+      {
+        type: "fixed",
+        description:
+          "Dependency audit: brace-expansion and js-yaml patched (PC-258).",
+      },
+    ],
+  },
+  {
+    version: "2026.07.21b",
+    date: "2026-07-21",
+    summary:
+      "Feed nav parrot matches sibling tab icons; like birds are half that size.",
+    changes: [
+      {
+        type: "changed",
+        description:
+          "Bottom FEED parrot restored to 24×24 (same as other nav icons); feed like birds set to 12×12 (half) via shared constants (PC-270).",
+      },
+    ],
+  },
+  {
+    version: "2026.07.21",
+    date: "2026-07-21",
+    summary:
+      "Feed Controls (presets + Detailed Tweaking), votes milestones, larger like bird.",
+    changes: [
+      {
+        type: "added",
+        description:
+          "Feed Settings cog with presets and collapsed Detailed Tweaking (Who/What filters); prefs persist on the account (PC-264–PC-268). SCHEMA_VERSION 29.",
+      },
+      {
+        type: "added",
+        description:
+          "Vote milestones (accept/decline/poll) appear in the feed when Votes content is enabled (PC-267).",
+      },
+      {
+        type: "changed",
+        description: "Feed like bird enlarged to 40×40 for visibility (PC-269).",
+      },
+    ],
+  },
+  {
+    version: "2026.07.20",
+    date: "2026-07-20",
+    summary:
+      "Month all-day bars, feed image uploads, Feed parrot, draft-return notifs, batch Reschedule, conflict lists.",
+    changes: [
+      {
+        type: "fixed",
+        description:
+          "Multi-day all-day month bars merge virtual day slices and use TZ-safe noon bounds so US timezones no longer show overlapping 2-day fragments (PC-258).",
+      },
+      {
+        type: "fixed",
+        description:
+          "Feed image Server Action body limit raised to 4MB with try/catch and client size precheck (PC-259).",
+      },
+      {
+        type: "changed",
+        description:
+          "Feed bottom-nav icon is the parrot asset at 36×36 (1.5×) (PC-260).",
+      },
+      {
+        type: "changed",
+        description:
+          "Returning a proposal to drafts dismisses prior proposal notifications and sends one informational notice with reason (PC-261).",
+      },
+      {
+        type: "changed",
+        description:
+          "Reschedule is hidden for batch sleeping proposals (PC-262).",
+      },
+      {
+        type: "changed",
+        description:
+          "Conflict check/submit messages list each overlapping person/place and title (PC-263).",
+      },
+    ],
+  },
+  {
     version: "2026.07.17",
     date: "2026-07-17",
     summary: "Feed Code Status starts minimized and expands via chevron.",

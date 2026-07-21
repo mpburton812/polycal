@@ -249,3 +249,10 @@
 2026-07-17 | a374076 | PC-257 | collapse Code Status by default with chevron expand | src/components/feed/FeedClient.tsx
 2026-07-17 | 308cff2 | PC-257 | fix Code Status collapse chevron selector | e2e/feed-code-status-journey.spec.ts
 2026-07-17 | 2d6b7cf | PC-257 | raise Code Status journey timeout for suite load | e2e/feed-code-status-journey.spec.ts
+2026-07-20 | f4b1802 | PC-258 | six-item batch — month spans, feed image, parrot, drafts, batch, conflicts | src/actions/admin-fast-sleeping.ts
+2026-07-20 | a685cf5 | PC-261 | remove sync re-exports from use server notifications | src/actions/notifications.ts
+2026-07-20 | 6579fb2 | PC-261 | scope inbox title and expect draft-return copy | e2e/batch-sleeping-partners-journey.spec.ts
+2026-07-20 | 31c509c | PC-258 | patch brace-expansion and js-yaml via npm audit | n/a
+2026-07-20 | 7b2d259 | PC-264 | Feed Controls presets, Detailed Tweaking, votes, larger bird | src/actions/feed.ts
+2026-07-20 | 39142b1 | PC-270 | match nav parrot to tabs; like birds half size | src/components/feed/FeedLikeControl.tsx
+2026-07-20 | c93f061 | PC-271 | consolidated production release notes | src/lib/changelog/entries.ts

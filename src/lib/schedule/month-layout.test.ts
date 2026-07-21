@@ -126,4 +126,36 @@ describe("buildMonthLayout", () => {
     const chip = layout.weeks.flatMap((week) => week.days.flatMap((day) => day.chips))[0];
     expect(chip?.variant).toBe("archived");
   });
+
+  it("merges virtual_span_day windows into one continuous NY month bar (PC-258)", () => {
+    const grid = buildMonthGrid(new Date(2026, 6, 1));
+    const tz = "America/New_York";
+    const days = ["2026-07-17", "2026-07-18", "2026-07-19", "2026-07-20"];
+    const events = days.map((dateKey) =>
+      makeEvent({
+        id: `prop-trip:${dateKey}`,
+        proposalId: "prop-trip",
+        rootProposalId: "prop-trip",
+        title: "Cool Kids Pittsburgh Trip",
+        isAllDay: true,
+        state: "proposed",
+        startAt: `${dateKey}T00:00:00.000Z`,
+        endAt: `${dateKey}T23:59:59.999Z`,
+        sliceKind: "virtual_span_day",
+        sliceKey: dateKey,
+      }),
+    );
+
+    const layout = buildMonthLayout(grid, events, tz, 3);
+    const titled = layout.weeks.flatMap((week) =>
+      week.spanSegments.filter((segment) => segment.showTitle),
+    );
+    expect(titled).toHaveLength(1);
+    expect(titled[0]!.event.title).toBe("Cool Kids Pittsburgh Trip");
+
+    const allSegments = layout.weeks.flatMap((week) => week.spanSegments);
+    // Week-row split only: Fri–Sun then Mon — not N overlapping 2-day bars.
+    expect(allSegments.length).toBe(2);
+    expect(allSegments.every((s) => s.event.rootProposalId === "prop-trip")).toBe(true);
+  });
 });

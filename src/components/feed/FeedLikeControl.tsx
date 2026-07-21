@@ -17,6 +17,7 @@ import {
 import { useEffect, useState, useTransition } from "react";
 
 import { listFeedLikersAction, toggleFeedLikeAction } from "@/actions/feed";
+import { FEED_LIKE_BIRD_PX } from "@/components/feed/feedIconSizes";
 import { avatarSrcForKey } from "@/lib/constants/avatars";
 import type { FeedLikeTargetType, FeedLiker } from "@/lib/feed/likes";
 import { GARDEN_TOKENS } from "@/theme/tokens";
@@ -94,7 +95,13 @@ export function FeedLikeControl({
           }}
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={parrotSrc} alt="" width={28} height={28} style={{ display: "block" }} />
+          <img
+            src={parrotSrc}
+            alt=""
+            width={FEED_LIKE_BIRD_PX}
+            height={FEED_LIKE_BIRD_PX}
+            style={{ display: "block" }}
+          />
         </ButtonBase>
         <ButtonBase
           onClick={() => void openLikers()}
