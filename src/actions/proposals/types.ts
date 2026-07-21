@@ -173,8 +173,8 @@ export interface ProposalDetail {
   /** True when the viewer already voted but their calendar now conflicts (PC-45/46). */
   hasOverlapWarning: boolean;
   canAcknowledgeOverlap: boolean;
-  /** Optional invitee still voting on a poll after required attendees resolved (PC-49). */
-  optionalPollPending: boolean;
+  /** Optional invitee still owes RSVP after required attendees resolved (PC-278 / PC-49). */
+  optionalRsvpPending: boolean;
   /** Kanban/detail chip state — may show proposed while DB state is resolved (PC-49). */
   displayState: ProposalState;
   /** Minutes before event start to send reminder (PC-65). */

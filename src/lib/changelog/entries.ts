@@ -26,6 +26,19 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "2026.07.21e",
+    date: "2026-07-21",
+    summary:
+      "Optional invitees stay visible after required attendees resolve (extend PC-49).",
+    changes: [
+      {
+        type: "added",
+        description:
+          "Unfinished optional invitees keep Proposed-board visibility, a detail Alert, and an actionable resolve notification until they RSVP; optional still does not block schedule resolution (PC-278).",
+      },
+    ],
+  },
+  {
     version: "2026.07.21d",
     date: "2026-07-21",
     summary: "Feed like bird enlarged to 36×36 (3× prior size).",

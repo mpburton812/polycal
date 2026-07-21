@@ -104,10 +104,15 @@ test.describe("Week schedule poly-family journey", () => {
     await logout(page);
     await loginWithOnboardingIfNeeded(page, USERS.han.username);
     await goToProposals(page);
-    await selectProposalTab(page, "Resolved");
+    await expectInAppNotification(page, new RegExp(escape(dinnerTitle)));
+    await expectInAppNotification(page, /Please Accept or Decline/i);
+    await selectProposalTab(page, "Proposed");
     await openProposalCard(page, dinnerTitle);
 
     const hanDialog = page.getByRole("dialog");
+    await expect(
+      hanDialog.getByText(/approved by all required attendees and scheduled/i),
+    ).toBeVisible();
     await hanDialog.getByPlaceholder("Add a comment…").fill(declineNote);
     await hanDialog.getByRole("button", { name: "Post" }).click();
     await expect(hanDialog.getByText(declineNote)).toBeVisible({ timeout: 15_000 });
@@ -118,11 +123,10 @@ test.describe("Week schedule poly-family journey", () => {
     await expect(hanDialog.getByText("Accepted", { exact: true })).toBeVisible();
 
     // —— Phase 7: Notifications reflect key actions for each actor ——
+    // Dinner resolve/submit notices are dismissed on RSVP (PC-217 / PC-278).
     await expectInAppNotification(page, new RegExp(escape(brunchTitle)));
     await expectInAppNotification(page, new RegExp(escape(gameTitle)));
     await expectInAppNotification(page, /needs your review/i);
-    await expectInAppNotification(page, new RegExp(escape(dinnerTitle)));
-    await expectInAppNotification(page, /approved and scheduled/i);
 
     await logout(page);
     await loginWithOnboardingIfNeeded(page, USERS.leia.username);
