@@ -21,6 +21,7 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- PC-278: Optional invitees keep Proposed visibility + actionable resolve notification after required attendees resolve (extend PC-49 to non-polls). Change control: `2026.07.21e`.
 - **Production release `2026.07.21-prod` (PC-271):** Consolidated Code Status entry for this promote — Feed Controls (PC-264–268), six-item UX batch (PC-258–263), FEED/like parrot sizing (PC-270; supersedes interim PC-260/269 sizes), brace-expansion/js-yaml audit patches (PC-258).
 
 ### Changed

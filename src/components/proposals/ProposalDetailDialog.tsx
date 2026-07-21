@@ -503,10 +503,11 @@ export function ProposalDetailDialog({
         }}
       >
         <CardContent sx={{ pb: 1, overflowY: "auto", flex: 1 }}>
-          {detail?.optionalPollPending && (
+          {detail?.optionalRsvpPending && (
             <Alert severity="success" sx={{ mb: 2 }}>
-              This proposal was approved by all required attendees and scheduled. Please complete
-              your poll votes below.
+              {detail.isPoll
+                ? "This proposal was approved by all required attendees and scheduled. Please complete your poll votes below."
+                : "This proposal was approved by all required attendees and scheduled. Please Accept or Decline below."}
             </Alert>
           )}
           {detail?.atRisk && detail.state === "resolved" && (

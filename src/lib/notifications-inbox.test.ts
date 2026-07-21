@@ -42,6 +42,15 @@ describe("isActionableProposalNotification", () => {
     ).toBe(false);
   });
 
+  it("clears proposal_resolved when metadata.action is vote (optional RSVP)", () => {
+    expect(
+      isActionableProposalNotification("proposal_resolved", {
+        proposalId: "p1",
+        action: "vote",
+      }),
+    ).toBe(true);
+  });
+
   it("does not treat others' proposal_vote_cast as actionable for the recipient", () => {
     expect(
       isActionableProposalNotification("proposal_vote_cast", {

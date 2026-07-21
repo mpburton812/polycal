@@ -42,7 +42,7 @@ Approved proposals appear on the **Schedule** tab. Color coding:
 |------|---------|
 | **Proposer** | Created the proposal. Can edit drafts, submit, re-draft, cancel, clone, and manage invitees (within rules below). |
 | **Required invitee** | Must respond before the proposal can finalize. Unanimous approval (Accept, Accept Sub-optimal, or Abstain) is required among required invitees. |
-| **Optional invitee** | May vote; their response is logged but does not block resolution. Optional invitees can still vote after an item is resolved. |
+| **Optional invitee** | May vote; their response is logged but does not block resolution. After required attendees resolve an item, unfinished optional invitees keep it on **Proposed** with a needs-action highlight and an actionable notification until they Accept or Decline (polls: complete slot votes). Optional RSVP still does not change the schedule. |
 
 When adding people to a draft, each person is marked **Required**, **Optional**, or **None** (not invited).
 
@@ -131,7 +131,7 @@ Vote options:
 | **Abstain** | Counts as approval for threshold purposes (“no preference / available”). In polls, completes your row as available for all slots. |
 | **Decline** | **Non-poll:** returns proposal to **Drafts** (proposer can remove decliner and resubmit). **Poll:** stays Proposed until all required rows are in; if no slot works for everyone, goes to Drafts. |
 
-**Resolution rule:** When every **required** invitee has responded and all responses are Accept, Accept sub-optimal, or Abstain, the proposal becomes **Resolved** and the winning time is written to the schedule.
+**Resolution rule:** When every **required** invitee has responded and all responses are Accept, Accept sub-optimal, or Abstain, the proposal becomes **Resolved** and the winning time is written to the schedule. Unfinished **optional** invitees still see the card on **Proposed** (with a needs-action prompt and actionable notification) until they RSVP; their vote does not reopen or block the schedule.
 
 **While Proposed:**
 
