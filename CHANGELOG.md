@@ -20,6 +20,9 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+- **Production release `2026.07.21-prod` (PC-271):** Consolidated Code Status entry for this promote — Feed Controls (PC-264–268), six-item UX batch (PC-258–263), FEED/like parrot sizing (PC-270; supersedes interim PC-260/269 sizes), brace-expansion/js-yaml audit patches (PC-258).
+
 ### Changed
 - PC-270: Bottom FEED parrot matches sibling nav icons (24×24); feed like birds half that (12×12). Change control: `2026.07.21b`.
 
