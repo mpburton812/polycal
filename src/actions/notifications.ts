@@ -1,7 +1,7 @@
 "use server";
 
 import { and, desc, eq, like, notInArray } from "drizzle-orm";
-import { revalidatePath } from "next/cache";
+import { revalidateNotificationShellPaths } from "@/lib/notifications-revalidate";
 
 import { auth } from "@/lib/auth";
 import { getDb } from "@/lib/db/client";
@@ -144,7 +144,7 @@ export async function dismissNotificationAction(
     .values({ userId, logId, dismissedAt: now })
     .onConflictDoNothing();
 
-  revalidatePath("/", "layout");
+  revalidateNotificationShellPaths();
   return { ok: true, message: "Notification dismissed." };
 }
 
@@ -177,7 +177,7 @@ export async function clearAllNotificationsAction(): Promise<{
       .onConflictDoNothing();
   }
 
-  revalidatePath("/", "layout");
+  revalidateNotificationShellPaths();
   return { ok: true, message: "All notifications cleared." };
 }
 
@@ -229,7 +229,7 @@ export async function dismissNotificationsForProposal(
   }
 
   if (cleared > 0) {
-    revalidatePath("/", "layout");
+    revalidateNotificationShellPaths();
   }
   return cleared;
 }

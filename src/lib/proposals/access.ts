@@ -4,8 +4,10 @@ import { getDb } from "@/lib/db/client";
 import { polyGroup, type ProposalState, type ProposalType } from "@/lib/db/schema";
 import type { AuditLogVisibility } from "@/types/poly-group";
 
-export const MASKED_TITLE = "Private event";
-export const MASKED_DESCRIPTION = "Details are hidden for this privacy level.";
+/** Title shown when sleeping-network visibility hides details from a non-participant. */
+export const MASKED_TITLE = "Busy";
+/** Body copy for masked sleeping proposals (PC-282 — privacy levels were removed in PC-280). */
+export const MASKED_DESCRIPTION = "Details are hidden for this sleeping arrangement.";
 
 /**
  * Generic content redaction — used when sleeping-network visibility (PC-229)
@@ -48,14 +50,6 @@ export async function getAdminCanSeeUninvolved(
     .where(eq(polyGroup.id, 1))
     .limit(1);
   return group?.adminCanSeeUninvolved ?? true;
-}
-
-/**
- * Sleeping network visibility is hard-defaulted to "involved" — only proposer,
- * invitees, and (when allowed) admins can see sleeping proposals (PC-280).
- */
-export async function getSleepingNetworkVisibility(): Promise<"involved"> {
-  return "involved";
 }
 
 /** Whether the viewer may see a proposal in a non-draft column. */

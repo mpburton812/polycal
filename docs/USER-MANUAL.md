@@ -247,4 +247,4 @@ Admins can also toggle **Admins can see proposals they are not involved in** (de
 - [ARCHITECTURE.md](./ARCHITECTURE.md) — technical environment map  
 - [REQUIREMENTS-WORKFLOW.md](./REQUIREMENTS-WORKFLOW.md) — development & Jira process (for builders)
 
-*Last updated for PC-280 (removed Planning drawer, Clone, group-name proposals, power management, and private/super-private event privacy; sleeping network visibility hard-defaulted to involved).*
+*Last updated for PC-282 (post-280 audit: timezone-safe sleeping nights, feed-image ACL, impersonation admin gate, Playwright accuracy). Builds on PC-280 removals (Planning, Clone, group-name, power management, private/super-private; sleeping involved-only).*

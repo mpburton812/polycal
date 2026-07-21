@@ -51,7 +51,7 @@ import {
   ensureLinkPreview,
 } from "@/lib/feed/link-preview-store";
 import { extractFirstUrl, normalizeLinkUrl } from "@/lib/feed/link-preview";
-import { checkRateLimit } from "@/lib/rate-limit";
+import { checkRateLimitPersistent } from "@/lib/rate-limit";
 import { buildFeedUpdateToken } from "@/lib/feed/update-token";
 import { isFeedMilestoneVisibleViaAdminOnly } from "@/lib/feed/admin-only-visibility";
 import { notifyUser } from "@/lib/notifications";
@@ -988,7 +988,7 @@ export async function previewFeedLinkAction(
     return { ok: false, message: "URL must be http(s)." };
   }
 
-  if (!checkRateLimit(`feed-link-preview:${sessionResult.user.id}`, 20, 60_000)) {
+  if (!(await checkRateLimitPersistent(`feed-link-preview:${sessionResult.user.id}`, 20, 60_000))) {
     return { ok: false, message: "Too many preview requests. Try again shortly." };
   }
 
@@ -1091,33 +1091,6 @@ export async function deleteNetworkChatCommentAction(
     revalidatePath("/feed");
     return { ok: true, message: "Comment deleted." };
   });
-}
-
-/** @deprecated Use listFeedItemsAction — kept for transitional imports. */
-export async function listFeedMilestonesAction(
-  input: { cursor?: string | null; limit?: number } = {},
-): Promise<{ ok: boolean; message: string; items?: FeedMilestone[]; nextCursor?: string | null }> {
-  const result = await listFeedItemsAction(input);
-  if (!result.ok) return { ok: false, message: result.message };
-  if (!result.items) return { ok: false, message: result.message };
-  const milestones = result.items.filter((i) => i.kind === "milestone") as FeedMilestone[];
-  return {
-    ok: true,
-    message: "OK",
-    items: milestones,
-    nextCursor: result.nextCursor,
-  };
-}
-
-/** @deprecated Use listFeedItemsAction — kept for transitional imports. */
-export async function listNetworkChatMessagesAction(
-  input: { limit?: number; before?: string | null } = {},
-): Promise<{ ok: boolean; message: string; items?: NetworkChatMessage[] }> {
-  const result = await listFeedItemsAction({ limit: input.limit ?? 50, cursor: input.before });
-  if (!result.ok) return { ok: false, message: result.message };
-  if (!result.items) return { ok: false, message: result.message };
-  const chat = result.items.filter((i) => i.kind === "chat") as NetworkChatMessage[];
-  return { ok: true, message: "OK", items: chat };
 }
 
 const likeTargetSchema = z.object({

@@ -43,7 +43,8 @@ Source of truth for SAFE list: `SAFE_PARALLEL_SPECS` in [`e2e/parallel.ts`](../e
 | `death-star-poll-journey.spec.ts` | han, leia, luke | No | SERIAL_ONLY (`testManualDb`) | Yes |
 | `event-reminder-journey.spec.ts` | luke | No | SAFE_PARALLEL | Yes |
 | `event-schedule-views-journey.spec.ts` | luke, leia | No | SERIAL_ONLY (`testManualDb`, file-level reset) | Yes |
-| `group-name-proposal-journey.spec.ts` | luke, leia, han | No | SERIAL_ONLY | Yes |
+| `feed-code-status-journey.spec.ts` | luke | No | SAFE_PARALLEL | Yes |
+| `feed-likes-journey.spec.ts` | luke, leia | No | SAFE_PARALLEL | Yes |
 | `impersonation-journey.spec.ts` | luke / admin | No | SERIAL_ONLY | Yes |
 | `multi-day-event-slice-journey.spec.ts` | luke, leia | No | SAFE_PARALLEL | Yes |
 | `notification-inbox-journey.spec.ts` | luke | No | SERIAL_ONLY | Yes |

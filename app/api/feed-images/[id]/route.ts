@@ -5,9 +5,11 @@ import { auth } from "@/lib/auth";
 import { getDb } from "@/lib/db/client";
 import { ensureDbReady } from "@/lib/db/ensure-ready";
 import { storedImages } from "@/lib/db/schema";
+import { canViewerAccessFeedImage } from "@/lib/feed/image-access";
+import type { UserRole } from "@/types/user";
 
 /**
- * Serves feed-attached image blobs to any signed-in network member (PC-236).
+ * Serves feed-attached image blobs only when the session can see the attachment (PC-282).
  */
 export async function GET(
   _request: Request,
@@ -24,8 +26,17 @@ export async function GET(
   }
 
   await ensureDbReady();
-  const db = getDb();
 
+  const allowed = await canViewerAccessFeedImage(
+    session.user.id,
+    session.user.role as UserRole,
+    id,
+  );
+  if (!allowed) {
+    return new NextResponse("Forbidden", { status: 403 });
+  }
+
+  const db = getDb();
   const [row] = await db
     .select({ mimeType: storedImages.mimeType, data: storedImages.data })
     .from(storedImages)
