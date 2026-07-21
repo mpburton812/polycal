@@ -136,7 +136,7 @@ Vote options:
 **While Proposed:**
 
 - If the event **start time passes** without full approval → system returns it to **Drafts** and resets votes (proposer is notified).
-- If admins set a **max hours in Proposed** limit and time runs out → same return to Drafts.
+- If admins set a **max days in Proposed** limit and time runs out → same return to Drafts.
 - If another proposal **resolves** and overlaps this one, conflicting pending proposals may be **auto-declined** with a system note for the proposer to review.
 
 **Overlap warning:** If you already voted and a new conflict appears on your calendar, you may see an overlap warning and can acknowledge or decline.
@@ -227,11 +227,13 @@ Admins can tune enforcement under **Admin → Poly Group Settings**. Defaults if
 
 | Setting | Default | What it does |
 |---------|---------|----------------|
-| Max hours in Proposed | 0 (off) | Only expire Proposed when event start passes |
-| At-risk draft TTL | 168 h (7 days) | Drafts left at-risk without action → Archived |
+| Max days in Proposed | 0 (off) | Only expire Proposed when event start passes |
+| At-risk draft TTL | 7 days | Drafts left at-risk without action → Archived |
+| Sleeping partner proposal TTL | 5 days | Unanswered partnership proposals are deleted; both people notified |
 | Archive grace | 24 h | After event end before Resolved → Archived |
 | Redraft deadline | 24 h | Before event start, at-risk Resolved → Proposed again |
-| Recovery max hours | 48 h | Hold calendar when required invitees drop to zero |
+
+Admins can also toggle **Admins can see proposals they are not involved in** (default on). When off, admins only see proposals they proposed or are invited to. Peach card chrome marks uninvolved admin oversight views only — not when the admin is an invitee.
 
 ---
 

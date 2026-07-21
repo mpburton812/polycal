@@ -99,14 +99,20 @@ export const proposalCardSx = {
 } as const;
 
 /**
- * True when the viewer is an app admin looking at a proposal they did not propose.
+ * True when an admin is viewing a proposal they neither proposed nor are invited to (PC-196 / PC-274).
  */
 export function isAdminOversightView(
   isAdmin: boolean,
   currentUserId: string,
   proposerId: string | null | undefined,
+  viewerIsInvitee = false,
 ): boolean {
-  return Boolean(isAdmin && proposerId && proposerId !== currentUserId);
+  return Boolean(
+    isAdmin &&
+      proposerId &&
+      proposerId !== currentUserId &&
+      !viewerIsInvitee,
+  );
 }
 
 export const brutalPressSx = {

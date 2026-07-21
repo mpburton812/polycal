@@ -10,10 +10,12 @@ interface ProposalEventIconProps {
   isContentMasked: boolean;
   proposalType: "event" | "sleeping";
   size?: number;
+  /** Stretch to parent height for kanban card watermarks (PC-275). */
+  fillHeight?: boolean;
 }
 
 /**
- * Inline event category icon for proposal cards and detail (PC-116 phase 2).
+ * Event category icon for proposal cards and detail (PC-116 / PC-275).
  * Hidden when content is masked or no icon is set.
  */
 export function ProposalEventIcon({
@@ -21,9 +23,31 @@ export function ProposalEventIcon({
   isContentMasked,
   proposalType,
   size = 22,
+  fillHeight = false,
 }: ProposalEventIconProps) {
   if (isContentMasked || proposalType !== "event" || !isEventIconKey(eventIconKey)) {
     return null;
+  }
+
+  if (fillHeight) {
+    return (
+      <Box
+        sx={{
+          height: "100%",
+          width: "auto",
+          aspectRatio: "1 / 1",
+          maxWidth: "100%",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "flex-end",
+        }}
+      >
+        <EventCategoryIcon
+          iconKey={eventIconKey}
+          sx={{ height: "100%", width: "100%", display: "block" }}
+        />
+      </Box>
+    );
   }
 
   return (

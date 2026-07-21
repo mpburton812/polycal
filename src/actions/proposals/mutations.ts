@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 
 import { cleanupResidencyProposalLinkage } from "@/actions/residency-proposals";
 import { auth } from "@/lib/auth";
+import { userHasAdminAccess } from "@/lib/admin-access";
 import { logUserActivity } from "@/lib/audit";
 import { getDb } from "@/lib/db/client";
 import { ensureDbReady } from "@/lib/db/ensure-ready";
@@ -18,7 +19,7 @@ import {
 } from "@/lib/db/schema";
 
 /**
- * Deletes a draft owned by the signed-in user (PC-40, PC-71 module split).
+ * Deletes a draft owned by the signed-in user, or any draft when the actor is an admin (PC-274).
  */
 export async function deleteDraftProposalAction(
   proposalId: string,
@@ -36,7 +37,9 @@ export async function deleteDraftProposalAction(
     .where(eq(proposals.id, proposalId))
     .limit(1);
 
-  if (!proposal || proposal.proposerId !== session.user.id || proposal.state !== "draft") {
+  const isAdmin = await userHasAdminAccess(session.user.role);
+  const isOwner = proposal?.proposerId === session.user.id;
+  if (!proposal || proposal.state !== "draft" || (!isOwner && !isAdmin)) {
     return { ok: false, message: "Draft not found." };
   }
 

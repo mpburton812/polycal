@@ -126,7 +126,12 @@ export function ProposalCard({
     proposal.locationName && proposal.bedroomLabel
       ? `${proposal.locationName} · ${proposal.bedroomLabel}`
       : proposal.locationName;
-  const adminOversight = isAdminOversightView(isAdmin, currentUserId, proposal.proposerId);
+  const adminOversight = isAdminOversightView(
+    isAdmin,
+    currentUserId,
+    proposal.proposerId,
+    Boolean(proposal.viewerIsInvitee),
+  );
 
   const sparseBadges: string[] = [];
   if (!proposal.isContentMasked) {
@@ -161,6 +166,8 @@ export function ProposalCard({
         ...brutalPressSx,
         ...(adminOversight ? { bgcolor: ADMIN_OVERSIGHT_BG } : {}),
         cursor: "pointer",
+        position: "relative",
+        overflow: "hidden",
         transform: `rotate(${rotation})`,
         borderLeft: `6px solid ${typeAccent}`,
         "&:hover": {
@@ -170,7 +177,35 @@ export function ProposalCard({
       }}
       onClick={() => onOpen(proposal.id)}
     >
-      <CardContent sx={{ pb: 1 }}>
+      {!proposal.isContentMasked &&
+        proposal.proposalType === "event" &&
+        proposal.eventIconKey && (
+          <Box
+            aria-hidden
+            sx={{
+              position: "absolute",
+              top: 0,
+              right: 0,
+              bottom: 0,
+              width: "42%",
+              display: "flex",
+              alignItems: "stretch",
+              justifyContent: "flex-end",
+              pointerEvents: "none",
+              opacity: 0.3,
+              color: GARDEN_TOKENS.ink,
+              zIndex: 0,
+            }}
+          >
+            <ProposalEventIcon
+              eventIconKey={proposal.eventIconKey}
+              isContentMasked={false}
+              proposalType={proposal.proposalType}
+              fillHeight
+            />
+          </Box>
+        )}
+      <CardContent sx={{ pb: 1, position: "relative", zIndex: 1 }}>
         {proposal.cardKind === "partnership" && (
           <Typography
             variant="caption"
@@ -198,12 +233,6 @@ export function ProposalCard({
 
         {/* What */}
         <Stack direction="row" spacing={0.75} alignItems="center" sx={{ mb: 0.5 }}>
-          <ProposalEventIcon
-            eventIconKey={proposal.eventIconKey}
-            isContentMasked={proposal.isContentMasked}
-            proposalType={proposal.proposalType}
-            size={20}
-          />
           <Box sx={{ flex: 1, minWidth: 0 }}>
             <Typography
               variant="h6"
@@ -331,7 +360,7 @@ export function ProposalCard({
 
       {proposal.state === "draft" && (onContinueEdit || onDeleteDraft) && (
         <CardActions
-          sx={{ px: 2, pb: 2, pt: 0, flexWrap: "wrap", gap: 1 }}
+          sx={{ px: 2, pb: 2, pt: 0, flexWrap: "wrap", gap: 1, position: "relative", zIndex: 1 }}
           onClick={(e) => e.stopPropagation()}
         >
           {onContinueEdit && (

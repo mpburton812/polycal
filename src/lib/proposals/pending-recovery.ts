@@ -8,10 +8,6 @@ import {
   dismissAllNotificationsForProposal,
   formatDraftReturnNotification,
 } from "@/lib/notifications-draft-return";
-import {
-  loadEnforcementSettings,
-  type EnforcementSettings,
-} from "@/lib/proposals/enforcement";
 import { proposalInvitees, proposalStateLog, proposals } from "@/lib/db/schema";
 
 type Db = ReturnType<typeof getDb>;
@@ -32,19 +28,15 @@ async function logSystemTransition(
   });
 }
 
-function recoveryExpiresAt(settings: EnforcementSettings, fromMs = Date.now()): string {
-  return new Date(fromMs + settings.recoveryMaxHours * 60 * 60 * 1000).toISOString();
-}
-
 /**
- * When a resolved proposal loses all required invitees and is not intentional solo,
- * hold the calendar block until recovery TTL elapses (PC-53).
+ * When a proposal loses all required invitees and is not intentional solo,
+ * clear the calendar and return it to drafts immediately (PC-273 — recovery hold removed).
  */
 export async function enterPendingRecoveryIfNeeded(
   db: Db,
   proposalId: string,
   reason: string,
-): Promise<"recovery" | "draft" | "none"> {
+): Promise<"draft" | "none"> {
   const [proposal] = await db
     .select()
     .from(proposals)
@@ -62,34 +54,6 @@ export async function enterPendingRecoveryIfNeeded(
   if (remainingRequired.length > 0) return "none";
 
   const now = new Date().toISOString();
-  const settings = await loadEnforcementSettings(db);
-
-  if (proposal.state === "resolved" && proposal.scheduledStartAt) {
-    const until = recoveryExpiresAt(settings);
-    await db
-      .update(proposals)
-      .set({
-        pendingRecoveryUntil: until,
-        updatedAt: now,
-      })
-      .where(eq(proposals.id, proposalId));
-
-    await logSystemTransition(
-      db,
-      proposalId,
-      "proposal.pending_recovery",
-      `${reason} Recovery TTL until ${until}.`,
-    );
-
-    await notifyUser(
-      proposal.proposerId,
-      "proposal_missing_invitees",
-      `Proposal "${proposal.title}" needs invitees or solo confirmation before ${new Date(until).toLocaleString()}.`,
-      { proposalId },
-    );
-    return "recovery";
-  }
-
   const noteLine = `Missing invitees: ${reason}`;
   await db
     .update(proposals)
@@ -124,7 +88,7 @@ export async function enterPendingRecoveryIfNeeded(
 }
 
 /**
- * Expires pending-recovery holds — clears calendar and returns proposal to drafts (PC-53).
+ * Clears any legacy pending-recovery holds left from before PC-273 (returns to drafts).
  */
 export async function expirePendingRecoveryProposals(db: Db): Promise<void> {
   const now = new Date().toISOString();
@@ -134,9 +98,9 @@ export async function expirePendingRecoveryProposals(db: Db): Promise<void> {
     .where(and(eq(proposals.state, "resolved")));
 
   for (const proposal of rows) {
-    if (!proposal.pendingRecoveryUntil || proposal.pendingRecoveryUntil > now) continue;
+    if (!proposal.pendingRecoveryUntil) continue;
 
-    const noteLine = "Missing invitees: recovery TTL elapsed.";
+    const noteLine = "Missing invitees: legacy recovery hold cleared.";
     await db
       .update(proposals)
       .set({

@@ -3,8 +3,13 @@ import { describe, expect, it } from "vitest";
 import { isAdminOversightView } from "./proposalCardTheme";
 
 describe("isAdminOversightView", () => {
-  it("is true when admin views another user's proposal", () => {
+  it("is true when admin views another user's proposal and is not an invitee", () => {
     expect(isAdminOversightView(true, "admin-1", "user-2")).toBe(true);
+    expect(isAdminOversightView(true, "admin-1", "user-2", false)).toBe(true);
+  });
+
+  it("is false when admin is an invitee", () => {
+    expect(isAdminOversightView(true, "admin-1", "user-2", true)).toBe(false);
   });
 
   it("is false for the proposer's own cards", () => {

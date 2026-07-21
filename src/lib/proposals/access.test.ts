@@ -39,6 +39,29 @@ describe("proposal access helpers", () => {
     ).toBe(true);
   });
 
+  it("allows admins to see proposals by default, but not when uninvolved toggle is off", () => {
+    expect(
+      viewerCanSeeProposal("admin", true, "u1", ["u2"], {
+        state: "proposed",
+        eventPrivacy: "private",
+      }),
+    ).toBe(true);
+    expect(
+      viewerCanSeeProposal("admin", true, "u1", ["u2"], {
+        state: "proposed",
+        eventPrivacy: "private",
+        adminCanSeeUninvolved: false,
+      }),
+    ).toBe(false);
+    expect(
+      viewerCanSeeProposal("admin", true, "u1", ["admin"], {
+        state: "proposed",
+        eventPrivacy: "private",
+        adminCanSeeUninvolved: false,
+      }),
+    ).toBe(true);
+  });
+
   it("masks private resolved content for non-participants", () => {
     expect(
       shouldMaskProposalContent("u3", false, "u1", ["u2"], "private", false, false, "resolved"),

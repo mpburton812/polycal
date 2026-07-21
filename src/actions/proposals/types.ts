@@ -44,6 +44,8 @@ export interface ProposalCard {
   specialKind?: "residency" | "group_name";
   /** Category icon key; null when masked or unset (PC-116). */
   eventIconKey?: string | null;
+  /** True when the current viewer is an invitee on this proposal (PC-274). */
+  viewerIsInvitee?: boolean;
   /** Sleeping batch proposal (PC-124). */
   isBatchSleeping?: boolean;
   /** Recurring series parent or child (PC-124). */
