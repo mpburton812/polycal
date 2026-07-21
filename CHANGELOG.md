@@ -20,7 +20,11 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+- PC-264–PC-268: Feed Controls — Settings cog, presets, Detailed Tweaking (Who/What), account-persisted feed prefs, server-side filter, votes milestones. Change control: `2026.07.21`.
+
 ### Changed
+- PC-269: Feed like bird enlarged to 40×40. Change control: `2026.07.21`.
 - PC-258–263: Six-item UX batch — month all-day span merge/TZ bounds; feed image 4MB limit + error handling; Feed parrot nav icon 1.5×; draft-return notification revoke+replace; hide batch Reschedule; conflict messages list overlaps. Change control: `2026.07.20`.
 - PC-257: Feed Code Status starts minimized and expands via chevron (same collapsible pattern as Admin). Change control: `2026.07.17`.
 

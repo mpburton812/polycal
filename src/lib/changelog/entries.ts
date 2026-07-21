@@ -26,6 +26,28 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "2026.07.21",
+    date: "2026-07-21",
+    summary:
+      "Feed Controls (presets + Detailed Tweaking), votes milestones, larger like bird.",
+    changes: [
+      {
+        type: "added",
+        description:
+          "Feed Settings cog with presets and collapsed Detailed Tweaking (Who/What filters); prefs persist on the account (PC-264–PC-268). SCHEMA_VERSION 29.",
+      },
+      {
+        type: "added",
+        description:
+          "Vote milestones (accept/decline/poll) appear in the feed when Votes content is enabled (PC-267).",
+      },
+      {
+        type: "changed",
+        description: "Feed like bird enlarged to 40×40 for visibility (PC-269).",
+      },
+    ],
+  },
+  {
     version: "2026.07.20",
     date: "2026-07-20",
     summary:

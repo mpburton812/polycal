@@ -253,3 +253,4 @@
 2026-07-20 | a685cf5 | PC-261 | remove sync re-exports from use server notifications | src/actions/notifications.ts
 2026-07-20 | 6579fb2 | PC-261 | scope inbox title and expect draft-return copy | e2e/batch-sleeping-partners-journey.spec.ts
 2026-07-20 | 31c509c | PC-258 | patch brace-expansion and js-yaml via npm audit | n/a
+2026-07-20 | 7b2d259 | PC-264 | Feed Controls presets, Detailed Tweaking, votes, larger bird | src/actions/feed.ts

@@ -56,6 +56,8 @@ export const users = sqliteTable("users", {
   passwordResetToken: text("password_reset_token"),
   passwordResetTokenExpiresAt: text("password_reset_token_expires_at"),
   notificationPrefsJson: text("notification_prefs_json"),
+  /** Account-persisted Feed Controls (Who/What filters) — PC-265. */
+  feedPrefsJson: text("feed_prefs_json"),
   /** IANA timezone for schedule display normalization (PC-48 / spec §10). */
   timezone: text("timezone").notNull().default("UTC"),
   /** Optional blurb shown under the user's name on People & Places (PC-117). */
