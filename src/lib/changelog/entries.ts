@@ -26,6 +26,18 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "2026.07.21d",
+    date: "2026-07-21",
+    summary: "Feed like bird enlarged to 36×36 (3× prior size).",
+    changes: [
+      {
+        type: "changed",
+        description:
+          "Feed window like (upvote) parrot set to 36×36 — three times the prior 12×12 size — for easier tapping (PC-277). Bottom nav parrot stays 24×24.",
+      },
+    ],
+  },
+  {
     version: "2026.07.21c",
     date: "2026-07-21",
     summary:
