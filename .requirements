@@ -267,3 +267,4 @@
 2026-07-21 | 5adf633 | PC-282 | post-280 cleanup — TZ sleeping, security, perf, Playwright | src/actions/feed.ts
 2026-07-21 | 980ee97 | PC-282 | allow newline after Enter in feed composer assert | e2e/feed.spec.ts
 2026-07-21 | 55fa0c8 | PC-289 | production wipe script keeps people/places, clears schedule+chat | src/lib/changelog/entries.ts
+2026-07-21 | c2f1f16 | PC-289 | delete notification dismissals before activity log in prod wipe | scripts/wipe-production-schedule-keep-people.ts
