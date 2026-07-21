@@ -27,6 +27,7 @@ export interface FeedComment {
   canDelete: boolean;
   likeCount: number;
   likedByMe: boolean;
+  linkPreview: FeedLinkPreview | null;
 }
 
 export interface FeedMilestone {
@@ -64,6 +65,18 @@ export interface NetworkChatMessage {
   comments: FeedComment[];
   likeCount: number;
   likedByMe: boolean;
+  linkPreview: FeedLinkPreview | null;
+}
+
+/** Facebook-style Open Graph card attached to a feed body (PC-279). */
+export interface FeedLinkPreview {
+  id: string;
+  url: string;
+  title: string | null;
+  description: string | null;
+  imageUrl: string | null;
+  siteName: string | null;
+  status: "ok" | "failed";
 }
 
 export type FeedItem =
