@@ -50,6 +50,7 @@ import { isFeedMilestoneVisibleViaAdminOnly } from "@/lib/feed/admin-only-visibi
 import { notifyUser } from "@/lib/notifications";
 import {
   applyProposalMask,
+  getAdminCanSeeUninvolved,
   getPrivacyAdminFlags,
   getSleepingNetworkVisibility,
   shouldMaskProposalContent,
@@ -379,6 +380,7 @@ async function loadMilestoneBatch(
   {
     const privacyFlags = await getPrivacyAdminFlags(db);
     const sleepingNetworkVisibility = await getSleepingNetworkVisibility(db);
+    const adminCanSeeUninvolved = await getAdminCanSeeUninvolved(db);
     const [group] = await db
       .select({ auditLogVisibility: polyGroup.auditLogVisibility })
       .from(polyGroup)
@@ -449,6 +451,7 @@ async function loadMilestoneBatch(
         sleepingNetworkVisibility,
         state: row.state,
         eventPrivacy: row.eventPrivacy,
+        adminCanSeeUninvolved,
       };
       if (
         !viewerCanSeeProposalWithSleepingGate(viewerId, isAdmin, row.proposerId, inviteeUserIds, gateOptions)

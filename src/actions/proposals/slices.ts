@@ -27,6 +27,7 @@ import {
 } from "@/lib/proposals/batch-sleeping";
 import {
   applyProposalMask,
+  getAdminCanSeeUninvolved,
   getPrivacyAdminFlags,
   getSleepingNetworkVisibility,
   viewerCanSeeProposalWithSleepingGate,
@@ -237,6 +238,7 @@ export async function getProposalSliceDetailAction(
   const isAdmin = await userHasAdminAccess(session.user.role);
   const privacyFlags = await getSlicePrivacyFlags(db);
   const sleepingNetworkVisibility = await getSleepingNetworkVisibility(db);
+  const adminCanSeeUninvolved = await getAdminCanSeeUninvolved(db);
   const partnerIds = await acceptedSleepingPartnerIds(db, session.user.id);
   const { rootProposalId, sliceKind, sliceKey } = parsed.data;
   const sliceTag = formatSliceTag(sliceKind, sliceKey);
@@ -291,6 +293,7 @@ export async function getProposalSliceDetailAction(
       sleepingNetworkVisibility,
       state: row.state,
       eventPrivacy: row.eventPrivacy,
+      adminCanSeeUninvolved,
     })
   ) {
     return { ok: false, message: "Proposal not found." };

@@ -50,10 +50,12 @@ test.describe("Admin", () => {
   test("shows proposal enforcement settings for admin", async ({ page }) => {
     await expandAdminSection(page, "Poly group settings");
     await expect(page.getByText("Proposal enforcement")).toBeVisible();
-    await expect(page.getByLabel("Max hours in proposed")).toBeVisible();
-    await expect(page.getByLabel("At-risk draft TTL (hours)")).toBeVisible();
+    await expect(page.getByLabel("Max days in proposed")).toBeVisible();
+    await expect(page.getByLabel("At-risk draft TTL (days)")).toBeVisible();
+    await expect(page.getByLabel("Sleeping partner proposal TTL (days)")).toBeVisible();
     await expect(page.getByLabel("Archive grace (hours after end)")).toBeVisible();
     await expect(page.getByLabel("Redraft deadline (hours before start)")).toBeVisible();
+    await expect(page.getByLabel("Missing-invitee recovery (hours)")).toHaveCount(0);
   });
 });
 

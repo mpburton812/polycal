@@ -29,7 +29,10 @@ export async function applyProposalsMigrations(sql: Client): Promise<void> {
   await ensureColumn(sql, "proposals", "detached_from_slot_id", "TEXT");
   await ensureColumn(sql, "proposals", "detached_at", "TEXT");
   await ensureColumn(sql, "proposals", "event_icon_key", "TEXT");
+  // Legacy hour columns retained for one-time migration to days (PC-273); no longer read by app.
   await ensureColumn(sql, "poly_group", "recovery_max_hours", "INTEGER NOT NULL DEFAULT 48");
+  await ensureColumn(sql, "poly_group", "proposed_max_hours", "INTEGER NOT NULL DEFAULT 0");
+  await ensureColumn(sql, "poly_group", "at_risk_ttl_hours", "INTEGER NOT NULL DEFAULT 168");
 
   await sql.execute(`
     CREATE TABLE IF NOT EXISTS proposal_invitees (
@@ -58,10 +61,45 @@ export async function applyProposalsMigrations(sql: Client): Promise<void> {
     WHERE added_by_user_id IS NULL
   `);
 
-  await ensureColumn(sql, "poly_group", "proposed_max_hours", "INTEGER NOT NULL DEFAULT 0");
-  await ensureColumn(sql, "poly_group", "at_risk_ttl_hours", "INTEGER NOT NULL DEFAULT 168");
   await ensureColumn(sql, "poly_group", "archive_grace_hours", "INTEGER NOT NULL DEFAULT 24");
   await ensureColumn(sql, "poly_group", "redraft_deadline_hours", "INTEGER NOT NULL DEFAULT 24");
+  await ensureColumn(sql, "poly_group", "proposed_max_days", "INTEGER NOT NULL DEFAULT 0");
+  await ensureColumn(sql, "poly_group", "at_risk_ttl_days", "INTEGER NOT NULL DEFAULT 7");
+  await ensureColumn(
+    sql,
+    "poly_group",
+    "sleeping_partner_proposal_max_days",
+    "INTEGER NOT NULL DEFAULT 5",
+  );
+  await ensureColumn(
+    sql,
+    "poly_group",
+    "admin_can_see_uninvolved",
+    "INTEGER NOT NULL DEFAULT 1",
+  );
+
+  // One-time hours → days migration (ceil(hours/24); 0 stays 0) (PC-273).
+  const hoursToDaysFlag = await sql.execute(
+    `SELECT value FROM schema_meta WHERE key = 'enforcement_hours_to_days_v1' LIMIT 1`,
+  );
+  if (hoursToDaysFlag.rows.length === 0) {
+    await sql.execute(`
+      UPDATE poly_group SET
+        proposed_max_days = CASE
+          WHEN COALESCE(proposed_max_hours, 0) <= 0 THEN 0
+          ELSE CAST((COALESCE(proposed_max_hours, 0) + 23) / 24 AS INTEGER)
+        END,
+        at_risk_ttl_days = CASE
+          WHEN COALESCE(at_risk_ttl_hours, 0) <= 0 THEN 7
+          ELSE CAST((COALESCE(at_risk_ttl_hours, 0) + 23) / 24 AS INTEGER)
+        END
+    `);
+    await sql.execute({
+      sql: `INSERT INTO schema_meta (key, value) VALUES ('enforcement_hours_to_days_v1', '1')
+            ON CONFLICT(key) DO NOTHING`,
+      args: [],
+    });
+  }
 
   await sql.execute(`
     CREATE TABLE IF NOT EXISTS proposal_time_slots (

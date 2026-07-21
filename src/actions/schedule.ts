@@ -26,6 +26,7 @@ import { resolveTimezone } from "@/lib/schedule/timezone";
 import { parseBatchSlotMeta } from "@/lib/proposals/batch-sleeping";
 import { formatSleepingDisplayTitle } from "@/lib/proposals/sleeping-display";
 import {
+  getAdminCanSeeUninvolved,
   getPrivacyAdminFlags,
   MASKED_TITLE,
   viewerCanSeeProposalWithSleepingGate,
@@ -92,8 +93,10 @@ async function getSchedulePrivacyFlags(
   adminCanSeeSuperPrivate: boolean;
   hideSleeping: boolean;
   sleepingNetworkVisibility: "everyone" | "involved";
+  adminCanSeeUninvolved: boolean;
 }> {
   const privacy = await getPrivacyAdminFlags(db);
+  const adminCanSeeUninvolved = await getAdminCanSeeUninvolved(db);
   const [group] = await db
     .select({
       hideSleepingArrangements: polyGroup.hideSleepingArrangements,
@@ -107,6 +110,7 @@ async function getSchedulePrivacyFlags(
     hideSleeping: group?.hideSleepingArrangements ?? false,
     sleepingNetworkVisibility:
       group?.sleepingNetworkVisibility === "involved" ? "involved" : "everyone",
+    adminCanSeeUninvolved,
   };
 }
 
@@ -333,6 +337,7 @@ export async function listScheduleEventsAction(
           sleepingNetworkVisibility: privacyFlags.sleepingNetworkVisibility,
           state: row.state,
           eventPrivacy: row.eventPrivacy,
+          adminCanSeeUninvolved: privacyFlags.adminCanSeeUninvolved,
         })
       ) {
         continue;
