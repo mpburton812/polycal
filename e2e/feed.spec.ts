@@ -33,7 +33,8 @@ test.describe("Feed tab", () => {
     await composer.click();
     await composer.fill(stamp);
     await composer.press("Enter");
-    await expect(composer).toHaveValue(stamp);
+    // Enter inserts a newline (PC-280); it must not clear/submit the composer.
+    await expect(composer).toHaveValue(new RegExp(`^${stamp.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\n?$`));
     await expect(page.getByTestId("feed-chat-card").filter({ hasText: stamp })).toHaveCount(0);
 
     await expect(page.getByTestId("feed-send")).toBeEnabled();
