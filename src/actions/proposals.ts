@@ -28,7 +28,6 @@ export {
   castProposalVoteAction,
   castSlotVoteAction,
   checkProposalConflictsAction,
-  cloneProposalAction,
   createDraftProposalAction,
   deleteProposalCommentAction,
   getProposalDetailAction,

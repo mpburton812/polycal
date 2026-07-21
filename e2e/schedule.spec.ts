@@ -43,10 +43,6 @@ test.describe("Schedule calendar", () => {
 
   test("shows resolved and proposed seed events for invitee", async ({ page }) => {
     await expect(page.getByRole("button", { name: /Yavin 4 victory celebration/i }).first()).toBeVisible();
-
-    await page.getByRole("button", { name: "Planning", exact: true }).click();
-    const drawer = page.locator(".MuiDrawer-paper");
-    await expect(drawer.getByText("Rescue Han from carbonite")).toBeVisible({ timeout: 15_000 });
   });
 
   test("opens proposal detail from calendar block", async ({ page }) => {
@@ -55,13 +51,6 @@ test.describe("Schedule calendar", () => {
     await expect(
       page.getByRole("dialog").getByRole("heading", { name: "Yavin 4 victory celebration" }),
     ).toBeVisible();
-  });
-
-  test("planning mode lists accessible proposals", async ({ page }) => {
-    await page.getByRole("button", { name: "Planning", exact: true }).click();
-    const drawer = page.locator(".MuiDrawer-paper");
-    await expect(drawer.getByText("Planning mode")).toBeVisible();
-    await expect(drawer.getByText("Jedi Council briefing")).toBeVisible({ timeout: 20_000 });
   });
 
   test("can jump to today", async ({ page }) => {

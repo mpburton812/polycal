@@ -39,7 +39,6 @@ export const draftProposalSchema = z.object({
   intentionalSolo: z.boolean().optional(),
   isPoll: z.boolean().optional(),
   isAllDay: z.boolean().optional(),
-  eventPrivacy: z.enum(["open", "private", "super_private"]).optional(),
   invitees: z.array(inviteeInputSchema).optional(),
   timeSlots: z.array(timeSlotInputSchema).max(10).optional(),
   isRecurring: z.boolean().optional(),

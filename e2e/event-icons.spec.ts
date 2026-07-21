@@ -40,8 +40,8 @@ test.describe("Event category icons (PC-116)", () => {
     await expect(detail.getByRole("img", { name: "Food and pizza event" })).toBeVisible();
   });
 
-  test("clone copies event icon into edit draft", async ({ page }) => {
-    const title = `Clone icon ${Date.now()}`;
+  test("re-draft keeps event icon on the returned draft", async ({ page }) => {
+    const title = `Redraft icon ${Date.now()}`;
     const { start, end } = oneHourEventWindow(41, 10);
 
     const dialog = await openEventProposalDraft(page);
@@ -57,10 +57,11 @@ test.describe("Event category icons (PC-116)", () => {
     await proposalCard(page, title).click();
 
     const detail = page.getByRole("dialog");
-    await detail.getByRole("button", { name: "Clone" }).click();
+    page.once("dialog", (confirmDialog) => confirmDialog.accept());
+    await detail.getByRole("button", { name: "Re-draft" }).click();
 
     const draft = page.getByRole("dialog");
-    await expect(draft.getByLabel("Title")).toHaveValue(`${title} (copy)`, { timeout: 15_000 });
+    await expect(draft.getByLabel("Title")).toHaveValue(title, { timeout: 15_000 });
     await expandDraftMoreOptions(draft);
     await expect(draft.getByRole("button", { name: "Gaming event" })).toHaveAttribute(
       "aria-pressed",

@@ -16,28 +16,11 @@ import {
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
-import {
-  getPolyGroupSettingsAction,
-  proposeGroupNameChangeAction,
-  updatePolyGroupSettingsAction,
-} from "@/actions/poly-group";
+import { getPolyGroupSettingsAction, updatePolyGroupSettingsAction } from "@/actions/poly-group";
 import { AdminCollapsibleSection } from "@/components/admin/AdminCollapsibleSection";
 import { LONG_TEXT_MAX } from "@/lib/validation/string-limits";
 import type { PolyGroupSettings } from "@/types/poly-group";
-import {
-  auditLogVisibilityLevels,
-  groupNameChangeModes,
-  placesMapVisibilityLevels,
-  powerManagementModes,
-  sleepingNetworkVisibilityLevels,
-} from "@/types/poly-group";
-
-const GROUP_NAME_LABELS: Record<string, string> = {
-  admin_only: "Admin only",
-  mandatory_consensus: "Mandatory consensus",
-  plurality: "Plurality of users",
-  auto: "No votes required (automatic)",
-};
+import { auditLogVisibilityLevels, placesMapVisibilityLevels } from "@/types/poly-group";
 
 const AUDIT_LABELS: Record<string, string> = {
   everyone: "Everyone",
@@ -52,11 +35,6 @@ const MAP_VISIBILITY_LABELS: Record<string, string> = {
   none: "Hidden",
 };
 
-const SLEEPING_NETWORK_LABELS: Record<string, string> = {
-  everyone: "Visible to whole network (subject to private/super-private)",
-  involved: "Only people involved (proposer, invitees, admins)",
-};
-
 /**
  * Poly group settings editor for the Admin tab (PC-30).
  */
@@ -69,11 +47,7 @@ export function AdminPolyGroupSettingsPanel({
   const [settings, setSettings] = useState(initialSettings);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [proposedName, setProposedName] = useState("");
-  const [proposalMessage, setProposalMessage] = useState<string | null>(null);
-  // Separate transitions so Save's router.refresh() does not keep Propose disabled (PC-252 e2e).
   const [savePending, startSaveTransition] = useTransition();
-  const [proposePending, startProposeTransition] = useTransition();
 
   function save() {
     setMessage(null);
@@ -89,24 +63,6 @@ export function AdminPolyGroupSettingsPanel({
     });
   }
 
-  function proposeNameChange() {
-    setProposalMessage(null);
-    setError(null);
-    startProposeTransition(async () => {
-      const result = await proposeGroupNameChangeAction({ proposedName });
-      if (!result.ok) {
-        setError(result.message);
-        return;
-      }
-      setProposalMessage(result.message);
-      setProposedName("");
-      if (result.proposalId) {
-        router.push(`/proposals?open=${encodeURIComponent(result.proposalId)}`);
-      }
-      router.refresh();
-    });
-  }
-
   return (
     <AdminCollapsibleSection title="Poly group settings">
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
@@ -118,132 +74,6 @@ export function AdminPolyGroupSettingsPanel({
           onChange={(e) => setSettings({ ...settings, name: e.target.value })}
           fullWidth
           inputProps={{ maxLength: LONG_TEXT_MAX }}
-          helperText={
-            settings.allowGroupNameProposals
-              ? "Direct saves update immediately; use “Propose name change” for consensus workflow."
-              : undefined
-          }
-        />
-        {settings.allowGroupNameProposals && (
-          <Stack direction="row" spacing={2} alignItems="flex-start">
-            <TextField
-              label="Proposed new name"
-              value={proposedName}
-              onChange={(e) => setProposedName(e.target.value)}
-              fullWidth
-              inputProps={{ maxLength: LONG_TEXT_MAX }}
-            />
-            <Button
-              variant="outlined"
-              onClick={proposeNameChange}
-              disabled={proposePending || !proposedName.trim()}
-            >
-              Propose name change (draft)
-            </Button>
-          </Stack>
-        )}
-        {proposalMessage && <Alert severity="success">{proposalMessage}</Alert>}
-        <FormControlLabel
-          control={
-            <Switch
-              checked={settings.allowGroupNameProposals}
-              onChange={(e) =>
-                setSettings({ ...settings, allowGroupNameProposals: e.target.checked })
-              }
-            />
-          }
-          label="Allow proposals to change group name"
-        />
-        <FormControl fullWidth>
-          <InputLabel>Group name change mode</InputLabel>
-          <Select
-            label="Group name change mode"
-            value={settings.groupNameChangeMode}
-            onChange={(e) =>
-              setSettings({
-                ...settings,
-                groupNameChangeMode: e.target.value as PolyGroupSettings["groupNameChangeMode"],
-              })
-            }
-          >
-            {groupNameChangeModes.map((mode) => (
-              <MenuItem key={mode} value={mode}>
-                {GROUP_NAME_LABELS[mode] ?? mode}
-              </MenuItem>
-            ))}
-          </Select>
-        </FormControl>
-        <FormControl fullWidth>
-          <InputLabel>Power management</InputLabel>
-          <Select
-            label="Power management"
-            value={settings.powerManagementMode}
-            onChange={(e) =>
-              setSettings({
-                ...settings,
-                powerManagementMode: e.target.value as PolyGroupSettings["powerManagementMode"],
-              })
-            }
-          >
-            <MenuItem value="admin_user">Admin / user levels</MenuItem>
-            <MenuItem value="all_admin">All users as administrators</MenuItem>
-          </Select>
-        </FormControl>
-        <Typography variant="subtitle2">Event privacy types</Typography>
-        <FormControlLabel
-          control={
-            <Switch
-              checked={settings.eventPrivacyOpen}
-              onChange={(e) =>
-                setSettings({ ...settings, eventPrivacyOpen: e.target.checked })
-              }
-            />
-          }
-          label="Open (default)"
-        />
-        <FormControlLabel
-          control={
-            <Switch
-              checked={settings.eventPrivacyPrivate}
-              onChange={(e) =>
-                setSettings({ ...settings, eventPrivacyPrivate: e.target.checked })
-              }
-            />
-          }
-          label="Private"
-        />
-        <FormControlLabel
-          control={
-            <Switch
-              checked={settings.eventPrivacySuperPrivate}
-              onChange={(e) =>
-                setSettings({ ...settings, eventPrivacySuperPrivate: e.target.checked })
-              }
-            />
-          }
-          label="Super private"
-        />
-        <FormControlLabel
-          control={
-            <Switch
-              checked={settings.adminCanSeePrivate}
-              onChange={(e) =>
-                setSettings({ ...settings, adminCanSeePrivate: e.target.checked })
-              }
-            />
-          }
-          label="Admins can interact with private events"
-        />
-        <FormControlLabel
-          control={
-            <Switch
-              checked={settings.adminCanSeeSuperPrivate}
-              onChange={(e) =>
-                setSettings({ ...settings, adminCanSeeSuperPrivate: e.target.checked })
-              }
-            />
-          }
-          label="Admins can interact with super-private events"
         />
         <FormControlLabel
           control={
@@ -297,26 +127,6 @@ export function AdminPolyGroupSettingsPanel({
           }
           label="Hide sleeping arrangements from non-sleeping partners on calendar"
         />
-        <FormControl fullWidth>
-          <InputLabel>Sleeping proposals network visibility</InputLabel>
-          <Select
-            label="Sleeping proposals network visibility"
-            value={settings.sleepingNetworkVisibility}
-            onChange={(e) =>
-              setSettings({
-                ...settings,
-                sleepingNetworkVisibility:
-                  e.target.value as PolyGroupSettings["sleepingNetworkVisibility"],
-              })
-            }
-          >
-            {sleepingNetworkVisibilityLevels.map((level) => (
-              <MenuItem key={level} value={level}>
-                {SLEEPING_NETWORK_LABELS[level] ?? level}
-              </MenuItem>
-            ))}
-          </Select>
-        </FormControl>
         <FormControl fullWidth>
           <InputLabel>Sleeping Partners tab visibility</InputLabel>
           <Select
