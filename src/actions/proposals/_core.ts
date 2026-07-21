@@ -271,7 +271,7 @@ function requiredCompletedPollMatrix(
   });
 }
 
-import { optionalPollVotesPending } from "@/lib/proposals/poll-utils";
+import { optionalInviteeVotesPending } from "@/lib/proposals/poll-utils";
 function advanceOccurrenceDate(date: Date, pattern: RecurrencePattern, interval: number): Date {
   const next = new Date(date);
   switch (pattern) {
@@ -1083,22 +1083,23 @@ async function resolveProposal(
   for (const userId of notifyIds) {
     const invitee = invitees.find((row) => row.userId === userId);
     const optionalStillVoting =
-      pollMatrix &&
-      invitee?.role === "optional" &&
-      invitee.voteStatus === "not_seen";
+      invitee?.role === "optional" && invitee.voteStatus === "not_seen";
     let message: string;
     if (specialKind === "residency") {
       message = `Residency proposal "${proposal.title}" was accepted.`;
     } else if (specialKind === "group_name") {
       message = `Group rename proposal "${proposal.title}" was approved.`;
     } else if (optionalStillVoting) {
-      message = `Proposal "${proposal.title}" was approved by all required attendees and scheduled. Please complete your poll votes.`;
+      message = pollMatrix
+        ? `Proposal "${proposal.title}" was approved by all required attendees and scheduled. Please complete your poll votes.`
+        : `Proposal "${proposal.title}" was approved by all required attendees and scheduled. Please Accept or Decline.`;
     } else {
       message = `Proposal "${proposal.title}" was approved and scheduled.`;
     }
     await notifyUser(userId, "proposal_resolved", message, {
       proposalId: proposal.id,
       proposalType: proposal.proposalType,
+      ...(optionalStillVoting ? { action: "vote" } : {}),
     });
   }
 
@@ -2461,8 +2462,8 @@ export async function getProposalDetailAction(
       )
     : false;
 
-  const optionalPollPending = optionalPollVotesPending(row, viewerInvitee, slotRows.length);
-  const displayState: ProposalState = optionalPollPending ? "proposed" : row.state;
+  const optionalRsvpPending = optionalInviteeVotesPending(row, viewerInvitee);
+  const displayState: ProposalState = optionalRsvpPending ? "proposed" : row.state;
   const batchEntries = masked ? [] : parseBatchEntriesJson(row.batchEntriesJson);
   const batchLocationIds = [
     ...new Set(
@@ -2662,7 +2663,7 @@ export async function getProposalDetailAction(
       viewerSlotVotes: masked ? {} : viewerSlotVotes,
       hasOverlapWarning,
       canAcknowledgeOverlap: hasOverlapWarning,
-      optionalPollPending,
+      optionalRsvpPending,
       displayState,
       reminderOffsetMinutes: row.reminderOffsetMinutes ?? null,
       eventIconKey:
