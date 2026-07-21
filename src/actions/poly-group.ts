@@ -1,7 +1,6 @@
 "use server";
 
-import { randomUUID } from "node:crypto";
-import { and, eq, ne } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
@@ -9,15 +8,11 @@ import { auth } from "@/lib/auth";
 import { logUserActivity } from "@/lib/audit";
 import { getDb } from "@/lib/db/client";
 import { ensureDbReady } from "@/lib/db/ensure-ready";
-import { polyGroup, proposalInvitees, proposalStateLog, proposals, users } from "@/lib/db/schema";
-import { serializeGroupNameProposalMeta } from "@/lib/proposals/special-proposals";
+import { polyGroup } from "@/lib/db/schema";
 import {
   DEFAULT_ONBOARDING_WELCOME_MESSAGE,
   auditLogVisibilityLevels,
-  groupNameChangeModes,
   placesMapVisibilityLevels,
-  powerManagementModes,
-  sleepingNetworkVisibilityLevels,
   type PlacesMapVisibility,
   type PolyGroupSettings,
 } from "@/types/poly-group";
@@ -36,19 +31,10 @@ export interface PolyGroupActionResult {
 
 const settingsSchema = z.object({
   name: requiredLimitedString("Poly group name", LONG_TEXT_MAX),
-  allowGroupNameProposals: z.boolean(),
-  groupNameChangeMode: z.enum(groupNameChangeModes),
-  powerManagementMode: z.enum(powerManagementModes),
-  eventPrivacyOpen: z.boolean(),
-  eventPrivacyPrivate: z.boolean(),
-  eventPrivacySuperPrivate: z.boolean(),
-  adminCanSeePrivate: z.boolean(),
-  adminCanSeeSuperPrivate: z.boolean(),
   adminCanSeeUninvolved: z.boolean(),
   auditLogVisibility: z.enum(auditLogVisibilityLevels),
   allowUserProvisioning: z.boolean(),
   hideSleepingArrangements: z.boolean(),
-  sleepingNetworkVisibility: z.enum(sleepingNetworkVisibilityLevels),
   placesMapVisibility: z.enum(placesMapVisibilityLevels),
   logTailLength: z.number().int().min(0).max(1000),
   onboardingWelcomeMessage: z
@@ -66,20 +52,10 @@ const settingsSchema = z.object({
 function rowToSettings(row: typeof polyGroup.$inferSelect): PolyGroupSettings {
   return {
     name: row.name,
-    allowGroupNameProposals: row.allowGroupNameProposals,
-    groupNameChangeMode: row.groupNameChangeMode as PolyGroupSettings["groupNameChangeMode"],
-    powerManagementMode: row.powerManagementMode as PolyGroupSettings["powerManagementMode"],
-    eventPrivacyOpen: row.eventPrivacyOpen,
-    eventPrivacyPrivate: row.eventPrivacyPrivate,
-    eventPrivacySuperPrivate: row.eventPrivacySuperPrivate,
-    adminCanSeePrivate: row.adminCanSeePrivate,
-    adminCanSeeSuperPrivate: row.adminCanSeeSuperPrivate,
     adminCanSeeUninvolved: row.adminCanSeeUninvolved ?? true,
     auditLogVisibility: row.auditLogVisibility as PolyGroupSettings["auditLogVisibility"],
     allowUserProvisioning: row.allowUserProvisioning,
     hideSleepingArrangements: row.hideSleepingArrangements,
-    sleepingNetworkVisibility:
-      row.sleepingNetworkVisibility === "involved" ? "involved" : "everyone",
     placesMapVisibility:
       (row.placesMapVisibility as PolyGroupSettings["placesMapVisibility"]) ?? "all",
     logTailLength: row.logTailLength,
@@ -129,42 +105,9 @@ export async function getPolyGroupSettingsAction(): Promise<PolyGroupSettings | 
   return rowToSettings(row);
 }
 
-export interface EventPrivacyAvailability {
-  open: boolean;
-  private: boolean;
-  superPrivate: boolean;
-}
-
 /**
- * Returns which event privacy levels are enabled for new proposals (any signed-in user) (PC-134).
- */
-export async function getEventPrivacyAvailabilityAction(): Promise<EventPrivacyAvailability> {
-  const session = await auth();
-  if (!session?.user) {
-    return { open: true, private: false, superPrivate: false };
-  }
-
-  await ensureDbReady();
-  const db = getDb();
-  const [row] = await db
-    .select({
-      eventPrivacyOpen: polyGroup.eventPrivacyOpen,
-      eventPrivacyPrivate: polyGroup.eventPrivacyPrivate,
-      eventPrivacySuperPrivate: polyGroup.eventPrivacySuperPrivate,
-    })
-    .from(polyGroup)
-    .where(eq(polyGroup.id, 1))
-    .limit(1);
-
-  return {
-    open: row?.eventPrivacyOpen ?? true,
-    private: row?.eventPrivacyPrivate ?? true,
-    superPrivate: row?.eventPrivacySuperPrivate ?? true,
-  };
-}
-
-/**
- * Persists poly group settings and applies power-management role overrides (PC-30).
+ * Persists poly group settings (PC-30). Power management and event privacy levels
+ * were removed (PC-280) — every group is admin_user mode and every proposal is open.
  */
 export async function updatePolyGroupSettingsAction(
   input: PolyGroupSettings,
@@ -187,69 +130,15 @@ export async function updatePolyGroupSettingsAction(
   }
 
   const now = new Date().toISOString();
-  let roleSnapshotsJson = current.roleSnapshotsJson;
-
-  if (
-    parsed.data.powerManagementMode === "all_admin" &&
-    current.powerManagementMode !== "all_admin"
-  ) {
-    const allUsers = await db
-      .select({ id: users.id, role: users.role })
-      .from(users)
-      .where(eq(users.status, "active"));
-    roleSnapshotsJson = JSON.stringify(
-      Object.fromEntries(allUsers.map((u) => [u.id, u.role])),
-    );
-    for (const user of allUsers) {
-      if (user.role !== "admin") {
-        await db
-          .update(users)
-          .set({ role: "admin", updatedAt: now })
-          .where(eq(users.id, user.id));
-      }
-    }
-  }
-
-  if (
-    parsed.data.powerManagementMode === "admin_user" &&
-    current.powerManagementMode === "all_admin" &&
-    roleSnapshotsJson
-  ) {
-    try {
-      const snapshots = JSON.parse(roleSnapshotsJson) as Record<string, string>;
-      for (const [userId, role] of Object.entries(snapshots)) {
-        await db
-          .update(users)
-          .set({
-            role: role === "admin" ? "admin" : "user",
-            updatedAt: now,
-          })
-          .where(eq(users.id, userId));
-      }
-    } catch {
-      /* ignore corrupt snapshot */
-    }
-    roleSnapshotsJson = null;
-  }
 
   await db
     .update(polyGroup)
     .set({
       name: parsed.data.name,
-      allowGroupNameProposals: parsed.data.allowGroupNameProposals,
-      groupNameChangeMode: parsed.data.groupNameChangeMode,
-      powerManagementMode: parsed.data.powerManagementMode,
-      roleSnapshotsJson,
-      eventPrivacyOpen: parsed.data.eventPrivacyOpen,
-      eventPrivacyPrivate: parsed.data.eventPrivacyPrivate,
-      eventPrivacySuperPrivate: parsed.data.eventPrivacySuperPrivate,
-      adminCanSeePrivate: parsed.data.adminCanSeePrivate,
-      adminCanSeeSuperPrivate: parsed.data.adminCanSeeSuperPrivate,
       adminCanSeeUninvolved: parsed.data.adminCanSeeUninvolved,
       auditLogVisibility: parsed.data.auditLogVisibility,
       allowUserProvisioning: parsed.data.allowUserProvisioning,
       hideSleepingArrangements: parsed.data.hideSleepingArrangements,
-      sleepingNetworkVisibility: parsed.data.sleepingNetworkVisibility,
       placesMapVisibility: parsed.data.placesMapVisibility,
       logTailLength: parsed.data.logTailLength,
       onboardingWelcomeMessage: parsed.data.onboardingWelcomeMessage,
@@ -275,109 +164,6 @@ export async function updatePolyGroupSettingsAction(
   revalidatePath("/proposals");
   revalidatePath("/schedule");
   return { ok: true, message: "Poly group settings saved." };
-}
-
-const groupNameProposalSchema = z.object({
-  proposedName: requiredLimitedString("Proposed name", LONG_TEXT_MAX),
-});
-
-/**
- * Creates a draft group name change proposal when enabled (PC-45/PC-60).
- */
-export async function proposeGroupNameChangeAction(
-  input: z.infer<typeof groupNameProposalSchema>,
-): Promise<PolyGroupActionResult & { proposalId?: string }> {
-  const session = await requireAdmin();
-  if (!session) {
-    return { ok: false, message: "Admin access required." };
-  }
-
-  const parsed = groupNameProposalSchema.safeParse(input);
-  if (!parsed.success) {
-    return { ok: false, message: parsed.error.issues[0]?.message ?? "Invalid name." };
-  }
-
-  await ensureDbReady();
-  const db = getDb();
-  const [group] = await db.select().from(polyGroup).where(eq(polyGroup.id, 1)).limit(1);
-  if (!group?.allowGroupNameProposals) {
-    return { ok: false, message: "Group name proposals are disabled." };
-  }
-
-  if (group.groupNameChangeMode === "admin_only" && session.user.role !== "admin") {
-    return { ok: false, message: "Only admins may propose group name changes in admin-only mode." };
-  }
-
-  if (parsed.data.proposedName === group.name) {
-    return { ok: false, message: "Proposed name matches the current name." };
-  }
-
-  const inviteeFilter =
-    group.groupNameChangeMode === "mandatory_consensus" ||
-    group.groupNameChangeMode === "plurality"
-      ? and(eq(users.status, "active"), ne(users.role, "passive"))
-      : and(eq(users.status, "active"), ne(users.role, "passive"));
-
-  const activeUsers = await db
-    .select({ id: users.id })
-    .from(users)
-    .where(inviteeFilter);
-
-  const now = new Date().toISOString();
-  const proposalId = `prop-${randomUUID()}`;
-  const title = `Rename group to "${parsed.data.proposedName}"`;
-
-  await db.insert(proposals).values({
-    id: proposalId,
-    title,
-    description: serializeGroupNameProposalMeta({
-      groupNameProposal: true,
-      proposedName: parsed.data.proposedName,
-      previousName: group.name,
-    }),
-    proposalType: "event",
-    state: "draft",
-    proposerId: session.user.id,
-    eventPrivacy: "open",
-    createdAt: now,
-    updatedAt: now,
-  });
-
-  for (const user of activeUsers) {
-    if (user.id === session.user.id) continue;
-    await db.insert(proposalInvitees).values({
-      id: `pi-${randomUUID()}`,
-      proposalId,
-      userId: user.id,
-      role: "required",
-      voteStatus: "not_seen",
-      createdAt: now,
-    });
-  }
-
-  await db.insert(proposalStateLog).values({
-    id: `psl-${randomUUID()}`,
-    proposalId,
-    actorUserId: session.user.id,
-    action: "draft.created",
-    details: JSON.stringify({ kind: "group_name", proposedName: parsed.data.proposedName }),
-    createdAt: now,
-  });
-
-  await logUserActivity(
-    session.user.id,
-    "admin.group_name_proposal",
-    JSON.stringify({ proposalId, proposedName: parsed.data.proposedName, state: "draft" }),
-    "system",
-  );
-
-  revalidatePath("/admin");
-  revalidatePath("/proposals");
-  return {
-    ok: true,
-    message: "Group name change saved as draft. Submit from Proposals when ready.",
-    proposalId,
-  };
 }
 
 /**

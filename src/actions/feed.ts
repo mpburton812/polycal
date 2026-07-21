@@ -56,11 +56,7 @@ import { buildFeedUpdateToken } from "@/lib/feed/update-token";
 import { isFeedMilestoneVisibleViaAdminOnly } from "@/lib/feed/admin-only-visibility";
 import { notifyUser } from "@/lib/notifications";
 import {
-  applyProposalMask,
   getAdminCanSeeUninvolved,
-  getPrivacyAdminFlags,
-  getSleepingNetworkVisibility,
-  shouldMaskProposalContent,
   viewerCanSeeAuditLog,
   viewerCanSeeProposalWithSleepingGate,
 } from "@/lib/proposals/access";
@@ -385,8 +381,6 @@ async function loadMilestoneBatch(
   partnerIds: ReadonlySet<string>,
 ): Promise<FeedItem[]> {
   {
-    const privacyFlags = await getPrivacyAdminFlags(db);
-    const sleepingNetworkVisibility = await getSleepingNetworkVisibility(db);
     const adminCanSeeUninvolved = await getAdminCanSeeUninvolved(db);
     const [group] = await db
       .select({ auditLogVisibility: polyGroup.auditLogVisibility })
@@ -417,7 +411,6 @@ async function loadMilestoneBatch(
         description: proposals.description,
         proposalType: proposals.proposalType,
         state: proposals.state,
-        eventPrivacy: proposals.eventPrivacy,
         proposerId: proposals.proposerId,
         scheduledStartAt: proposals.scheduledStartAt,
         scheduledEndAt: proposals.scheduledEndAt,
@@ -455,9 +448,7 @@ async function loadMilestoneBatch(
       const inviteeUserIds = inviteesByProposal.get(row.proposalId) ?? [];
       const gateOptions = {
         proposalType: row.proposalType,
-        sleepingNetworkVisibility,
         state: row.state,
-        eventPrivacy: row.eventPrivacy,
         adminCanSeeUninvolved,
       };
       if (
@@ -496,27 +487,9 @@ async function loadMilestoneBatch(
         ),
       });
 
-      const masked = shouldMaskProposalContent(
-        viewerId,
-        isAdmin,
-        row.proposerId,
-        inviteeUserIds,
-        row.eventPrivacy,
-        privacyFlags.adminCanSeePrivate,
-        privacyFlags.adminCanSeeSuperPrivate,
-        row.state,
-      );
-
-      const display = applyProposalMask(
-        {
-          title: row.title,
-          description: row.description,
-          locationName: null,
-          scheduledStartAt: row.scheduledStartAt,
-          scheduledEndAt: row.scheduledEndAt,
-        },
-        masked,
-      );
+      // Privacy-level masking was removed (PC-280) — all proposals are "open".
+      const masked = false;
+      const display = { title: row.title };
 
       const headline = formatProposalLogLine({
         action: row.action,
@@ -539,11 +512,6 @@ async function loadMilestoneBatch(
         masked,
         visibleViaAdminOnly,
         canComment: canCommentOnProposal({
-          viewerId,
-          isAdmin,
-          proposerId: row.proposerId,
-          inviteeUserIds,
-          eventPrivacy: row.eventPrivacy,
           state: row.state,
           isContentMasked: masked,
         }),

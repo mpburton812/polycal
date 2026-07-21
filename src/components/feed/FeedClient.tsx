@@ -50,7 +50,6 @@ import { buildFeedUpdateToken } from "@/lib/feed/update-token";
 import type { ChangelogEntry } from "@/lib/changelog/entries";
 import type { BuildInfo } from "@/lib/env";
 import { LONG_TEXT_MAX } from "@/lib/validation/string-limits";
-import { handleCommentEnterKey } from "@/lib/ui/comment-keydown";
 import { brutalPageTitleSx } from "@/theme/brutalUi";
 import { GARDEN_TOKENS } from "@/theme/tokens";
 
@@ -888,19 +887,12 @@ export function FeedClient({
                   fullWidth
                   size="small"
                   multiline
-                  minRows={1}
+                  minRows={2}
                   maxRows={3}
                   placeholder="Comment on this milestone…"
                   value={commentDrafts[draftKey] ?? ""}
                   onChange={(e) =>
                     setCommentDrafts((prev) => ({ ...prev, [draftKey]: e.target.value }))
-                  }
-                  onKeyDown={(e) =>
-                    handleCommentEnterKey(
-                      e,
-                      () => postMilestoneComment(item.proposalId, draftKey),
-                      !pending,
-                    )
                   }
                   inputProps={{ maxLength: LONG_TEXT_MAX }}
                   InputProps={{
@@ -1038,15 +1030,12 @@ export function FeedClient({
             fullWidth
             size="small"
             multiline
-            minRows={1}
+            minRows={2}
             maxRows={3}
             placeholder="Reply…"
             value={commentDrafts[`chat-${item.id}`] ?? ""}
             onChange={(e) =>
               setCommentDrafts((prev) => ({ ...prev, [`chat-${item.id}`]: e.target.value }))
-            }
-            onKeyDown={(e) =>
-              handleCommentEnterKey(e, () => postChatComment(item.id), !pending)
             }
             inputProps={{ maxLength: LONG_TEXT_MAX }}
             InputProps={{
@@ -1079,9 +1068,6 @@ export function FeedClient({
         </Typography>
         <FeedControlsButton onOpen={() => setControlsOpen(true)} />
       </Stack>
-      <Typography sx={{ mb: 2, color: GARDEN_TOKENS.inkMuted }}>
-        Proposal milestones and network chat in one timeline.
-      </Typography>
 
       <FeedControlsDrawer
         open={controlsOpen}
@@ -1178,12 +1164,11 @@ export function FeedClient({
           <TextField
             fullWidth
             multiline
-            minRows={1}
+            minRows={2}
             maxRows={4}
             label="Message the network"
             value={chatDraft}
             onChange={(e) => setChatDraft(e.target.value)}
-            onKeyDown={(e) => handleCommentEnterKey(e, sendChat, !pending && !sending)}
             inputProps={{ maxLength: LONG_TEXT_MAX }}
           />
           <Button

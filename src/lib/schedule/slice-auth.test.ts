@@ -39,15 +39,10 @@ describe("slice-auth", () => {
   it("masks sleeping for non-participants when hideSleeping is enabled", () => {
     const result = applyScheduleMasking({
       viewerId: "viewer-1",
-      isAdmin: false,
       proposerId: "proposer-1",
       inviteeUserIds: ["invitee-1"],
-      eventPrivacy: "open",
-      proposalState: "resolved",
       proposalType: "sleeping",
       privacyFlags: {
-        adminCanSeePrivate: false,
-        adminCanSeeSuperPrivate: false,
         hideSleeping: true,
       },
       acceptedPartnerIds: new Set(),
@@ -58,11 +53,6 @@ describe("slice-auth", () => {
 
   it("does not allow comments on archived proposals", () => {
     const allowed = canCommentOnProposal({
-      viewerId: "user-1",
-      isAdmin: false,
-      proposerId: "user-1",
-      inviteeUserIds: [],
-      eventPrivacy: "open",
       state: "archived",
       isContentMasked: false,
     });

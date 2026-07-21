@@ -262,3 +262,5 @@
 2026-07-20 | 5eaed09 | PC-277 | enlarge like bird to 3x prior size | src/components/feed/feedIconSizes.test.ts
 2026-07-21 | b20413e | PC-278 | keep optional invitees visible after resolve | src/actions/proposals/_core.ts
 2026-07-21 | b544c2c | PC-279 | Facebook-style URL link previews | src/actions/feed.ts
+2026-07-21 | e730a3c | PC-280 | cleanup batch — removals, privacy purge, sleeping fixes | src/actions/feed.ts
+2026-07-21 | b7ef68d | PC-280 | drop tab blurb assert; sleeping archive is involved-only | e2e/admin-schedule.spec.ts

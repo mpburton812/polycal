@@ -1,8 +1,4 @@
-import type { EventPrivacyLevel, ProposalState } from "@/lib/db/schema";
-import {
-  getPrivacyAdminFlags,
-  shouldMaskProposalContent,
-} from "@/lib/proposals/access";
+import type { ProposalState } from "@/lib/db/schema";
 import {
   allDayBoundsForDateKey,
   expandAllDayDateKeys,
@@ -27,35 +23,21 @@ export interface SliceMembershipSlot {
 
 export interface ScheduleMaskingInput {
   viewerId: string;
-  isAdmin: boolean;
   proposerId: string;
   inviteeUserIds: string[];
-  eventPrivacy: EventPrivacyLevel;
-  proposalState: ProposalState;
   proposalType: "event" | "sleeping";
-  privacyFlags: Awaited<ReturnType<typeof getPrivacyAdminFlags>> & { hideSleeping: boolean };
+  privacyFlags: { hideSleeping: boolean };
   acceptedPartnerIds: Set<string>;
 }
 
 /**
- * Unified privacy + sleeping-arrangement masking for schedule and slice surfaces.
+ * Sleeping-arrangement masking for schedule and slice surfaces (event/super-private
+ * masking was removed with PC-280 — proposals are always "open").
  */
 export function applyScheduleMasking(input: ScheduleMaskingInput): {
-  privacyMasked: boolean;
   sleepingMasked: boolean;
   isContentMasked: boolean;
 } {
-  const privacyMasked = shouldMaskProposalContent(
-    input.viewerId,
-    input.isAdmin,
-    input.proposerId,
-    input.inviteeUserIds,
-    input.eventPrivacy,
-    input.privacyFlags.adminCanSeePrivate,
-    input.privacyFlags.adminCanSeeSuperPrivate,
-    input.proposalState,
-  );
-
   const sleepingMasked =
     input.proposalType === "sleeping" &&
     shouldMaskSleepingForViewer(
@@ -67,9 +49,8 @@ export function applyScheduleMasking(input: ScheduleMaskingInput): {
     );
 
   return {
-    privacyMasked,
     sleepingMasked,
-    isContentMasked: privacyMasked || sleepingMasked,
+    isContentMasked: sleepingMasked,
   };
 }
 
@@ -148,24 +129,16 @@ export function validateSliceMembership(
 
 /**
  * Single source for comment permission on proposals and slice detail UI.
+ * All proposals are "open" (privacy levels removed PC-280), so any viewer who can
+ * see a non-masked, non-draft/archived proposal may comment on it.
  */
 export function canCommentOnProposal(input: {
-  viewerId: string;
-  isAdmin: boolean;
-  proposerId: string;
-  inviteeUserIds: string[];
-  eventPrivacy: EventPrivacyLevel;
   state: ProposalState;
   isContentMasked: boolean;
 }): boolean {
   if (input.isContentMasked) return false;
   if (input.state === "draft" || input.state === "archived") return false;
-  return (
-    input.proposerId === input.viewerId ||
-    input.isAdmin ||
-    input.inviteeUserIds.includes(input.viewerId) ||
-    input.eventPrivacy === "open"
-  );
+  return true;
 }
 
 const SLICE_TAG_PATTERN = /^(slot:[\w-]+|day:\d{4}-\d{2}-\d{2})$/;

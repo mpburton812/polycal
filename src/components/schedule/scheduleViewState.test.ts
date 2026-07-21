@@ -25,7 +25,6 @@ describe("scheduleViewState period mode", () => {
       compact: false,
       filterMode: "whole" as const,
       filterPersonId: "",
-      planningOpen: false,
     };
     expect(applyPeriodMode(base, "twoWeek").compact).toBe(true);
     expect(applyPeriodMode(base, "month").calendarLayout).toBe("month");
@@ -56,7 +55,6 @@ describe("schedule URL helpers", () => {
         compact: true,
         filterMode: "whole",
         filterPersonId: "",
-        planningOpen: false,
       },
       "abc",
     );
@@ -73,7 +71,6 @@ describe("schedule URL helpers", () => {
       compact: false,
       filterMode: "whole",
       filterPersonId: "",
-      planningOpen: false,
     });
     expect(search).toContain("layout=day");
   });

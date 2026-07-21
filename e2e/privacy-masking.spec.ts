@@ -6,25 +6,37 @@ import { fillProposalDateTimeField } from "./helpers/datePickers";
 import { goToProposals, selectProposalTab } from "./helpers/navigation";
 import { expandDraftMoreOptions, openEventProposalDraft, proposalCard, submitProposalDraft } from "./helpers/proposals";
 
-test.describe("Privacy masking", () => {
-  test("admin without private visibility sees masked resolved private event", async ({ page }) => {
-    test.setTimeout(180_000);
+/**
+ * Privacy levels (open/private/super_private) were removed for PC-280 — every
+ * proposal is always "open" and content is never masked by privacy setting.
+ */
+test.describe("Privacy removal (PC-280)", () => {
+  test("no Privacy control appears when drafting an event", async ({ page }) => {
+    await loginWithOnboardingIfNeeded(page, USERS.han.username);
+    await goToProposals(page);
 
-    const title = `Private mask ${Date.now()}`;
+    const dialog = await openEventProposalDraft(page);
+    await expandDraftMoreOptions(dialog);
+    await expect(dialog.getByLabel("Privacy")).toHaveCount(0);
+    await expect(dialog.getByText("Private", { exact: true })).toHaveCount(0);
+    await expect(dialog.getByText("Super private", { exact: true })).toHaveCount(0);
+  });
+
+  test("resolved event is fully visible to a non-invitee (no masking)", async ({ page }) => {
+    test.setTimeout(120_000);
+
+    const title = `Open event ${Date.now()}`;
 
     await loginWithOnboardingIfNeeded(page, USERS.han.username);
     await goToProposals(page);
 
     const dialog = await openEventProposalDraft(page);
     await dialog.getByLabel("Title").fill(title);
-    await expandDraftMoreOptions(dialog);
-    await dialog.getByLabel("Privacy").click();
-    await page.getByRole("option", { name: "Private", exact: true }).click();
     await dialog.getByRole("button", { name: "Solo event (just me)" }).click();
-    await fillProposalDateTimeField(dialog.getByLabel("Start").first(), "2099-09-01T19:00");
+    await fillProposalDateTimeField(dialog.getByLabel("Start").first(), "2099-09-02T19:00");
     await fillProposalDateTimeField(
       dialog.getByLabel("End (optional)").first(),
-      "2099-09-01T21:00",
+      "2099-09-02T21:00",
     );
     await submitProposalDraft(page, dialog);
     await logout(page);
@@ -33,8 +45,7 @@ test.describe("Privacy masking", () => {
     await goToProposals(page);
     await selectProposalTab(page, "Resolved");
 
-    const card = proposalCard(page, "Private event");
+    const card = proposalCard(page, title);
     await expect(card).toBeVisible({ timeout: 15_000 });
-    await expect(card).not.toContainText(title);
   });
 });

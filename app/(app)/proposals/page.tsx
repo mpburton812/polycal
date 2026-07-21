@@ -8,7 +8,6 @@ import { ProposalsClient } from "@/components/proposals/ProposalsClient";
 import { auth } from "@/lib/auth";
 import { userHasAdminAccess } from "@/lib/admin-access";
 import { brutalPageTitleSx } from "@/theme/brutalUi";
-import { GARDEN_TOKENS } from "@/theme/tokens";
 import type { UserRole } from "@/types/user";
 
 export default async function ProposalsPage() {
@@ -30,9 +29,6 @@ export default async function ProposalsPage() {
     <>
       <Typography variant="h5" component="h1" gutterBottom sx={brutalPageTitleSx}>
         Proposals
-      </Typography>
-      <Typography sx={{ mb: 3, color: GARDEN_TOKENS.inkMuted }}>
-        Draft, submit, vote, and resolve proposals. Click any card for details and actions.
       </Typography>
       <Suspense fallback={null}>
         <ProposalsClient

@@ -1,4 +1,5 @@
 /** Shared PolyCal proposal card palette and helpers — Garden Brutalism (PC-40). */
+import { sleepingCalendarDayEnd } from "@/lib/proposals/sleeping-schedule";
 import {
   EVENT_BLOCK_ROTATIONS,
   GARDEN_TOKENS,
@@ -71,18 +72,27 @@ export function formatDateRange(start: string | null, end: string | null): strin
 export function typeBadgeLabel(
   type: string,
   cardKind?: string,
-  specialKind?: "residency" | "group_name",
+  specialKind?: "residency",
 ): string {
   if (specialKind === "residency" || cardKind === "residency") return "RESIDENCY PROPOSAL";
-  if (specialKind === "group_name") return "GROUP RENAME";
   if (cardKind === "partnership") return "RELATIONSHIP PROPOSAL";
   return type === "sleeping" ? "SLEEPING PROPOSAL" : "EVENT PROPOSAL";
 }
 
-export function isPastSchedule(startIso: string | undefined): boolean {
+/**
+ * Sleeping nights are calendar-date-only — a night is only "past" once its whole
+ * calendar day has elapsed, not at its (often midnight) start timestamp (PC-280).
+ */
+export function isPastSchedule(
+  startIso: string | undefined,
+  proposalType: "event" | "sleeping" = "event",
+): boolean {
   if (!startIso) return false;
   const start = new Date(startIso);
-  return !Number.isNaN(start.getTime()) && start.getTime() < Date.now();
+  if (Number.isNaN(start.getTime())) return false;
+  const compareTime =
+    proposalType === "sleeping" ? sleepingCalendarDayEnd(startIso).getTime() : start.getTime();
+  return compareTime < Date.now();
 }
 
 /** Deterministic slight tilt for masonry proposal cards. */
@@ -126,7 +136,7 @@ export const brutalPressSx = {
 export function typeChipSxForProposal(
   proposalType: string,
   cardKind?: string,
-  specialKind?: "residency" | "group_name",
+  specialKind?: "residency",
 ) {
   if (specialKind === "residency" || cardKind === "residency" || cardKind === "partnership") {
     return {

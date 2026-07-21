@@ -12,7 +12,6 @@ import { CHANGELOG, getLatestChangelogEntry } from "@/lib/changelog/entries";
 import { isImpersonationConfigured } from "@/lib/auth/impersonation";
 import { getBuildInfo, isNonProductionEnvironment } from "@/lib/env";
 import { brutalPageTitleSx } from "@/theme/brutalUi";
-import { GARDEN_TOKENS } from "@/theme/tokens";
 
 function AdminPanelFallback() {
   return (
@@ -79,9 +78,6 @@ export default async function AdminPage() {
     <>
       <Typography variant="h5" component="h1" gutterBottom sx={brutalPageTitleSx}>
         Admin
-      </Typography>
-      <Typography sx={{ mb: 2, color: GARDEN_TOKENS.inkMuted }}>
-        Group settings, members, and environment controls.
       </Typography>
       <Stack spacing={3}>
         <AdminCodeStatusPanel

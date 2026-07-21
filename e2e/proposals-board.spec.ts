@@ -73,15 +73,16 @@ test.describe("Proposals visibility", () => {
     await expect(proposalCard(page, DEMO.proposedDeathStar)).toHaveCount(0);
   });
 
-  test("archived open proposals are visible to network members", async ({ page }) => {
+  test("archived sleeping proposals stay involved-only for network members", async ({ page }) => {
     await login(page, USERS.han.username);
     await goToProposals(page);
     await selectProposalTab(page, "Archived");
+    // PC-280: sleeping visibility is always involved — Han is not on this archived sleeping item.
     await expect(
       page.getByRole("heading", {
         level: 2,
         name: /Sleeping:.*Dagobah/i,
       }),
-    ).toBeVisible();
+    ).toHaveCount(0);
   });
 });

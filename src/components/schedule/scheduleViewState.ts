@@ -18,7 +18,6 @@ export interface ScheduleViewState {
   compact: boolean;
   filterMode: ScheduleFilterMode;
   filterPersonId: string;
-  planningOpen: boolean;
 }
 
 export function periodModeFromState(
@@ -56,7 +55,6 @@ const DEFAULT_STATE = (): ScheduleViewState => {
     compact: false,
     filterMode: "whole",
     filterPersonId: "",
-    planningOpen: false,
   };
 };
 
@@ -82,7 +80,6 @@ export function loadScheduleViewState(): ScheduleViewState {
       calendarLayout,
       filterMode: parsed.filterMode ?? defaults.filterMode,
       filterPersonId: parsed.filterPersonId ?? defaults.filterPersonId,
-      planningOpen: parsed.planningOpen ?? defaults.planningOpen,
       weekStartIso: parsed.weekStartIso ?? defaults.weekStartIso,
       monthAnchorIso: parsed.monthAnchorIso ?? defaults.monthAnchorIso,
     };
