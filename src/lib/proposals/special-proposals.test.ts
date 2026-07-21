@@ -3,7 +3,6 @@ import { describe, expect, it } from "vitest";
 import {
   getProposalSpecialKind,
   isNonScheduleProposal,
-  parseGroupNameProposalMeta,
   parseResidencyProposalMeta,
   proposalDescriptionForDisplay,
   serializeResidencyProposalMeta,
@@ -26,27 +25,13 @@ describe("special-proposals metadata", () => {
     expect(isNonScheduleProposal(json)).toBe(true);
   });
 
-  it("parses group name metadata", () => {
-    const json = JSON.stringify({
-      groupNameProposal: true,
-      proposedName: "New Name",
-      previousName: "Old Name",
-    });
-    expect(parseGroupNameProposalMeta(json)).toEqual({
-      groupNameProposal: true,
-      proposedName: "New Name",
-      previousName: "Old Name",
-    });
-    expect(getProposalSpecialKind(json)).toBe("group_name");
-  });
-
   it("returns null for regular descriptions", () => {
     expect(parseResidencyProposalMeta("plain text")).toBeNull();
     expect(getProposalSpecialKind(null)).toBeNull();
     expect(isNonScheduleProposal(null)).toBe(false);
   });
 
-  it("formats group rename and residency role for display", () => {
+  it("formats residency role for display", () => {
     const residencyJson = serializeResidencyProposalMeta({
       residencyProposal: true,
       targetUserId: "user-1",
@@ -63,15 +48,6 @@ describe("special-proposals metadata", () => {
     expect(proposalDescriptionForDisplay(ownerJson)).toBe(
       "Requesting Owner access — can manage members and approve residency requests.",
     );
-    expect(
-      proposalDescriptionForDisplay(
-        JSON.stringify({
-          groupNameProposal: true,
-          proposedName: "New Name",
-          previousName: "Old Name",
-        }),
-      ),
-    ).toBe('Rename to "New Name" (from "Old Name")');
     expect(proposalDescriptionForDisplay("A regular note")).toBe("A regular note");
   });
 });

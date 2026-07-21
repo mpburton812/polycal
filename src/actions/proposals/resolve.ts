@@ -1,9 +1,8 @@
 /**
- * Resolved proposal lifecycle: attendees, reschedule, clone, cancel, redraft (PC-62).
+ * Resolved proposal lifecycle: attendees, reschedule, cancel, redraft (PC-62).
  */
 export {
   cancelProposalAction,
-  cloneProposalAction,
   redraftProposalAction,
   rescheduleProposalAction,
   respondAttendeeUpdateAction,

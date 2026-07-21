@@ -10,14 +10,7 @@ export interface ResidencyProposalMeta {
   placeRole?: "owner" | "resident";
 }
 
-/** Metadata shape stored in proposal.description for poly group rename (PC-45/PC-60). */
-export interface GroupNameProposalMeta {
-  groupNameProposal: true;
-  proposedName: string;
-  previousName: string;
-}
-
-export type ProposalSpecialKind = "residency" | "group_name";
+export type ProposalSpecialKind = "residency";
 
 /**
  * Parses residency metadata from a proposal description JSON blob.
@@ -50,33 +43,10 @@ export function parseResidencyProposalMeta(
 }
 
 /**
- * Parses group name change metadata from a proposal description JSON blob.
- */
-export function parseGroupNameProposalMeta(
-  description: string | null,
-): GroupNameProposalMeta | null {
-  if (!description) return null;
-  try {
-    const parsed = JSON.parse(description) as Partial<GroupNameProposalMeta>;
-    if (parsed.groupNameProposal !== true) return null;
-    if (typeof parsed.proposedName !== "string" || !parsed.proposedName.trim()) return null;
-    return {
-      groupNameProposal: true,
-      proposedName: parsed.proposedName.trim(),
-      previousName:
-        typeof parsed.previousName === "string" ? parsed.previousName.trim() : "",
-    };
-  } catch {
-    return null;
-  }
-}
-
-/**
  * Returns the special workflow kind for a proposal, if any.
  */
 export function getProposalSpecialKind(description: string | null): ProposalSpecialKind | null {
   if (parseResidencyProposalMeta(description)) return "residency";
-  if (parseGroupNameProposalMeta(description)) return "group_name";
   return null;
 }
 
@@ -85,15 +55,6 @@ export function getProposalSpecialKind(description: string | null): ProposalSpec
  */
 export function serializeResidencyProposalMeta(
   meta: ResidencyProposalMeta,
-): string {
-  return JSON.stringify(meta);
-}
-
-/**
- * Serializes group name metadata for storage on proposals.description.
- */
-export function serializeGroupNameProposalMeta(
-  meta: GroupNameProposalMeta,
 ): string {
   return JSON.stringify(meta);
 }
@@ -110,12 +71,6 @@ export function isNonScheduleProposal(description: string | null): boolean {
  */
 export function proposalDescriptionForDisplay(description: string | null): string | null {
   if (!description?.trim()) return null;
-
-  const groupMeta = parseGroupNameProposalMeta(description);
-  if (groupMeta) {
-    const from = groupMeta.previousName ? ` (from "${groupMeta.previousName}")` : "";
-    return `Rename to "${groupMeta.proposedName}"${from}`;
-  }
 
   const residencyMeta = parseResidencyProposalMeta(description);
   if (residencyMeta) {

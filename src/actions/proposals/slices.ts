@@ -28,8 +28,6 @@ import {
 import {
   applyProposalMask,
   getAdminCanSeeUninvolved,
-  getPrivacyAdminFlags,
-  getSleepingNetworkVisibility,
   viewerCanSeeProposalWithSleepingGate,
 } from "@/lib/proposals/access";
 import { formatSleepingDisplayTitle } from "@/lib/proposals/sleeping-display";
@@ -66,14 +64,12 @@ const sliceDetailSchema = z.object({
 const detachSliceSchema = sliceDetailSchema;
 
 async function getSlicePrivacyFlags(db: ReturnType<typeof getDb>) {
-  const privacyFlags = await getPrivacyAdminFlags(db);
   const [group] = await db
     .select({ hideSleepingArrangements: polyGroup.hideSleepingArrangements })
     .from(polyGroup)
     .where(eq(polyGroup.id, 1))
     .limit(1);
   return {
-    ...privacyFlags,
     hideSleeping: group?.hideSleepingArrangements ?? false,
   };
 }
@@ -237,7 +233,6 @@ export async function getProposalSliceDetailAction(
   const db = getDb();
   const isAdmin = await userHasAdminAccess(session.user.role);
   const privacyFlags = await getSlicePrivacyFlags(db);
-  const sleepingNetworkVisibility = await getSleepingNetworkVisibility(db);
   const adminCanSeeUninvolved = await getAdminCanSeeUninvolved(db);
   const partnerIds = await acceptedSleepingPartnerIds(db, session.user.id);
   const { rootProposalId, sliceKind, sliceKey } = parsed.data;
@@ -259,7 +254,6 @@ export async function getProposalSliceDetailAction(
       locationText: proposals.locationText,
       intentionalSolo: proposals.intentionalSolo,
       isAllDay: proposals.isAllDay,
-      eventPrivacy: proposals.eventPrivacy,
       scheduledStartAt: proposals.scheduledStartAt,
       scheduledEndAt: proposals.scheduledEndAt,
       isBatchSleeping: proposals.isBatchSleeping,
@@ -290,9 +284,7 @@ export async function getProposalSliceDetailAction(
   if (
     !viewerCanSeeProposalWithSleepingGate(session.user.id, isAdmin, row.proposerId, inviteeUserIds, {
       proposalType: row.proposalType,
-      sleepingNetworkVisibility,
       state: row.state,
-      eventPrivacy: row.eventPrivacy,
       adminCanSeeUninvolved,
     })
   ) {
@@ -328,11 +320,8 @@ export async function getProposalSliceDetailAction(
 
   const { isContentMasked } = applyScheduleMasking({
     viewerId: session.user.id,
-    isAdmin,
     proposerId: row.proposerId,
     inviteeUserIds,
-    eventPrivacy: row.eventPrivacy,
-    proposalState: row.state,
     proposalType: row.proposalType,
     privacyFlags,
     acceptedPartnerIds: partnerIds,
@@ -420,11 +409,6 @@ export async function getProposalSliceDetailAction(
 
   const viewerInvitee = inviteeRows.find((invitee) => invitee.userId === session.user.id);
   const canComment = canCommentOnProposal({
-    viewerId: session.user.id,
-    isAdmin,
-    proposerId: row.proposerId,
-    inviteeUserIds,
-    eventPrivacy: row.eventPrivacy,
     state: row.state,
     isContentMasked,
   });
