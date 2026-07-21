@@ -254,3 +254,4 @@
 2026-07-20 | 6579fb2 | PC-261 | scope inbox title and expect draft-return copy | e2e/batch-sleeping-partners-journey.spec.ts
 2026-07-20 | 31c509c | PC-258 | patch brace-expansion and js-yaml via npm audit | n/a
 2026-07-20 | 7b2d259 | PC-264 | Feed Controls presets, Detailed Tweaking, votes, larger bird | src/actions/feed.ts
+2026-07-20 | 39142b1 | PC-270 | match nav parrot to tabs; like birds half size | src/components/feed/FeedLikeControl.tsx
