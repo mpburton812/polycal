@@ -476,7 +476,12 @@ export function ProposalDetailDialog({
     : null;
 
   const isPollMatrix = detail?.isPoll && (detail.timeSlots.length ?? 0) > 1;
-  const adminOversight = isAdminOversightView(isAdmin, currentUserId, detail?.proposerId);
+  const adminOversight = isAdminOversightView(
+    isAdmin,
+    currentUserId,
+    detail?.proposerId,
+    Boolean(detail?.invitees.some((invitee) => invitee.userId === currentUserId)),
+  );
 
   return (
     <>

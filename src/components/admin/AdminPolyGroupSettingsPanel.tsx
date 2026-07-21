@@ -245,6 +245,17 @@ export function AdminPolyGroupSettingsPanel({
           }
           label="Admins can interact with super-private events"
         />
+        <FormControlLabel
+          control={
+            <Switch
+              checked={settings.adminCanSeeUninvolved}
+              onChange={(e) =>
+                setSettings({ ...settings, adminCanSeeUninvolved: e.target.checked })
+              }
+            />
+          }
+          label="Admins can see proposals they are not involved in"
+        />
         <FormControl fullWidth>
           <InputLabel>Proposal audit log visibility</InputLabel>
           <Select
@@ -354,30 +365,46 @@ export function AdminPolyGroupSettingsPanel({
           Proposal enforcement
         </Typography>
         <TextField
-          label="Max hours in proposed"
+          label="Max days in proposed"
           type="number"
-          inputProps={{ min: 0, max: 8760 }}
-          value={settings.proposedMaxHours}
+          inputProps={{ min: 0, max: 365 }}
+          value={settings.proposedMaxDays}
           onChange={(e) =>
             setSettings({
               ...settings,
-              proposedMaxHours: Math.min(8760, Math.max(0, Number(e.target.value) || 0)),
+              proposedMaxDays: Math.min(365, Math.max(0, Number(e.target.value) || 0)),
             })
           }
           helperText="0 = expire only when event start passes without resolution"
         />
         <TextField
-          label="At-risk draft TTL (hours)"
+          label="At-risk draft TTL (days)"
           type="number"
-          inputProps={{ min: 1, max: 8760 }}
-          value={settings.atRiskTtlHours}
+          inputProps={{ min: 1, max: 365 }}
+          value={settings.atRiskTtlDays}
           onChange={(e) =>
             setSettings({
               ...settings,
-              atRiskTtlHours: Math.min(8760, Math.max(1, Number(e.target.value) || 1)),
+              atRiskTtlDays: Math.min(365, Math.max(1, Number(e.target.value) || 1)),
             })
           }
           helperText="How long collision/re-draft drafts stay editable before archive"
+        />
+        <TextField
+          label="Sleeping partner proposal TTL (days)"
+          type="number"
+          inputProps={{ min: 1, max: 365 }}
+          value={settings.sleepingPartnerProposalMaxDays}
+          onChange={(e) =>
+            setSettings({
+              ...settings,
+              sleepingPartnerProposalMaxDays: Math.min(
+                365,
+                Math.max(1, Number(e.target.value) || 1),
+              ),
+            })
+          }
+          helperText="Unanswered sleeping-partner proposals are deleted after this many days; both people are notified"
         />
         <TextField
           label="Archive grace (hours after end)"
@@ -404,19 +431,6 @@ export function AdminPolyGroupSettingsPanel({
             })
           }
           helperText="At-risk resolved events return to proposed within this window"
-        />
-        <TextField
-          label="Missing-invitee recovery (hours)"
-          type="number"
-          inputProps={{ min: 1, max: 8760 }}
-          value={settings.recoveryMaxHours}
-          onChange={(e) =>
-            setSettings({
-              ...settings,
-              recoveryMaxHours: Math.min(8760, Math.max(1, Number(e.target.value) || 1)),
-            })
-          }
-          helperText="Resolved events hold calendar this long when all required invitees are removed"
         />
         <Button variant="contained" onClick={save} disabled={savePending}>
           {savePending ? "Saving…" : "Save settings"}

@@ -260,10 +260,15 @@ export function ProposalsClient({
               isAdmin={isAdmin}
               currentUserId={currentUserId}
               onContinueEdit={
-                isStandardDraftProposal(proposal) ? handleContinueEdit : undefined
+                isStandardDraftProposal(proposal) && proposal.proposerId === currentUserId
+                  ? handleContinueEdit
+                  : undefined
               }
               onDeleteDraft={
-                isStandardDraftProposal(proposal) ? handleDeleteDraft : undefined
+                isStandardDraftProposal(proposal) &&
+                (proposal.proposerId === currentUserId || isAdmin)
+                  ? handleDeleteDraft
+                  : undefined
               }
             />
           ))}

@@ -88,6 +88,7 @@ import { resetInviteeVotes, wipeProposalVotes } from "@/lib/proposals/services/v
 import { formatSleepingDisplayTitle } from "@/lib/proposals/sleeping-display";
 import {
   applyProposalMask,
+  getAdminCanSeeUninvolved,
   getPrivacyAdminFlags,
   getSleepingNetworkVisibility,
   MASKED_DESCRIPTION,
@@ -2260,6 +2261,7 @@ export async function getProposalDetailAction(
   const isAdmin = await userHasAdminAccess(session.user.role);
   const privacyFlags = await getPrivacyAdminFlags(db);
   const sleepingNetworkVisibility = await getSleepingNetworkVisibility(db);
+  const adminCanSeeUninvolved = await getAdminCanSeeUninvolved(db);
 
   const [row] = await db
     .select({
@@ -2320,7 +2322,7 @@ export async function getProposalDetailAction(
     .where(eq(proposalInvitees.proposalId, proposalId));
 
   const inviteeUserIds = inviteeRows.map((invitee) => invitee.userId);
-  if (row.state === "draft" && row.proposerId !== session.user.id) {
+  if (row.state === "draft" && row.proposerId !== session.user.id && !isAdmin) {
     return { ok: false, message: "Proposal not found." };
   }
   if (
@@ -2330,6 +2332,7 @@ export async function getProposalDetailAction(
       sleepingNetworkVisibility,
       state: row.state,
       eventPrivacy: row.eventPrivacy,
+      adminCanSeeUninvolved,
     })
   ) {
     return { ok: false, message: "Proposal not found." };
@@ -2595,7 +2598,7 @@ export async function getProposalDetailAction(
           }))
         : [],
       stateLog: stateLogEntries,
-      canEdit: row.state === "draft" && isProposer,
+      canEdit: row.state === "draft" && (isProposer || isAdmin),
       canVote:
         !masked &&
         !isPollMatrix &&
@@ -2634,6 +2637,7 @@ export async function getProposalDetailAction(
           sleepingNetworkVisibility,
           state: row.state,
           eventPrivacy: row.eventPrivacy,
+          adminCanSeeUninvolved,
         }),
       canCancel: canManage && (row.state === "proposed" || row.state === "resolved"),
       canRedraft: isProposer && row.state === "resolved",
