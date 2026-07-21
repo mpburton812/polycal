@@ -6,9 +6,10 @@ import { applyProposalsMigrations } from "./proposals-migrations";
 import { applyAlphaFeedbackMigrations } from "./alpha-feedback-migrations";
 import { applyFeedMigrations } from "./feed-migrations";
 import { applyPc280Migrations } from "./pc280-migrations";
+import { applyRateLimitMigrations } from "./rate-limit-migrations";
 
 /** Bump whenever bootstrap DDL or *-migrations.ts modules change (PC-143). */
-export const SCHEMA_VERSION = "32";
+export const SCHEMA_VERSION = "33";
 
 /**
  * True when the stored schema version already matches the app target — skip
@@ -57,6 +58,7 @@ export async function runMigrations(): Promise<void> {
   await applyAlphaFeedbackMigrations(sql);
   await applyFeedMigrations(sql);
   await applyPc280Migrations(sql);
+  await applyRateLimitMigrations(sql);
 
   await sql.execute({
     sql: `INSERT INTO schema_meta (key, value) VALUES ('version', ?)

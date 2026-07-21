@@ -21,6 +21,30 @@ async function postFeedChat(page: Page, stamp: string) {
 }
 
 test.describe("Feed tab", () => {
+  test("composer requires Send click (Enter alone does not post)", async ({ page }) => {
+    test.setTimeout(90_000);
+
+    await login(page, USERS.luke.username);
+    await expectAuthenticatedShell(page);
+    await goToFeed(page);
+
+    const stamp = `feed-enter-${Date.now()}`;
+    const composer = feedComposer(page);
+    await composer.click();
+    await composer.fill(stamp);
+    await composer.press("Enter");
+    // Enter inserts a newline (PC-280); it must not clear/submit the composer.
+    await expect(composer).toHaveValue(new RegExp(`^${stamp.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\n?$`));
+    await expect(page.getByTestId("feed-chat-card").filter({ hasText: stamp })).toHaveCount(0);
+
+    await expect(page.getByTestId("feed-send")).toBeEnabled();
+    await page.getByTestId("feed-send").click();
+    await expect(composer).toHaveValue("", { timeout: 30_000 });
+    await expect(page.getByTestId("feed-chat-card").filter({ hasText: stamp }).first()).toBeVisible({
+      timeout: 30_000,
+    });
+  });
+
   test("unified feed with bottom composer and chat reply", async ({ page }) => {
     test.setTimeout(120_000);
 
