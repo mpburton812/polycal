@@ -26,6 +26,28 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "2026.07.21h",
+    date: "2026-07-21",
+    summary: "Post-280 audit: TZ sleeping dates, security hardenings, perf, Playwright.",
+    changes: [
+      {
+        type: "fixed",
+        description:
+          "Sleeping civil dates and day-end expiry/archive use the viewer's IANA timezone (default America/New_York) instead of the host process locale — fixes Vercel UTC midnight shifts (PC-282).",
+      },
+      {
+        type: "changed",
+        description:
+          "Masked sleeping copy is now \"Busy\" / Hidden (not \"Private event\"). Feed image downloads require attachment membership; Credentials impersonation requires an existing admin JWT; rate limits persist in SCHEMA 33; production alpha-feedback CORS is allowlisted; CSP img-src allows https OG images (PC-282).",
+      },
+      {
+        type: "changed",
+        description:
+          "Schedule overlap marking uses day buckets for large weeks; notification revalidation is scoped to shell tabs; People & Places loads via next/dynamic (PC-282).",
+      },
+    ],
+  },
+  {
     version: "2026.07.21g",
     date: "2026-07-21",
     summary: "UX cleanup batch: removals, privacy purge, polish, sleeping-past fixes.",

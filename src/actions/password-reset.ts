@@ -12,7 +12,7 @@ import { getPublicAppUrl } from "@/lib/env";
 import { getDb } from "@/lib/db/client";
 import { ensureDbReady } from "@/lib/db/ensure-ready";
 import { users } from "@/lib/db/schema";
-import { checkRateLimit } from "@/lib/rate-limit";
+import { checkRateLimitPersistent } from "@/lib/rate-limit";
 
 const GENERIC_REQUEST_MESSAGE =
   "If that account has a verified notification email, we sent a reset link.";
@@ -52,8 +52,8 @@ export async function requestPasswordResetAction(
 
   const username = parsed.data.toLowerCase();
   if (
-    !checkRateLimit(`password-reset-ip:${clientIp}`, 10, 60_000) ||
-    !checkRateLimit(`password-reset-user:${username}`, 5, 60_000)
+    !(await checkRateLimitPersistent(`password-reset-ip:${clientIp}`, 10, 60_000)) ||
+    !(await checkRateLimitPersistent(`password-reset-user:${username}`, 5, 60_000))
   ) {
     return { ok: false, error: "Too many reset requests. Try again in a minute." };
   }
@@ -132,7 +132,13 @@ export async function resetPasswordWithTokenAction(
     return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid input." };
   }
 
-  if (!checkRateLimit(`password-reset-redeem:${parsed.data.token.slice(0, 16)}`, 10, 60_000)) {
+  if (
+    !(await checkRateLimitPersistent(
+      `password-reset-redeem:${parsed.data.token.slice(0, 16)}`,
+      10,
+      60_000,
+    ))
+  ) {
     return { ok: false, error: "Too many attempts. Try again shortly." };
   }
 

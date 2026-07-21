@@ -27,7 +27,7 @@ export async function requireSession():
 }
 
 /**
- * Requires admin panel access (power-management aware) (PC-80).
+ * Requires admin panel access (role-based; PC-80 / PC-280).
  */
 export async function requireAdminAccess():
   Promise<{ ok: true; user: SessionUser } | ActionContextError> {

@@ -519,7 +519,7 @@ export function ProposalDetailDialog({
           )}
           {detail?.isContentMasked && (
             <Alert severity="warning" sx={{ mb: 2 }}>
-              This is a private event. Details are hidden because you are not an invitee.
+              This sleeping arrangement is hidden. Details are only visible to people involved.
             </Alert>
           )}
           {detail?.hasOverlapWarning && (

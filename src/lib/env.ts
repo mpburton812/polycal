@@ -103,16 +103,40 @@ export function getBuildInfo(): BuildInfo {
   };
 }
 
+/** True when an auth/public URL points at a loopback host (PC-282). */
+function authUrlLooksLikeLocalhost(url: string): boolean {
+  try {
+    const hostname = new URL(url).hostname.toLowerCase();
+    return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1";
+  } catch {
+    return /localhost|127\.0\.0\.1/i.test(url);
+  }
+}
+
 /**
  * Validates database URL against deployment tier at startup (PC-82).
  * Production must never use a local `file:` database.
+ * Production / polycal-prod also refuse localhost AUTH_URL (PC-282).
+ * Seed login hints remain gated by isNonProductionEnvironment separately.
  */
 export function validateDeploymentDatabaseConfig(): void {
   const environment = getAppEnvironment();
   const databaseUrl = process.env.TURSO_DATABASE_URL?.trim() ?? "";
+  const isProdTier =
+    environment === "production" || databaseUrl.includes("polycal-prod");
 
   if (environment === "production" && databaseUrl.startsWith("file:")) {
     throw new Error("Production deployments must not use a file: database URL.");
+  }
+
+  if (isProdTier) {
+    const authUrl =
+      process.env.AUTH_URL?.trim() || process.env.NEXTAUTH_URL?.trim() || "";
+    if (authUrl && authUrlLooksLikeLocalhost(authUrl)) {
+      throw new Error(
+        "Production deployments must not use a localhost AUTH_URL / NEXTAUTH_URL.",
+      );
+    }
   }
 
   if (databaseUrl.includes("polycal-prod") || environment === "production") {
@@ -124,4 +148,12 @@ export function validateDeploymentDatabaseConfig(): void {
   } else if (databaseUrl.startsWith("file:")) {
     console.info("[polycal] Database tier: local file");
   }
+}
+
+/**
+ * Production hardening gate (PC-282): database + AUTH_URL checks.
+ * Seed credential hints are already denied when getAppEnvironment() is production.
+ */
+export function assertProductionHardening(): void {
+  validateDeploymentDatabaseConfig();
 }

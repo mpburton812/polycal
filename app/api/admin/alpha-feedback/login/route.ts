@@ -6,7 +6,7 @@ import {
   alphaFeedbackOptions,
   withAlphaFeedbackCors,
 } from "@/lib/alpha-feedback/cors";
-import { checkRateLimit } from "@/lib/rate-limit";
+import { checkRateLimitPersistent } from "@/lib/rate-limit";
 
 const loginSchema = z.object({
   username: z.string().trim().min(1).max(64),
@@ -40,7 +40,7 @@ export async function POST(request: Request): Promise<NextResponse> {
   }
 
   const rateKey = `alpha-feedback-login:${parsed.data.username.toLowerCase()}`;
-  if (!checkRateLimit(rateKey, 10, 60_000)) {
+  if (!(await checkRateLimitPersistent(rateKey, 10, 60_000))) {
     return withAlphaFeedbackCors(
       request,
       NextResponse.json({ error: "Too many attempts." }, { status: 429 }),

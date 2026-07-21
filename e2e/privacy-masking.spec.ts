@@ -9,6 +9,7 @@ import { expandDraftMoreOptions, openEventProposalDraft, proposalCard, submitPro
 /**
  * Privacy levels (open/private/super_private) were removed for PC-280 — every
  * proposal is always "open" and content is never masked by privacy setting.
+ * Sleeping involved-only masking (when applicable) uses "Busy" / Hidden copy (PC-282).
  */
 test.describe("Privacy removal (PC-280)", () => {
   test("no Privacy control appears when drafting an event", async ({ page }) => {
@@ -20,6 +21,7 @@ test.describe("Privacy removal (PC-280)", () => {
     await expect(dialog.getByLabel("Privacy")).toHaveCount(0);
     await expect(dialog.getByText("Private", { exact: true })).toHaveCount(0);
     await expect(dialog.getByText("Super private", { exact: true })).toHaveCount(0);
+    await expect(dialog.getByText("Private event", { exact: true })).toHaveCount(0);
   });
 
   test("resolved event is fully visible to a non-invitee (no masking)", async ({ page }) => {

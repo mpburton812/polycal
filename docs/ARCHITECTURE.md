@@ -68,14 +68,14 @@ Shared helpers: `src/lib/actions/context.ts` (`requireSession`, `requireAdminAcc
 
 ## Admin capability matrix
 
-| Capability | `role === "admin"` | `userHasAdminAccess()` |
-|------------|-------------------|------------------------|
-| Admin tab / panel | Yes | Yes (includes delegated power-management) |
-| Pause/delete users | Yes | Yes |
-| Impersonation (non-prod) | Yes | Yes |
-| View masked proposal content as admin | Configurable via privacy flags | Same |
+| Capability | `role === "admin"` | Notes |
+|------------|-------------------|--------|
+| Admin tab / panel | Yes | Power-management / “all admins” was removed in PC-280 |
+| Pause/delete users | Yes | |
+| Impersonation | Yes when `AUTH_IMPERSONATION_SECRET` is set | Admin User management (prod allowed); Test data / DevBar non-prod only |
+| Sleeping proposal visibility | Involved-only (hard default) | Proposer, invitees, and admins when `adminCanSeeUninvolved`; masked copy shows “Busy” / Hidden for non-participants |
 
-Server actions that gate on admin use `userHasAdminAccess` so power-management delegates match UI visibility.
+Server actions that gate on admin use `userHasAdminAccess` (role-based; no delegated power-management).
 
 ## Proposal state machine (summary)
 

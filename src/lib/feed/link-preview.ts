@@ -148,6 +148,12 @@ export async function fetchLinkPreviewMeta(
         throw new Error("not_html");
       }
 
+      // Re-assert after redirects (and re-resolve DNS) before consuming the body
+      // so a DNS rebinding between connect and read cannot reach a private IP (PC-282).
+      const finalUrl = response.url && response.url.length > 0 ? response.url : current;
+      await assertUrlSafeToFetch(finalUrl);
+      current = finalUrl;
+
       const reader = response.body?.getReader();
       if (!reader) throw new Error("empty_body");
       const chunks: Uint8Array[] = [];

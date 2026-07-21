@@ -1,5 +1,4 @@
 import { and, eq, like } from "drizzle-orm";
-import { revalidatePath } from "next/cache";
 
 import { getDb } from "@/lib/db/client";
 import { ensureDbReady } from "@/lib/db/ensure-ready";
@@ -8,6 +7,7 @@ import {
   INBOX_EXCLUDED_NOTIFICATION_TYPES,
   proposalIdFromNotificationMetadata,
 } from "@/lib/notifications-inbox";
+import { revalidateNotificationShellPaths } from "@/lib/notifications-revalidate";
 
 /**
  * Inbox copy when a proposal is returned to drafts (PC-261).
@@ -74,7 +74,7 @@ export async function dismissAllNotificationsForProposal(
   }
 
   if (cleared > 0) {
-    revalidatePath("/", "layout");
+    revalidateNotificationShellPaths();
   }
   return cleared;
 }

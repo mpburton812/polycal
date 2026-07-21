@@ -93,4 +93,56 @@ describe("markOverlaps", () => {
     expect(result[0]!.hasOverlap).toBe(false);
     expect(result[1]!.hasOverlap).toBe(false);
   });
+
+  it("flags overlapping pairs in large lists via day buckets (PC-282)", () => {
+    const events: OverlapCandidate[] = [];
+    for (let i = 0; i < 40; i += 1) {
+      const day = 1 + (i % 20);
+      const dayStr = String(day).padStart(2, "0");
+      events.push(
+        candidate({
+          startAt: `2026-07-${dayStr}T10:00:00.000Z`,
+          endAt: `2026-07-${dayStr}T11:00:00.000Z`,
+          participantIds: [`u${i}`],
+        }),
+      );
+    }
+    // Two entries on the same day with a shared participant — should flag.
+    events.push(
+      candidate({
+        startAt: "2026-07-05T10:00:00.000Z",
+        endAt: "2026-07-05T11:00:00.000Z",
+        participantIds: ["shared"],
+      }),
+      candidate({
+        startAt: "2026-07-05T10:30:00.000Z",
+        endAt: "2026-07-05T11:30:00.000Z",
+        participantIds: ["shared"],
+      }),
+    );
+
+    const result = markOverlaps(events);
+    const flagged = result.filter((e) => e.hasOverlap);
+    expect(flagged).toHaveLength(2);
+    expect(flagged.every((e) => e.participantIds.includes("shared"))).toBe(true);
+  });
+
+  it("does not flag same participant on distinct days in large lists", () => {
+    const events: OverlapCandidate[] = [];
+    for (let i = 1; i <= 40; i += 1) {
+      // Spread across Jul/Aug so each 1h block is on its own UTC day.
+      const month = i <= 28 ? "07" : "08";
+      const day = i <= 28 ? i : i - 28;
+      const dayStr = String(day).padStart(2, "0");
+      events.push(
+        candidate({
+          startAt: `2026-${month}-${dayStr}T10:00:00.000Z`,
+          endAt: `2026-${month}-${dayStr}T11:00:00.000Z`,
+          participantIds: ["u1"],
+        }),
+      );
+    }
+    const result = markOverlaps(events);
+    expect(result.every((e) => !e.hasOverlap)).toBe(true);
+  });
 });
