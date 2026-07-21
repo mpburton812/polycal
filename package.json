@@ -9,6 +9,7 @@
     "start": "next start",
     "lint": "next lint",
     "db:seed": "tsx scripts/db-seed.ts",
+    "db:wipe:prod-schedule": "tsx scripts/wipe-production-schedule-keep-people.ts",
     "db:reset:test": "tsx scripts/reset-polycal-test.ts",
     "test:prepare:test": "tsx scripts/reset-polycal-test.ts",
     "test:validate:test": "node scripts/validate-test-seed.mjs",
