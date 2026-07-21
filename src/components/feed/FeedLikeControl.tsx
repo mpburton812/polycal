@@ -94,7 +94,7 @@ export function FeedLikeControl({
           }}
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={parrotSrc} alt="" width={28} height={28} style={{ display: "block" }} />
+          <img src={parrotSrc} alt="" width={40} height={40} style={{ display: "block" }} />
         </ButtonBase>
         <ButtonBase
           onClick={() => void openLikers()}

@@ -35,6 +35,10 @@ import {
 import type { PersonSummary } from "@/actions/users";
 import { FeedLikeRow } from "@/components/feed/FeedLikeControl";
 import { FeedCodeStatusPanel } from "@/components/feed/FeedCodeStatusPanel";
+import {
+  FeedControlsButton,
+  FeedControlsDrawer,
+} from "@/components/feed/FeedControlsDrawer";
 import { ADMIN_ONLY_FEED_COMMENT_BG } from "@/components/proposals/proposalCardTheme";
 import { feedImageUrl, MAX_FEED_IMAGE_BYTES, MAX_FEED_IMAGES } from "@/lib/feed/images";
 import type { FeedLikeTargetType } from "@/lib/feed/likes";
@@ -325,6 +329,7 @@ export function FeedClient({
   latestChangelogEntry: ChangelogEntry | null;
 }) {
   const [items, setItems] = useState<FeedItem[]>([]);
+  const [controlsOpen, setControlsOpen] = useState(false);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -1027,12 +1032,21 @@ export function FeedClient({
 
   return (
     <Box sx={{ pb: 18 }}>
-      <Typography variant="h5" component="h1" gutterBottom sx={brutalPageTitleSx}>
-        Feed
-      </Typography>
+      <Stack direction="row" alignItems="flex-start" justifyContent="space-between" sx={{ mb: 0.5 }}>
+        <Typography variant="h5" component="h1" sx={brutalPageTitleSx}>
+          Feed
+        </Typography>
+        <FeedControlsButton onOpen={() => setControlsOpen(true)} />
+      </Stack>
       <Typography sx={{ mb: 2, color: GARDEN_TOKENS.inkMuted }}>
         Proposal milestones and network chat in one timeline.
       </Typography>
+
+      <FeedControlsDrawer
+        open={controlsOpen}
+        onClose={() => setControlsOpen(false)}
+        onPrefsApplied={() => void loadFeed(null, { silent: false })}
+      />
 
       <FeedCodeStatusPanel
         buildInfo={buildInfo}

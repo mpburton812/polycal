@@ -1,7 +1,7 @@
 "use server";
 
 import { randomUUID } from "node:crypto";
-import { and, asc, desc, eq, inArray, isNull, lt } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull, lt, or } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
@@ -20,6 +20,7 @@ import {
   proposalInvitees,
   proposalStateLog,
   proposals,
+  sleepingPartnerships,
   storedImages,
   users,
 } from "@/lib/db/schema";
@@ -31,7 +32,14 @@ import {
   type FeedLiker,
 } from "@/lib/feed/likes";
 import {
-  FEED_MILESTONE_ACTIONS,
+  classifyChatInvolvement,
+  classifyMilestoneInvolvement,
+  involvementAllowed,
+  milestoneActionsForPrefs,
+  networkChatAllowed,
+  proposalCommentsAllowed,
+} from "@/lib/feed/prefs-filter";
+import {
   type FeedComment,
   type FeedItem,
   type FeedMilestone,
@@ -52,6 +60,12 @@ import { formatProposalLogLine } from "@/lib/proposals/state-log-format";
 import { canCommentOnProposal } from "@/lib/schedule/slice-auth";
 import { readFeedImageUploads } from "@/lib/feed/images";
 import type { AuditLogVisibility } from "@/types/poly-group";
+import {
+  DEFAULT_FEED_PREFS,
+  detectPresetId,
+  parseFeedPrefs,
+  type FeedPrefs,
+} from "@/types/feed-prefs";
 import { LONG_TEXT_MAX, maxCharsMessage } from "@/lib/validation/string-limits";
 
 const listFeedSchema = z.object({
@@ -199,7 +213,83 @@ async function loadLikeSummaries(
 }
 
 /**
- * Unified chronological feed: milestones + chat (PC-232).
+ * Loads accepted sleeping-partner user IDs for involvement filtering (PC-266).
+ */
+async function loadAcceptedPartnerIds(
+  db: Parameters<Parameters<typeof withDb>[0]>[0],
+  viewerId: string,
+): Promise<Set<string>> {
+  const rows = await db
+    .select({
+      userLowId: sleepingPartnerships.userLowId,
+      userHighId: sleepingPartnerships.userHighId,
+    })
+    .from(sleepingPartnerships)
+    .where(
+      and(
+        eq(sleepingPartnerships.status, "accepted"),
+        or(
+          eq(sleepingPartnerships.userLowId, viewerId),
+          eq(sleepingPartnerships.userHighId, viewerId),
+        ),
+      ),
+    );
+  const partners = new Set<string>();
+  for (const row of rows) {
+    partners.add(row.userLowId === viewerId ? row.userHighId : row.userLowId);
+  }
+  return partners;
+}
+
+/**
+ * Loads Feed Controls prefs for the signed-in user (PC-265).
+ */
+export async function getFeedPrefsAction(): Promise<FeedPrefs> {
+  const sessionResult = await requireSession();
+  if (!sessionResult.ok) return { ...DEFAULT_FEED_PREFS };
+
+  return withDb(async (db) => {
+    const [row] = await db
+      .select({ feedPrefsJson: users.feedPrefsJson })
+      .from(users)
+      .where(eq(users.id, sessionResult.user.id))
+      .limit(1);
+    return parseFeedPrefs(row?.feedPrefsJson);
+  });
+}
+
+/**
+ * Saves Feed Controls prefs and revalidates the feed (PC-265).
+ */
+export async function updateFeedPrefsAction(
+  prefs: FeedPrefs,
+): Promise<{ ok: boolean; message: string; prefs?: FeedPrefs }> {
+  const sessionResult = await requireSession();
+  if (!sessionResult.ok) return sessionResult;
+
+  const normalized: FeedPrefs = {
+    involvement: { ...prefs.involvement },
+    content: { ...prefs.content },
+    messagesInclude: { ...prefs.messagesInclude },
+    presetId: detectPresetId(prefs),
+  };
+
+  await withDb(async (db) => {
+    await db
+      .update(users)
+      .set({
+        feedPrefsJson: JSON.stringify(normalized),
+        updatedAt: new Date().toISOString(),
+      })
+      .where(eq(users.id, sessionResult.user.id));
+  });
+
+  revalidatePath("/feed");
+  return { ok: true, message: "OK", prefs: normalized };
+}
+
+/**
+ * Unified chronological feed: milestones + chat (PC-232), filtered by FeedPrefs (PC-266).
  */
 export async function listFeedItemsAction(
   input: z.infer<typeof listFeedSchema> = {},
@@ -219,8 +309,26 @@ export async function listFeedItemsAction(
 
   // Single DB handle — parallel withDb on sqlite can stall local e2e (PC-232).
   return withDb(async (db) => {
-    const milestones = await loadMilestoneBatch(db, viewerId, isAdmin, limit * 4, cursor);
-    const chatMessages = await loadChatBatch(db, viewerId, isAdmin, limit * 4, cursor);
+    const [prefsRow] = await db
+      .select({ feedPrefsJson: users.feedPrefsJson })
+      .from(users)
+      .where(eq(users.id, viewerId))
+      .limit(1);
+    const prefs = parseFeedPrefs(prefsRow?.feedPrefsJson);
+    const partnerIds = await loadAcceptedPartnerIds(db, viewerId);
+
+    const milestones = await loadMilestoneBatch(
+      db,
+      viewerId,
+      isAdmin,
+      limit * 4,
+      cursor,
+      prefs,
+      partnerIds,
+    );
+    const chatMessages = networkChatAllowed(prefs)
+      ? await loadChatBatch(db, viewerId, isAdmin, limit * 4, cursor, prefs, partnerIds)
+      : [];
 
     let merged: FeedItem[] = [...milestones, ...chatMessages];
     merged.sort((a, b) => {
@@ -265,6 +373,8 @@ async function loadMilestoneBatch(
   isAdmin: boolean,
   fetchSize: number,
   cursor: { createdAt: string; kind: string; id: string } | null,
+  prefs: FeedPrefs,
+  partnerIds: ReadonlySet<string>,
 ): Promise<FeedItem[]> {
   {
     const privacyFlags = await getPrivacyAdminFlags(db);
@@ -276,7 +386,12 @@ async function loadMilestoneBatch(
       .limit(1);
     const auditVisibility = (group?.auditLogVisibility ?? "admin_only") as AuditLogVisibility;
 
-    const conditions = [inArray(proposalStateLog.action, [...FEED_MILESTONE_ACTIONS])];
+    const allowedActions = milestoneActionsForPrefs(prefs);
+    if (allowedActions.length === 0) {
+      return [];
+    }
+
+    const conditions = [inArray(proposalStateLog.action, allowedActions)];
     if (cursor) {
       conditions.push(lt(proposalStateLog.createdAt, cursor.createdAt));
     }
@@ -344,6 +459,14 @@ async function loadMilestoneBatch(
       const isProposer = row.proposerId === viewerId;
       const isInvitee = inviteeUserIds.includes(viewerId);
       if (!viewerCanSeeAuditLog(auditVisibility, isAdmin, isProposer, isInvitee)) continue;
+
+      const involvement = classifyMilestoneInvolvement(
+        viewerId,
+        row.proposerId,
+        inviteeUserIds,
+        partnerIds,
+      );
+      if (!involvementAllowed(prefs, involvement)) continue;
 
       // Admin sees this milestone, but a non-admin in the same seat would not (PC-250).
       const visibleViaAdminOnly = isFeedMilestoneVisibleViaAdminOnly({
@@ -432,7 +555,9 @@ async function loadMilestoneBatch(
       milestone.likedByMe = likes.likedByMe;
     }
 
-    const commentProposalIds = milestones.filter((m) => !m.masked).map((m) => m.proposalId);
+    const commentProposalIds = proposalCommentsAllowed(prefs)
+      ? milestones.filter((m) => !m.masked).map((m) => m.proposalId)
+      : [];
     if (commentProposalIds.length > 0) {
       const commentRows = await db
         .select({
@@ -496,6 +621,8 @@ async function loadChatBatch(
   isAdmin: boolean,
   fetchSize: number,
   cursor: { createdAt: string; kind: string; id: string } | null,
+  prefs: FeedPrefs,
+  partnerIds: ReadonlySet<string>,
 ): Promise<FeedItem[]> {
   {
     const conditions = [isNull(networkChatMessages.deletedAt)];
@@ -515,9 +642,16 @@ async function loadChatBatch(
       .innerJoin(users, eq(networkChatMessages.authorId, users.id))
       .where(and(...conditions))
       .orderBy(desc(networkChatMessages.createdAt))
-      .limit(fetchSize);
+      .limit(Math.min(120, fetchSize * 3));
 
-    const messageIds = rows.map((r) => r.id);
+    const filteredRows = rows
+      .filter((row) => {
+        const bucket = classifyChatInvolvement(viewerId, row.authorId, partnerIds);
+        return involvementAllowed(prefs, bucket);
+      })
+      .slice(0, fetchSize);
+
+    const messageIds = filteredRows.map((r) => r.id);
     const imagesByMessage = await loadImageIdsByParent(db, "message", messageIds);
 
     const commentRows =
@@ -547,7 +681,7 @@ async function loadChatBatch(
     const chatLikes = await loadLikeSummaries(db, "chat", messageIds, viewerId);
     const chatCommentLikes = await loadLikeSummaries(db, "chat_comment", commentIds, viewerId);
     const commentsByMessage = new Map<string, FeedComment[]>();
-    const messageAuthorById = new Map(rows.map((r) => [r.id, r.authorId]));
+    const messageAuthorById = new Map(filteredRows.map((r) => [r.id, r.authorId]));
 
     for (const comment of commentRows) {
       const messageAuthorId = messageAuthorById.get(comment.messageId) ?? "";
@@ -570,7 +704,7 @@ async function loadChatBatch(
       commentsByMessage.set(comment.messageId, list);
     }
 
-    const messages: NetworkChatMessage[] = rows.map((row) => {
+    const messages: NetworkChatMessage[] = filteredRows.map((row) => {
       const likes = chatLikes.get(row.id) ?? emptyLikeSummary();
       return {
         id: row.id,

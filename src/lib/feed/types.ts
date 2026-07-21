@@ -1,14 +1,18 @@
-/** Curated lifecycle actions shown as Feed milestones (PC-226). Archived excluded (PC-232). */
+import {
+  FEED_PROPOSED_ACTIONS,
+  FEED_RESOLVED_ACTIONS,
+  FEED_VOTE_ACTIONS,
+} from "@/lib/feed/prefs-filter";
+
+/**
+ * Curated lifecycle + vote actions eligible for Feed milestones (PC-226 / PC-267).
+ * Runtime queries use milestoneActionsForPrefs() so Votes can be toggled off.
+ * Archived proposals are excluded at load time (PC-232).
+ */
 export const FEED_MILESTONE_ACTIONS = [
-  "proposal.submitted",
-  "proposal.auto_resolved",
-  "proposal.resolved",
-  "proposal.at_risk",
-  "proposal.cancelled",
-  "proposal.redrafted",
-  "proposal.attendees_updated",
-  "proposal.admin_fast_add",
-  "proposal.admin_rescheduled",
+  ...FEED_PROPOSED_ACTIONS,
+  ...FEED_RESOLVED_ACTIONS,
+  ...FEED_VOTE_ACTIONS,
 ] as const;
 
 export type FeedMilestoneAction = (typeof FEED_MILESTONE_ACTIONS)[number];
