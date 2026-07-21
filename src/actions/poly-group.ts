@@ -44,6 +44,7 @@ const settingsSchema = z.object({
   eventPrivacySuperPrivate: z.boolean(),
   adminCanSeePrivate: z.boolean(),
   adminCanSeeSuperPrivate: z.boolean(),
+  adminCanSeeUninvolved: z.boolean(),
   auditLogVisibility: z.enum(auditLogVisibilityLevels),
   allowUserProvisioning: z.boolean(),
   hideSleepingArrangements: z.boolean(),
@@ -55,11 +56,11 @@ const settingsSchema = z.object({
     .trim()
     .min(1, "Welcome message is required.")
     .max(LONG_TEXT_MAX, maxCharsMessage("Welcome message", LONG_TEXT_MAX)),
-  proposedMaxHours: z.number().int().min(0).max(8760),
-  atRiskTtlHours: z.number().int().min(1).max(8760),
+  proposedMaxDays: z.number().int().min(0).max(365),
+  atRiskTtlDays: z.number().int().min(1).max(365),
   archiveGraceHours: z.number().int().min(0).max(8760),
   redraftDeadlineHours: z.number().int().min(1).max(168),
-  recoveryMaxHours: z.number().int().min(1).max(8760),
+  sleepingPartnerProposalMaxDays: z.number().int().min(1).max(365),
 });
 
 function rowToSettings(row: typeof polyGroup.$inferSelect): PolyGroupSettings {
@@ -73,6 +74,7 @@ function rowToSettings(row: typeof polyGroup.$inferSelect): PolyGroupSettings {
     eventPrivacySuperPrivate: row.eventPrivacySuperPrivate,
     adminCanSeePrivate: row.adminCanSeePrivate,
     adminCanSeeSuperPrivate: row.adminCanSeeSuperPrivate,
+    adminCanSeeUninvolved: row.adminCanSeeUninvolved ?? true,
     auditLogVisibility: row.auditLogVisibility as PolyGroupSettings["auditLogVisibility"],
     allowUserProvisioning: row.allowUserProvisioning,
     hideSleepingArrangements: row.hideSleepingArrangements,
@@ -83,11 +85,11 @@ function rowToSettings(row: typeof polyGroup.$inferSelect): PolyGroupSettings {
     logTailLength: row.logTailLength,
     onboardingWelcomeMessage:
       row.onboardingWelcomeMessage?.trim() || DEFAULT_ONBOARDING_WELCOME_MESSAGE,
-    proposedMaxHours: row.proposedMaxHours ?? 0,
-    atRiskTtlHours: row.atRiskTtlHours ?? 168,
+    proposedMaxDays: row.proposedMaxDays ?? 0,
+    atRiskTtlDays: row.atRiskTtlDays ?? 7,
     archiveGraceHours: row.archiveGraceHours ?? 24,
     redraftDeadlineHours: row.redraftDeadlineHours ?? 24,
-    recoveryMaxHours: row.recoveryMaxHours ?? 48,
+    sleepingPartnerProposalMaxDays: row.sleepingPartnerProposalMaxDays ?? 5,
   };
 }
 
@@ -243,6 +245,7 @@ export async function updatePolyGroupSettingsAction(
       eventPrivacySuperPrivate: parsed.data.eventPrivacySuperPrivate,
       adminCanSeePrivate: parsed.data.adminCanSeePrivate,
       adminCanSeeSuperPrivate: parsed.data.adminCanSeeSuperPrivate,
+      adminCanSeeUninvolved: parsed.data.adminCanSeeUninvolved,
       auditLogVisibility: parsed.data.auditLogVisibility,
       allowUserProvisioning: parsed.data.allowUserProvisioning,
       hideSleepingArrangements: parsed.data.hideSleepingArrangements,
@@ -250,11 +253,11 @@ export async function updatePolyGroupSettingsAction(
       placesMapVisibility: parsed.data.placesMapVisibility,
       logTailLength: parsed.data.logTailLength,
       onboardingWelcomeMessage: parsed.data.onboardingWelcomeMessage,
-      proposedMaxHours: parsed.data.proposedMaxHours,
-      atRiskTtlHours: parsed.data.atRiskTtlHours,
+      proposedMaxDays: parsed.data.proposedMaxDays,
+      atRiskTtlDays: parsed.data.atRiskTtlDays,
       archiveGraceHours: parsed.data.archiveGraceHours,
       redraftDeadlineHours: parsed.data.redraftDeadlineHours,
-      recoveryMaxHours: parsed.data.recoveryMaxHours,
+      sleepingPartnerProposalMaxDays: parsed.data.sleepingPartnerProposalMaxDays,
       updatedAt: now,
     })
     .where(eq(polyGroup.id, 1));

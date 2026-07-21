@@ -35,6 +35,8 @@ export interface PolyGroupSettings {
   eventPrivacySuperPrivate: boolean;
   adminCanSeePrivate: boolean;
   adminCanSeeSuperPrivate: boolean;
+  /** When false, admins only see proposals they proposed or are invited to (PC-274). */
+  adminCanSeeUninvolved: boolean;
   auditLogVisibility: AuditLogVisibility;
   allowUserProvisioning: boolean;
   hideSleepingArrangements: boolean;
@@ -43,11 +45,14 @@ export interface PolyGroupSettings {
   placesMapVisibility: PlacesMapVisibility;
   logTailLength: number;
   onboardingWelcomeMessage: string;
-  proposedMaxHours: number;
-  atRiskTtlHours: number;
+  /** Days in Proposed before return to Draft; 0 = only when event start passes (PC-273). */
+  proposedMaxDays: number;
+  /** Days an at-risk draft stays editable before archive (PC-273). */
+  atRiskTtlDays: number;
   archiveGraceHours: number;
   redraftDeadlineHours: number;
-  recoveryMaxHours: number;
+  /** Days before unanswered sleeping-partner proposals are deleted (PC-273). */
+  sleepingPartnerProposalMaxDays: number;
 }
 
 export const DEFAULT_ONBOARDING_WELCOME_MESSAGE =

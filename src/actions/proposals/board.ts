@@ -22,6 +22,7 @@ import {
 } from "@/lib/proposals/special-proposals";
 import {
   applyProposalMask,
+  getAdminCanSeeUninvolved,
   getPrivacyAdminFlags,
   getSleepingNetworkVisibility,
   shouldMaskProposalContent,
@@ -75,9 +76,11 @@ export async function listProposalBoardAction(): Promise<ProposalBoard> {
   const isAdmin = await userHasAdminAccess(session.user.role);
   const privacyFlags = await getPrivacyAdminFlags(db);
   const sleepingNetworkVisibility = await getSleepingNetworkVisibility(db);
+  const adminCanSeeUninvolved = await getAdminCanSeeUninvolved(db);
+  const adminSeesAll = isAdmin && adminCanSeeUninvolved;
   const nowIso = new Date().toISOString();
 
-  const viewerInviteeProposalRows = isAdmin
+  const viewerInviteeProposalRows = adminSeesAll
     ? []
     : await db
         .select({ proposalId: proposalInvitees.proposalId })
@@ -85,7 +88,7 @@ export async function listProposalBoardAction(): Promise<ProposalBoard> {
         .where(eq(proposalInvitees.userId, viewerId));
   const viewerInviteeProposalIds = viewerInviteeProposalRows.map((row) => row.proposalId);
 
-  const boardVisibilityFilter = isAdmin
+  const boardVisibilityFilter = adminSeesAll
     ? undefined
     : or(
         and(eq(proposals.state, "draft"), eq(proposals.proposerId, viewerId)),
@@ -216,6 +219,7 @@ export async function listProposalBoardAction(): Promise<ProposalBoard> {
           sleepingNetworkVisibility,
           state: row.state,
           eventPrivacy: row.eventPrivacy,
+          adminCanSeeUninvolved,
         })
       ) {
         continue;
@@ -294,6 +298,7 @@ export async function listProposalBoardAction(): Promise<ProposalBoard> {
             ),
       eventIconKey:
         masked || row.proposalType !== "event" ? null : row.eventIconKey ?? null,
+      viewerIsInvitee: viewerInvitee !== undefined,
       notOnCalendar:
         row.state === "resolved" &&
         !proposalHasSchedulableWindows(
@@ -347,7 +352,7 @@ export async function listProposalBoardAction(): Promise<ProposalBoard> {
     for (const row of partnershipRows) {
       const isParticipant =
         row.userLowId === viewerId || row.userHighId === viewerId;
-      if (!isParticipant && !isAdmin) continue;
+      if (!isParticipant && !adminSeesAll) continue;
 
       const partnerId =
         row.userLowId === viewerId ? row.userHighId : row.userLowId;
@@ -392,6 +397,7 @@ export async function listProposalBoardAction(): Promise<ProposalBoard> {
         cardKind: "partnership",
         partnershipId: row.id,
         partnerName,
+        viewerIsInvitee: isParticipant && row.proposedById !== viewerId,
       });
     }
   }

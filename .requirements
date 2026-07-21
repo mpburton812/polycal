@@ -256,3 +256,6 @@
 2026-07-20 | 7b2d259 | PC-264 | Feed Controls presets, Detailed Tweaking, votes, larger bird | src/actions/feed.ts
 2026-07-20 | 39142b1 | PC-270 | match nav parrot to tabs; like birds half size | src/components/feed/FeedLikeControl.tsx
 2026-07-20 | c93f061 | PC-271 | consolidated production release notes | src/lib/changelog/entries.ts
+2026-07-20 | d3f5608 | PC-273 | proposal enforcement days, sleeping TTL, admin visibility | src/actions/feed.ts
+2026-07-20 | bdc3b27 | PC-273 | add Jira ticket script for proposal enforcement UX | scripts/create-pc-proposal-enforcement-ux.mjs
+2026-07-20 | 0b9501f | PC-273 | assert Proposal enforcement heading exactly | e2e/admin-schedule.spec.ts

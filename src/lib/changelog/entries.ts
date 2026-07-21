@@ -26,6 +26,29 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "2026.07.21c",
+    date: "2026-07-21",
+    summary:
+      "Proposal enforcement in days, admin visibility fixes, icon watermarks, CI Node 24.",
+    changes: [
+      {
+        type: "changed",
+        description:
+          "Max proposed / at-risk TTL use days; sleeping-partner proposals auto-delete after configurable days (default 5) with notifications; missing-invitee recovery removed (PC-273).",
+      },
+      {
+        type: "fixed",
+        description:
+          "Admins can delete any draft; Delete/Continue gated by ownership; peach oversight only when uninvolved; toggle for admins seeing uninvolved proposals (PC-274).",
+      },
+      {
+        type: "changed",
+        description:
+          "Higher-detail event icons as right-aligned 30% opacity kanban watermarks (PC-275). GitHub Actions checkout/setup-node/artifact bumped to @v5 (PC-276). SCHEMA_VERSION 30.",
+      },
+    ],
+  },
+  {
     version: "2026.07.21-prod",
     date: "2026-07-21",
     summary:

@@ -16,47 +16,52 @@ import {
   proposalStateLog,
   proposalTimeSlots,
   proposals,
+  sleepingPartnerships,
+  users,
 } from "@/lib/db/schema";
 
 export interface EnforcementSettings {
-  /** Max hours in proposed before expiry; 0 = only expire when event start passes. */
-  proposedMaxHours: number;
-  atRiskTtlHours: number;
+  /** Max days in proposed before expiry; 0 = only expire when event start passes. */
+  proposedMaxDays: number;
+  atRiskTtlDays: number;
   archiveGraceHours: number;
   redraftDeadlineHours: number;
-  /** Hours to hold calendar when required invitees drop to zero (PC-53). */
-  recoveryMaxHours: number;
+  /** Days before unanswered sleeping-partner proposals are deleted. */
+  sleepingPartnerProposalMaxDays: number;
 }
 
 const DEFAULT_ENFORCEMENT: EnforcementSettings = {
-  proposedMaxHours: 0,
-  atRiskTtlHours: 168,
+  proposedMaxDays: 0,
+  atRiskTtlDays: 7,
   archiveGraceHours: 24,
   redraftDeadlineHours: 24,
-  recoveryMaxHours: 48,
+  sleepingPartnerProposalMaxDays: 5,
 };
 
 type Db = ReturnType<typeof getDb>;
 
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
 /**
- * Loads admin-configurable enforcement thresholds from poly group settings (PC-46).
+ * Loads admin-configurable enforcement thresholds from poly group settings (PC-46 / PC-273).
  */
 export async function loadEnforcementSettings(db: Db): Promise<EnforcementSettings> {
   const [row] = await db.select().from(polyGroup).where(eq(polyGroup.id, 1)).limit(1);
   if (!row) return DEFAULT_ENFORCEMENT;
 
   return {
-    proposedMaxHours: row.proposedMaxHours ?? DEFAULT_ENFORCEMENT.proposedMaxHours,
-    atRiskTtlHours: row.atRiskTtlHours ?? DEFAULT_ENFORCEMENT.atRiskTtlHours,
+    proposedMaxDays: row.proposedMaxDays ?? DEFAULT_ENFORCEMENT.proposedMaxDays,
+    atRiskTtlDays: row.atRiskTtlDays ?? DEFAULT_ENFORCEMENT.atRiskTtlDays,
     archiveGraceHours: row.archiveGraceHours ?? DEFAULT_ENFORCEMENT.archiveGraceHours,
     redraftDeadlineHours: row.redraftDeadlineHours ?? DEFAULT_ENFORCEMENT.redraftDeadlineHours,
-    recoveryMaxHours: row.recoveryMaxHours ?? DEFAULT_ENFORCEMENT.recoveryMaxHours,
+    sleepingPartnerProposalMaxDays:
+      row.sleepingPartnerProposalMaxDays ?? DEFAULT_ENFORCEMENT.sleepingPartnerProposalMaxDays,
   };
 }
 
 /** ISO timestamp for at-risk draft/archive TTL based on poly group settings. */
 export function atRiskExpiresAtIso(settings: EnforcementSettings, fromMs = Date.now()): string {
-  return new Date(fromMs + settings.atRiskTtlHours * 60 * 60 * 1000).toISOString();
+  return new Date(fromMs + settings.atRiskTtlDays * MS_PER_DAY).toISOString();
 }
 
 /**
@@ -67,7 +72,7 @@ export function computeAtRiskExpiresAt(
   scheduledStartAt: string | null,
   fromMs = Date.now(),
 ): string {
-  const ttlExpiryMs = fromMs + settings.atRiskTtlHours * 60 * 60 * 1000;
+  const ttlExpiryMs = fromMs + settings.atRiskTtlDays * MS_PER_DAY;
   if (!scheduledStartAt) {
     return new Date(ttlExpiryMs).toISOString();
   }
@@ -189,12 +194,12 @@ async function expireProposedProposals(db: Db, settings: EnforcementSettings): P
     const expirationInstant = await getProposedExpirationInstant(db, proposal);
     const startPassed = Boolean(expirationInstant && expirationInstant <= nowIso);
 
-    const maxHoursExpired =
-      settings.proposedMaxHours > 0 &&
+    const maxDaysExpired =
+      settings.proposedMaxDays > 0 &&
       now.getTime() - new Date(proposal.updatedAt).getTime() >
-        settings.proposedMaxHours * 60 * 60 * 1000;
+        settings.proposedMaxDays * MS_PER_DAY;
 
-    if (!startPassed && !maxHoursExpired) continue;
+    if (!startPassed && !maxDaysExpired) continue;
 
     await db
       .update(proposals)
@@ -205,7 +210,7 @@ async function expireProposedProposals(db: Db, settings: EnforcementSettings): P
 
     const reason = startPassed
       ? "Event start passed without full approval — returned to draft."
-      : `Proposed longer than ${settings.proposedMaxHours}h without resolution — returned to draft.`;
+      : `Proposed longer than ${settings.proposedMaxDays}d without resolution — returned to draft.`;
 
     await logSystemTransition(db, proposal.id, "proposal.proposed_expired", reason);
 
@@ -403,7 +408,50 @@ async function autoCancelUnresolvedAtRiskResolved(db: Db): Promise<void> {
 }
 
 /**
- * Runs all proposal enforcement jobs (call on board load, detail fetch, and cron) (PC-46/48).
+ * Deletes unanswered sleeping-partner proposals past the configured day TTL
+ * and notifies both parties (PC-273).
+ */
+async function expireSleepingPartnerProposals(
+  db: Db,
+  settings: EnforcementSettings,
+): Promise<void> {
+  const cutoffMs = Date.now() - settings.sleepingPartnerProposalMaxDays * MS_PER_DAY;
+  const cutoffIso = new Date(cutoffMs).toISOString();
+  const pending = await db
+    .select()
+    .from(sleepingPartnerships)
+    .where(eq(sleepingPartnerships.status, "proposed"));
+
+  for (const row of pending) {
+    const proposedAt = row.updatedAt || row.createdAt;
+    if (proposedAt > cutoffIso) continue;
+
+    const partnerIds = [row.userLowId, row.userHighId];
+    const nameRows = await db
+      .select({ id: users.id, displayName: users.displayName })
+      .from(users)
+      .where(inArray(users.id, partnerIds));
+    const names = new Map(nameRows.map((n) => [n.id, n.displayName]));
+    const proposerName = names.get(row.proposedById) ?? "Someone";
+    const inviteeId =
+      row.proposedById === row.userLowId ? row.userHighId : row.userLowId;
+    const inviteeName = names.get(inviteeId) ?? "your partner";
+
+    await db.delete(sleepingPartnerships).where(eq(sleepingPartnerships.id, row.id));
+
+    const message = `The sleeping partnership proposal between ${proposerName} and ${inviteeName} expired after ${settings.sleepingPartnerProposalMaxDays} day(s) without a response and was removed.`;
+    for (const userId of partnerIds) {
+      await notifyUser(userId, "partnership_expired", message, {
+        partnershipId: row.id,
+        proposerId: row.proposedById,
+        partnerId: inviteeId,
+      });
+    }
+  }
+}
+
+/**
+ * Runs all proposal enforcement jobs (call on board load, detail fetch, and cron) (PC-46/48/273).
  */
 export async function runProposalEnforcement(db: Db): Promise<void> {
   const settings = await loadEnforcementSettings(db);
@@ -414,6 +462,7 @@ export async function runProposalEnforcement(db: Db): Promise<void> {
   await archiveExpiredRecurrenceSeries(db, settings);
   await processRedraftDeadlines(db, settings);
   await autoCancelUnresolvedAtRiskResolved(db);
+  await expireSleepingPartnerProposals(db, settings);
 }
 
 /** Returns true when two ISO intervals overlap (open end uses start as instant). */

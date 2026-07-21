@@ -26,6 +26,21 @@ export async function getPrivacyAdminFlags(
   };
 }
 
+/**
+ * Whether admins see proposals they are not proposer/invitee for (PC-274).
+ * Defaults to true (legacy behavior) when unset.
+ */
+export async function getAdminCanSeeUninvolved(
+  db: ReturnType<typeof getDb> = getDb(),
+): Promise<boolean> {
+  const [group] = await db
+    .select({ adminCanSeeUninvolved: polyGroup.adminCanSeeUninvolved })
+    .from(polyGroup)
+    .where(eq(polyGroup.id, 1))
+    .limit(1);
+  return group?.adminCanSeeUninvolved ?? true;
+}
+
 /** Loads sleeping network visibility (everyone vs involved) from poly group (PC-229). */
 export async function getSleepingNetworkVisibility(
   db: ReturnType<typeof getDb> = getDb(),
@@ -90,9 +105,15 @@ export function viewerCanSeeProposal(
   isAdmin: boolean,
   proposerId: string,
   inviteeUserIds: string[],
-  context?: { state?: ProposalState; eventPrivacy?: EventPrivacyLevel },
+  context?: {
+    state?: ProposalState;
+    eventPrivacy?: EventPrivacyLevel;
+    /** When false, admins must be proposer or invitee (PC-274). Default true. */
+    adminCanSeeUninvolved?: boolean;
+  },
 ): boolean {
-  if (isAdmin) return true;
+  const adminSeesAll = isAdmin && context?.adminCanSeeUninvolved !== false;
+  if (adminSeesAll) return true;
   if (proposerId === viewerId) return true;
   if (inviteeUserIds.includes(viewerId)) return true;
   if (context?.state === "resolved" && context.eventPrivacy === "open") return true;
@@ -102,7 +123,7 @@ export function viewerCanSeeProposal(
 
 /**
  * Sleeping visibility when `sleepingNetworkVisibility` is `involved`:
- * only proposer, invitees, and admins — even for open resolved/archived (PC-229).
+ * only proposer, invitees, and (when allowed) admins — even for open resolved/archived (PC-229).
  */
 export function viewerCanSeeSleepingProposal(
   viewerId: string,
@@ -113,10 +134,12 @@ export function viewerCanSeeSleepingProposal(
     sleepingNetworkVisibility: SleepingNetworkVisibility;
     state?: ProposalState;
     eventPrivacy?: EventPrivacyLevel;
+    adminCanSeeUninvolved?: boolean;
   },
 ): boolean {
   if (options.sleepingNetworkVisibility === "involved") {
-    if (isAdmin) return true;
+    const adminSeesAll = isAdmin && options.adminCanSeeUninvolved !== false;
+    if (adminSeesAll) return true;
     if (proposerId === viewerId) return true;
     if (inviteeUserIds.includes(viewerId)) return true;
     return false;
@@ -124,6 +147,7 @@ export function viewerCanSeeSleepingProposal(
   return viewerCanSeeProposal(viewerId, isAdmin, proposerId, inviteeUserIds, {
     state: options.state,
     eventPrivacy: options.eventPrivacy,
+    adminCanSeeUninvolved: options.adminCanSeeUninvolved,
   });
 }
 
@@ -140,6 +164,7 @@ export function viewerCanSeeProposalWithSleepingGate(
     sleepingNetworkVisibility: SleepingNetworkVisibility;
     state?: ProposalState;
     eventPrivacy?: EventPrivacyLevel;
+    adminCanSeeUninvolved?: boolean;
   },
 ): boolean {
   if (options.proposalType === "sleeping") {
@@ -147,11 +172,13 @@ export function viewerCanSeeProposalWithSleepingGate(
       sleepingNetworkVisibility: options.sleepingNetworkVisibility,
       state: options.state,
       eventPrivacy: options.eventPrivacy,
+      adminCanSeeUninvolved: options.adminCanSeeUninvolved,
     });
   }
   return viewerCanSeeProposal(viewerId, isAdmin, proposerId, inviteeUserIds, {
     state: options.state,
     eventPrivacy: options.eventPrivacy,
+    adminCanSeeUninvolved: options.adminCanSeeUninvolved,
   });
 }
 

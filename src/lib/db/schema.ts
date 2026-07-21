@@ -91,6 +91,13 @@ export const polyGroup = sqliteTable("poly_group", {
   adminCanSeeSuperPrivate: integer("admin_can_see_super_private", { mode: "boolean" })
     .notNull()
     .default(false),
+  /**
+   * When true, admins see proposals they are not proposer/invitee for (PC-274).
+   * Peach oversight chrome still applies for those uninvolved views.
+   */
+  adminCanSeeUninvolved: integer("admin_can_see_uninvolved", { mode: "boolean" })
+    .notNull()
+    .default(true),
   auditLogVisibility: text("audit_log_visibility").notNull().default("admin_only"),
   hideSleepingArrangements: integer("hide_sleeping_arrangements", { mode: "boolean" })
     .notNull()
@@ -100,13 +107,19 @@ export const polyGroup = sqliteTable("poly_group", {
   placesMapVisibility: text("places_map_visibility").notNull().default("all"),
   logTailLength: integer("log_tail_length").notNull().default(100),
   onboardingWelcomeMessage: text("onboarding_welcome_message"),
-  /** Hours in proposed before auto-expire; 0 = expire only when event start passes (PC-46). */
-  proposedMaxHours: integer("proposed_max_hours").notNull().default(0),
-  atRiskTtlHours: integer("at_risk_ttl_hours").notNull().default(168),
+  /** Days in proposed before auto-expire; 0 = expire only when event start passes (PC-273). */
+  proposedMaxDays: integer("proposed_max_days").notNull().default(0),
+  /** Days an at-risk draft stays editable before archive (PC-273). */
+  atRiskTtlDays: integer("at_risk_ttl_days").notNull().default(7),
   archiveGraceHours: integer("archive_grace_hours").notNull().default(24),
   redraftDeadlineHours: integer("redraft_deadline_hours").notNull().default(24),
-  /** Hours to hold resolved calendar blocks when required invitees drop to zero (PC-53). */
-  recoveryMaxHours: integer("recovery_max_hours").notNull().default(48),
+  /**
+   * Days a pending sleeping-partnership proposal may sit unanswered before
+   * auto-delete + notify proposer and invitee (PC-273).
+   */
+  sleepingPartnerProposalMaxDays: integer("sleeping_partner_proposal_max_days")
+    .notNull()
+    .default(5),
   updatedAt: text("updated_at").notNull(),
 });
 
