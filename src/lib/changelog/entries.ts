@@ -26,6 +26,39 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "2026.07.21-prod",
+    date: "2026-07-21",
+    summary:
+      "Production: Feed Controls, six-item UX batch, nav/like parrot sizing, audit patches.",
+    changes: [
+      {
+        type: "added",
+        description:
+          "Feed Controls — Settings cog with presets and Detailed Tweaking (Who/What); prefs persist on the account; server-side list filter; vote milestones when Votes content is enabled (PC-264–PC-268). SCHEMA_VERSION 29.",
+      },
+      {
+        type: "fixed",
+        description:
+          "Month all-day bars no longer fragment in US timezones; feed image uploads tolerate up to 4MB with clear errors (PC-258–PC-259).",
+      },
+      {
+        type: "changed",
+        description:
+          "Draft-return notifications revoke+replace with reason; Reschedule hidden for batch sleeping; conflict messages list each overlap (PC-261–PC-263).",
+      },
+      {
+        type: "changed",
+        description:
+          "Bottom FEED parrot matches sibling nav icons (24×24); feed like birds are half that (12×12) via shared constants (PC-270). Supersedes interim 36×36 nav / 40×40 like sizes from PC-260 / PC-269.",
+      },
+      {
+        type: "fixed",
+        description:
+          "Dependency audit: brace-expansion and js-yaml patched (PC-258).",
+      },
+    ],
+  },
+  {
     version: "2026.07.21b",
     date: "2026-07-21",
     summary:
