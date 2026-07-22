@@ -13,6 +13,21 @@ import { eq } from "drizzle-orm";
 const URGENT_NOTIFICATION_TYPES = new Set(["password_reset", "account_paused", "account_deleted"]);
 
 /**
+ * Builds consistent actor metadata for user-facing notifications (PC-299).
+ * The fallback keeps notification copy and audit attribution useful when a
+ * legacy or partially populated user record has no display name.
+ */
+export function actorNotifyFields(actor: {
+  id: string;
+  displayName?: string | null;
+}): { actorUserId: string; actorDisplayName: string } {
+  return {
+    actorUserId: actor.id,
+    actorDisplayName: actor.displayName?.trim() || "Someone",
+  };
+}
+
+/**
  * Returns true when local time falls inside the user's quiet-hours window (PC-45).
  * Supports overnight ranges (e.g. 22:00–07:00).
  */

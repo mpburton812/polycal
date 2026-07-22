@@ -5,7 +5,10 @@ import { revalidatePath } from "next/cache";
 
 import { auth } from "@/lib/auth";
 import { logUserActivity } from "@/lib/audit";
-import { formatActivityLogDetails } from "@/lib/audit/activity-log-display";
+import {
+  formatActivityLogDetails,
+  getNotificationActivityActor,
+} from "@/lib/audit/activity-log-display";
 import { userHasAdminAccess } from "@/lib/admin-access";
 import { requireAdminAccess, withDb } from "@/lib/actions/context";
 import { getImpersonationSecret } from "@/lib/auth/impersonation";
@@ -137,6 +140,26 @@ export interface ActivityLogEntry {
 }
 
 /**
+ * Adds the original notification recipient to details after the log's User column
+ * is reassigned to the initiating actor (PC-299).
+ */
+function withNotificationRecipient(
+  action: string,
+  details: string | null,
+  recipientDisplayName: string | null,
+): string | null {
+  if (!action.startsWith("notification.") || !details || !recipientDisplayName) return details;
+  try {
+    return JSON.stringify({
+      ...(JSON.parse(details) as Record<string, unknown>),
+      recipientDisplayName,
+    });
+  } catch {
+    return details;
+  }
+}
+
+/**
  * Lists recent system administrator log entries (PC-32).
  */
 export async function listActivityLogAction(): Promise<ActivityLogEntry[]> {
@@ -164,7 +187,17 @@ export async function listActivityLogAction(): Promise<ActivityLogEntry[]> {
     .orderBy(desc(userActivityLog.id))
     .limit(tail);
 
-  const userIds = [...new Set(rows.map((r) => r.userId).filter(Boolean))] as string[];
+  const notificationActors = rows.map((row) =>
+    getNotificationActivityActor(row.action, row.details),
+  );
+  const userIds = [
+    ...new Set(
+      [
+        ...rows.map((row) => row.userId),
+        ...notificationActors.map((actor) => actor?.actorUserId),
+      ].filter(Boolean),
+    ),
+  ] as string[];
   const userMap = new Map<string, string>();
   if (userIds.length > 0) {
     const userRows = await db
@@ -175,10 +208,20 @@ export async function listActivityLogAction(): Promise<ActivityLogEntry[]> {
     }
   }
 
-  return rows.map((row) => ({
-    ...row,
-    userDisplayName: row.userId ? (userMap.get(row.userId) ?? null) : null,
-  }));
+  return rows.map((row, index) => {
+    const recipientDisplayName = row.userId ? (userMap.get(row.userId) ?? null) : null;
+    const actor = notificationActors[index];
+    return {
+      ...row,
+      userId: actor?.actorUserId ?? row.userId,
+      userDisplayName:
+        actor?.actorDisplayName ??
+        (actor?.actorUserId ? (userMap.get(actor.actorUserId) ?? null) : recipientDisplayName),
+      details: actor
+        ? withNotificationRecipient(row.action, row.details, recipientDisplayName)
+        : row.details,
+    };
+  });
 }
 
 /**

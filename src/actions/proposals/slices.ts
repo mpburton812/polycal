@@ -20,7 +20,7 @@ import {
   sleepingPartnerships,
   users,
 } from "@/lib/db/schema";
-import { notifyUser } from "@/lib/notifications";
+import { actorNotifyFields, notifyUser } from "@/lib/notifications";
 import {
   parseBatchEntriesJson,
   parseBatchSlotMeta,
@@ -183,6 +183,7 @@ async function notifyStakeholders(
   title: string,
   notificationType: string,
   message: string,
+  actor: ReturnType<typeof actorNotifyFields>,
 ): Promise<void> {
   const invitees = await db
     .select({ userId: proposalInvitees.userId })
@@ -190,7 +191,11 @@ async function notifyStakeholders(
     .where(eq(proposalInvitees.proposalId, proposalId));
   const notifyIds = new Set<string>([proposerId, ...invitees.map((row) => row.userId)]);
   for (const userId of notifyIds) {
-    await notifyUser(userId, notificationType, message, { proposalId, proposalTitle: title });
+    await notifyUser(userId, notificationType, message, {
+      proposalId,
+      proposalTitle: title,
+      ...actor,
+    });
   }
 }
 
@@ -466,6 +471,7 @@ export async function detachProposalSliceAction(
   const db = getDb();
   const isAdmin = await userHasAdminAccess(session.user.role);
   const { rootProposalId, sliceKind, sliceKey } = parsed.data;
+  const actor = actorNotifyFields(session.user);
 
   const [parent] = await db
     .select()
@@ -649,7 +655,7 @@ export async function detachProposalSliceAction(
         proposalId: rootProposalId,
         proposerId: parent.proposerId,
         title: parent.title,
-        message: `A night was detached from "${parent.title}".`,
+        message: `${actor.actorDisplayName} detached a night from "${parent.title}".`,
       };
     } else {
       const slotRows = await tx
@@ -782,7 +788,7 @@ export async function detachProposalSliceAction(
         proposalId: rootProposalId,
         proposerId: parent.proposerId,
         title: parent.title,
-        message: `A day was detached from "${parent.title}".`,
+        message: `${actor.actorDisplayName} detached a day from "${parent.title}".`,
       };
     }
 
@@ -808,6 +814,7 @@ export async function detachProposalSliceAction(
         notifyAfterCommit.title,
         "proposal_child_detached",
         notifyAfterCommit.message,
+        actor,
       );
     } catch {
       // Detach already committed — do not fail the action on notification errors.
