@@ -1,3 +1,4 @@
+import { getDb } from "@/lib/db/client";
 import { getAcceptedSleepingPartnerIds } from "@/lib/proposals/partners";
 import { notifyUser } from "@/lib/notifications";
 

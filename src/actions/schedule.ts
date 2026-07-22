@@ -3,7 +3,6 @@
 import { and, asc, eq, gte, inArray, isNotNull, isNull, lte, or } from "drizzle-orm";
 import { z } from "zod";
 
-import { auth } from "@/lib/auth";
 import { userHasAdminAccess } from "@/lib/admin-access";
 import { requireSession, withDb } from "@/lib/actions/context";
 import { getDb } from "@/lib/db/client";

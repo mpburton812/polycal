@@ -20,6 +20,9 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Changed
+- PC-305–PC-307: Shared partners/eligible-locations loaders; `canViewProposalContent` for schedule Busy masking; dead masked=false scaffolding removed; admin calendar toggle label matches uninvolved-admin masking. Change control: `2026.07.22d`.
+
 ### Added
 - PC-298: Feed pins currently-happening non-sleeping (resolved) events in a sticky **Happening now** highlight stack above the timeline; silent poll tracks active window changes. Change control: `2026.07.22b`.
 - PC-291–PC-296: Proposed Kanban **Nudge** for pending voters (1h cooldown); live proposed/at-risk expiry countdowns on summary cards; admin **hard-delete** of proposals in any state (including archived), with `proposal_admin_deleted` notify to all participants. Change control: `2026.07.22a`. SCHEMA_VERSION 34 (`last_nudge_at`).
