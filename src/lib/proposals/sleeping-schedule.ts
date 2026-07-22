@@ -1,7 +1,13 @@
 /**
  * Sleeping proposals use calendar dates only — not clock-time blocks (PC-53).
- * Civil yyyy-MM-dd values are interpreted in an IANA timezone (PC-282), not the
- * host process locale (which is UTC on Vercel).
+ *
+ * Date contract (PC-317): a sleeping night is a civil `yyyy-MM-dd` date anchored
+ * to **midnight in an IANA timezone** (PC-282), NOT the host process locale
+ * (which is UTC on Vercel) and NOT the noon-UTC bounds used for all-day events
+ * (see `proposalDraftDateUtils`). `sleepingDateToStartIso` performs the civil
+ * date → midnight-in-TZ mapping; `sleepingCalendarDayEnd` returns the inclusive
+ * end of that civil day so single-night arrangements (which store a null end)
+ * still occupy the whole day for archive/expiry/conflict comparisons.
  */
 
 import { localDateKey } from "@/lib/schedule/dates";

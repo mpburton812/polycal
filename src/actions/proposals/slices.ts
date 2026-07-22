@@ -663,7 +663,7 @@ export async function detachProposalSliceAction(
       if (activeSlots.length > 0) {
         const spanSlot =
           activeSlots.find((slot) =>
-            expandAllDayDateKeys(slot.startAt, slot.endAt).includes(sliceKey),
+            expandAllDayDateKeys(slot.startAt, slot.endAt, viewerTimeZone).includes(sliceKey),
           ) ?? activeSlots[0]!;
         sourceStart = spanSlot.startAt;
         sourceEnd = spanSlot.endAt;
@@ -723,7 +723,7 @@ export async function detachProposalSliceAction(
         });
       }
 
-      const allKeys = expandAllDayDateKeys(sourceStart!, sourceEnd);
+      const allKeys = expandAllDayDateKeys(sourceStart!, sourceEnd, viewerTimeZone);
       const remainingKeys = allKeys.filter((key) => key !== sliceKey);
       const ranges = splitContiguousDateKeys(remainingKeys);
 
