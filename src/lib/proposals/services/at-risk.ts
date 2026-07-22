@@ -1,14 +1,14 @@
 import { eq } from "drizzle-orm";
 
 import type { getDb } from "@/lib/db/client";
-import { proposalInvitees, proposals } from "@/lib/db/schema";
-import { notifyUser } from "@/lib/notifications";
+import { proposals } from "@/lib/db/schema";
 import {
   computeAtRiskExpiresAt,
   loadEnforcementSettings,
 } from "@/lib/proposals/enforcement";
 
 import { logProposalTransition } from "./state-log";
+import { notifyProposalParticipants } from "./notify-participants";
 import { resetInviteeVotes } from "./votes";
 
 type Db = ReturnType<typeof getDb>;
@@ -39,25 +39,19 @@ export async function enterAtRiskProposedState(
   await resetInviteeVotes(db, proposal.id);
   await logProposalTransition(db, proposal.id, actorUserId, "proposal.at_risk", reason);
 
-  await notifyUser(
-    proposal.proposerId,
-    "proposal_at_risk",
-    `Proposal "${proposal.title}" is at risk. Cancel, re-draft, or update attendees.`,
-    { proposalId: proposal.id, action: "at_risk_options", proposalType: proposal.proposalType },
-  );
-
-  const invitees = await db
-    .select({ userId: proposalInvitees.userId })
-    .from(proposalInvitees)
-    .where(eq(proposalInvitees.proposalId, proposal.id));
-
-  for (const row of invitees) {
-    if (row.userId === proposal.proposerId) continue;
-    await notifyUser(
-      row.userId,
-      "proposal_at_risk",
-      `Proposal "${proposal.title}" is tentative/at risk on the calendar until re-approved.`,
-      { proposalId: proposal.id, action: "vote", proposalType: proposal.proposalType },
-    );
-  }
+  // Proposer gets the at-risk resolution options; invitees get the tentative
+  // calendar notice + vote deep-link. Thin wrapper over the shared fan-out that
+  // preserves the prior per-audience copy and metadata exactly (PC-322).
+  await notifyProposalParticipants(db, {
+    proposalId: proposal.id,
+    proposerId: proposal.proposerId,
+    notificationType: "proposal_at_risk",
+    metadata: { proposalType: proposal.proposalType },
+    message: ({ isProposer }) =>
+      isProposer
+        ? `Proposal "${proposal.title}" is at risk. Cancel, re-draft, or update attendees.`
+        : `Proposal "${proposal.title}" is tentative/at risk on the calendar until re-approved.`,
+    metadataFor: ({ isProposer }) =>
+      isProposer ? { action: "at_risk_options" } : { action: "vote" },
+  });
 }

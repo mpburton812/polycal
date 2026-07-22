@@ -1,39 +1,21 @@
 import type { FeedPrefs } from "@/types/feed-prefs";
+import {
+  FEED_PROPOSED_ACTIONS,
+  FEED_RESOLVED_ACTIONS,
+  FEED_VOTE_ACTIONS,
+  contentKindForMilestoneAction,
+  type FeedMilestoneContentKind,
+} from "@/lib/proposals/services/transition-catalog";
 
-/** Core lifecycle actions always eligible for Proposed / Resolved rows (PC-266). */
-export const FEED_PROPOSED_ACTIONS = [
-  "proposal.submitted",
-  "proposal.redrafted",
-  "proposal.attendees_updated",
-  "proposal.admin_fast_add",
-] as const;
-
-export const FEED_RESOLVED_ACTIONS = [
-  "proposal.resolved",
-  "proposal.auto_resolved",
-  "proposal.cancelled",
-  "proposal.at_risk",
-  "proposal.admin_rescheduled",
-] as const;
-
-/** Vote milestones — gated by Votes content pref (PC-267). */
-export const FEED_VOTE_ACTIONS = [
-  "proposal.vote_cast",
-  "proposal.slot_vote_cast",
-  "proposal.passive_proxy_vote",
-] as const;
-
-export type FeedMilestoneContentKind = "proposed" | "votes" | "resolved";
-
-/**
- * Maps a state-log action to a feed content kind, or null if not a feed milestone.
- */
-export function contentKindForMilestoneAction(action: string): FeedMilestoneContentKind | null {
-  if ((FEED_PROPOSED_ACTIONS as readonly string[]).includes(action)) return "proposed";
-  if ((FEED_VOTE_ACTIONS as readonly string[]).includes(action)) return "votes";
-  if ((FEED_RESOLVED_ACTIONS as readonly string[]).includes(action)) return "resolved";
-  return null;
-}
+// Re-export the transition→feed-kind catalog (source of truth lives beside the
+// state-log writer) so existing Feed imports keep a stable path (PC-323).
+export {
+  FEED_PROPOSED_ACTIONS,
+  FEED_RESOLVED_ACTIONS,
+  FEED_VOTE_ACTIONS,
+  contentKindForMilestoneAction,
+};
+export type { FeedMilestoneContentKind };
 
 /**
  * State-log actions to query for the given prefs (PC-266 / PC-267).

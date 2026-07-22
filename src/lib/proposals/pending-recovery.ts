@@ -1,5 +1,3 @@
-import { randomUUID } from "node:crypto";
-
 import { and, eq } from "drizzle-orm";
 
 import { getDb } from "@/lib/db/client";
@@ -8,25 +6,11 @@ import {
   dismissAllNotificationsForProposal,
   formatDraftReturnNotification,
 } from "@/lib/notifications-draft-return";
-import { proposalInvitees, proposalStateLog, proposals } from "@/lib/db/schema";
+import { logProposalTransition } from "@/lib/proposals/services/state-log";
+import { notifyProposalParticipants } from "@/lib/proposals/services/notify-participants";
+import { proposalInvitees, proposals } from "@/lib/db/schema";
 
 type Db = ReturnType<typeof getDb>;
-
-async function logSystemTransition(
-  db: Db,
-  proposalId: string,
-  action: string,
-  details: string,
-): Promise<void> {
-  await db.insert(proposalStateLog).values({
-    id: `psl-${randomUUID()}`,
-    proposalId,
-    actorUserId: null,
-    action,
-    details,
-    createdAt: new Date().toISOString(),
-  });
-}
 
 /**
  * When a proposal loses all required invitees and is not intentional solo,
@@ -68,22 +52,16 @@ export async function enterPendingRecoveryIfNeeded(
     })
     .where(eq(proposals.id, proposalId));
 
-  await logSystemTransition(db, proposalId, "proposal.reverted_to_draft", noteLine);
+  await logProposalTransition(db, proposalId, null, "proposal.reverted_to_draft", noteLine);
 
-  const invitees = await db
-    .select({ userId: proposalInvitees.userId })
-    .from(proposalInvitees)
-    .where(eq(proposalInvitees.proposalId, proposalId));
-
-  const notifyIds = new Set<string>([proposal.proposerId, ...invitees.map((row) => row.userId)]);
   await dismissAllNotificationsForProposal(proposalId);
-  const message = formatDraftReturnNotification(proposal.title, reason);
-  for (const notifyId of notifyIds) {
-    await notifyUser(notifyId, "proposal_reverted_to_draft", message, {
-      proposalId,
-      reason,
-    });
-  }
+  await notifyProposalParticipants(db, {
+    proposalId,
+    proposerId: proposal.proposerId,
+    notificationType: "proposal_reverted_to_draft",
+    message: formatDraftReturnNotification(proposal.title, reason),
+    metadata: { reason },
+  });
   return "draft";
 }
 
@@ -114,7 +92,7 @@ export async function expirePendingRecoveryProposals(db: Db): Promise<void> {
       })
       .where(eq(proposals.id, proposal.id));
 
-    await logSystemTransition(db, proposal.id, "proposal.recovery_expired", noteLine);
+    await logProposalTransition(db, proposal.id, null, "proposal.recovery_expired", noteLine);
 
     await notifyUser(
       proposal.proposerId,

@@ -360,13 +360,14 @@ export async function castPollSlotVote(
   await row.getByRole("button", { name: new RegExp(`${voteLabel} for`, "i") }).click();
 }
 
-/** Creates and submits a time poll with the given slot start times and required invitees. */
+/** Creates and submits a time poll with the given slot start times and invitees. */
 export async function createAndSubmitPoll(
   page: Page,
   options: {
     title: string;
     description?: string;
     requiredNames: string[];
+    optionalNames?: string[];
     slotStarts: string[];
     slotLabels?: string[];
   },
@@ -381,6 +382,9 @@ export async function createAndSubmitPoll(
   for (const name of options.requiredNames) {
     await setInviteeRequired(dialog, name);
   }
+  for (const name of options.optionalNames ?? []) {
+    await setInviteeOptional(dialog, name);
+  }
   for (let index = 0; index < options.slotStarts.length; index += 1) {
     if (index > 0) {
       await dialog.getByRole("button", { name: "Add poll option" }).click();
@@ -394,6 +398,18 @@ export async function createAndSubmitPoll(
     );
   }
   await submitProposalDraft(page, dialog);
+}
+
+/** Casts the same Accept / Sub-opt / Decline vote on every poll matrix row. */
+export async function castAllPollSlotVotes(
+  dialog: Locator,
+  voteLabel: "Accept" | "Sub-opt" | "Decline",
+): Promise<void> {
+  const rows = dialog.locator("table").first().locator("tbody tr");
+  const count = await rows.count();
+  for (let index = 0; index < count; index += 1) {
+    await castPollSlotVote(dialog, index, voteLabel);
+  }
 }
 
 /** Locates one night block in the shared fast sleeping plan grid by ISO date. */

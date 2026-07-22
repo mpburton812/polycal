@@ -86,6 +86,7 @@ import { canProxyVoteForPassiveInvitee, actorCanProxyVoteSync } from "@/lib/prop
 import { canManageSleepingAttendees } from "@/lib/proposals/passive-auto-accept";
 import { enterAtRiskProposedState } from "@/lib/proposals/services/at-risk";
 import { logProposalTransition } from "@/lib/proposals/services/state-log";
+import { notifyProposalParticipants } from "@/lib/proposals/services/notify-participants";
 import { resetInviteeVotes, wipeProposalVotes } from "@/lib/proposals/services/votes";
 import { formatSleepingDisplayTitle } from "@/lib/proposals/sleeping-display";
 import {
@@ -388,7 +389,13 @@ function aggregateVoteFromSlotVotes(
   return "abstain";
 }
 
-/** Notifies proposer and all invitees on a proposal (PC-40). */
+/**
+ * Notifies proposer and all invitees on a proposal (PC-40).
+ *
+ * Thin wrapper over the shared {@link notifyProposalParticipants} fan-out that
+ * layers on the standard proposal context (title/type/when/where) so the copy
+ * and metadata are identical to the historical hand-rolled loop (PC-322).
+ */
 async function notifyProposalStakeholders(
   db: ReturnType<typeof getDb>,
   proposal: typeof proposals.$inferSelect,
@@ -396,15 +403,12 @@ async function notifyProposalStakeholders(
   message: string,
   extra?: Record<string, unknown>,
 ): Promise<void> {
-  const invitees = await db
-    .select({ userId: proposalInvitees.userId })
-    .from(proposalInvitees)
-    .where(eq(proposalInvitees.proposalId, proposal.id));
-
-  const notifyIds = new Set<string>([proposal.proposerId, ...invitees.map((row) => row.userId)]);
-  for (const userId of notifyIds) {
-    await notifyUser(userId, notificationType, message, {
-      proposalId: proposal.id,
+  await notifyProposalParticipants(db, {
+    proposalId: proposal.id,
+    proposerId: proposal.proposerId,
+    notificationType,
+    message,
+    metadata: {
       proposalTitle: proposal.title,
       proposalType: proposal.proposalType,
       // Extra proposal context so notification surfaces can render when/where.
@@ -413,8 +417,8 @@ async function notifyProposalStakeholders(
       locationText: proposal.locationText ?? undefined,
       isAllDay: proposal.isAllDay ?? undefined,
       ...extra,
-    });
-  }
+    },
+  });
 }
 
 /** Parses bedroom label JSON stored on locations (PC-40). */
@@ -771,22 +775,15 @@ async function revertProposalToDraft(
     revalidatePath("/people-places");
   }
 
-  const invitees = await db
-    .select({ userId: proposalInvitees.userId })
-    .from(proposalInvitees)
-    .where(eq(proposalInvitees.proposalId, proposal.id));
-
   await dismissAllNotificationsForProposal(proposal.id);
 
-  const notifyIds = new Set<string>([proposal.proposerId, ...invitees.map((row) => row.userId)]);
-  const message = formatDraftReturnNotification(proposal.title, reason);
-  for (const userId of notifyIds) {
-    await notifyUser(userId, "proposal_reverted_to_draft", message, {
-      proposalId: proposal.id,
-      reason,
-      proposalType: proposal.proposalType,
-    });
-  }
+  await notifyProposalParticipants(db, {
+    proposalId: proposal.id,
+    proposerId: proposal.proposerId,
+    notificationType: "proposal_reverted_to_draft",
+    message: formatDraftReturnNotification(proposal.title, reason),
+    metadata: { reason, proposalType: proposal.proposalType },
+  });
 }
 
 /**
@@ -1078,38 +1075,32 @@ async function resolveProposal(
     await applyResidencyProposalResolution(db, proposal, actorUserId);
   }
 
-  const invitees = await db
-    .select({
-      userId: proposalInvitees.userId,
-      role: proposalInvitees.role,
-      voteStatus: proposalInvitees.voteStatus,
-    })
-    .from(proposalInvitees)
-    .where(eq(proposalInvitees.proposalId, proposal.id));
-
   const pollMatrix = proposal.isPoll && slots.length > 1;
   const specialKind = getProposalSpecialKind(proposal.description);
-  const notifyIds = new Set<string>([proposal.proposerId, ...invitees.map((row) => row.userId)]);
-  for (const userId of notifyIds) {
-    const invitee = invitees.find((row) => row.userId === userId);
-    const optionalStillVoting =
-      invitee?.role === "optional" && invitee.voteStatus === "not_seen";
-    let message: string;
-    if (specialKind === "residency") {
-      message = `Residency proposal "${proposal.title}" was accepted.`;
-    } else if (optionalStillVoting) {
-      message = pollMatrix
-        ? `Proposal "${proposal.title}" was approved by all required attendees and scheduled. Please complete your poll votes.`
-        : `Proposal "${proposal.title}" was approved by all required attendees and scheduled. Please Accept or Decline.`;
-    } else {
-      message = `Proposal "${proposal.title}" was approved and scheduled.`;
-    }
-    await notifyUser(userId, "proposal_resolved", message, {
-      proposalId: proposal.id,
-      proposalType: proposal.proposalType,
-      ...(optionalStillVoting ? { action: "vote" } : {}),
-    });
-  }
+  // Optional invitees still owe an RSVP after required attendees resolve, so they
+  // get an actionable variant (message + vote deep-link) while everyone else gets
+  // the plain "approved and scheduled" copy — behavior identical to the prior loop
+  // (PC-49 / PC-278 / PC-322).
+  await notifyProposalParticipants(db, {
+    proposalId: proposal.id,
+    proposerId: proposal.proposerId,
+    notificationType: "proposal_resolved",
+    metadata: { proposalType: proposal.proposalType },
+    message: ({ role, voteStatus }) => {
+      const optionalStillVoting = role === "optional" && voteStatus === "not_seen";
+      if (specialKind === "residency") {
+        return `Residency proposal "${proposal.title}" was accepted.`;
+      }
+      if (optionalStillVoting) {
+        return pollMatrix
+          ? `Proposal "${proposal.title}" was approved by all required attendees and scheduled. Please complete your poll votes.`
+          : `Proposal "${proposal.title}" was approved by all required attendees and scheduled. Please Accept or Decline.`;
+      }
+      return `Proposal "${proposal.title}" was approved and scheduled.`;
+    },
+    metadataFor: ({ role, voteStatus }) =>
+      role === "optional" && voteStatus === "not_seen" ? { action: "vote" } : {},
+  });
 
   if (!isNonScheduleProposal(proposal.description)) {
     await autoDeclineCollidingProposals(db, proposal, scheduleStart, scheduleEnd, actorUserId);
