@@ -280,3 +280,6 @@
 2026-07-22 | c1c18cf | PC-318 | conflict parity via buildScheduleWindows + widened overlap windows | src/lib/proposals/conflict-windows.ts
 2026-07-22 | c1c18cf | PC-319 | unit tests: same-day all-day, same-night sleeping, event×sleeping PC-59, draft date contract | src/lib/proposals/conflict-windows.test.ts
 2026-07-22 | c6aae60 | PC-320 | consolidate state-transition logging + notify fan-out [][][][] | src/actions/proposals/_core.ts
+2026-07-22 | 33cee27 | PC-325 | poll invitee paths and midnight/11pm self-appointment journeys | src/lib/changelog/entries.ts
+2026-07-22 | f3fea5e | PC-325 | merge(dev): resolve changelog conflicts for | n/a
+2026-07-22 | 956e1f8 | PC-325 | merge(dev): resync changelog for | n/a
