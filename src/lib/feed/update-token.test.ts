@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { buildFeedUpdateToken } from "@/lib/feed/update-token";
-import type { FeedItem } from "@/lib/feed/types";
+import type { FeedActiveEvent, FeedItem } from "@/lib/feed/types";
 
 function chatItem(overrides: Partial<FeedItem & { kind: "chat" }> = {}): FeedItem {
   return {
@@ -21,20 +21,33 @@ function chatItem(overrides: Partial<FeedItem & { kind: "chat" }> = {}): FeedIte
   };
 }
 
+const activeEvent: FeedActiveEvent = {
+  proposalId: "p1",
+  title: "Garden party",
+  scheduledStartAt: "2026-07-16T11:00:00.000Z",
+  scheduledEndAt: "2026-07-16T13:00:00.000Z",
+  proposalState: "resolved",
+};
+
 describe("buildFeedUpdateToken", () => {
   it("is stable for identical heads", () => {
     const items = [chatItem()];
-    expect(buildFeedUpdateToken(items)).toBe(buildFeedUpdateToken(items));
+    expect(buildFeedUpdateToken(items, [activeEvent])).toBe(
+      buildFeedUpdateToken(items, [activeEvent]),
+    );
   });
 
   it("changes when like counts change", () => {
-    const before = buildFeedUpdateToken([chatItem({ likeCount: 0 })]);
-    const after = buildFeedUpdateToken([chatItem({ likeCount: 1, likedByMe: true })]);
+    const before = buildFeedUpdateToken([chatItem({ likeCount: 0 })], []);
+    const after = buildFeedUpdateToken(
+      [chatItem({ likeCount: 1, likedByMe: true })],
+      [],
+    );
     expect(before).not.toBe(after);
   });
 
   it("changes when a comment is added", () => {
-    const before = buildFeedUpdateToken([chatItem()]);
+    const before = buildFeedUpdateToken([chatItem()], []);
     const after = buildFeedUpdateToken([
       chatItem({
         comments: [
@@ -52,13 +65,19 @@ describe("buildFeedUpdateToken", () => {
           },
         ],
       }),
-    ]);
+    ], []);
     expect(before).not.toBe(after);
   });
 
   it("changes when the newest item id changes", () => {
-    const before = buildFeedUpdateToken([chatItem({ id: "c1" })]);
-    const after = buildFeedUpdateToken([chatItem({ id: "c2" })]);
+    const before = buildFeedUpdateToken([chatItem({ id: "c1" })], []);
+    const after = buildFeedUpdateToken([chatItem({ id: "c2" })], []);
+    expect(before).not.toBe(after);
+  });
+
+  it("changes when the active event stack changes", () => {
+    const before = buildFeedUpdateToken([chatItem()], []);
+    const after = buildFeedUpdateToken([chatItem()], [activeEvent]);
     expect(before).not.toBe(after);
   });
 });

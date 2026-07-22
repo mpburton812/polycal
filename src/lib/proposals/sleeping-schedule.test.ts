@@ -26,6 +26,15 @@ describe("sleepingDateToStartIso", () => {
     expect(utc).toBe("2099-01-15T00:00:00.000Z");
   });
 
+  it("maps civil nights to Chicago midnight so Eastern-default ISO is not a day early", () => {
+    const chicago = sleepingDateToStartIso("2026-07-21", "America/Chicago")!;
+    const easternDefault = sleepingDateToStartIso("2026-07-21", "America/New_York")!;
+    expect(chicago).toBe("2026-07-21T05:00:00.000Z");
+    expect(isoToSleepingDateInput(chicago, "America/Chicago")).toBe("2026-07-21");
+    // Eastern midnight for the same civil date lands on the previous evening in Chicago.
+    expect(isoToSleepingDateInput(easternDefault, "America/Chicago")).toBe("2026-07-20");
+  });
+
   it("returns undefined for empty or invalid input", () => {
     expect(sleepingDateToStartIso("")).toBeUndefined();
     expect(sleepingDateToStartIso("not-a-date")).toBeUndefined();

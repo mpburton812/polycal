@@ -29,7 +29,7 @@ import {
   type ProposalState,
   type ProposalType,
 } from "@/lib/db/schema";
-import { notifyUser } from "@/lib/notifications";
+import { actorNotifyFields, notifyUser } from "@/lib/notifications";
 import { dismissNotificationsForProposal } from "@/actions/notifications";
 import {
   dismissAllNotificationsForProposal,
@@ -1017,7 +1017,11 @@ async function resolveProposal(
       if (proposal.isBatchSleeping && slots.length > 0) {
         const sorted = [...slots].sort((a, b) => a.startAt.localeCompare(b.startAt));
         scheduleStart = sorted[0]?.startAt ?? null;
-        scheduleEnd = null;
+        // Last night start anchors archive/grace (scheduledEndAt null would use first night only).
+        scheduleEnd = sorted[sorted.length - 1]?.startAt ?? null;
+        if (scheduleStart && scheduleEnd && scheduleStart === scheduleEnd) {
+          scheduleEnd = null;
+        }
       } else {
         const sleeping = sleepingScheduleFromSlotRows(slots);
         scheduleStart = sleeping.start;
@@ -2565,6 +2569,7 @@ export async function getProposalDetailAction(
           adminCanSeeUninvolved,
         }),
       canCancel: canManage && (row.state === "proposed" || row.state === "resolved"),
+      canAdminDeleteProposal: isAdmin,
       canRedraft: isProposer && row.state === "resolved",
       canReschedule:
         isAdmin &&
@@ -2658,6 +2663,7 @@ export async function acknowledgeProposalOverlapAction(
   }
 
   const now = new Date().toISOString();
+  const actor = actorNotifyFields(session.user);
 
   if (parsed.data.response === "acknowledge") {
     await db
@@ -2698,8 +2704,14 @@ export async function acknowledgeProposalOverlapAction(
   await notifyUser(
     proposal.proposerId,
     "proposal_vote_cast",
-    `A vote was changed to decline on "${proposal.title}" after a schedule conflict.`,
-    { proposalId: proposal.id, voterId: session.user.id, vote: "decline", proposalType: proposal.proposalType },
+    `${actor.actorDisplayName} changed their vote to decline on "${proposal.title}" after a schedule conflict.`,
+    {
+      proposalId: proposal.id,
+      voterId: session.user.id,
+      vote: "decline",
+      proposalType: proposal.proposalType,
+      ...actor,
+    },
   );
 
   if (invitee.role === "required") {
@@ -2820,6 +2832,7 @@ export async function castProposalVoteAction(
   }
 
   const now = new Date().toISOString();
+  const actor = actorNotifyFields(session.user);
   await db
     .update(proposalInvitees)
     .set({
@@ -2846,12 +2859,13 @@ export async function castProposalVoteAction(
     }),
   );
 
-  await notifyUser(proposal.proposerId, "proposal_vote_cast", `A vote was cast on "${proposal.title}".`, {
+  await notifyUser(proposal.proposerId, "proposal_vote_cast", `${actor.actorDisplayName} cast a vote on "${proposal.title}".`, {
     proposalId: proposal.id,
     voterId: session.user.id,
     vote: parsed.data.vote,
     proposalType: proposal.proposalType,
     ...(isProxy ? { onBehalfOfUserId: targetUserId } : {}),
+    ...actor,
   });
 
   if (invitee.role === "required") {
@@ -3042,6 +3056,7 @@ export async function updateResolvedAttendeesAction(
   }
 
   const now = new Date().toISOString();
+  const actor = actorNotifyFields(session.user);
   let attendeesChanged = false;
   let removedRequiredAttendee = false;
   const addedRequiredNames: string[] = [];
@@ -3076,9 +3091,10 @@ export async function updateResolvedAttendeesAction(
     attendeesChanged = true;
     removedNames.push(await displayNameFor(userId));
 
-    await notifyUser(userId, "proposal_attendee_removed", `You were removed from "${proposal.title}".`, {
+    await notifyUser(userId, "proposal_attendee_removed", `${actor.actorDisplayName} removed you from "${proposal.title}".`, {
       proposalId: proposal.id,
       proposalType: proposal.proposalType,
+      ...actor,
     });
   }
 
@@ -3110,9 +3126,10 @@ export async function updateResolvedAttendeesAction(
     if (role === "required") addedRequiredNames.push(name);
     else addedOptionalNames.push(name);
 
-    await notifyUser(userId, "proposal_attendee_added", `You were added to "${proposal.title}".`, {
+    await notifyUser(userId, "proposal_attendee_added", `${actor.actorDisplayName} added you to "${proposal.title}".`, {
       proposalId: proposal.id,
       proposalType: proposal.proposalType,
+      ...actor,
     });
   }
 
@@ -3139,8 +3156,13 @@ export async function updateResolvedAttendeesAction(
         await notifyUser(
           row.userId,
           "proposal_attendee_update",
-          `Attendees changed on "${proposal.title}" — maintain your acceptance or decline.`,
-          { proposalId: proposal.id, action: "attendee_update", proposalType: proposal.proposalType },
+          `${actor.actorDisplayName} changed attendees on "${proposal.title}" — maintain your acceptance or decline.`,
+          {
+            proposalId: proposal.id,
+            action: "attendee_update",
+            proposalType: proposal.proposalType,
+            ...actor,
+          },
         );
       }
     }
@@ -3451,11 +3473,13 @@ export async function rescheduleProposalAction(
     }),
   );
 
+  const actor = actorNotifyFields(session.user);
   await notifyProposalStakeholders(
     db,
     proposal,
     "proposal_rescheduled",
-    `Proposal "${proposal.title}" was rescheduled by an administrator.`,
+    `${actor.actorDisplayName} rescheduled "${proposal.title}".`,
+    actor,
   );
 
   revalidatePath("/proposals");
@@ -3801,4 +3825,99 @@ export async function redraftProposalAction(
   revalidatePath("/schedule");
 
   return { ok: true, message: "Proposal moved to drafts. Calendar entry flagged at-risk until resubmitted." };
+}
+
+const NUDGE_COOLDOWN_MS = 60 * 60 * 1000;
+
+/**
+ * Notifies invitees who have not voted yet (proposer or admin, PC-293).
+ */
+export async function nudgePendingVotersAction(
+  proposalId: string,
+): Promise<{ ok: boolean; message: string; nudgedCount?: number }> {
+  const session = await auth();
+  if (!session?.user) {
+    return { ok: false, message: "Sign in required." };
+  }
+
+  await ensureDbReady();
+  const db = getDb();
+  const [proposal] = await db
+    .select()
+    .from(proposals)
+    .where(eq(proposals.id, proposalId))
+    .limit(1);
+
+  if (!proposal) {
+    return { ok: false, message: "Proposal not found." };
+  }
+
+  const isAdmin = await userHasAdminAccess(session.user.role);
+  if (proposal.proposerId !== session.user.id && !isAdmin) {
+    return { ok: false, message: "Only the proposer or an admin can nudge voters." };
+  }
+
+  const invitees = await db
+    .select({
+      userId: proposalInvitees.userId,
+      role: proposalInvitees.role,
+      voteStatus: proposalInvitees.voteStatus,
+    })
+    .from(proposalInvitees)
+    .where(eq(proposalInvitees.proposalId, proposalId));
+
+  const pending = invitees.filter((row) => row.voteStatus === "not_seen");
+  const hasPendingOptional =
+    proposal.state === "resolved" &&
+    invitees.some((row) => row.role === "optional" && row.voteStatus === "not_seen");
+
+  if (proposal.state !== "proposed" && !hasPendingOptional) {
+    return { ok: false, message: "Only open proposals can be nudged." };
+  }
+
+  if (pending.length === 0) {
+    return { ok: true, message: "Everyone has already responded.", nudgedCount: 0 };
+  }
+
+  if (proposal.lastNudgeAt) {
+    const lastMs = Date.parse(proposal.lastNudgeAt);
+    if (!Number.isNaN(lastMs) && Date.now() - lastMs < NUDGE_COOLDOWN_MS) {
+      return { ok: false, message: "Wait at least an hour between nudges." };
+    }
+  }
+
+  const now = new Date().toISOString();
+  for (const invitee of pending) {
+    await notifyUser(
+      invitee.userId,
+      "proposal_nudge",
+      `Reminder: "${proposal.title}" still needs your response.`,
+      {
+        proposalId: proposal.id,
+        proposalTitle: proposal.title,
+        proposalType: proposal.proposalType,
+        action: "vote",
+      },
+    );
+  }
+
+  await db
+    .update(proposals)
+    .set({ lastNudgeAt: now, updatedAt: now })
+    .where(eq(proposals.id, proposalId));
+
+  await logProposalTransition(
+    db,
+    proposalId,
+    session.user.id,
+    "proposal.vote_nudge",
+    JSON.stringify({ nudgedCount: pending.length }),
+  );
+
+  revalidatePath("/proposals");
+  return {
+    ok: true,
+    message: `Nudged ${pending.length} pending voter${pending.length === 1 ? "" : "s"}.`,
+    nudgedCount: pending.length,
+  };
 }

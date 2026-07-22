@@ -21,6 +21,8 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- PC-298: Feed pins currently-happening non-sleeping (resolved) events in a sticky **Happening now** highlight stack above the timeline; silent poll tracks active window changes. Change control: `2026.07.22b`.
+- PC-291–PC-296: Proposed Kanban **Nudge** for pending voters (1h cooldown); live proposed/at-risk expiry countdowns on summary cards; admin **hard-delete** of proposals in any state (including archived), with `proposal_admin_deleted` notify to all participants. Change control: `2026.07.22a`. SCHEMA_VERSION 34 (`last_nudge_at`).
 - PC-279: Feed URL embeds — linkify chat/comment bodies and show Facebook-style Open Graph preview cards (SSRF-safe cache). Change control: `2026.07.21f`. SCHEMA_VERSION 31.
 - PC-278: Optional invitees keep Proposed visibility + actionable resolve notification after required attendees resolve (extend PC-49 to non-polls). Change control: `2026.07.21e`.
 - **Production release `2026.07.21-prod` (PC-271):** Consolidated Code Status entry for this promote — Feed Controls (PC-264–268), six-item UX batch (PC-258–263), FEED/like parrot sizing (PC-270; supersedes interim PC-260/269 sizes), brace-expansion/js-yaml audit patches (PC-258).
@@ -32,6 +34,7 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - PC-270: Bottom FEED parrot matches sibling nav icons (24×24); feed like birds half that (12×12). Change control: `2026.07.21b`.
 
 ### Fixed
+- PC-299: Actor-authored proposal, place, and user-lifecycle notifications name the initiating user (no more hardcoded “An admin” / “an administrator”); admin activity logs attribute `notification.*` rows to the actor while preserving the recipient in details. Change control: `2026.07.22b`.
 - PC-280: Sleeping proposals no longer show as "past" until the whole calendar day elapses (board + proposal cards); Schedule overlap/red-conflict check no longer flags a sleeping arrangement against an event on the same night (PC-59 parity). Change control: `2026.07.21g`.
 
 ### Added

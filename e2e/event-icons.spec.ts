@@ -3,12 +3,11 @@ import { expect, test } from "./helpers/test";
 import { login } from "./helpers/auth";
 import { USERS } from "./helpers/constants";
 import { fillProposalDateTimeField } from "./helpers/datePickers";
-import { goToProposals } from "./helpers/navigation";
+import { goToProposals, openProposalCard } from "./helpers/navigation";
 import {
   expectResolvedProposal,
   expandDraftMoreOptions,
   openEventProposalDraft,
-  proposalCard,
   selectEventIcon,
   submitProposalDraft,
 } from "./helpers/proposals";
@@ -34,7 +33,8 @@ test.describe("Event category icons (PC-116)", () => {
     await submitProposalDraft(page, dialog);
 
     await expectResolvedProposal(page, title);
-    await proposalCard(page, title).click();
+    // Click the title heading — admin Delete on the card must not steal the click (PC-295).
+    await openProposalCard(page, title);
 
     const detail = page.getByRole("dialog");
     await expect(detail.getByRole("img", { name: "Food and pizza event" })).toBeVisible();
@@ -54,7 +54,7 @@ test.describe("Event category icons (PC-116)", () => {
     await submitProposalDraft(page, dialog);
 
     await expectResolvedProposal(page, title);
-    await proposalCard(page, title).click();
+    await openProposalCard(page, title);
 
     const detail = page.getByRole("dialog");
     page.once("dialog", (confirmDialog) => confirmDialog.accept());

@@ -19,7 +19,7 @@ import {
   userActivityLog,
   users,
 } from "@/lib/db/schema";
-import { notifyUser } from "@/lib/notifications";
+import { actorNotifyFields, notifyUser } from "@/lib/notifications";
 import { userIsPlaceOwner } from "@/lib/places/membership";
 import type { PlaceRole } from "@/types/relationship";
 import type { UserRole } from "@/types/user";
@@ -240,6 +240,15 @@ async function revertProposalsForDeletedPlace(
   deletedByUserId: string,
 ): Promise<number> {
   const linked = await db.select().from(proposals).where(eq(proposals.locationId, placeId));
+  const [deletedBy] = await db
+    .select({ displayName: users.displayName })
+    .from(users)
+    .where(eq(users.id, deletedByUserId))
+    .limit(1);
+  const actor = actorNotifyFields({
+    id: deletedByUserId,
+    displayName: deletedBy?.displayName,
+  });
   const now = new Date().toISOString();
   let movedCount = 0;
 
@@ -266,7 +275,7 @@ async function revertProposalsForDeletedPlace(
         .where(eq(proposalInvitees.proposalId, proposal.id));
 
       const notifyIds = new Set<string>([proposal.proposerId, ...inviteeRows.map((r) => r.userId)]);
-      const notificationMessage = `Place "${placeName}" was deleted. Proposal "${proposal.title}" was moved to drafts.`;
+      const notificationMessage = `${actor.actorDisplayName} deleted place "${placeName}". Proposal "${proposal.title}" was moved to drafts.`;
 
       for (const userId of notifyIds) {
         await notifyUser(userId, "place_deleted_proposal_reverted", notificationMessage, {
@@ -275,6 +284,7 @@ async function revertProposalsForDeletedPlace(
           proposalId: proposal.id,
           proposalTitle: proposal.title,
           deletedByUserId,
+          ...actor,
         });
       }
 

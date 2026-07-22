@@ -23,6 +23,7 @@ import {
 import { logProposalTransition } from "@/lib/proposals/services/state-log";
 import { formatSleepingDisplayTitle } from "@/lib/proposals/sleeping-display";
 import { sleepingDateToStartIso } from "@/lib/proposals/sleeping-schedule";
+import { resolveTimezone } from "@/lib/schedule/timezone";
 import type { UserRole } from "@/types/user";
 
 export type BatchLocationPolicy = "network" | "exists";
@@ -226,19 +227,35 @@ export async function replaceBatchInvitees(
   }
 }
 
+/**
+ * Loads the proposer's IANA timezone so civil night dates map to midnight in
+ * their zone (not the server default America/New_York).
+ */
+async function loadUserTimezone(db: Db, userId: string): Promise<string> {
+  const [row] = await db
+    .select({ timezone: users.timezone })
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
+  return resolveTimezone(row?.timezone);
+}
+
 /** Writes per-night time slots with batch metadata for a sleeping draft. */
 export async function persistBatchSleepingDraft(
   db: Db,
   proposalId: string,
   entries: BatchSleepingEntry[],
+  timeZone?: string,
 ): Promise<void> {
   await db.delete(proposalSlotVotes).where(eq(proposalSlotVotes.proposalId, proposalId));
   await db.delete(proposalTimeSlots).where(eq(proposalTimeSlots.proposalId, proposalId));
 
+  const tz = resolveTimezone(timeZone);
   const now = new Date().toISOString();
   for (let index = 0; index < entries.length; index += 1) {
     const entry = entries[index]!;
-    const startIso = sleepingDateToStartIso(entry.nightDate.slice(0, 10));
+    const nightDate = entry.nightDate.slice(0, 10);
+    const startIso = sleepingDateToStartIso(nightDate, tz);
     if (!startIso) {
       throw new Error("Invalid batch night date.");
     }
@@ -374,7 +391,8 @@ export async function createBatchSleepingDraft(
   });
 
   await replaceBatchInvitees(db, proposalId, input.proposerId, batchInvitees);
-  await persistBatchSleepingDraft(db, proposalId, input.entries);
+  const proposerTz = await loadUserTimezone(db, input.proposerId);
+  await persistBatchSleepingDraft(db, proposalId, input.entries, proposerTz);
   await logProposalTransition(db, proposalId, input.actorUserId, "draft.created");
 
   return { proposalId, title, intentionalSolo };
@@ -418,7 +436,8 @@ export async function updateBatchSleepingDraft(
     .where(eq(proposals.id, input.proposalId));
 
   await replaceBatchInvitees(db, input.proposalId, input.proposerId, batchInvitees);
-  await persistBatchSleepingDraft(db, input.proposalId, input.entries);
+  const proposerTz = await loadUserTimezone(db, input.proposerId);
+  await persistBatchSleepingDraft(db, input.proposalId, input.entries, proposerTz);
 
   return { title, intentionalSolo };
 }

@@ -1,11 +1,15 @@
-import type { FeedItem } from "@/lib/feed/types";
+import type { FeedActiveEvent, FeedItem } from "@/lib/feed/types";
 
 /**
- * Builds a compact token for the first-page feed head so clients can skip
- * full reloads when nothing changed (PC-239 silent poll).
+ * Builds a compact token for the first-page Feed head and active-event pins.
+ * Including pin timing/state lets silent polling refresh when an event enters,
+ * leaves, or changes within the highlighted stack (PC-239 / PC-298).
  */
-export function buildFeedUpdateToken(items: FeedItem[]): string {
-  return items
+export function buildFeedUpdateToken(
+  items: FeedItem[],
+  activeEvents: FeedActiveEvent[],
+): string {
+  const itemToken = items
     .map((item) => {
       const commentPart = item.comments
         .map((c) => `${c.id}:${c.likeCount}:${c.likedByMe ? 1 : 0}`)
@@ -21,4 +25,18 @@ export function buildFeedUpdateToken(items: FeedItem[]): string {
       ].join(":");
     })
     .join("|");
+
+  const activeEventToken = activeEvents
+    .map((event) =>
+      [
+        event.proposalId,
+        event.title,
+        event.scheduledStartAt,
+        event.scheduledEndAt ?? "",
+        event.proposalState,
+      ].join(":"),
+    )
+    .join("|");
+
+  return `${itemToken}#active:${activeEventToken}`;
 }

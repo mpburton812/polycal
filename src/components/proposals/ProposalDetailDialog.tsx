@@ -39,6 +39,7 @@ import { useEffect, useState, useTransition } from "react";
 import {
   acknowledgeProposalOverlapAction,
   addProposalCommentAction,
+  adminDeleteProposalAction,
   cancelProposalAction,
   castProposalVoteAction,
   castSlotVoteAction,
@@ -164,6 +165,7 @@ export function ProposalDetailDialog({
   const [addAttendeeId, setAddAttendeeId] = useState("");
   const [addAttendeeRole, setAddAttendeeRole] = useState<"required" | "optional">("required");
   const [cancelScopeOpen, setCancelScopeOpen] = useState(false);
+  const [adminDeleteScopeOpen, setAdminDeleteScopeOpen] = useState(false);
   const [rescheduleOpen, setRescheduleOpen] = useState(false);
   const [rescheduleStart, setRescheduleStart] = useState("");
   const [rescheduleEnd, setRescheduleEnd] = useState("");
@@ -311,6 +313,34 @@ export function ProposalDetailDialog({
     }
     if (!window.confirm("Cancel this proposal? It will be archived.")) return;
     handleCancel("occurrence");
+  }
+
+  function handleAdminDelete(scope: "occurrence" | "series" = "occurrence") {
+    if (!proposalId) return;
+    startTransition(async () => {
+      const result = await adminDeleteProposalAction(proposalId, scope);
+      notifyResult(result);
+      setAdminDeleteScopeOpen(false);
+      if (!result.ok) return;
+      onClose();
+      router.refresh();
+    });
+  }
+
+  function handleAdminDeleteClick() {
+    if (!detail) return;
+    if (detail.isRecurring) {
+      setAdminDeleteScopeOpen(true);
+      return;
+    }
+    if (
+      !window.confirm(
+        "Permanently delete this proposal? All participants will be notified. This cannot be undone.",
+      )
+    ) {
+      return;
+    }
+    handleAdminDelete("occurrence");
   }
 
   function handleRevokeAcceptance() {
@@ -1069,6 +1099,17 @@ export function ProposalDetailDialog({
                 Cancel
               </Button>
             )}
+            {detail?.canAdminDeleteProposal && (
+              <Button
+                color="error"
+                variant="outlined"
+                onClick={handleAdminDeleteClick}
+                disabled={pending}
+                sx={outlinedButtonSx}
+              >
+                Delete proposal
+              </Button>
+            )}
             {detail?.canRedraft && (
               <Button variant="outlined" onClick={handleRedraft} disabled={pending} sx={outlinedButtonSx}>
                 Re-draft
@@ -1119,6 +1160,37 @@ export function ProposalDetailDialog({
           This occurrence only
         </Button>
         <Button color="error" variant="contained" onClick={() => handleCancel("series")} disabled={pending}>
+          Entire series
+        </Button>
+      </DialogActions>
+    </Dialog>
+    <Dialog open={adminDeleteScopeOpen} onClose={() => setAdminDeleteScopeOpen(false)}>
+      <DialogTitle>Delete recurring proposal</DialogTitle>
+      <DialogContent>
+        <Typography variant="body2" sx={{ mt: 1 }}>
+          Permanently delete this occurrence only, or the entire series? Participants will be
+          notified.
+        </Typography>
+      </DialogContent>
+      <DialogActions>
+        <Button variant="outlined" onClick={() => setAdminDeleteScopeOpen(false)} sx={outlinedButtonSx}>
+          Back
+        </Button>
+        <Button
+          color="error"
+          variant="outlined"
+          onClick={() => handleAdminDelete("occurrence")}
+          disabled={pending}
+          sx={outlinedButtonSx}
+        >
+          This occurrence only
+        </Button>
+        <Button
+          color="error"
+          variant="contained"
+          onClick={() => handleAdminDelete("series")}
+          disabled={pending}
+        >
           Entire series
         </Button>
       </DialogActions>
