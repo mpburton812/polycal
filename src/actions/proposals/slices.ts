@@ -14,12 +14,13 @@ import {
   polyGroup,
   proposalComments,
   proposalInvitees,
-  proposalStateLog,
   proposalTimeSlots,
   proposals,
   users,
 } from "@/lib/db/schema";
-import { actorNotifyFields, notifyUser } from "@/lib/notifications";
+import { actorNotifyFields } from "@/lib/notifications";
+import { logProposalTransition } from "@/lib/proposals/services/state-log";
+import { notifyProposalParticipants } from "@/lib/proposals/services/notify-participants";
 import { logUserActivity } from "@/lib/audit";
 import {
   parseBatchEntriesJson,
@@ -113,46 +114,6 @@ async function archiveParentIfScheduleEmpty(
     .set({ state: "archived", updatedAt: now })
     .where(eq(proposals.id, parentId));
   await logProposalTransition(tx, parentId, actorUserId, "proposal.archived", "All slices detached.");
-}
-
-async function logProposalTransition(
-  db: DbExecutor,
-  proposalId: string,
-  actorUserId: string,
-  action: string,
-  details?: string,
-): Promise<void> {
-  await db.insert(proposalStateLog).values({
-    id: `psl-${randomUUID()}`,
-    proposalId,
-    actorUserId,
-    action,
-    details: details ?? null,
-    createdAt: new Date().toISOString(),
-  });
-}
-
-async function notifyStakeholders(
-  db: DbExecutor,
-  proposalId: string,
-  proposerId: string,
-  title: string,
-  notificationType: string,
-  message: string,
-  actor: ReturnType<typeof actorNotifyFields>,
-): Promise<void> {
-  const invitees = await db
-    .select({ userId: proposalInvitees.userId })
-    .from(proposalInvitees)
-    .where(eq(proposalInvitees.proposalId, proposalId));
-  const notifyIds = new Set<string>([proposerId, ...invitees.map((row) => row.userId)]);
-  for (const userId of notifyIds) {
-    await notifyUser(userId, notificationType, message, {
-      proposalId,
-      proposalTitle: title,
-      ...actor,
-    });
-  }
 }
 
 function splitContiguousDateKeys(keys: string[]): string[][] {
@@ -798,15 +759,13 @@ export async function detachProposalSliceAction(
 
   if (notifyAfterCommit) {
     try {
-      await notifyStakeholders(
-        db,
-        notifyAfterCommit.proposalId,
-        notifyAfterCommit.proposerId,
-        notifyAfterCommit.title,
-        "proposal_child_detached",
-        notifyAfterCommit.message,
-        actor,
-      );
+      await notifyProposalParticipants(db, {
+        proposalId: notifyAfterCommit.proposalId,
+        proposerId: notifyAfterCommit.proposerId,
+        notificationType: "proposal_child_detached",
+        message: notifyAfterCommit.message,
+        metadata: { proposalTitle: notifyAfterCommit.title, ...actor },
+      });
     } catch {
       // Detach already committed — do not fail the action on notification errors.
     }
