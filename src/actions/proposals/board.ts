@@ -17,6 +17,11 @@ import {
 import { PARTNERSHIP_CARD_PREFIX } from "@/lib/proposals/constants";
 import { optionalInviteeVotesPending } from "@/lib/proposals/poll-utils";
 import {
+  computeProposedExpiresAt,
+  computeScheduleExpirationInstant,
+  loadEnforcementSettings,
+} from "@/lib/proposals/enforcement";
+import {
   getProposalSpecialKind,
   proposalDescriptionForDisplay,
 } from "@/lib/proposals/special-proposals";
@@ -74,6 +79,7 @@ export async function listProposalBoardAction(): Promise<ProposalBoard> {
   const adminCanSeeUninvolved = await getAdminCanSeeUninvolved(db);
   const adminSeesAll = isAdmin && adminCanSeeUninvolved;
   const nowIso = new Date().toISOString();
+  const enforcement = await loadEnforcementSettings(db);
 
   const viewerInviteeProposalRows = adminSeesAll
     ? []
@@ -113,6 +119,9 @@ export async function listProposalBoardAction(): Promise<ProposalBoard> {
       scheduledStartAt: proposals.scheduledStartAt,
       scheduledEndAt: proposals.scheduledEndAt,
       atRisk: proposals.atRisk,
+      atRiskExpiresAt: proposals.atRiskExpiresAt,
+      lastNudgeAt: proposals.lastNudgeAt,
+      updatedAt: proposals.updatedAt,
       isPoll: proposals.isPoll,
       isAllDay: proposals.isAllDay,
       intentionalSolo: proposals.intentionalSolo,
@@ -213,6 +222,35 @@ export async function listProposalBoardAction(): Promise<ProposalBoard> {
         (row.state === "resolved" && !row.atRisk && viewerInvitee.role === "required") ||
         optionalRsvpPending);
 
+    const pendingVoteCount = invitees.filter((inv) => inv.voteStatus === "not_seen").length;
+    const hasPendingOptional =
+      row.state === "resolved" &&
+      invitees.some((inv) => inv.role === "optional" && inv.voteStatus === "not_seen");
+    const nudgeEligibleState = row.state === "proposed" || hasPendingOptional;
+    const canNudge =
+      !masked &&
+      nudgeEligibleState &&
+      pendingVoteCount > 0 &&
+      (isAdmin || row.proposerId === viewerId) &&
+      getProposalSpecialKind(row.description) !== "residency";
+
+    const slotStarts = (slotsByProposal.get(row.id) ?? [])
+      .filter((slot) => !slot.isDetached)
+      .map((slot) => slot.startAt)
+      .sort();
+    const scheduleInstant =
+      row.state === "proposed"
+        ? computeScheduleExpirationInstant(row, slotStarts)
+        : null;
+    const proposedExpiresAt =
+      row.state === "proposed"
+        ? computeProposedExpiresAt(
+            scheduleInstant,
+            row.updatedAt,
+            enforcement.proposedMaxDays,
+          )
+        : null;
+
     const scheduleEnd = display.scheduledEndAt ?? display.scheduledStartAt;
     // Sleeping nights are calendar-date-only — compare against end of the calendar
     // day rather than the raw (often midnight) timestamp (PC-280).
@@ -253,6 +291,12 @@ export async function listProposalBoardAction(): Promise<ProposalBoard> {
       needsViewerAction,
       inviteeCount: invitees.length,
       respondedCount,
+      pendingVoteCount,
+      proposedExpiresAt,
+      atRiskExpiresAt: row.atRisk ? row.atRiskExpiresAt : null,
+      canNudge,
+      lastNudgeAt: row.lastNudgeAt ?? null,
+      canAdminDeleteProposal: isAdmin,
       isPastSchedule,
       isBatchSleeping: row.isBatchSleeping,
       isRecurring: Boolean(row.isRecurrenceParent || row.parentProposalId),

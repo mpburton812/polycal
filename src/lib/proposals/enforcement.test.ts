@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import {
   computeAtRiskExpiresAt,
+  computeProposedExpiresAt,
+  computeScheduleExpirationInstant,
   resolveResolvedArchiveEndAt,
   type EnforcementSettings,
 } from "./enforcement";
@@ -29,6 +31,48 @@ describe("computeAtRiskExpiresAt", () => {
     const futureStart = "2026-07-05T04:00:00.000Z";
     const expires = computeAtRiskExpiresAt(settings, futureStart, fromMs);
     expect(expires).toBe("2026-07-04T04:00:00.000Z");
+  });
+});
+
+describe("computeProposedExpiresAt", () => {
+  it("returns the earlier of schedule and max-days wall", () => {
+    const expires = computeProposedExpiresAt(
+      "2099-07-10T12:00:00.000Z",
+      "2099-07-01T12:00:00.000Z",
+      3,
+    );
+    expect(expires).toBe("2099-07-04T12:00:00.000Z");
+  });
+
+  it("uses schedule only when proposedMaxDays is 0", () => {
+    const expires = computeProposedExpiresAt(
+      "2099-07-10T12:00:00.000Z",
+      "2099-07-01T12:00:00.000Z",
+      0,
+    );
+    expect(expires).toBe("2099-07-10T12:00:00.000Z");
+  });
+
+  it("uses max-days wall when schedule is null", () => {
+    const expires = computeProposedExpiresAt(null, "2099-07-01T12:00:00.000Z", 2);
+    expect(expires).toBe("2099-07-03T12:00:00.000Z");
+  });
+});
+
+describe("computeScheduleExpirationInstant", () => {
+  it("uses end of calendar day for sleeping", () => {
+    const start = sleepingDateToStartIso("2099-07-05")!;
+    const instant = computeScheduleExpirationInstant(
+      {
+        id: "p1",
+        proposalType: "sleeping",
+        isBatchSleeping: false,
+        scheduledStartAt: start,
+        scheduledEndAt: null,
+      },
+      [],
+    );
+    expect(instant).toBe(sleepingCalendarDayEnd(start).toISOString());
   });
 });
 

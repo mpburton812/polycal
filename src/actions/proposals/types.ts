@@ -27,6 +27,18 @@ export interface ProposalCard {
   needsViewerAction: boolean;
   inviteeCount: number;
   respondedCount: number;
+  /** Invitees still at not_seen (PC-292). */
+  pendingVoteCount?: number;
+  /** ISO when proposed enforcement would expire this item (PC-292). */
+  proposedExpiresAt?: string | null;
+  /** Pass-through at-risk TTL when flagged (PC-292). */
+  atRiskExpiresAt?: string | null;
+  /** Viewer may nudge pending voters (PC-293). */
+  canNudge?: boolean;
+  /** Last nudge timestamp for cooldown UI (PC-293). */
+  lastNudgeAt?: string | null;
+  /** Admin may hard-delete this proposal in any state (PC-295). */
+  canAdminDeleteProposal?: boolean;
   isPastSchedule: boolean;
   /** Resolved proposal with no schedulable calendar windows in any range. */
   notOnCalendar?: boolean;
@@ -161,6 +173,8 @@ export interface ProposalDetail {
   canManageAttendees: boolean;
   canComment: boolean;
   canCancel: boolean;
+  /** Admin hard-delete in any state (PC-295). */
+  canAdminDeleteProposal: boolean;
   canRedraft: boolean;
   canReschedule: boolean;
   canRevokeAcceptance: boolean;

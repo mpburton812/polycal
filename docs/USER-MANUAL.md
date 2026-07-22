@@ -125,6 +125,9 @@ Vote options:
 
 **While Proposed:**
 
+- Cards show a live **countdown** until the proposal would expire (event start / sleeping day-end, and/or the admin **max days in Proposed** limit).
+- **At risk** items also show time remaining on the at-risk TTL when set.
+- The proposer (or an admin) can press **Nudge** (upper-right on the card) to remind everyone who has not voted yet. Nudges are limited to once per hour per proposal.
 - If the event **start time passes** without full approval → system returns it to **Drafts** and resets votes (proposer is notified).
 - If admins set a **max days in Proposed** limit and time runs out → same return to Drafts.
 - If another proposal **resolves** and overlaps this one, conflicting pending proposals may be **auto-declined** with a system note for the proposer to review.
@@ -139,9 +142,10 @@ Vote options:
 
 **After resolution, the proposer or admin can:**
 
-- **Cancel** — removes from calendar; notifications go out.
+- **Cancel** — removes from calendar (archives); notifications go out.
 - **Re-draft** — returns to Drafts but keeps a calendar hold marked **At risk** until re-submitted and re-approved.
 
+**Admins** can also **Delete proposal** from detail or any Kanban column (including **Archived**). This permanently removes the proposal (and optionally an entire recurring series) and notifies all participants.
 **Changing attendees on a resolved event:**
 
 - **Add required** — new person gets their own Proposed vote; core event stays Resolved until they accept.
@@ -203,7 +207,7 @@ Vote options:
 
 ## 6. Notifications & audit
 
-- Submit, vote, resolve, decline, at-risk, recovery, and partnership changes generate **notifications** (bell icon).
+- Submit, vote, resolve, decline, at-risk, recovery, partnership, **nudge**, and **admin delete** changes generate **notifications** (bell icon).
 - Optional **notification email** (Profile): verify the address to receive the same alerts by email when the email channel is enabled.
 - **Forgot password?** on the sign-in page emails a reset link only when that verified notification email is set.
 - Each proposal keeps an **activity / audit log** of state changes (who did what, when). Admins can configure how visible that log is (everyone → admin only).

@@ -14,8 +14,10 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 
 import {
+  adminDeleteProposalAction,
   deleteDraftProposalAction,
   getProposalDetailAction,
+  nudgePendingVotersAction,
   type ProposalBoard,
   type ProposalCard as ProposalCardData,
   type ProposalDetail,
@@ -135,6 +137,7 @@ export function ProposalsClient({
   const [partnershipOpen, setPartnershipOpen] = useState(false);
   const { showToast } = useToast();
   const [, startTransition] = useTransition();
+  const [nudgeTargetId, setNudgeTargetId] = useState<string | null>(null);
 
   const proposals = board[activeTab];
 
@@ -170,6 +173,40 @@ export function ProposalsClient({
     if (!window.confirm("Delete this draft?")) return;
     startTransition(async () => {
       const result = await deleteDraftProposalAction(proposalId);
+      showToast(result.message, result.ok ? "success" : "error");
+      if (result.ok) router.refresh();
+    });
+  }
+
+  function handleNudge(proposalId: string) {
+    setNudgeTargetId(proposalId);
+    startTransition(async () => {
+      const result = await nudgePendingVotersAction(proposalId);
+      showToast(result.message, result.ok ? "success" : "error");
+      setNudgeTargetId(null);
+      if (result.ok) router.refresh();
+    });
+  }
+
+  function handleAdminDelete(proposalId: string) {
+    const card = allBoardCards.find((row) => row.id === proposalId);
+    let scope: "occurrence" | "series" = "occurrence";
+    if (card?.isRecurring) {
+      const deleteSeries = window.confirm(
+        "This is a recurring proposal.\n\nOK = delete entire series\nCancel = delete this occurrence only",
+      );
+      scope = deleteSeries ? "series" : "occurrence";
+    }
+    if (
+      !window.confirm(
+        `Permanently delete ${scope === "series" ? "the entire series" : "this proposal"}? All participants will be notified. This cannot be undone.`,
+      )
+    ) {
+      return;
+    }
+
+    startTransition(async () => {
+      const result = await adminDeleteProposalAction(proposalId, scope);
       showToast(result.message, result.ok ? "success" : "error");
       if (result.ok) router.refresh();
     });
@@ -259,6 +296,13 @@ export function ProposalsClient({
               onOpen={openDetail}
               isAdmin={isAdmin}
               currentUserId={currentUserId}
+              onNudge={proposal.canNudge ? handleNudge : undefined}
+              nudgePending={nudgeTargetId === proposal.id}
+              onAdminDelete={
+                proposal.canAdminDeleteProposal && !proposal.id.startsWith(PARTNERSHIP_CARD_PREFIX)
+                  ? handleAdminDelete
+                  : undefined
+              }
               onContinueEdit={
                 isStandardDraftProposal(proposal) && proposal.proposerId === currentUserId
                   ? handleContinueEdit

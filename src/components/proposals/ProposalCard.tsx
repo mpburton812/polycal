@@ -30,7 +30,15 @@ import {
   typeChipSxForProposal,
 } from "./proposalCardTheme";
 import { ProposalEventIcon } from "./ProposalEventIcon";
+import { ProposalExpiryCountdown } from "./ProposalExpiryCountdown";
 
+const NUDGE_COOLDOWN_MS = 60 * 60 * 1000;
+
+function nudgeOnCooldown(lastNudgeAt: string | null | undefined, nowMs = Date.now()): boolean {
+  if (!lastNudgeAt) return false;
+  const lastMs = Date.parse(lastNudgeAt);
+  return !Number.isNaN(lastMs) && nowMs - lastMs < NUDGE_COOLDOWN_MS;
+}
 function stateBadgeLabel(proposal: ProposalCardData): string {
   if (proposal.workflowStatus === "declined") return "DECLINED";
   return proposal.state.toUpperCase();
@@ -94,6 +102,9 @@ interface ProposalCardProps {
   onOpen: (id: string) => void;
   onContinueEdit?: (id: string) => void;
   onDeleteDraft?: (id: string) => void;
+  onNudge?: (id: string) => void;
+  onAdminDelete?: (id: string) => void;
+  nudgePending?: boolean;
   /** App admin viewer — used for oversight chrome (PC-196). */
   isAdmin?: boolean;
   currentUserId?: string;
@@ -107,6 +118,9 @@ export function ProposalCard({
   onOpen,
   onContinueEdit,
   onDeleteDraft,
+  onNudge,
+  onAdminDelete,
+  nudgePending = false,
   isAdmin = false,
   currentUserId = "",
 }: ProposalCardProps) {
@@ -220,7 +234,7 @@ export function ProposalCard({
           </Typography>
         )}
         {/* What */}
-        <Stack direction="row" spacing={0.75} alignItems="center" sx={{ mb: 0.5 }}>
+        <Stack direction="row" spacing={0.75} alignItems="flex-start" sx={{ mb: 0.5 }}>
           <Box sx={{ flex: 1, minWidth: 0 }}>
             <Typography
               variant="h6"
@@ -263,6 +277,29 @@ export function ProposalCard({
               </Typography>
             </Stack>
           </Box>
+          {proposal.canNudge && onNudge && (
+            <Button
+              size="small"
+              variant="outlined"
+              disabled={nudgePending || nudgeOnCooldown(proposal.lastNudgeAt)}
+              aria-label={`Nudge pending voters for ${proposal.title}`}
+              sx={{
+                flexShrink: 0,
+                border: `2px solid ${GARDEN_TOKENS.ink}`,
+                color: GARDEN_TOKENS.ink,
+                minWidth: 0,
+                px: 1,
+                py: 0.25,
+                fontSize: "0.7rem",
+              }}
+              onClick={(event) => {
+                event.stopPropagation();
+                onNudge(proposal.id);
+              }}
+            >
+              Nudge
+            </Button>
+          )}
         </Stack>
 
         {/* When */}
@@ -279,6 +316,17 @@ export function ProposalCard({
                 {timeLabel}
               </Typography>
             </Stack>
+          )}
+
+        {!proposal.isContentMasked &&
+          proposal.cardKind !== "partnership" &&
+          proposal.specialKind !== "residency" &&
+          proposal.cardKind !== "residency" && (
+            <ProposalExpiryCountdown
+              proposedExpiresAt={proposal.proposedExpiresAt}
+              atRisk={proposal.atRisk}
+              atRiskExpiresAt={proposal.atRiskExpiresAt}
+            />
           )}
 
         {/* Where */}
@@ -346,12 +394,13 @@ export function ProposalCard({
         )}
       </CardContent>
 
-      {proposal.state === "draft" && (onContinueEdit || onDeleteDraft) && (
+      {(proposal.state === "draft" && (onContinueEdit || onDeleteDraft)) ||
+      (proposal.canAdminDeleteProposal && onAdminDelete) ? (
         <CardActions
           sx={{ px: 2, pb: 2, pt: 0, flexWrap: "wrap", gap: 1, position: "relative", zIndex: 1 }}
           onClick={(e) => e.stopPropagation()}
         >
-          {onContinueEdit && (
+          {proposal.state === "draft" && onContinueEdit && (
             <Button
               variant="contained"
               size="small"
@@ -364,7 +413,7 @@ export function ProposalCard({
               Continue Editing
             </Button>
           )}
-          {onDeleteDraft && (
+          {proposal.state === "draft" && onDeleteDraft && (
             <Button
               variant="outlined"
               size="small"
@@ -381,8 +430,27 @@ export function ProposalCard({
               Delete Draft
             </Button>
           )}
+          {proposal.canAdminDeleteProposal && onAdminDelete && (
+            <Button
+              variant="outlined"
+              size="small"
+              color="error"
+              sx={{
+                border: `2px solid ${GARDEN_TOKENS.ink}`,
+                color: GARDEN_TOKENS.terracotta,
+                boxShadow: "none",
+                ml: proposal.state === "draft" ? 0 : "auto",
+              }}
+              onClick={(event) => {
+                event.stopPropagation();
+                onAdminDelete(proposal.id);
+              }}
+            >
+              Delete
+            </Button>
+          )}
         </CardActions>
-      )}
+      ) : null}
     </Card>
   );
 }
