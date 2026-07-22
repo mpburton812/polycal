@@ -66,6 +66,8 @@ export function atRiskExpiresAtIso(settings: EnforcementSettings, fromMs = Date.
 
 /**
  * Computes at-risk expiry as the earlier of TTL-from-now or T-minus redraft deadline (PC-48).
+ * When the event start (or T-minus deadline) is already in the past, use the full TTL so a
+ * mid-series redraft is not immediately archived by enforcement.
  */
 export function computeAtRiskExpiresAt(
   settings: EnforcementSettings,
@@ -78,6 +80,9 @@ export function computeAtRiskExpiresAt(
   }
   const eventStartMs = new Date(scheduledStartAt).getTime();
   const beforeEventMs = eventStartMs - settings.redraftDeadlineHours * 60 * 60 * 1000;
+  if (beforeEventMs <= fromMs) {
+    return new Date(ttlExpiryMs).toISOString();
+  }
   return new Date(Math.min(ttlExpiryMs, beforeEventMs)).toISOString();
 }
 

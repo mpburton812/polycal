@@ -1017,7 +1017,11 @@ async function resolveProposal(
       if (proposal.isBatchSleeping && slots.length > 0) {
         const sorted = [...slots].sort((a, b) => a.startAt.localeCompare(b.startAt));
         scheduleStart = sorted[0]?.startAt ?? null;
-        scheduleEnd = null;
+        // Last night start anchors archive/grace (scheduledEndAt null would use first night only).
+        scheduleEnd = sorted[sorted.length - 1]?.startAt ?? null;
+        if (scheduleStart && scheduleEnd && scheduleStart === scheduleEnd) {
+          scheduleEnd = null;
+        }
       } else {
         const sleeping = sleepingScheduleFromSlotRows(slots);
         scheduleStart = sleeping.start;
