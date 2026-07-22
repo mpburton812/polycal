@@ -14,13 +14,13 @@ import {
   polyGroup,
   proposalComments,
   proposalInvitees,
-  proposalStateLog,
   proposalTimeSlots,
   proposals,
-  sleepingPartnerships,
   users,
 } from "@/lib/db/schema";
-import { actorNotifyFields, notifyUser } from "@/lib/notifications";
+import { actorNotifyFields } from "@/lib/notifications";
+import { logProposalTransition } from "@/lib/proposals/services/state-log";
+import { notifyProposalParticipants } from "@/lib/proposals/services/notify-participants";
 import { logUserActivity } from "@/lib/audit";
 import {
   parseBatchEntriesJson,
@@ -28,22 +28,19 @@ import {
 } from "@/lib/proposals/batch-sleeping";
 import {
   applyProposalMask,
+  canViewProposalContent,
   getAdminCanSeeUninvolved,
-  viewerCanSeeProposalWithSleepingGate,
 } from "@/lib/proposals/access";
 import { formatSleepingDisplayTitle } from "@/lib/proposals/sleeping-display";
 import { proposalDescriptionForDisplay } from "@/lib/proposals/special-proposals";
+import { getAcceptedSleepingPartnerIds } from "@/lib/proposals/partners";
 import {
   allDayBoundsForDateKey,
   expandAllDayDateKeys,
   proposalHasSchedulableWindows,
 } from "@/lib/schedule/schedule-slices";
 import { formatSliceTag } from "@/lib/schedule/slice-types";
-import {
-  applyScheduleMasking,
-  canCommentOnProposal,
-  validateSliceMembership,
-} from "@/lib/schedule/slice-auth";
+import { canCommentOnProposal, validateSliceMembership } from "@/lib/schedule/slice-auth";
 import { localDateKey } from "@/lib/schedule/dates";
 import { resolveTimezone } from "@/lib/schedule/timezone";
 import type { ProposalSliceDetail } from "./slice-types";
@@ -74,48 +71,6 @@ async function getSlicePrivacyFlags(db: ReturnType<typeof getDb>) {
   return {
     hideSleeping: group?.hideSleepingArrangements ?? false,
   };
-}
-
-async function acceptedSleepingPartnerIds(
-  db: ReturnType<typeof getDb>,
-  viewerId: string,
-): Promise<Set<string>> {
-  const rows = await db
-    .select({
-      userLowId: sleepingPartnerships.userLowId,
-      userHighId: sleepingPartnerships.userHighId,
-    })
-    .from(sleepingPartnerships)
-    .where(
-      and(
-        eq(sleepingPartnerships.status, "accepted"),
-        eq(sleepingPartnerships.userLowId, viewerId),
-      ),
-    );
-
-  const partnerIds = new Set<string>();
-  for (const row of rows) {
-    partnerIds.add(row.userLowId === viewerId ? row.userHighId : row.userLowId);
-  }
-
-  const rowsHigh = await db
-    .select({
-      userLowId: sleepingPartnerships.userLowId,
-      userHighId: sleepingPartnerships.userHighId,
-    })
-    .from(sleepingPartnerships)
-    .where(
-      and(
-        eq(sleepingPartnerships.status, "accepted"),
-        eq(sleepingPartnerships.userHighId, viewerId),
-      ),
-    );
-
-  for (const row of rowsHigh) {
-    partnerIds.add(row.userLowId === viewerId ? row.userHighId : row.userLowId);
-  }
-
-  return partnerIds;
 }
 
 async function archiveParentIfScheduleEmpty(
@@ -161,46 +116,6 @@ async function archiveParentIfScheduleEmpty(
   await logProposalTransition(tx, parentId, actorUserId, "proposal.archived", "All slices detached.");
 }
 
-async function logProposalTransition(
-  db: DbExecutor,
-  proposalId: string,
-  actorUserId: string,
-  action: string,
-  details?: string,
-): Promise<void> {
-  await db.insert(proposalStateLog).values({
-    id: `psl-${randomUUID()}`,
-    proposalId,
-    actorUserId,
-    action,
-    details: details ?? null,
-    createdAt: new Date().toISOString(),
-  });
-}
-
-async function notifyStakeholders(
-  db: DbExecutor,
-  proposalId: string,
-  proposerId: string,
-  title: string,
-  notificationType: string,
-  message: string,
-  actor: ReturnType<typeof actorNotifyFields>,
-): Promise<void> {
-  const invitees = await db
-    .select({ userId: proposalInvitees.userId })
-    .from(proposalInvitees)
-    .where(eq(proposalInvitees.proposalId, proposalId));
-  const notifyIds = new Set<string>([proposerId, ...invitees.map((row) => row.userId)]);
-  for (const userId of notifyIds) {
-    await notifyUser(userId, notificationType, message, {
-      proposalId,
-      proposalTitle: title,
-      ...actor,
-    });
-  }
-}
-
 function splitContiguousDateKeys(keys: string[]): string[][] {
   if (keys.length === 0) return [];
   const ranges: string[][] = [];
@@ -241,7 +156,7 @@ export async function getProposalSliceDetailAction(
   const isAdmin = await userHasAdminAccess(session.user.role);
   const privacyFlags = await getSlicePrivacyFlags(db);
   const adminCanSeeUninvolved = await getAdminCanSeeUninvolved(db);
-  const partnerIds = await acceptedSleepingPartnerIds(db, session.user.id);
+  const partnerIds = await getAcceptedSleepingPartnerIds(db, session.user.id);
   const [viewerRow] = await db
     .select({ timezone: users.timezone })
     .from(users)
@@ -294,13 +209,19 @@ export async function getProposalSliceDetailAction(
     .where(eq(proposalInvitees.proposalId, rootProposalId));
 
   const inviteeUserIds = inviteeRows.map((invitee) => invitee.userId);
-  if (
-    !viewerCanSeeProposalWithSleepingGate(session.user.id, isAdmin, row.proposerId, inviteeUserIds, {
-      proposalType: row.proposalType,
-      state: row.state,
-      adminCanSeeUninvolved,
-    })
-  ) {
+  const { visible, contentMasked: isContentMasked } = canViewProposalContent({
+    viewerId: session.user.id,
+    isAdmin,
+    proposerId: row.proposerId,
+    inviteeUserIds,
+    proposalType: row.proposalType,
+    state: row.state,
+    adminCanSeeUninvolved,
+    applyScheduleMask: true,
+    hideSleeping: privacyFlags.hideSleeping,
+    acceptedPartnerIds: partnerIds,
+  });
+  if (!visible) {
     return { ok: false, message: "Proposal not found." };
   }
 
@@ -343,14 +264,6 @@ export async function getProposalSliceDetailAction(
     return { ok: false, message: membership.message };
   }
 
-  const { isContentMasked } = applyScheduleMasking({
-    viewerId: session.user.id,
-    proposerId: row.proposerId,
-    inviteeUserIds,
-    proposalType: row.proposalType,
-    privacyFlags,
-    acceptedPartnerIds: partnerIds,
-  });
   const display = applyProposalMask(row, isContentMasked);
 
   let startAt = row.scheduledStartAt ?? "";
@@ -711,7 +624,7 @@ export async function detachProposalSliceAction(
       if (activeSlots.length > 0) {
         const spanSlot =
           activeSlots.find((slot) =>
-            expandAllDayDateKeys(slot.startAt, slot.endAt).includes(sliceKey),
+            expandAllDayDateKeys(slot.startAt, slot.endAt, viewerTimeZone).includes(sliceKey),
           ) ?? activeSlots[0]!;
         sourceStart = spanSlot.startAt;
         sourceEnd = spanSlot.endAt;
@@ -771,7 +684,7 @@ export async function detachProposalSliceAction(
         });
       }
 
-      const allKeys = expandAllDayDateKeys(sourceStart!, sourceEnd);
+      const allKeys = expandAllDayDateKeys(sourceStart!, sourceEnd, viewerTimeZone);
       const remainingKeys = allKeys.filter((key) => key !== sliceKey);
       const ranges = splitContiguousDateKeys(remainingKeys);
 
@@ -846,15 +759,13 @@ export async function detachProposalSliceAction(
 
   if (notifyAfterCommit) {
     try {
-      await notifyStakeholders(
-        db,
-        notifyAfterCommit.proposalId,
-        notifyAfterCommit.proposerId,
-        notifyAfterCommit.title,
-        "proposal_child_detached",
-        notifyAfterCommit.message,
-        actor,
-      );
+      await notifyProposalParticipants(db, {
+        proposalId: notifyAfterCommit.proposalId,
+        proposerId: notifyAfterCommit.proposerId,
+        notificationType: "proposal_child_detached",
+        message: notifyAfterCommit.message,
+        metadata: { proposalTitle: notifyAfterCommit.title, ...actor },
+      });
     } catch {
       // Detach already committed — do not fail the action on notification errors.
     }

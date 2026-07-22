@@ -81,6 +81,47 @@ export function oneHourEventWindow(
   };
 }
 
+/**
+ * Builds a timed self-appointment window starting `daysFromToday` at `startHour`
+ * and lasting `durationHours` (crosses midnight when needed).
+ */
+export function timedAppointmentWindow(
+  daysFromToday: number,
+  startHour: number,
+  durationHours: number,
+): { start: string; end: string; startDay: string; endDay: string } {
+  const pad = (value: number) => String(value).padStart(2, "0");
+  const startDay = dateOffsetIso(daysFromToday);
+  const start = `${startDay}T${pad(startHour)}:00`;
+  // Apply duration via Date arithmetic so 23:00 + 1h → next calendar day 00:00.
+  const [datePart, timePart] = start.split("T") as [string, string];
+  const [hour, minute] = timePart.split(":").map(Number) as [number, number];
+  const endDate = parseIsoDate(datePart);
+  endDate.setHours(hour + durationHours, minute, 0, 0);
+  const endDay = `${endDate.getFullYear()}-${pad(endDate.getMonth() + 1)}-${pad(endDate.getDate())}`;
+  const endTime = `${pad(endDate.getHours())}:${pad(endDate.getMinutes())}`;
+  return {
+    start,
+    end: `${endDay}T${endTime}`,
+    startDay,
+    endDay,
+  };
+}
+
+/**
+ * Confirms an event appears when the schedule is navigated to each listed day (PC-326).
+ * Uses week layout — Day hour-grid scrolls away from midnight / 11pm without extra scroll.
+ */
+export async function assertEventOnCalendarDays(
+  page: Page,
+  titlePattern: RegExp,
+  dayIsos: string[],
+): Promise<void> {
+  for (const dayIso of dayIsos) {
+    await advanceScheduleUntilEventVisible(page, titlePattern, { targetDateIso: dayIso });
+  }
+}
+
 /** Forces day hour-grid layout (PC-204). */
 export async function selectScheduleDayView(page: Page): Promise<void> {
   await page.getByLabel("Calendar period").getByRole("button", { name: "Day", exact: true }).click();

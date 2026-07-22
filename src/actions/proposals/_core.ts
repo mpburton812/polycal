@@ -12,7 +12,6 @@ import { getDb } from "@/lib/db/client";
 import { ensureDbReady } from "@/lib/db/ensure-ready";
 import {
   feedImageUploads,
-  locationResidents,
   locations,
   polyGroup,
   proposalCommentImages,
@@ -22,7 +21,6 @@ import {
   proposalStateLog,
   proposalTimeSlots,
   proposals,
-  sleepingPartnerships,
   users,
   type InviteeRole,
   type InviteeVoteStatus,
@@ -40,10 +38,17 @@ import {
   atRiskExpiresAtIso,
   computeAtRiskExpiresAt,
   detectViewerOverlapWarning,
-  intervalsOverlap,
   loadEnforcementSettings,
   runProposalEnforcement,
 } from "@/lib/proposals/enforcement";
+import { intervalsOverlap } from "@/lib/schedule/dates";
+import {
+  buildConflictWindows,
+  widenConflictWindow,
+  windowsConflict,
+  type ConflictWindow,
+} from "@/lib/proposals/conflict-windows";
+import { DEFAULT_VIEWER_TIMEZONE } from "@/lib/schedule/timezone";
 import {
   recordProposalInviteeView,
   shouldRecordProposalInviteeView,
@@ -81,8 +86,14 @@ import { canProxyVoteForPassiveInvitee, actorCanProxyVoteSync } from "@/lib/prop
 import { canManageSleepingAttendees } from "@/lib/proposals/passive-auto-accept";
 import { enterAtRiskProposedState } from "@/lib/proposals/services/at-risk";
 import { logProposalTransition } from "@/lib/proposals/services/state-log";
+import { notifyProposalParticipants } from "@/lib/proposals/services/notify-participants";
 import { resetInviteeVotes, wipeProposalVotes } from "@/lib/proposals/services/votes";
 import { formatSleepingDisplayTitle } from "@/lib/proposals/sleeping-display";
+import {
+  getAcceptedSleepingPartnerIds as loadAcceptedSleepingPartnerIds,
+  getEligibleLocationIdsForUser as loadEligibleLocationIdsForUser,
+  getEligibleLocationIdsForUsers as loadEligibleLocationIdsForUsers,
+} from "@/lib/proposals/partners";
 import {
   getAdminCanSeeUninvolved,
   viewerCanSeeAuditLog,
@@ -378,7 +389,13 @@ function aggregateVoteFromSlotVotes(
   return "abstain";
 }
 
-/** Notifies proposer and all invitees on a proposal (PC-40). */
+/**
+ * Notifies proposer and all invitees on a proposal (PC-40).
+ *
+ * Thin wrapper over the shared {@link notifyProposalParticipants} fan-out that
+ * layers on the standard proposal context (title/type/when/where) so the copy
+ * and metadata are identical to the historical hand-rolled loop (PC-322).
+ */
 async function notifyProposalStakeholders(
   db: ReturnType<typeof getDb>,
   proposal: typeof proposals.$inferSelect,
@@ -386,15 +403,12 @@ async function notifyProposalStakeholders(
   message: string,
   extra?: Record<string, unknown>,
 ): Promise<void> {
-  const invitees = await db
-    .select({ userId: proposalInvitees.userId })
-    .from(proposalInvitees)
-    .where(eq(proposalInvitees.proposalId, proposal.id));
-
-  const notifyIds = new Set<string>([proposal.proposerId, ...invitees.map((row) => row.userId)]);
-  for (const userId of notifyIds) {
-    await notifyUser(userId, notificationType, message, {
-      proposalId: proposal.id,
+  await notifyProposalParticipants(db, {
+    proposalId: proposal.id,
+    proposerId: proposal.proposerId,
+    notificationType,
+    message,
+    metadata: {
       proposalTitle: proposal.title,
       proposalType: proposal.proposalType,
       // Extra proposal context so notification surfaces can render when/where.
@@ -403,8 +417,8 @@ async function notifyProposalStakeholders(
       locationText: proposal.locationText ?? undefined,
       isAllDay: proposal.isAllDay ?? undefined,
       ...extra,
-    });
-  }
+    },
+  });
 }
 
 /** Parses bedroom label JSON stored on locations (PC-40). */
@@ -466,48 +480,7 @@ async function getEligibleLocationIdsForUser(
   db: ReturnType<typeof getDb>,
   userId: string,
 ): Promise<string[]> {
-  const directRows = await db
-    .select({ locationId: locationResidents.locationId })
-    .from(locationResidents)
-    .where(
-      and(eq(locationResidents.userId, userId), eq(locationResidents.status, "accepted")),
-    );
-
-  const partnershipRows = await db
-    .select({
-      userLowId: sleepingPartnerships.userLowId,
-      userHighId: sleepingPartnerships.userHighId,
-    })
-    .from(sleepingPartnerships)
-    .where(
-      and(
-        eq(sleepingPartnerships.status, "accepted"),
-        or(
-          eq(sleepingPartnerships.userLowId, userId),
-          eq(sleepingPartnerships.userHighId, userId),
-        ),
-      ),
-    );
-
-  const partnerIds = partnershipRows.map((row) =>
-    row.userLowId === userId ? row.userHighId : row.userLowId,
-  );
-
-  let networkLocationIds: string[] = [];
-  if (partnerIds.length > 0) {
-    const partnerResidency = await db
-      .select({ locationId: locationResidents.locationId })
-      .from(locationResidents)
-      .where(
-        and(
-          inArray(locationResidents.userId, partnerIds),
-          eq(locationResidents.status, "accepted"),
-        ),
-      );
-    networkLocationIds = partnerResidency.map((row) => row.locationId);
-  }
-
-  return [...new Set([...directRows.map((row) => row.locationId), ...networkLocationIds])];
+  return loadEligibleLocationIdsForUser(db, userId);
 }
 
 /** Accepted sleeping partner user ids for invitee validation. */
@@ -515,25 +488,7 @@ async function getAcceptedSleepingPartnerIds(
   db: ReturnType<typeof getDb>,
   userId: string,
 ): Promise<Set<string>> {
-  const partnershipRows = await db
-    .select({
-      userLowId: sleepingPartnerships.userLowId,
-      userHighId: sleepingPartnerships.userHighId,
-    })
-    .from(sleepingPartnerships)
-    .where(
-      and(
-        eq(sleepingPartnerships.status, "accepted"),
-        or(
-          eq(sleepingPartnerships.userLowId, userId),
-          eq(sleepingPartnerships.userHighId, userId),
-        ),
-      ),
-    );
-
-  return new Set(
-    partnershipRows.map((row) => (row.userLowId === userId ? row.userHighId : row.userLowId)),
-  );
+  return loadAcceptedSleepingPartnerIds(db, userId);
 }
 
 /**
@@ -567,13 +522,7 @@ async function getEligibleLocationIdsForUsers(
   db: ReturnType<typeof getDb>,
   userIds: string[],
 ): Promise<string[]> {
-  const ids = new Set<string>();
-  for (const userId of userIds) {
-    for (const locationId of await getEligibleLocationIdsForUser(db, userId)) {
-      ids.add(locationId);
-    }
-  }
-  return [...ids];
+  return loadEligibleLocationIdsForUsers(db, userIds);
 }
 
 /**
@@ -826,45 +775,73 @@ async function revertProposalToDraft(
     revalidatePath("/people-places");
   }
 
-  const invitees = await db
-    .select({ userId: proposalInvitees.userId })
-    .from(proposalInvitees)
-    .where(eq(proposalInvitees.proposalId, proposal.id));
-
   await dismissAllNotificationsForProposal(proposal.id);
 
-  const notifyIds = new Set<string>([proposal.proposerId, ...invitees.map((row) => row.userId)]);
-  const message = formatDraftReturnNotification(proposal.title, reason);
-  for (const userId of notifyIds) {
-    await notifyUser(userId, "proposal_reverted_to_draft", message, {
-      proposalId: proposal.id,
-      reason,
-      proposalType: proposal.proposalType,
-    });
-  }
+  await notifyProposalParticipants(db, {
+    proposalId: proposal.id,
+    proposerId: proposal.proposerId,
+    notificationType: "proposal_reverted_to_draft",
+    message: formatDraftReturnNotification(proposal.title, reason),
+    metadata: { reason, proposalType: proposal.proposalType },
+  });
 }
 
 /**
- * Builds schedule windows for collision checks from slots or resolved times (PC-40).
+ * Overlap windows for collision checks, built from the SAME calendar windows
+ * (buildScheduleWindows) and widened for date-only kinds so conflict detection
+ * matches the calendar (PC-318, replaces the old raw slot/resolved compare).
+ *
+ * Loads the flags buildScheduleWindows needs (all-day, batch sleeping,
+ * recurrence, detached slots) plus the proposal type used for widening.
  */
-async function proposalScheduleWindows(
+async function proposalConflictWindows(
   db: ReturnType<typeof getDb>,
-  proposalId: string,
-  scheduledStartAt: string | null,
-  scheduledEndAt: string | null,
-): Promise<{ start: string; end: string | null }[]> {
+  proposal: {
+    id: string;
+    proposalType: string;
+    isAllDay: boolean;
+    isBatchSleeping: boolean;
+    parentProposalId: string | null;
+    isRecurrenceParent: boolean;
+    scheduledStartAt: string | null;
+    scheduledEndAt: string | null;
+  },
+  timeZone: string = DEFAULT_VIEWER_TIMEZONE,
+): Promise<ConflictWindow[]> {
   const slots = await db
-    .select({ startAt: proposalTimeSlots.startAt, endAt: proposalTimeSlots.endAt })
+    .select({
+      id: proposalTimeSlots.id,
+      startAt: proposalTimeSlots.startAt,
+      endAt: proposalTimeSlots.endAt,
+      label: proposalTimeSlots.label,
+      isDetached: proposalTimeSlots.isDetached,
+    })
     .from(proposalTimeSlots)
-    .where(eq(proposalTimeSlots.proposalId, proposalId));
+    .where(eq(proposalTimeSlots.proposalId, proposal.id));
 
-  if (slots.length > 0) {
-    return slots.map((slot) => ({ start: slot.startAt, end: slot.endAt }));
-  }
-  if (scheduledStartAt) {
-    return [{ start: scheduledStartAt, end: scheduledEndAt }];
-  }
-  return [];
+  const scheduled = proposal.scheduledStartAt
+    ? { startAt: proposal.scheduledStartAt, endAt: proposal.scheduledEndAt }
+    : null;
+
+  return buildConflictWindows(
+    {
+      id: proposal.id,
+      proposalType: proposal.proposalType,
+      isAllDay: proposal.isAllDay,
+      isBatchSleeping: proposal.isBatchSleeping,
+      parentProposalId: proposal.parentProposalId,
+      isRecurrenceParent: proposal.isRecurrenceParent,
+    },
+    slots.map((slot) => ({
+      id: slot.id,
+      startAt: slot.startAt,
+      endAt: slot.endAt,
+      label: slot.label,
+      isDetached: slot.isDetached,
+    })),
+    scheduled,
+    timeZone,
+  );
 }
 
 /**
@@ -879,6 +856,11 @@ async function autoDeclineCollidingProposals(
   actorUserId: string,
 ): Promise<void> {
   if (!scheduleStart) return;
+
+  // Build widened windows for the resolved item (parity with the calendar +
+  // board conflict logic; handles batch nights and null sleeping ends) (PC-318).
+  const resolvedWindows = await proposalConflictWindows(db, resolved);
+  if (resolvedWindows.length === 0) return;
 
   const resolvedInvitees = await db
     .select({ userId: proposalInvitees.userId })
@@ -913,6 +895,8 @@ async function autoDeclineCollidingProposals(
 
   for (const other of pending) {
     if (other.id === resolved.id) continue;
+    // Events never collide with sleeping arrangements (PC-59 parity).
+    if (other.proposalType !== resolved.proposalType) continue;
 
     const otherStakeholders = new Set<string>([
       other.proposerId,
@@ -923,16 +907,14 @@ async function autoDeclineCollidingProposals(
     );
     if (!sharesStakeholder) continue;
 
-    const otherWindows = await proposalScheduleWindows(
-      db,
-      other.id,
-      other.scheduledStartAt,
-      other.scheduledEndAt,
-    );
+    const otherWindows = await proposalConflictWindows(db, other);
     if (otherWindows.length === 0) continue;
 
-    const overlaps = otherWindows.some((window) =>
-      intervalsOverlap(scheduleStart, scheduleEnd, window.start, window.end),
+    const overlaps = windowsConflict(
+      resolved.proposalType,
+      resolvedWindows,
+      other.proposalType,
+      otherWindows,
     );
     if (!overlaps) continue;
 
@@ -1093,38 +1075,32 @@ async function resolveProposal(
     await applyResidencyProposalResolution(db, proposal, actorUserId);
   }
 
-  const invitees = await db
-    .select({
-      userId: proposalInvitees.userId,
-      role: proposalInvitees.role,
-      voteStatus: proposalInvitees.voteStatus,
-    })
-    .from(proposalInvitees)
-    .where(eq(proposalInvitees.proposalId, proposal.id));
-
   const pollMatrix = proposal.isPoll && slots.length > 1;
   const specialKind = getProposalSpecialKind(proposal.description);
-  const notifyIds = new Set<string>([proposal.proposerId, ...invitees.map((row) => row.userId)]);
-  for (const userId of notifyIds) {
-    const invitee = invitees.find((row) => row.userId === userId);
-    const optionalStillVoting =
-      invitee?.role === "optional" && invitee.voteStatus === "not_seen";
-    let message: string;
-    if (specialKind === "residency") {
-      message = `Residency proposal "${proposal.title}" was accepted.`;
-    } else if (optionalStillVoting) {
-      message = pollMatrix
-        ? `Proposal "${proposal.title}" was approved by all required attendees and scheduled. Please complete your poll votes.`
-        : `Proposal "${proposal.title}" was approved by all required attendees and scheduled. Please Accept or Decline.`;
-    } else {
-      message = `Proposal "${proposal.title}" was approved and scheduled.`;
-    }
-    await notifyUser(userId, "proposal_resolved", message, {
-      proposalId: proposal.id,
-      proposalType: proposal.proposalType,
-      ...(optionalStillVoting ? { action: "vote" } : {}),
-    });
-  }
+  // Optional invitees still owe an RSVP after required attendees resolve, so they
+  // get an actionable variant (message + vote deep-link) while everyone else gets
+  // the plain "approved and scheduled" copy — behavior identical to the prior loop
+  // (PC-49 / PC-278 / PC-322).
+  await notifyProposalParticipants(db, {
+    proposalId: proposal.id,
+    proposerId: proposal.proposerId,
+    notificationType: "proposal_resolved",
+    metadata: { proposalType: proposal.proposalType },
+    message: ({ role, voteStatus }) => {
+      const optionalStillVoting = role === "optional" && voteStatus === "not_seen";
+      if (specialKind === "residency") {
+        return `Residency proposal "${proposal.title}" was accepted.`;
+      }
+      if (optionalStillVoting) {
+        return pollMatrix
+          ? `Proposal "${proposal.title}" was approved by all required attendees and scheduled. Please complete your poll votes.`
+          : `Proposal "${proposal.title}" was approved by all required attendees and scheduled. Please Accept or Decline.`;
+      }
+      return `Proposal "${proposal.title}" was approved and scheduled.`;
+    },
+    metadataFor: ({ role, voteStatus }) =>
+      role === "optional" && voteStatus === "not_seen" ? { action: "vote" } : {},
+  });
 
   if (!isNonScheduleProposal(proposal.description)) {
     await autoDeclineCollidingProposals(db, proposal, scheduleStart, scheduleEnd, actorUserId);
@@ -1326,13 +1302,22 @@ async function checkPlaceAssetConflicts(
       proposal.bedroomIndex === other.bedroomIndex;
     if (!sameBedroom) continue;
 
+    // Both sides are sleeping — widen the other night to its civil day so a
+    // null/same-day end still overlaps the (already widened) check windows (PC-318).
+    const otherWindow = widenConflictWindow(
+      other.scheduledStartAt,
+      other.scheduledEndAt,
+      "sleeping",
+      false,
+    );
+
     for (const window of checkWindows) {
       if (
         intervalsOverlap(
           window.start,
           window.end,
-          other.scheduledStartAt,
-          other.scheduledEndAt,
+          otherWindow.start,
+          otherWindow.end,
         )
       ) {
         warnings.push({
@@ -1431,17 +1416,8 @@ async function gatherProposalConflictWarnings(
     .from(proposalInvitees)
     .where(eq(proposalInvitees.proposalId, proposalId));
 
-  const slots = await db
-    .select({ startAt: proposalTimeSlots.startAt, endAt: proposalTimeSlots.endAt })
-    .from(proposalTimeSlots)
-    .where(eq(proposalTimeSlots.proposalId, proposalId));
-
-  const checkWindows =
-    slots.length > 0
-      ? slots.map((s) => ({ start: s.startAt, end: s.endAt }))
-      : proposal.scheduledStartAt
-        ? [{ start: proposal.scheduledStartAt, end: proposal.scheduledEndAt }]
-        : [];
+  // Same calendar windows the schedule renders, widened for date-only kinds (PC-318).
+  const checkWindows = await proposalConflictWindows(db, proposal);
 
   if (checkWindows.length === 0) {
     return [];
@@ -1457,6 +1433,7 @@ async function gatherProposalConflictWarnings(
       state: proposals.state,
       proposerId: proposals.proposerId,
       proposalType: proposals.proposalType,
+      isAllDay: proposals.isAllDay,
       scheduledStartAt: proposals.scheduledStartAt,
       scheduledEndAt: proposals.scheduledEndAt,
     })
@@ -1493,13 +1470,22 @@ async function gatherProposalConflictWarnings(
     const affected = [...stakeholderIds].filter((id) => otherStakeholders.has(id));
     if (affected.length === 0) continue;
 
+    // Widen the other side too so same-night sleeping (null end) and same-day
+    // all-day (noon/noon) collide symmetrically with the current windows (PC-318).
+    const otherWindow = widenConflictWindow(
+      other.scheduledStartAt,
+      other.scheduledEndAt,
+      other.proposalType,
+      other.isAllDay,
+    );
+
     for (const window of checkWindows) {
       if (
         intervalsOverlap(
           window.start,
           window.end,
-          other.scheduledStartAt,
-          other.scheduledEndAt,
+          otherWindow.start,
+          otherWindow.end,
         )
       ) {
         for (const userId of affected) {
@@ -2322,8 +2308,7 @@ export async function getProposalDetailAction(
 
   const display = row;
   const userFacingDescription = proposalDescriptionForDisplay(row.description);
-  // Privacy masking was removed (PC-280) — content is never hidden by privacy level anymore.
-  const masked = false;
+  // Detail dialog never applies schedule sleeping mask (PC-306) — content stays unmasked.
 
   // Preload sleeping partners for each proxy (passive) invitee so UI can show vote controls (PC-255).
   const proxyPartnerIdsByUser = new Map<string, Set<string>>();
@@ -2358,7 +2343,7 @@ export async function getProposalDetailAction(
     viewerInvitee &&
     shouldRecordProposalInviteeView({
       proposalState: row.state,
-      masked,
+      masked: false,
       isInvitee: true,
       viewedAt: viewerInvitee.viewedAt,
     })
@@ -2410,32 +2395,29 @@ export async function getProposalDetailAction(
   const isInvitee = inviteeUserIds.includes(session.user.id);
   const canManage = isProposer || isAdmin;
   const recurrenceRule = parseRecurrenceRule(row.recurrenceRule);
-  const canViewSensitive = !masked;
 
-  const stateLogEntries = canViewSensitive
-    ? logRows.map((entry) => ({
-        action: entry.action,
-        actorName: entry.actorName ?? null,
-        details: entry.details ?? null,
-        createdAt: entry.createdAt,
-      }))
-    : [];
+  const stateLogEntries = logRows.map((entry) => ({
+    action: entry.action,
+    actorName: entry.actorName ?? null,
+    details: entry.details ?? null,
+    createdAt: entry.createdAt,
+  }));
 
-  const hasOverlapWarning = canViewSensitive
-    ? await detectViewerOverlapWarning(
-        db,
-        proposalId,
-        session.user.id,
-        viewerInvitee?.voteStatus,
-        viewerInvitee?.overlapAcknowledgedAt,
-        display.scheduledStartAt ?? null,
-        display.scheduledEndAt ?? null,
-      )
-    : false;
+  const hasOverlapWarning = await detectViewerOverlapWarning(
+    db,
+    proposalId,
+    session.user.id,
+    viewerInvitee?.voteStatus,
+    viewerInvitee?.overlapAcknowledgedAt,
+    display.scheduledStartAt ?? null,
+    display.scheduledEndAt ?? null,
+    row.proposalType,
+    row.isAllDay,
+  );
 
   const optionalRsvpPending = optionalInviteeVotesPending(row, viewerInvitee);
   const displayState: ProposalState = optionalRsvpPending ? "proposed" : row.state;
-  const batchEntries = masked ? [] : parseBatchEntriesJson(row.batchEntriesJson);
+  const batchEntries = parseBatchEntriesJson(row.batchEntriesJson);
   const batchLocationIds = [
     ...new Set(
       batchEntries
@@ -2455,7 +2437,7 @@ export async function getProposalDetailAction(
   );
 
   let detailTitle = display.title;
-  if (!masked && row.proposalType === "sleeping") {
+  if (row.proposalType === "sleeping") {
     detailTitle = await buildSleepingProposalTitle(db, {
       proposerName: row.proposerName,
       intentionalSolo: row.intentionalSolo,
@@ -2476,17 +2458,16 @@ export async function getProposalDetailAction(
       id: row.id,
       title: detailTitle,
       description: userFacingDescription,
-      notes: masked
-        ? null
-        : isProposer || isInvitee || isAdmin || row.state === "resolved"
+      notes:
+        isProposer || isInvitee || isAdmin || row.state === "resolved"
           ? row.notes
           : null,
       proposalType: row.proposalType,
       state: row.state,
       proposerId: row.proposerId,
       proposerName: row.proposerName,
-      locationId: masked ? null : row.locationId ?? null,
-      locationText: masked ? null : row.locationText ?? null,
+      locationId: row.locationId ?? null,
+      locationText: row.locationText ?? null,
       locationName: display.locationName ?? display.locationText ?? null,
       intentionalSolo: row.intentionalSolo,
       isPoll: row.isPoll,
@@ -2494,15 +2475,15 @@ export async function getProposalDetailAction(
       scheduledStartAt: display.scheduledStartAt ?? null,
       scheduledEndAt: display.scheduledEndAt ?? null,
       atRisk: row.atRisk,
-      isContentMasked: masked,
+      isContentMasked: false,
       isRecurring: Boolean(recurrenceRule || row.parentProposalId),
       isRecurrenceParent: row.isRecurrenceParent,
       parentProposalId: row.parentProposalId ?? null,
       recurrenceRule,
       occurrenceIndex: row.occurrenceIndex ?? null,
-      bedroomIndex: masked ? null : row.bedroomIndex ?? null,
+      bedroomIndex: row.bedroomIndex ?? null,
       bedroomLabel:
-        masked || row.proposalType !== "sleeping" || row.bedroomIndex === null
+        row.proposalType !== "sleeping" || row.bedroomIndex === null
           ? null
           : (() => {
               const names = parseBedroomNames(row.locationBedroomNames);
@@ -2518,57 +2499,48 @@ export async function getProposalDetailAction(
       isBatchSleeping: row.isBatchSleeping,
       batchEntries,
       batchPlaceNames,
-      invitees: canViewSensitive
-        ? inviteeRows.map((invitee) => ({
-            userId: invitee.userId,
-            displayName: invitee.displayName,
-            role: invitee.role,
-            voteStatus: invitee.voteStatus,
-            viewedAt: invitee.viewedAt ?? null,
-            userRole: invitee.userRole,
-            addedByUserId: invitee.addedByUserId ?? null,
-            canProxyVote:
-              invitee.userRole === "passive" &&
-              (row.state === "proposed" || row.state === "resolved") &&
-              actorCanProxyVoteSync({
-                isAdmin,
-                actorUserId: session.user.id,
-                proposerId: row.proposerId,
-                sleepingPartnerIds: proxyPartnerIdsByUser.get(invitee.userId) ?? new Set(),
-              }),
-          }))
-        : [],
-      timeSlots: masked
-        ? []
-        : slotRows.map((slot) => ({
-            id: slot.id,
-            startAt: slot.startAt,
-            endAt: slot.endAt ?? null,
-            label: slot.label ?? null,
-            isAllDay: slot.isAllDay ?? false,
-          })),
-      slotVotes: masked
-        ? []
-        : slotVoteRows.map((vote) => ({
-            timeSlotId: vote.timeSlotId,
-            userId: vote.userId,
-            displayName: vote.displayName,
-            voteStatus: vote.voteStatus,
-          })),
+      invitees: inviteeRows.map((invitee) => ({
+        userId: invitee.userId,
+        displayName: invitee.displayName,
+        role: invitee.role,
+        voteStatus: invitee.voteStatus,
+        viewedAt: invitee.viewedAt ?? null,
+        userRole: invitee.userRole,
+        addedByUserId: invitee.addedByUserId ?? null,
+        canProxyVote:
+          invitee.userRole === "passive" &&
+          (row.state === "proposed" || row.state === "resolved") &&
+          actorCanProxyVoteSync({
+            isAdmin,
+            actorUserId: session.user.id,
+            proposerId: row.proposerId,
+            sleepingPartnerIds: proxyPartnerIdsByUser.get(invitee.userId) ?? new Set(),
+          }),
+      })),
+      timeSlots: slotRows.map((slot) => ({
+        id: slot.id,
+        startAt: slot.startAt,
+        endAt: slot.endAt ?? null,
+        label: slot.label ?? null,
+        isAllDay: slot.isAllDay ?? false,
+      })),
+      slotVotes: slotVoteRows.map((vote) => ({
+        timeSlotId: vote.timeSlotId,
+        userId: vote.userId,
+        displayName: vote.displayName,
+        voteStatus: vote.voteStatus,
+      })),
       winningSlotId: row.winningSlotId ?? null,
-      comments: canViewSensitive
-        ? commentRows.map((comment) => ({
-            id: comment.id,
-            authorName: comment.authorName,
-            body: comment.body,
-            createdAt: comment.createdAt,
-            sliceTag: comment.sliceTag ?? null,
-          }))
-        : [],
+      comments: commentRows.map((comment) => ({
+        id: comment.id,
+        authorName: comment.authorName,
+        body: comment.body,
+        createdAt: comment.createdAt,
+        sliceTag: comment.sliceTag ?? null,
+      })),
       stateLog: stateLogEntries,
       canEdit: row.state === "draft" && (isProposer || isAdmin),
       canVote:
-        !masked &&
         !isPollMatrix &&
         ((row.state === "proposed" &&
           viewerInvitee !== undefined &&
@@ -2585,19 +2557,16 @@ export async function getProposalDetailAction(
             viewerInvitee?.role === "optional" &&
             viewerInvitee.voteStatus === "not_seen")),
       canVoteSlots:
-        !masked &&
         isPollMatrix &&
         viewerInvitee !== undefined &&
         (row.state === "proposed" || (row.state === "resolved" && viewerInvitee.role === "optional")) &&
         pollSlotsIncomplete,
       canManageAttendees:
-        canViewSensitive &&
         row.state === "resolved" &&
         (row.proposalType === "sleeping"
           ? canManageSleepingAttendees(isProposer, isAdmin)
           : isProposer || isAdmin || isInvitee),
       canComment:
-        canViewSensitive &&
         row.state !== "draft" &&
         row.state !== "archived" &&
         viewerCanSeeProposalWithSleepingGate(session.user.id, isAdmin, row.proposerId, inviteeUserIds, {
@@ -2610,11 +2579,9 @@ export async function getProposalDetailAction(
       canRedraft: isProposer && row.state === "resolved",
       canReschedule:
         isAdmin &&
-        canViewSensitive &&
         (row.state === "proposed" || row.state === "resolved") &&
         !row.isBatchSleeping,
       canRevokeAcceptance:
-        !masked &&
         viewerInvitee?.role === "required" &&
         row.state === "resolved" &&
         !row.atRisk &&
@@ -2623,14 +2590,13 @@ export async function getProposalDetailAction(
             APPROVING_VOTES.includes(viewerInvitee.voteStatus as InviteeVoteStatus),
         ),
       viewerVoteStatus: viewerInvitee?.voteStatus ?? null,
-      viewerSlotVotes: masked ? {} : viewerSlotVotes,
+      viewerSlotVotes,
       hasOverlapWarning,
       canAcknowledgeOverlap: hasOverlapWarning,
       optionalRsvpPending,
       displayState,
       reminderOffsetMinutes: row.reminderOffsetMinutes ?? null,
-      eventIconKey:
-        masked || row.proposalType !== "event" ? null : row.eventIconKey ?? null,
+      eventIconKey: row.proposalType !== "event" ? null : row.eventIconKey ?? null,
       specialKind: getProposalSpecialKind(row.description) ?? undefined,
     },
   };
@@ -2693,6 +2659,8 @@ export async function acknowledgeProposalOverlapAction(
     invitee.overlapAcknowledgedAt,
     proposal.scheduledStartAt,
     proposal.scheduledEndAt,
+    proposal.proposalType,
+    proposal.isAllDay,
   );
 
   if (!hasOverlap) {

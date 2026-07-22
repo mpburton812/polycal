@@ -2,16 +2,17 @@ import { eq } from "drizzle-orm";
 
 import { getDb } from "@/lib/db/client";
 import { polyGroup, type ProposalState, type ProposalType } from "@/lib/db/schema";
+import { shouldMaskSleepingForViewer } from "@/lib/schedule/slice-auth";
 import type { AuditLogVisibility } from "@/types/poly-group";
 
-/** Title shown when sleeping-network visibility hides details from a non-participant. */
+/** Title shown when sleeping details are masked on calendar/slice (PC-307). */
 export const MASKED_TITLE = "Busy";
 /** Body copy for masked sleeping proposals (PC-282 — privacy levels were removed in PC-280). */
 export const MASKED_DESCRIPTION = "Details are hidden for this sleeping arrangement.";
 
 /**
- * Generic content redaction — used when sleeping-network visibility (PC-229)
- * hides a proposal's details from a non-participant viewer.
+ * Generic content redaction — used when schedule masking hides sleeping details
+ * from a viewer who can still see the proposal row (typically uninvolved admins).
  */
 export function applyProposalMask<
   T extends {
@@ -116,6 +117,51 @@ export function viewerCanSeeProposalWithSleepingGate(
     state: options.state,
     adminCanSeeUninvolved: options.adminCanSeeUninvolved,
   });
+}
+
+/**
+ * Combined visibility + optional schedule content mask (PC-306).
+ * Feed/board use `visible` only; schedule/slices pass `applyScheduleMask` for Busy redaction.
+ */
+export function canViewProposalContent(input: {
+  viewerId: string;
+  isAdmin: boolean;
+  proposerId: string;
+  inviteeUserIds: string[];
+  proposalType: ProposalType;
+  state?: ProposalState;
+  adminCanSeeUninvolved?: boolean;
+  applyScheduleMask?: boolean;
+  hideSleeping?: boolean;
+  acceptedPartnerIds?: ReadonlySet<string>;
+}): { visible: boolean; contentMasked: boolean } {
+  const visible = viewerCanSeeProposalWithSleepingGate(
+    input.viewerId,
+    input.isAdmin,
+    input.proposerId,
+    input.inviteeUserIds,
+    {
+      proposalType: input.proposalType,
+      state: input.state,
+      adminCanSeeUninvolved: input.adminCanSeeUninvolved,
+    },
+  );
+  if (!visible) {
+    return { visible: false, contentMasked: false };
+  }
+
+  const contentMasked =
+    Boolean(input.applyScheduleMask) &&
+    input.proposalType === "sleeping" &&
+    shouldMaskSleepingForViewer(
+      input.viewerId,
+      input.proposerId,
+      input.inviteeUserIds,
+      Boolean(input.hideSleeping),
+      input.acceptedPartnerIds ?? new Set(),
+    );
+
+  return { visible: true, contentMasked };
 }
 
 /** Whether the viewer may see proposal audit / feed milestone lines (PC-45 / PC-226). */

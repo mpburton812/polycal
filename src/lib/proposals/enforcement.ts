@@ -1,5 +1,3 @@
-import { randomUUID } from "node:crypto";
-
 import { and, asc, desc, eq, inArray } from "drizzle-orm";
 
 import { getDb } from "@/lib/db/client";
@@ -9,11 +7,14 @@ import {
   formatDraftReturnNotification,
 } from "@/lib/notifications-draft-return";
 import { expirePendingRecoveryProposals } from "@/lib/proposals/pending-recovery";
+import { logProposalTransition } from "@/lib/proposals/services/state-log";
+import { notifyProposalParticipants } from "@/lib/proposals/services/notify-participants";
 import { sleepingCalendarDayEnd } from "@/lib/proposals/sleeping-schedule";
+import { widenConflictWindow } from "@/lib/proposals/conflict-windows";
+import { intervalsOverlap } from "@/lib/schedule/dates";
 import {
   polyGroup,
   proposalInvitees,
-  proposalStateLog,
   proposalTimeSlots,
   proposals,
   sleepingPartnerships,
@@ -86,22 +87,6 @@ export function computeAtRiskExpiresAt(
   return new Date(Math.min(ttlExpiryMs, beforeEventMs)).toISOString();
 }
 
-async function logSystemTransition(
-  db: Db,
-  proposalId: string,
-  action: string,
-  details: string,
-): Promise<void> {
-  await db.insert(proposalStateLog).values({
-    id: `psl-${randomUUID()}`,
-    proposalId,
-    actorUserId: null,
-    action,
-    details,
-    createdAt: new Date().toISOString(),
-  });
-}
-
 async function resetInviteeVotes(db: Db, proposalId: string): Promise<void> {
   const now = new Date().toISOString();
   await db
@@ -131,9 +116,10 @@ async function expireAtRiskProposals(db: Db): Promise<void> {
         updatedAt: now,
       })
       .where(eq(proposals.id, proposal.id));
-    await logSystemTransition(
+    await logProposalTransition(
       db,
       proposal.id,
+      null,
       "proposal.at_risk_expired",
       "At-risk TTL elapsed without resubmission.",
     );
@@ -266,7 +252,7 @@ async function expireProposedProposals(db: Db, settings: EnforcementSettings): P
       ? "Event start passed without full approval — returned to draft."
       : `Proposed longer than ${settings.proposedMaxDays}d without resolution — returned to draft.`;
 
-    await logSystemTransition(db, proposal.id, "proposal.proposed_expired", reason);
+    await logProposalTransition(db, proposal.id, null, "proposal.proposed_expired", reason);
 
     await dismissAllNotificationsForProposal(proposal.id);
     await notifyUser(
@@ -300,9 +286,10 @@ async function archivePastResolvedProposals(db: Db, settings: EnforcementSetting
       .set({ state: "archived", atRisk: false, atRiskExpiresAt: null, updatedAt: nowIso })
       .where(eq(proposals.id, proposal.id));
 
-    await logSystemTransition(
+    await logProposalTransition(
       db,
       proposal.id,
+      null,
       "proposal.auto_archived",
       `Archived ${settings.archiveGraceHours}h after scheduled end.`,
     );
@@ -333,27 +320,21 @@ async function processRedraftDeadlines(db: Db, settings: EnforcementSettings): P
       .where(eq(proposals.id, proposal.id));
 
     await resetInviteeVotes(db, proposal.id);
-    await logSystemTransition(
+    await logProposalTransition(
       db,
       proposal.id,
+      null,
       "proposal.redraft_deadline",
       `Within ${settings.redraftDeadlineHours}h of start — returned to proposed for re-approval.`,
     );
 
-    const invitees = await db
-      .select({ userId: proposalInvitees.userId })
-      .from(proposalInvitees)
-      .where(eq(proposalInvitees.proposalId, proposal.id));
-
-    const notifyIds = new Set<string>([proposal.proposerId, ...invitees.map((row) => row.userId)]);
-    for (const userId of notifyIds) {
-      await notifyUser(
-        userId,
-        "proposal_redraft_deadline",
-        `Proposal "${proposal.title}" needs re-approval before it starts.`,
-        { proposalId: proposal.id, action: "vote" },
-      );
-    }
+    await notifyProposalParticipants(db, {
+      proposalId: proposal.id,
+      proposerId: proposal.proposerId,
+      notificationType: "proposal_redraft_deadline",
+      message: `Proposal "${proposal.title}" needs re-approval before it starts.`,
+      metadata: { action: "vote" },
+    });
   }
 }
 
@@ -398,9 +379,10 @@ async function archiveExpiredRecurrenceSeries(db: Db, settings: EnforcementSetti
         .update(proposals)
         .set({ state: "archived", atRisk: false, atRiskExpiresAt: null, updatedAt: nowIso })
         .where(eq(proposals.id, id));
-      await logSystemTransition(
+      await logProposalTransition(
         db,
         id,
+        null,
         "proposal.recurrence_series_archived",
         "Recurring series archived after final occurrence end.",
       );
@@ -437,27 +419,20 @@ async function autoCancelUnresolvedAtRiskResolved(db: Db): Promise<void> {
       })
       .where(eq(proposals.id, proposal.id));
 
-    await logSystemTransition(
+    await logProposalTransition(
       db,
       proposal.id,
+      null,
       "proposal.at_risk_auto_cancelled",
       "At-risk event auto-cancelled after TTL or event start without resolution.",
     );
 
-    const invitees = await db
-      .select({ userId: proposalInvitees.userId })
-      .from(proposalInvitees)
-      .where(eq(proposalInvitees.proposalId, proposal.id));
-
-    const notifyIds = new Set<string>([proposal.proposerId, ...invitees.map((row) => row.userId)]);
-    for (const userId of notifyIds) {
-      await notifyUser(
-        userId,
-        "proposal_at_risk_cancelled",
-        `Proposal "${proposal.title}" was auto-cancelled because at-risk status was not resolved.`,
-        { proposalId: proposal.id },
-      );
-    }
+    await notifyProposalParticipants(db, {
+      proposalId: proposal.id,
+      proposerId: proposal.proposerId,
+      notificationType: "proposal_at_risk_cancelled",
+      message: `Proposal "${proposal.title}" was auto-cancelled because at-risk status was not resolved.`,
+    });
   }
 }
 
@@ -519,22 +494,15 @@ export async function runProposalEnforcement(db: Db): Promise<void> {
   await expireSleepingPartnerProposals(db, settings);
 }
 
-/** Returns true when two ISO intervals overlap (open end uses start as instant). */
-export function intervalsOverlap(
-  aStart: string,
-  aEnd: string | null,
-  bStart: string,
-  bEnd: string | null,
-): boolean {
-  const aEndMs = aEnd ? new Date(aEnd).getTime() : new Date(aStart).getTime();
-  const bEndMs = bEnd ? new Date(bEnd).getTime() : new Date(bStart).getTime();
-  const aStartMs = new Date(aStart).getTime();
-  const bStartMs = new Date(bStart).getTime();
-  return aStartMs < bEndMs && bStartMs < aEndMs;
-}
+/** Re-export the single source-of-truth interval overlap check (PC-318). */
+export { intervalsOverlap };
 
 /**
  * Detects in-flight calendar overlap for a voter who already responded (PC-46).
+ *
+ * Windows are widened to whole-day bounds for sleeping/all-day kinds and only
+ * same-type pairs are compared so events never collide with sleeping (PC-59),
+ * matching the board conflict + calendar overlap logic (PC-318).
  */
 export async function detectViewerOverlapWarning(
   db: Db,
@@ -544,6 +512,8 @@ export async function detectViewerOverlapWarning(
   overlapAcknowledgedAt: string | null | undefined,
   scheduledStartAt: string | null,
   scheduledEndAt: string | null,
+  proposalType: string = "event",
+  isAllDay: boolean = false,
 ): Promise<boolean> {
   if (
     !scheduledStartAt ||
@@ -554,12 +524,21 @@ export async function detectViewerOverlapWarning(
     return false;
   }
 
+  const viewerWindow = widenConflictWindow(
+    scheduledStartAt,
+    scheduledEndAt,
+    proposalType,
+    isAllDay,
+  );
+
   const activeProposals = await db
     .select({
       id: proposals.id,
       scheduledStartAt: proposals.scheduledStartAt,
       scheduledEndAt: proposals.scheduledEndAt,
       proposerId: proposals.proposerId,
+      proposalType: proposals.proposalType,
+      isAllDay: proposals.isAllDay,
     })
     .from(proposals)
     .where(inArray(proposals.state, ["proposed", "resolved"]));
@@ -577,15 +556,24 @@ export async function detectViewerOverlapWarning(
 
   for (const other of activeProposals) {
     if (other.id === proposalId || !other.scheduledStartAt) continue;
+    // Sleeping arrangements never conflict with events (PC-59).
+    if (other.proposalType !== proposalType) continue;
     const stakeholders = new Set([other.proposerId, ...(inviteesByProposal.get(other.id) ?? [])]);
     if (!stakeholders.has(viewerId)) continue;
 
+    const otherWindow = widenConflictWindow(
+      other.scheduledStartAt,
+      other.scheduledEndAt,
+      other.proposalType,
+      other.isAllDay,
+    );
+
     if (
       intervalsOverlap(
-        scheduledStartAt,
-        scheduledEndAt,
-        other.scheduledStartAt,
-        other.scheduledEndAt,
+        viewerWindow.start,
+        viewerWindow.end,
+        otherWindow.start,
+        otherWindow.end,
       )
     ) {
       return true;

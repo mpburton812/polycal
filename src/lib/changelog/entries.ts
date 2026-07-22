@@ -26,6 +26,93 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "2026.07.22g",
+    date: "2026-07-22",
+    summary:
+      "Playwright journeys for poll required/optional approve paths and midnight/11pm self-appointment day boundaries.",
+    changes: [
+      {
+        type: "added",
+        description:
+          "Poll journey: 3 slots, 2 required + 1 optional; one required opens via notification, the other via Proposed; optional declines with a note visible to the proposer (PC-325).",
+      },
+      {
+        type: "added",
+        description:
+          "Self-appointment day-boundary journey: 1h/2d at 12am and 11pm, one-shot and weekly×3, confirming calendar placement three days out (PC-326).",
+      },
+    ],
+  },
+  {
+    version: "2026.07.22f",
+    date: "2026-07-22",
+    summary:
+      "Proposal state-transition + notification consolidation: one logProposalTransition writer, shared notifyProposalParticipants fan-out, typed action→feed-kind catalog.",
+    changes: [
+      {
+        type: "changed",
+        description:
+          "Single logProposalTransition (state-log) now accepts transaction executors and is the only writer of proposal_state_log rows — the duplicate slices logger and the enforcement/pending-recovery logSystemTransition helpers were removed and rewired through it (PC-321).",
+      },
+      {
+        type: "changed",
+        description:
+          "New shared notifyProposalParticipants fan-out (loads invitees, unions the proposer, dedupes, applies shared metadata defaults) backs the proposer/invitee stakeholder notifications; the _core stakeholder helper, slices detach notice, resolve optional-RSVP copy, at-risk proposer-vs-invitee copy, and the redraft/auto-cancel/revert loops are now thin wrappers with identical copy and metadata (PC-322).",
+      },
+      {
+        type: "changed",
+        description:
+          "FEED_* transition allowlists and contentKindForMilestoneAction moved into a typed transition-catalog beside state-log; feed/prefs-filter re-exports it so Feed behavior is unchanged (no new actions surface) (PC-323).",
+      },
+    ],
+  },
+  {
+    version: "2026.07.22e",
+    date: "2026-07-22",
+    summary:
+      "Date-only contract docs + conflict/calendar parity: sleeping midnight-TZ vs all-day noon-UTC, widened overlap windows.",
+    changes: [
+      {
+        type: "changed",
+        description:
+          "Proposal conflict detection reuses the calendar's buildScheduleWindows and widens sleeping/all-day windows to whole civil days, so same-night sleeping (null end) and same-day all-day (noon/noon) collide while events never conflict with sleeping (PC-318 / PC-59).",
+      },
+      {
+        type: "fixed",
+        description:
+          "Draft dialog sleeping/batch schedule preview now uses the sleeping midnight-in-TZ helper (was noon-UTC), matching the persisted value; stale all-day comment corrected and date-only contract documented (PC-317).",
+      },
+      {
+        type: "changed",
+        description:
+          "Single intervalsOverlap sourced from schedule/dates (enforcement re-exports it); viewer timezone passed into all-day span expansion on slice detach paths (PC-318).",
+      },
+    ],
+  },
+  {
+    version: "2026.07.22d",
+    date: "2026-07-22",
+    summary:
+      "Visibility/partners SSOT: shared partner loaders, schedule Busy mask helper, honest admin calendar toggle.",
+    changes: [
+      {
+        type: "changed",
+        description:
+          "Accepted sleeping partners and eligible locations load from one module used by schedule, slices, proposals, and fast-sleeping (PC-305).",
+      },
+      {
+        type: "changed",
+        description:
+          "canViewProposalContent unifies sleeping visibility + optional calendar Busy mask; dead masked=false scaffolding removed from board/feed/detail (PC-306).",
+      },
+      {
+        type: "changed",
+        description:
+          "Masked calendar copy is Busy everywhere; admin toggle label matches calendar-only masking for uninvolved admins (PC-307).",
+      },
+    ],
+  },
+  {
     version: "2026.07.22c",
     date: "2026-07-22",
     summary:

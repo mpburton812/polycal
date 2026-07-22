@@ -28,12 +28,13 @@ export interface ScheduleMaskingInput {
   inviteeUserIds: string[];
   proposalType: "event" | "sleeping";
   privacyFlags: { hideSleeping: boolean };
-  acceptedPartnerIds: Set<string>;
+  acceptedPartnerIds: ReadonlySet<string>;
 }
 
 /**
  * Sleeping-arrangement masking for schedule and slice surfaces (event/super-private
  * masking was removed with PC-280 — proposals are always "open").
+ * Prefer {@link canViewProposalContent} at call sites (PC-306).
  */
 export function applyScheduleMasking(input: ScheduleMaskingInput): {
   sleepingMasked: boolean;
@@ -63,7 +64,7 @@ export function shouldMaskSleepingForViewer(
   proposerId: string,
   inviteeUserIds: string[],
   hideSleeping: boolean,
-  acceptedPartnerIds: Set<string>,
+  acceptedPartnerIds: ReadonlySet<string>,
 ): boolean {
   if (!hideSleeping) return false;
   if (proposerId === viewerId || inviteeUserIds.includes(viewerId)) return false;
