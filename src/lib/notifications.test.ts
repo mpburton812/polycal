@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { resolveNotificationUrl } from "@/lib/notifications";
+import { actorNotifyFields, resolveNotificationUrl } from "@/lib/notifications";
 
 describe("resolveNotificationUrl", () => {
   it("uses explicit metadata url when provided", () => {
@@ -25,5 +25,21 @@ describe("resolveNotificationUrl", () => {
 
   it("routes residency notifications to places", () => {
     expect(resolveNotificationUrl("residency_proposed", {})).toBe("/places");
+  });
+});
+
+describe("actorNotifyFields", () => {
+  it("uses the named actor and preserves their user id", () => {
+    expect(actorNotifyFields({ id: "user-1", displayName: "Leia" })).toEqual({
+      actorUserId: "user-1",
+      actorDisplayName: "Leia",
+    });
+  });
+
+  it("falls back to Someone for a blank display name", () => {
+    expect(actorNotifyFields({ id: "user-2", displayName: "  " })).toEqual({
+      actorUserId: "user-2",
+      actorDisplayName: "Someone",
+    });
   });
 });

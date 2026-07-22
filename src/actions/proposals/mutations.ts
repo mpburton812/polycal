@@ -18,7 +18,7 @@ import {
   proposals,
 } from "@/lib/db/schema";
 import { dismissAllNotificationsForProposal } from "@/lib/notifications-draft-return";
-import { notifyUser } from "@/lib/notifications";
+import { actorNotifyFields, notifyUser } from "@/lib/notifications";
 
 type Db = ReturnType<typeof getDb>;
 
@@ -136,6 +136,7 @@ export async function adminDeleteProposalAction(
   const primaryTitle = proposal.title;
   const primaryType = proposal.proposalType;
   const deletedCount = rows.length;
+  const actor = actorNotifyFields(session.user);
 
   for (const row of rows) {
     await hardDeleteProposalCascade(db, row);
@@ -143,8 +144,8 @@ export async function adminDeleteProposalAction(
 
   const message =
     deletedCount > 1
-      ? `An admin deleted "${primaryTitle}" and ${deletedCount - 1} related occurrence(s).`
-      : `An admin deleted the proposal "${primaryTitle}".`;
+      ? `${actor.actorDisplayName} deleted "${primaryTitle}" and ${deletedCount - 1} related occurrence(s).`
+      : `${actor.actorDisplayName} deleted the proposal "${primaryTitle}".`;
 
   for (const userId of recipientIds) {
     await notifyUser(userId, "proposal_admin_deleted", message, {
@@ -153,6 +154,7 @@ export async function adminDeleteProposalAction(
       url: "/proposals",
       adminDeleted: true,
       scope,
+      ...actor,
     });
   }
 

@@ -29,7 +29,7 @@ import {
   type ProposalState,
   type ProposalType,
 } from "@/lib/db/schema";
-import { notifyUser } from "@/lib/notifications";
+import { actorNotifyFields, notifyUser } from "@/lib/notifications";
 import { dismissNotificationsForProposal } from "@/actions/notifications";
 import {
   dismissAllNotificationsForProposal,
@@ -2663,6 +2663,7 @@ export async function acknowledgeProposalOverlapAction(
   }
 
   const now = new Date().toISOString();
+  const actor = actorNotifyFields(session.user);
 
   if (parsed.data.response === "acknowledge") {
     await db
@@ -2703,8 +2704,14 @@ export async function acknowledgeProposalOverlapAction(
   await notifyUser(
     proposal.proposerId,
     "proposal_vote_cast",
-    `A vote was changed to decline on "${proposal.title}" after a schedule conflict.`,
-    { proposalId: proposal.id, voterId: session.user.id, vote: "decline", proposalType: proposal.proposalType },
+    `${actor.actorDisplayName} changed their vote to decline on "${proposal.title}" after a schedule conflict.`,
+    {
+      proposalId: proposal.id,
+      voterId: session.user.id,
+      vote: "decline",
+      proposalType: proposal.proposalType,
+      ...actor,
+    },
   );
 
   if (invitee.role === "required") {
@@ -2825,6 +2832,7 @@ export async function castProposalVoteAction(
   }
 
   const now = new Date().toISOString();
+  const actor = actorNotifyFields(session.user);
   await db
     .update(proposalInvitees)
     .set({
@@ -2851,12 +2859,13 @@ export async function castProposalVoteAction(
     }),
   );
 
-  await notifyUser(proposal.proposerId, "proposal_vote_cast", `A vote was cast on "${proposal.title}".`, {
+  await notifyUser(proposal.proposerId, "proposal_vote_cast", `${actor.actorDisplayName} cast a vote on "${proposal.title}".`, {
     proposalId: proposal.id,
     voterId: session.user.id,
     vote: parsed.data.vote,
     proposalType: proposal.proposalType,
     ...(isProxy ? { onBehalfOfUserId: targetUserId } : {}),
+    ...actor,
   });
 
   if (invitee.role === "required") {
@@ -3047,6 +3056,7 @@ export async function updateResolvedAttendeesAction(
   }
 
   const now = new Date().toISOString();
+  const actor = actorNotifyFields(session.user);
   let attendeesChanged = false;
   let removedRequiredAttendee = false;
   const addedRequiredNames: string[] = [];
@@ -3081,9 +3091,10 @@ export async function updateResolvedAttendeesAction(
     attendeesChanged = true;
     removedNames.push(await displayNameFor(userId));
 
-    await notifyUser(userId, "proposal_attendee_removed", `You were removed from "${proposal.title}".`, {
+    await notifyUser(userId, "proposal_attendee_removed", `${actor.actorDisplayName} removed you from "${proposal.title}".`, {
       proposalId: proposal.id,
       proposalType: proposal.proposalType,
+      ...actor,
     });
   }
 
@@ -3115,9 +3126,10 @@ export async function updateResolvedAttendeesAction(
     if (role === "required") addedRequiredNames.push(name);
     else addedOptionalNames.push(name);
 
-    await notifyUser(userId, "proposal_attendee_added", `You were added to "${proposal.title}".`, {
+    await notifyUser(userId, "proposal_attendee_added", `${actor.actorDisplayName} added you to "${proposal.title}".`, {
       proposalId: proposal.id,
       proposalType: proposal.proposalType,
+      ...actor,
     });
   }
 
@@ -3144,8 +3156,13 @@ export async function updateResolvedAttendeesAction(
         await notifyUser(
           row.userId,
           "proposal_attendee_update",
-          `Attendees changed on "${proposal.title}" — maintain your acceptance or decline.`,
-          { proposalId: proposal.id, action: "attendee_update", proposalType: proposal.proposalType },
+          `${actor.actorDisplayName} changed attendees on "${proposal.title}" — maintain your acceptance or decline.`,
+          {
+            proposalId: proposal.id,
+            action: "attendee_update",
+            proposalType: proposal.proposalType,
+            ...actor,
+          },
         );
       }
     }
@@ -3456,11 +3473,13 @@ export async function rescheduleProposalAction(
     }),
   );
 
+  const actor = actorNotifyFields(session.user);
   await notifyProposalStakeholders(
     db,
     proposal,
     "proposal_rescheduled",
-    `Proposal "${proposal.title}" was rescheduled by an administrator.`,
+    `${actor.actorDisplayName} rescheduled "${proposal.title}".`,
+    actor,
   );
 
   revalidatePath("/proposals");

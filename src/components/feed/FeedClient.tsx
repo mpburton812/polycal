@@ -44,7 +44,12 @@ import { FeedLinkifiedBody, FeedLinkPreviewCard } from "@/components/feed/FeedLi
 import { ADMIN_ONLY_FEED_COMMENT_BG } from "@/components/proposals/proposalCardTheme";
 import { feedImageUrl, MAX_FEED_IMAGE_BYTES, MAX_FEED_IMAGES } from "@/lib/feed/images";
 import type { FeedLikeTargetType } from "@/lib/feed/likes";
-import type { FeedComment, FeedItem, FeedLinkPreview } from "@/lib/feed/types";
+import type {
+  FeedActiveEvent,
+  FeedComment,
+  FeedItem,
+  FeedLinkPreview,
+} from "@/lib/feed/types";
 import { extractFirstUrl } from "@/lib/feed/link-preview-core";
 import { buildFeedUpdateToken } from "@/lib/feed/update-token";
 import type { ChangelogEntry } from "@/lib/changelog/entries";
@@ -63,6 +68,7 @@ const ProposalDetailDialog = dynamic(
 
 const MILESTONE_RAIL = "#2d6a4f";
 const CHAT_RAIL = "#1d4e89";
+const ACTIVE_EVENT_FILL = "#F5D76E";
 
 type PendingImage = {
   /** Stable client key while upload is in flight. */
@@ -72,6 +78,16 @@ type PendingImage = {
   preview: string;
   status: "uploading" | "ready" | "failed";
 };
+
+/**
+ * Formats the active-event interval in the viewer's locale so the sticky pin
+ * remains concise while still exposing both schedule boundaries (PC-298).
+ */
+function formatActiveEventSchedule(event: FeedActiveEvent): string {
+  const start = new Date(event.scheduledStartAt).toLocaleString();
+  if (!event.scheduledEndAt) return start;
+  return `${start} – ${new Date(event.scheduledEndAt).toLocaleString()}`;
+}
 
 /**
  * Renders a feed image with one cache-bust retry on load failure (PC-247).
@@ -340,6 +356,7 @@ export function FeedClient({
   latestChangelogEntry: ChangelogEntry | null;
 }) {
   const [items, setItems] = useState<FeedItem[]>([]);
+  const [activeEvents, setActiveEvents] = useState<FeedActiveEvent[]>([]);
   const [controlsOpen, setControlsOpen] = useState(false);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -384,7 +401,9 @@ export function FeedClient({
         setItems((prev) => (append ? [...prev, ...result.items!] : result.items!));
         setNextCursor(result.nextCursor ?? null);
         if (!append) {
-          updateTokenRef.current = buildFeedUpdateToken(result.items);
+          const nextActiveEvents = result.activeEvents ?? [];
+          setActiveEvents(nextActiveEvents);
+          updateTokenRef.current = buildFeedUpdateToken(result.items, nextActiveEvents);
         }
       }
       if (!silent || append) {
@@ -1080,6 +1099,73 @@ export function FeedClient({
         changelog={changelog}
         latestEntry={latestChangelogEntry}
       />
+
+      {activeEvents.length > 0 ? (
+        <Box
+          component="section"
+          aria-label="Events happening now"
+          data-testid="feed-active-events"
+          sx={{
+            position: "sticky",
+            top:
+              buildInfo.environment === "production"
+                ? { xs: 56, sm: 64 }
+                : { xs: 132, sm: 116 },
+            zIndex: 1100,
+            bgcolor: GARDEN_TOKENS.background,
+            border: `3px solid ${GARDEN_TOKENS.ink}`,
+            p: 1,
+            mb: 2,
+            maxHeight: "42vh",
+            overflowY: "auto",
+          }}
+        >
+          <Chip
+            size="small"
+            label="Happening now"
+            sx={{
+              mb: 1,
+              bgcolor: GARDEN_TOKENS.mustard,
+              color: GARDEN_TOKENS.ink,
+              border: `2px solid ${GARDEN_TOKENS.ink}`,
+              fontWeight: 800,
+            }}
+          />
+          <Stack spacing={1}>
+            {activeEvents.map((event) => (
+              <Box
+                key={event.proposalId}
+                data-testid="feed-active-event"
+                sx={{
+                  bgcolor: ACTIVE_EVENT_FILL,
+                  border: `3px solid ${GARDEN_TOKENS.ink}`,
+                  p: 1.5,
+                }}
+              >
+                <Typography variant="subtitle1" fontWeight={800}>
+                  {event.title}
+                </Typography>
+                <Typography variant="body2" sx={{ color: GARDEN_TOKENS.ink, mt: 0.25 }}>
+                  {formatActiveEventSchedule(event)}
+                </Typography>
+                <Button
+                  size="small"
+                  variant="contained"
+                  onClick={() => openDetail(event.proposalId)}
+                  sx={{
+                    mt: 0.75,
+                    bgcolor: GARDEN_TOKENS.ink,
+                    color: GARDEN_TOKENS.surface,
+                    "&:hover": { bgcolor: GARDEN_TOKENS.inkMuted },
+                  }}
+                >
+                  Open proposal
+                </Button>
+              </Box>
+            ))}
+          </Stack>
+        </Box>
+      ) : null}
 
       {error ? (
         <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
