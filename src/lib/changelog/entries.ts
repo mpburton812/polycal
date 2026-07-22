@@ -26,6 +26,29 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "2026.07.22d",
+    date: "2026-07-22",
+    summary:
+      "Visibility/partners SSOT: shared partner loaders, schedule Busy mask helper, honest admin calendar toggle.",
+    changes: [
+      {
+        type: "changed",
+        description:
+          "Accepted sleeping partners and eligible locations load from one module used by schedule, slices, proposals, and fast-sleeping (PC-305).",
+      },
+      {
+        type: "changed",
+        description:
+          "canViewProposalContent unifies sleeping visibility + optional calendar Busy mask; dead masked=false scaffolding removed from board/feed/detail (PC-306).",
+      },
+      {
+        type: "changed",
+        description:
+          "Masked calendar copy is Busy everywhere; admin toggle label matches calendar-only masking for uninvolved admins (PC-307).",
+      },
+    ],
+  },
+  {
     version: "2026.07.22c",
     date: "2026-07-22",
     summary:
