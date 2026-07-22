@@ -26,7 +26,7 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: "2026.07.22f",
+    version: "2026.07.22g",
     date: "2026-07-22",
     summary:
       "Playwright journeys for poll required/optional approve paths and midnight/11pm self-appointment day boundaries.",
@@ -40,6 +40,29 @@ export const CHANGELOG: ChangelogEntry[] = [
         type: "added",
         description:
           "Self-appointment day-boundary journey: 1h/2d at 12am and 11pm, one-shot and weekly×3, confirming calendar placement three days out (PC-326).",
+      },
+    ],
+  },
+  {
+    version: "2026.07.22f",
+    date: "2026-07-22",
+    summary:
+      "Proposal state-transition + notification consolidation: one logProposalTransition writer, shared notifyProposalParticipants fan-out, typed action→feed-kind catalog.",
+    changes: [
+      {
+        type: "changed",
+        description:
+          "Single logProposalTransition (state-log) now accepts transaction executors and is the only writer of proposal_state_log rows — the duplicate slices logger and the enforcement/pending-recovery logSystemTransition helpers were removed and rewired through it (PC-321).",
+      },
+      {
+        type: "changed",
+        description:
+          "New shared notifyProposalParticipants fan-out (loads invitees, unions the proposer, dedupes, applies shared metadata defaults) backs the proposer/invitee stakeholder notifications; the _core stakeholder helper, slices detach notice, resolve optional-RSVP copy, at-risk proposer-vs-invitee copy, and the redraft/auto-cancel/revert loops are now thin wrappers with identical copy and metadata (PC-322).",
+      },
+      {
+        type: "changed",
+        description:
+          "FEED_* transition allowlists and contentKindForMilestoneAction moved into a typed transition-catalog beside state-log; feed/prefs-filter re-exports it so Feed behavior is unchanged (no new actions surface) (PC-323).",
       },
     ],
   },
