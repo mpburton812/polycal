@@ -26,6 +26,29 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "2026.07.22e",
+    date: "2026-07-22",
+    summary:
+      "Date-only contract docs + conflict/calendar parity: sleeping midnight-TZ vs all-day noon-UTC, widened overlap windows.",
+    changes: [
+      {
+        type: "changed",
+        description:
+          "Proposal conflict detection reuses the calendar's buildScheduleWindows and widens sleeping/all-day windows to whole civil days, so same-night sleeping (null end) and same-day all-day (noon/noon) collide while events never conflict with sleeping (PC-318 / PC-59).",
+      },
+      {
+        type: "fixed",
+        description:
+          "Draft dialog sleeping/batch schedule preview now uses the sleeping midnight-in-TZ helper (was noon-UTC), matching the persisted value; stale all-day comment corrected and date-only contract documented (PC-317).",
+      },
+      {
+        type: "changed",
+        description:
+          "Single intervalsOverlap sourced from schedule/dates (enforcement re-exports it); viewer timezone passed into all-day span expansion on slice detach paths (PC-318).",
+      },
+    ],
+  },
+  {
     version: "2026.07.22d",
     date: "2026-07-22",
     summary:
