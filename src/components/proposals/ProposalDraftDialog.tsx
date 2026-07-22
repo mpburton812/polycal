@@ -202,35 +202,39 @@ export function ProposalDraftDialog({
         }))
       : [];
 
+  // Preview bounds must use the SAME helpers as the persist path so the schedule
+  // label a user sees before saving matches what is stored (PC-317): sleeping /
+  // batch nights are midnight-in-TZ via sleepingDateToStartIso (viewer TZ when a
+  // stored value later resolves it), while all-day events keep noon-UTC bounds.
   const previewStartIso = useMemo(() => {
     if (batchMode && configuredBatchEntries.length > 0) {
       const sorted = [...configuredBatchEntries]
-        .map((entry) => localDateToStartIso(entry.nightDate.slice(0, 10)))
+        .map((entry) => sleepingDateToStartIso(entry.nightDate.slice(0, 10)))
         .filter((iso): iso is string => Boolean(iso))
         .sort((a, b) => a.localeCompare(b));
       return sorted[0];
     }
     const first = slots.find((s) => s.startAt);
     if (!first) return undefined;
-    return proposalType === "sleeping" || allDay
-      ? localDateToStartIso(first.startAt)
-      : localInputToIso(first.startAt);
+    if (proposalType === "sleeping") return sleepingDateToStartIso(first.startAt);
+    return allDay ? localDateToStartIso(first.startAt) : localInputToIso(first.startAt);
   }, [batchMode, configuredBatchEntries, slots, proposalType, allDay]);
 
   const previewEndIso = useMemo(() => {
     if (batchMode && configuredBatchEntries.length > 0) {
       const sorted = [...configuredBatchEntries]
-        .map((entry) => localDateToEndIso(entry.nightDate.slice(0, 10)))
+        .map((entry) => sleepingDateToStartIso(entry.nightDate.slice(0, 10)))
         .filter((iso): iso is string => Boolean(iso))
         .sort((a, b) => a.localeCompare(b));
       return sorted[sorted.length - 1];
     }
     const first = slots.find((s) => s.startAt);
     if (!first) return undefined;
-    if (proposalType === "sleeping" || allDay) {
-      return first.endAt
-        ? localDateToEndIso(first.endAt)
-        : localDateToEndIso(first.startAt);
+    if (proposalType === "sleeping") {
+      return sleepingDateToStartIso(first.endAt || first.startAt);
+    }
+    if (allDay) {
+      return first.endAt ? localDateToEndIso(first.endAt) : localDateToEndIso(first.startAt);
     }
     return first.endAt ? localInputToIso(first.endAt) : undefined;
   }, [batchMode, configuredBatchEntries, slots, proposalType, allDay]);
@@ -482,8 +486,9 @@ export function ProposalDraftDialog({
               };
             }
             if (allDay) {
-              // All-day event: slot inputs are calendar dates; store as local
-              // midnight start and end-of-day end so overlap/display work.
+              // All-day event: slot inputs are calendar dates stored as noon-UTC
+              // civil bounds (same local day in every US TZ) — NOT the midnight-TZ
+              // bounds sleeping uses (PC-258 / PC-301 / PC-317).
               const startIso = localDateToStartIso(slot.startAt);
               if (!startIso) return null;
               const endSource = slot.endAt || slot.startAt;
