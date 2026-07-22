@@ -274,3 +274,4 @@
 2026-07-22 | f28c735 | PC-298 | sticky happening-now pins and named notify actors | src/actions/admin.ts
 2026-07-22 | 793937f | PC-299 | match actor-named vote notify copy | e2e/batch-sleeping-partners-journey.spec.ts
 2026-07-22 | 611ccf2 | PC-301 | all-day single-day span, slice admin errors, Tentative title | src/actions/proposals/_core.ts
+2026-07-22 | fcb6b10 | PC-305 | visibility/partners SSOT and Busy mask copy | src/actions/feed.ts
