@@ -27,18 +27,7 @@ export interface ScheduleSlotRow {
   isDetached?: boolean;
 }
 
-/**
- * True when an all-day interval spans more than one calendar day in the given timezone.
- */
-export function isMultiDayAllDaySpan(
-  startAt: string,
-  endAt: string | null,
-  isAllDay: boolean,
-  timeZone: string = DEFAULT_VIEWER_TIMEZONE,
-): boolean {
-  if (!isAllDay || !endAt) return false;
-  return localDateKey(startAt, timeZone) !== localDateKey(endAt, timeZone);
-}
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
 /**
  * Advances a YYYY-MM-DD calendar key by one UTC day.
@@ -51,16 +40,31 @@ function addOneUtcDateKey(dateKey: string): string {
 }
 
 /**
- * Inclusive calendar date keys from start through end for multi-day all-day spans.
- * Uses the viewer timezone so local end-of-day instants do not add an extra UTC day (PC-258).
+ * Inclusive calendar date keys for an all-day interval in the viewer timezone.
+ *
+ * Sub-24h ranges are treated as a single civil day using the interval midpoint so
+ * host-locale end-of-day ISO (e.g. EDT 00:00–23:59) does not become two days when
+ * the viewer profile TZ differs (PC-301). Longer ranges expand start→end inclusively
+ * (PC-258).
  */
 export function expandAllDayDateKeys(
   startAt: string,
   endAt: string | null,
   timeZone: string = DEFAULT_VIEWER_TIMEZONE,
 ): string[] {
+  const endIso = endAt ?? startAt;
+  const startMs = new Date(startAt).getTime();
+  const endMs = new Date(endIso).getTime();
+  const duration =
+    Number.isFinite(startMs) && Number.isFinite(endMs) ? Math.max(0, endMs - startMs) : 0;
+
+  if (duration < MS_PER_DAY) {
+    const midIso = new Date(startMs + duration / 2).toISOString();
+    return [localDateKey(midIso, timeZone)];
+  }
+
   const startKey = localDateKey(startAt, timeZone);
-  const endKey = localDateKey(endAt ?? startAt, timeZone);
+  const endKey = localDateKey(endIso, timeZone);
   const keys: string[] = [];
   let cursor = startKey;
 
@@ -71,6 +75,19 @@ export function expandAllDayDateKeys(
   }
 
   return keys;
+}
+
+/**
+ * True when an all-day interval spans more than one calendar day in the given timezone.
+ */
+export function isMultiDayAllDaySpan(
+  startAt: string,
+  endAt: string | null,
+  isAllDay: boolean,
+  timeZone: string = DEFAULT_VIEWER_TIMEZONE,
+): boolean {
+  if (!isAllDay || !endAt) return false;
+  return expandAllDayDateKeys(startAt, endAt, timeZone).length > 1;
 }
 
 /**
@@ -213,6 +230,21 @@ export function buildScheduleWindows(
       row.parentProposalId ||
       !isMultiDayAllDaySpan(startAt, endAt, row.isAllDay, timeZone)
     ) {
+      // Normalize single-day all-day to noon-UTC bounds so week/agenda inclusive
+      // startKey..endKey placement cannot spill into a second civil day (PC-301).
+      if (row.isAllDay && !row.isBatchSleeping && !row.parentProposalId) {
+        const dayKey =
+          expandAllDayDateKeys(startAt, endAt, timeZone)[0] ?? localDateKey(startAt, timeZone);
+        const bounds = allDayBoundsForDateKey(dayKey);
+        pushWindow(windows, row, {
+          startAt: bounds.startAt,
+          endAt: bounds.endAt,
+          slotLabel,
+          key: slotId ? `${keyPrefix}:${slotId}` : keyPrefix,
+          slotId,
+        });
+        return;
+      }
       pushWindow(windows, row, {
         startAt,
         endAt,
