@@ -98,6 +98,6 @@ test.describe("In-flight overlap and revoke acceptance", () => {
     const atRiskCard = page.locator(".MuiCard-root").filter({
       has: page.getByRole("heading", { name: eventA, level: 2 }),
     });
-    await expect(atRiskCard.getByText("At risk")).toBeVisible({ timeout: 15_000 });
+    await expect(atRiskCard.getByText("At risk", { exact: true })).toBeVisible({ timeout: 15_000 });
   });
 });

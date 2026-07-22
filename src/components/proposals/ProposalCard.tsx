@@ -446,7 +446,7 @@ export function ProposalCard({
                 onAdminDelete(proposal.id);
               }}
             >
-              Delete
+              Admin delete
             </Button>
           )}
         </CardActions>

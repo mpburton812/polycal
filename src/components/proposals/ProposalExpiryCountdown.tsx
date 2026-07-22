@@ -54,7 +54,7 @@ export function ProposalExpiryCountdown({
       )}
       {atRisk && atRiskExpiresAt && (
         <Typography variant="caption" sx={{ color: GARDEN_TOKENS.inkMuted, pl: 2.5 }}>
-          At risk · {formatCountdownRemaining(atRiskExpiresAt, nowMs)} left
+          Risk window · {formatCountdownRemaining(atRiskExpiresAt, nowMs)} left
         </Typography>
       )}
     </Stack>
