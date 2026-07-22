@@ -149,11 +149,62 @@ type ProposalScheduleRow = {
 };
 
 /**
+ * Schedule-based proposed expiry instant from preloaded slot starts (PC-292 / PC-46 / PC-282).
+ * Batch sleeping uses the latest night; sleeping nights expire at calendar day-end.
+ */
+export function computeScheduleExpirationInstant(
+  proposal: ProposalScheduleRow,
+  slotStartAts: string[],
+): string | null {
+  let anchor: string | null = null;
+  if (proposal.isBatchSleeping) {
+    anchor =
+      slotStartAts[slotStartAts.length - 1] ??
+      proposal.scheduledEndAt ??
+      proposal.scheduledStartAt;
+  } else if (proposal.scheduledStartAt) {
+    anchor = proposal.scheduledStartAt;
+  } else {
+    anchor = slotStartAts[0] ?? null;
+  }
+
+  if (!anchor) return null;
+  if (proposal.proposalType === "sleeping") {
+    return sleepingCalendarDayEnd(anchor).toISOString();
+  }
+  return anchor;
+}
+
+/**
+ * Wall-clock when a proposed item would expire under enforcement (PC-292).
+ * Earlier of schedule instant and updatedAt + proposedMaxDays when max days > 0.
+ */
+export function computeProposedExpiresAt(
+  scheduleInstant: string | null,
+  updatedAt: string,
+  proposedMaxDays: number,
+): string | null {
+  const candidates: number[] = [];
+  if (scheduleInstant) {
+    const scheduleMs = Date.parse(scheduleInstant);
+    if (!Number.isNaN(scheduleMs)) candidates.push(scheduleMs);
+  }
+  if (proposedMaxDays > 0) {
+    const updatedMs = Date.parse(updatedAt);
+    if (!Number.isNaN(updatedMs)) {
+      candidates.push(updatedMs + proposedMaxDays * MS_PER_DAY);
+    }
+  }
+  if (candidates.length === 0) return null;
+  return new Date(Math.min(...candidates)).toISOString();
+}
+
+/**
  * Resolves when a proposed item is treated as "past start" for expiry (PC-46 / PC-282).
  * Batch sleeping uses the latest night so earlier nights can still be voted on.
  * Sleeping nights expire at calendar day-end (parity with archive / board past).
  */
-async function getProposedExpirationInstant(
+export async function getProposedExpirationInstant(
   db: Db,
   proposal: ProposalScheduleRow,
 ): Promise<string | null> {
@@ -163,20 +214,10 @@ async function getProposedExpirationInstant(
     .where(eq(proposalTimeSlots.proposalId, proposal.id))
     .orderBy(asc(proposalTimeSlots.startAt));
 
-  let anchor: string | null = null;
-  if (proposal.isBatchSleeping) {
-    anchor = slots[slots.length - 1]?.startAt ?? proposal.scheduledEndAt ?? proposal.scheduledStartAt;
-  } else if (proposal.scheduledStartAt) {
-    anchor = proposal.scheduledStartAt;
-  } else {
-    anchor = slots[0]?.startAt ?? null;
-  }
-
-  if (!anchor) return null;
-  if (proposal.proposalType === "sleeping") {
-    return sleepingCalendarDayEnd(anchor).toISOString();
-  }
-  return anchor;
+  return computeScheduleExpirationInstant(
+    proposal,
+    slots.map((slot) => slot.startAt),
+  );
 }
 
 /**

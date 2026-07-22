@@ -21,6 +21,7 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- PC-291–PC-296: Proposed Kanban **Nudge** for pending voters (1h cooldown); live proposed/at-risk expiry countdowns on summary cards; admin **hard-delete** of proposals in any state (including archived), with `proposal_admin_deleted` notify to all participants. Change control: `2026.07.22a`. SCHEMA_VERSION 34 (`last_nudge_at`).
 - PC-279: Feed URL embeds — linkify chat/comment bodies and show Facebook-style Open Graph preview cards (SSRF-safe cache). Change control: `2026.07.21f`. SCHEMA_VERSION 31.
 - PC-278: Optional invitees keep Proposed visibility + actionable resolve notification after required attendees resolve (extend PC-49 to non-polls). Change control: `2026.07.21e`.
 - **Production release `2026.07.21-prod` (PC-271):** Consolidated Code Status entry for this promote — Feed Controls (PC-264–268), six-item UX batch (PC-258–263), FEED/like parrot sizing (PC-270; supersedes interim PC-260/269 sizes), brace-expansion/js-yaml audit patches (PC-258).

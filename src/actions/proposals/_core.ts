@@ -2569,6 +2569,7 @@ export async function getProposalDetailAction(
           adminCanSeeUninvolved,
         }),
       canCancel: canManage && (row.state === "proposed" || row.state === "resolved"),
+      canAdminDeleteProposal: isAdmin,
       canRedraft: isProposer && row.state === "resolved",
       canReschedule:
         isAdmin &&
@@ -3805,4 +3806,99 @@ export async function redraftProposalAction(
   revalidatePath("/schedule");
 
   return { ok: true, message: "Proposal moved to drafts. Calendar entry flagged at-risk until resubmitted." };
+}
+
+const NUDGE_COOLDOWN_MS = 60 * 60 * 1000;
+
+/**
+ * Notifies invitees who have not voted yet (proposer or admin, PC-293).
+ */
+export async function nudgePendingVotersAction(
+  proposalId: string,
+): Promise<{ ok: boolean; message: string; nudgedCount?: number }> {
+  const session = await auth();
+  if (!session?.user) {
+    return { ok: false, message: "Sign in required." };
+  }
+
+  await ensureDbReady();
+  const db = getDb();
+  const [proposal] = await db
+    .select()
+    .from(proposals)
+    .where(eq(proposals.id, proposalId))
+    .limit(1);
+
+  if (!proposal) {
+    return { ok: false, message: "Proposal not found." };
+  }
+
+  const isAdmin = await userHasAdminAccess(session.user.role);
+  if (proposal.proposerId !== session.user.id && !isAdmin) {
+    return { ok: false, message: "Only the proposer or an admin can nudge voters." };
+  }
+
+  const invitees = await db
+    .select({
+      userId: proposalInvitees.userId,
+      role: proposalInvitees.role,
+      voteStatus: proposalInvitees.voteStatus,
+    })
+    .from(proposalInvitees)
+    .where(eq(proposalInvitees.proposalId, proposalId));
+
+  const pending = invitees.filter((row) => row.voteStatus === "not_seen");
+  const hasPendingOptional =
+    proposal.state === "resolved" &&
+    invitees.some((row) => row.role === "optional" && row.voteStatus === "not_seen");
+
+  if (proposal.state !== "proposed" && !hasPendingOptional) {
+    return { ok: false, message: "Only open proposals can be nudged." };
+  }
+
+  if (pending.length === 0) {
+    return { ok: true, message: "Everyone has already responded.", nudgedCount: 0 };
+  }
+
+  if (proposal.lastNudgeAt) {
+    const lastMs = Date.parse(proposal.lastNudgeAt);
+    if (!Number.isNaN(lastMs) && Date.now() - lastMs < NUDGE_COOLDOWN_MS) {
+      return { ok: false, message: "Wait at least an hour between nudges." };
+    }
+  }
+
+  const now = new Date().toISOString();
+  for (const invitee of pending) {
+    await notifyUser(
+      invitee.userId,
+      "proposal_nudge",
+      `Reminder: "${proposal.title}" still needs your response.`,
+      {
+        proposalId: proposal.id,
+        proposalTitle: proposal.title,
+        proposalType: proposal.proposalType,
+        action: "vote",
+      },
+    );
+  }
+
+  await db
+    .update(proposals)
+    .set({ lastNudgeAt: now, updatedAt: now })
+    .where(eq(proposals.id, proposalId));
+
+  await logProposalTransition(
+    db,
+    proposalId,
+    session.user.id,
+    "proposal.vote_nudge",
+    JSON.stringify({ nudgedCount: pending.length }),
+  );
+
+  revalidatePath("/proposals");
+  return {
+    ok: true,
+    message: `Nudged ${pending.length} pending voter${pending.length === 1 ? "" : "s"}.`,
+    nudgedCount: pending.length,
+  };
 }
