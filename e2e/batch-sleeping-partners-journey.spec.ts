@@ -98,7 +98,7 @@ test.describe("Batch sleeping partners journey", () => {
       BT_USERS.katie.username,
       BURTON_THOMPSON_PASSWORD,
     );
-    await expectInAppNotification(page, /sent back to drafts|vote was cast/i);
+    await expectInAppNotification(page, /sent back to drafts|cast a vote/i);
     await goToProposals(page);
     await selectProposalTab(page, "Drafts");
 

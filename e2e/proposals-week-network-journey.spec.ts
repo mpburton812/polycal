@@ -136,7 +136,7 @@ test.describe("Week schedule poly-family journey", () => {
 
     await logout(page);
     await loginWithOnboardingIfNeeded(page, USERS.luke.username);
-    await expectInAppNotification(page, /A vote was cast on/i);
+    await expectInAppNotification(page, /cast a vote on/i);
     await expectInAppNotification(page, new RegExp(escape(cancelledBatchTitle)));
     await expectInAppNotification(page, /was cancelled/i);
     await expectInAppNotification(page, /approved and scheduled/i);
