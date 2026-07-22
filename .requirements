@@ -279,3 +279,4 @@
 2026-07-22 | c1c18cf | PC-317 | date-only contract + conflict/calendar parity | src/actions/proposals/_core.ts
 2026-07-22 | c1c18cf | PC-318 | conflict parity via buildScheduleWindows + widened overlap windows | src/lib/proposals/conflict-windows.ts
 2026-07-22 | c1c18cf | PC-319 | unit tests: same-day all-day, same-night sleeping, event×sleeping PC-59, draft date contract | src/lib/proposals/conflict-windows.test.ts
+2026-07-22 | c6aae60 | PC-320 | consolidate state-transition logging + notify fan-out [][][][] | src/actions/proposals/_core.ts
