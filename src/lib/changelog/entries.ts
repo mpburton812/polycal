@@ -26,6 +26,24 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "2026.07.22b",
+    date: "2026-07-22",
+    summary:
+      "Feed sticky Happening-now event pins; named actors on notifies and system log.",
+    changes: [
+      {
+        type: "added",
+        description:
+          "Feed pins currently-happening non-sleeping (resolved) events in a sticky Happening now highlight stack above the timeline; silent poll tracks active window changes (PC-298).",
+      },
+      {
+        type: "fixed",
+        description:
+          "Actor-authored notifications name the initiating user (no hardcoded \"An admin\" / \"an administrator\"); admin activity logs attribute notification.* rows to the actor while preserving the recipient in details (PC-299).",
+      },
+    ],
+  },
+  {
     version: "2026.07.21i",
     date: "2026-07-21",
     summary: "Ops script: production schedule/chat wipe keeping people and places.",

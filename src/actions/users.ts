@@ -23,7 +23,7 @@ import {
   users,
   type UserRole,
 } from "@/lib/db/schema";
-import { notifyUser } from "@/lib/notifications";
+import { actorNotifyFields, notifyUser } from "@/lib/notifications";
 import {
   dismissAllNotificationsForProposal,
   formatDraftReturnNotification,
@@ -171,6 +171,22 @@ function formatZodError(error: z.ZodError): string {
 }
 
 /**
+ * Resolves optional lifecycle-action actor metadata before user rows can be changed (PC-299).
+ */
+async function lifecycleActorFields(
+  db: ReturnType<typeof getDb>,
+  actorUserId: string | null,
+): Promise<ReturnType<typeof actorNotifyFields> | Record<string, never>> {
+  if (!actorUserId) return {};
+  const [actor] = await db
+    .select({ displayName: users.displayName })
+    .from(users)
+    .where(eq(users.id, actorUserId))
+    .limit(1);
+  return actorNotifyFields({ id: actorUserId, displayName: actor?.displayName });
+}
+
+/**
  * Archives proposals owned by a departing user and removes them as invitees elsewhere (PC-45).
  */
 async function archiveProposalsForDeletedUser(
@@ -179,6 +195,7 @@ async function archiveProposalsForDeletedUser(
   actorUserId: string,
 ): Promise<void> {
   const now = new Date().toISOString();
+  const actor = await lifecycleActorFields(db, actorUserId);
 
   const owned = await db
     .select({ id: proposals.id, title: proposals.title })
@@ -213,7 +230,7 @@ async function archiveProposalsForDeletedUser(
         invitee.userId,
         "proposal_cancelled",
         `Proposal "${proposal.title}" was archived because the proposer was removed.`,
-        { proposalId: proposal.id },
+        { proposalId: proposal.id, ...actor },
       );
     }
   }
@@ -253,6 +270,7 @@ async function demoteOrRemoveInviteeFromActiveProposals(
   reason: string,
 ): Promise<void> {
   const now = new Date().toISOString();
+  const actor = await lifecycleActorFields(db, actorUserId);
 
   const inviteeRows = await db
     .select({
@@ -301,7 +319,7 @@ async function demoteOrRemoveInviteeFromActiveProposals(
           notifyId,
           "proposal_attendees_updated",
           `A required attendee was ${reason} on "${proposal.title}".`,
-          { proposalId: row.proposalId },
+          { proposalId: row.proposalId, ...actor },
         );
       }
     }
@@ -314,8 +332,10 @@ async function demoteOrRemoveInviteeFromActiveProposals(
 async function pauseUserProposalSideEffects(
   db: ReturnType<typeof getDb>,
   userId: string,
+  actorUserId: string | null,
 ): Promise<void> {
   const now = new Date().toISOString();
+  const actor = await lifecycleActorFields(db, actorUserId);
   const affectedProposalIds = new Set<string>();
 
   const requiredRows = await db
@@ -381,6 +401,7 @@ async function pauseUserProposalSideEffects(
       await notifyUser(notifyId, "proposal_reverted_to_draft", message, {
         proposalId,
         reason: "participant paused",
+        ...actor,
       });
     }
   }
@@ -882,7 +903,7 @@ export async function pauseUserAction(userId: string): Promise<UserActionResult>
     return { ok: false, message: "User not found or not active." };
   }
 
-  await pauseUserProposalSideEffects(db, userId);
+  await pauseUserProposalSideEffects(db, userId, session.user.id);
 
   const now = new Date().toISOString();
   await db

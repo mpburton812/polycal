@@ -1,7 +1,7 @@
 "use server";
 
 import { randomUUID } from "node:crypto";
-import { and, asc, desc, eq, inArray, isNull, lt, or } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, isNull, lt, lte, or } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
@@ -40,11 +40,13 @@ import {
   proposalCommentsAllowed,
 } from "@/lib/feed/prefs-filter";
 import {
+  type FeedActiveEvent,
   type FeedComment,
   type FeedItem,
   type FeedMilestone,
   type NetworkChatMessage,
 } from "@/lib/feed/types";
+import { isEventHappeningNow } from "@/lib/feed/active-events";
 import {
   loadLinkPreviewsById,
   resolvePreviewForBody,
@@ -246,6 +248,115 @@ async function loadAcceptedPartnerIds(
 }
 
 /**
+ * Loads resolved events overlapping now for the highlighted first-page stack.
+ * The same proposal, audit-log, and involvement gates as Feed milestones are
+ * applied so pinning never broadens what the viewer is allowed to see (PC-298).
+ */
+async function loadActiveEvents(
+  db: Parameters<Parameters<typeof withDb>[0]>[0],
+  viewerId: string,
+  isAdmin: boolean,
+  prefs: FeedPrefs,
+  partnerIds: ReadonlySet<string>,
+  now: Date,
+): Promise<FeedActiveEvent[]> {
+  if (!prefs.content.resolved) return [];
+
+  const nowIso = now.toISOString();
+  const rows = await db
+    .select({
+      proposalId: proposals.id,
+      title: proposals.title,
+      proposalType: proposals.proposalType,
+      state: proposals.state,
+      proposerId: proposals.proposerId,
+      scheduledStartAt: proposals.scheduledStartAt,
+      scheduledEndAt: proposals.scheduledEndAt,
+    })
+    .from(proposals)
+    .where(
+      and(
+        eq(proposals.proposalType, "event"),
+        eq(proposals.state, "resolved"),
+        lte(proposals.scheduledStartAt, nowIso),
+        or(
+          gte(proposals.scheduledEndAt, nowIso),
+          and(isNull(proposals.scheduledEndAt), gte(proposals.scheduledStartAt, nowIso)),
+        ),
+      ),
+    )
+    .orderBy(asc(proposals.scheduledStartAt));
+
+  if (rows.length === 0) return [];
+
+  const inviteeRows = await db
+    .select({
+      proposalId: proposalInvitees.proposalId,
+      userId: proposalInvitees.userId,
+    })
+    .from(proposalInvitees)
+    .where(inArray(proposalInvitees.proposalId, rows.map((row) => row.proposalId)));
+  const inviteesByProposal = new Map<string, string[]>();
+  for (const invitee of inviteeRows) {
+    const list = inviteesByProposal.get(invitee.proposalId) ?? [];
+    list.push(invitee.userId);
+    inviteesByProposal.set(invitee.proposalId, list);
+  }
+
+  const adminCanSeeUninvolved = await getAdminCanSeeUninvolved(db);
+  const [group] = await db
+    .select({ auditLogVisibility: polyGroup.auditLogVisibility })
+    .from(polyGroup)
+    .where(eq(polyGroup.id, 1))
+    .limit(1);
+  const auditVisibility = (group?.auditLogVisibility ?? "admin_only") as AuditLogVisibility;
+
+  const activeEvents: FeedActiveEvent[] = [];
+  for (const row of rows) {
+    if (!isEventHappeningNow(row, now) || !row.scheduledStartAt) continue;
+
+    const inviteeUserIds = inviteesByProposal.get(row.proposalId) ?? [];
+    if (
+      !viewerCanSeeProposalWithSleepingGate(
+        viewerId,
+        isAdmin,
+        row.proposerId,
+        inviteeUserIds,
+        {
+          proposalType: row.proposalType,
+          state: row.state,
+          adminCanSeeUninvolved,
+        },
+      )
+    ) {
+      continue;
+    }
+
+    const isProposer = row.proposerId === viewerId;
+    const isInvitee = inviteeUserIds.includes(viewerId);
+    if (!viewerCanSeeAuditLog(auditVisibility, isAdmin, isProposer, isInvitee)) continue;
+
+    const involvement = classifyMilestoneInvolvement(
+      viewerId,
+      row.proposerId,
+      inviteeUserIds,
+      partnerIds,
+    );
+    if (!involvementAllowed(prefs, involvement)) continue;
+
+    activeEvents.push({
+      proposalId: row.proposalId,
+      title: row.title,
+      scheduledStartAt: row.scheduledStartAt,
+      scheduledEndAt: row.scheduledEndAt,
+      proposalState: row.state,
+    });
+  }
+
+  return activeEvents;
+}
+
+/**
  * Loads Feed Controls prefs for the signed-in user (PC-265).
  */
 export async function getFeedPrefsAction(): Promise<FeedPrefs> {
@@ -297,7 +408,13 @@ export async function updateFeedPrefsAction(
  */
 export async function listFeedItemsAction(
   input: z.infer<typeof listFeedSchema> = {},
-): Promise<{ ok: boolean; message: string; items?: FeedItem[]; nextCursor?: string | null }> {
+): Promise<{
+  ok: boolean;
+  message: string;
+  items?: FeedItem[];
+  activeEvents?: FeedActiveEvent[];
+  nextCursor?: string | null;
+}> {
   const sessionResult = await requireSession();
   if (!sessionResult.ok) return sessionResult;
 
@@ -320,6 +437,10 @@ export async function listFeedItemsAction(
       .limit(1);
     const prefs = parseFeedPrefs(prefsRow?.feedPrefsJson);
     const partnerIds = await loadAcceptedPartnerIds(db, viewerId);
+    const activeEvents =
+      parsed.data.cursor == null
+        ? await loadActiveEvents(db, viewerId, isAdmin, prefs, partnerIds, new Date())
+        : [];
 
     const milestones = await loadMilestoneBatch(
       db,
@@ -351,7 +472,7 @@ export async function listFeedItemsAction(
         ? encodeFeedCursor(items[items.length - 1]!)
         : null;
 
-    return { ok: true, message: "OK", items, nextCursor };
+    return { ok: true, message: "OK", items, activeEvents, nextCursor };
   });
 }
 
@@ -368,7 +489,11 @@ export async function getFeedUpdateTokenAction(): Promise<{
   if (!result.ok || !result.items) {
     return { ok: false, message: result.message };
   }
-  return { ok: true, message: "OK", token: buildFeedUpdateToken(result.items) };
+  return {
+    ok: true,
+    message: "OK",
+    token: buildFeedUpdateToken(result.items, result.activeEvents ?? []),
+  };
 }
 
 async function loadMilestoneBatch(

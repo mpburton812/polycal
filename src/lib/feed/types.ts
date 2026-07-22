@@ -54,6 +54,15 @@ export interface FeedMilestone {
   likedByMe: boolean;
 }
 
+/** Resolved event currently overlapping now and pinned above the Feed (PC-298). */
+export interface FeedActiveEvent {
+  proposalId: string;
+  title: string;
+  scheduledStartAt: string;
+  scheduledEndAt: string | null;
+  proposalState: string;
+}
+
 export interface NetworkChatMessage {
   id: string;
   authorId: string;
@@ -85,5 +94,6 @@ export type FeedItem =
 
 export interface FeedPage {
   items: FeedItem[];
+  activeEvents: FeedActiveEvent[];
   nextCursor: string | null;
 }

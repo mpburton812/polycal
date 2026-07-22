@@ -271,3 +271,5 @@
 2026-07-22 | 153d400 | PC-290 | store batch sleeping nights in proposer timezone | src/actions/proposals/_core.ts
 2026-07-22 | ea2a69d | PC-291 | nudge pending voters, expiry timers, admin delete | src/actions/proposals.ts
 2026-07-22 | 169d3c8 | PC-296 | avoid admin Delete card click and At risk strict match | src/components/proposals/ProposalCard.tsx
+2026-07-22 | f28c735 | PC-298 | sticky happening-now pins and named notify actors | src/actions/admin.ts
+2026-07-22 | 793937f | PC-299 | match actor-named vote notify copy | e2e/batch-sleeping-partners-journey.spec.ts

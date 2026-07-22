@@ -30,6 +30,9 @@ const ACTION_LABELS: Record<string, string> = {
   "residency.accepted": "Residency accepted",
   "residency.declined": "Residency declined",
   "residency.comment": "Residency comment",
+  "proposals.admin_delete": "Admin deleted proposal",
+  "proposals.draft_delete": "Deleted draft proposal",
+  "proposal.admin_rescheduled": "Admin rescheduled proposal",
 };
 
 /**
@@ -49,6 +52,24 @@ function asString(value: unknown): string | null {
 
 function asNumber(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+/**
+ * Extracts the initiating user from notification metadata for admin-log attribution (PC-299).
+ */
+export function getNotificationActivityActor(
+  action: string,
+  details: string | null,
+): { actorUserId: string; actorDisplayName: string } | null {
+  if (!action.startsWith("notification.") || !details?.trim()) return null;
+  try {
+    const parsed = JSON.parse(details) as Record<string, unknown>;
+    const actorUserId = asString(parsed.actorUserId);
+    const actorDisplayName = asString(parsed.actorDisplayName);
+    return actorUserId && actorDisplayName ? { actorUserId, actorDisplayName } : null;
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -74,7 +95,9 @@ export function formatActivityLogDetails(action: string, details: string | null)
 
     if (action.startsWith("notification.")) {
       const message = asString(parsed.message);
-      if (message) return message;
+      const recipient = asString(parsed.recipientDisplayName);
+      const parts = [recipient ? `Notified: ${recipient}` : null, message].filter(Boolean);
+      if (parts.length > 0) return parts.join(" · ");
       const url = asString(parsed.url);
       if (url) return url;
     }
