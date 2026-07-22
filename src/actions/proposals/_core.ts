@@ -12,7 +12,6 @@ import { getDb } from "@/lib/db/client";
 import { ensureDbReady } from "@/lib/db/ensure-ready";
 import {
   feedImageUploads,
-  locationResidents,
   locations,
   polyGroup,
   proposalCommentImages,
@@ -22,7 +21,6 @@ import {
   proposalStateLog,
   proposalTimeSlots,
   proposals,
-  sleepingPartnerships,
   users,
   type InviteeRole,
   type InviteeVoteStatus,
@@ -83,6 +81,11 @@ import { enterAtRiskProposedState } from "@/lib/proposals/services/at-risk";
 import { logProposalTransition } from "@/lib/proposals/services/state-log";
 import { resetInviteeVotes, wipeProposalVotes } from "@/lib/proposals/services/votes";
 import { formatSleepingDisplayTitle } from "@/lib/proposals/sleeping-display";
+import {
+  getAcceptedSleepingPartnerIds as loadAcceptedSleepingPartnerIds,
+  getEligibleLocationIdsForUser as loadEligibleLocationIdsForUser,
+  getEligibleLocationIdsForUsers as loadEligibleLocationIdsForUsers,
+} from "@/lib/proposals/partners";
 import {
   getAdminCanSeeUninvolved,
   viewerCanSeeAuditLog,
@@ -466,48 +469,7 @@ async function getEligibleLocationIdsForUser(
   db: ReturnType<typeof getDb>,
   userId: string,
 ): Promise<string[]> {
-  const directRows = await db
-    .select({ locationId: locationResidents.locationId })
-    .from(locationResidents)
-    .where(
-      and(eq(locationResidents.userId, userId), eq(locationResidents.status, "accepted")),
-    );
-
-  const partnershipRows = await db
-    .select({
-      userLowId: sleepingPartnerships.userLowId,
-      userHighId: sleepingPartnerships.userHighId,
-    })
-    .from(sleepingPartnerships)
-    .where(
-      and(
-        eq(sleepingPartnerships.status, "accepted"),
-        or(
-          eq(sleepingPartnerships.userLowId, userId),
-          eq(sleepingPartnerships.userHighId, userId),
-        ),
-      ),
-    );
-
-  const partnerIds = partnershipRows.map((row) =>
-    row.userLowId === userId ? row.userHighId : row.userLowId,
-  );
-
-  let networkLocationIds: string[] = [];
-  if (partnerIds.length > 0) {
-    const partnerResidency = await db
-      .select({ locationId: locationResidents.locationId })
-      .from(locationResidents)
-      .where(
-        and(
-          inArray(locationResidents.userId, partnerIds),
-          eq(locationResidents.status, "accepted"),
-        ),
-      );
-    networkLocationIds = partnerResidency.map((row) => row.locationId);
-  }
-
-  return [...new Set([...directRows.map((row) => row.locationId), ...networkLocationIds])];
+  return loadEligibleLocationIdsForUser(db, userId);
 }
 
 /** Accepted sleeping partner user ids for invitee validation. */
@@ -515,25 +477,7 @@ async function getAcceptedSleepingPartnerIds(
   db: ReturnType<typeof getDb>,
   userId: string,
 ): Promise<Set<string>> {
-  const partnershipRows = await db
-    .select({
-      userLowId: sleepingPartnerships.userLowId,
-      userHighId: sleepingPartnerships.userHighId,
-    })
-    .from(sleepingPartnerships)
-    .where(
-      and(
-        eq(sleepingPartnerships.status, "accepted"),
-        or(
-          eq(sleepingPartnerships.userLowId, userId),
-          eq(sleepingPartnerships.userHighId, userId),
-        ),
-      ),
-    );
-
-  return new Set(
-    partnershipRows.map((row) => (row.userLowId === userId ? row.userHighId : row.userLowId)),
-  );
+  return loadAcceptedSleepingPartnerIds(db, userId);
 }
 
 /**
@@ -567,13 +511,7 @@ async function getEligibleLocationIdsForUsers(
   db: ReturnType<typeof getDb>,
   userIds: string[],
 ): Promise<string[]> {
-  const ids = new Set<string>();
-  for (const userId of userIds) {
-    for (const locationId of await getEligibleLocationIdsForUser(db, userId)) {
-      ids.add(locationId);
-    }
-  }
-  return [...ids];
+  return loadEligibleLocationIdsForUsers(db, userIds);
 }
 
 /**
@@ -2322,8 +2260,7 @@ export async function getProposalDetailAction(
 
   const display = row;
   const userFacingDescription = proposalDescriptionForDisplay(row.description);
-  // Privacy masking was removed (PC-280) — content is never hidden by privacy level anymore.
-  const masked = false;
+  // Detail dialog never applies schedule sleeping mask (PC-306) — content stays unmasked.
 
   // Preload sleeping partners for each proxy (passive) invitee so UI can show vote controls (PC-255).
   const proxyPartnerIdsByUser = new Map<string, Set<string>>();
@@ -2358,7 +2295,7 @@ export async function getProposalDetailAction(
     viewerInvitee &&
     shouldRecordProposalInviteeView({
       proposalState: row.state,
-      masked,
+      masked: false,
       isInvitee: true,
       viewedAt: viewerInvitee.viewedAt,
     })
@@ -2410,32 +2347,27 @@ export async function getProposalDetailAction(
   const isInvitee = inviteeUserIds.includes(session.user.id);
   const canManage = isProposer || isAdmin;
   const recurrenceRule = parseRecurrenceRule(row.recurrenceRule);
-  const canViewSensitive = !masked;
 
-  const stateLogEntries = canViewSensitive
-    ? logRows.map((entry) => ({
-        action: entry.action,
-        actorName: entry.actorName ?? null,
-        details: entry.details ?? null,
-        createdAt: entry.createdAt,
-      }))
-    : [];
+  const stateLogEntries = logRows.map((entry) => ({
+    action: entry.action,
+    actorName: entry.actorName ?? null,
+    details: entry.details ?? null,
+    createdAt: entry.createdAt,
+  }));
 
-  const hasOverlapWarning = canViewSensitive
-    ? await detectViewerOverlapWarning(
-        db,
-        proposalId,
-        session.user.id,
-        viewerInvitee?.voteStatus,
-        viewerInvitee?.overlapAcknowledgedAt,
-        display.scheduledStartAt ?? null,
-        display.scheduledEndAt ?? null,
-      )
-    : false;
+  const hasOverlapWarning = await detectViewerOverlapWarning(
+    db,
+    proposalId,
+    session.user.id,
+    viewerInvitee?.voteStatus,
+    viewerInvitee?.overlapAcknowledgedAt,
+    display.scheduledStartAt ?? null,
+    display.scheduledEndAt ?? null,
+  );
 
   const optionalRsvpPending = optionalInviteeVotesPending(row, viewerInvitee);
   const displayState: ProposalState = optionalRsvpPending ? "proposed" : row.state;
-  const batchEntries = masked ? [] : parseBatchEntriesJson(row.batchEntriesJson);
+  const batchEntries = parseBatchEntriesJson(row.batchEntriesJson);
   const batchLocationIds = [
     ...new Set(
       batchEntries
@@ -2455,7 +2387,7 @@ export async function getProposalDetailAction(
   );
 
   let detailTitle = display.title;
-  if (!masked && row.proposalType === "sleeping") {
+  if (row.proposalType === "sleeping") {
     detailTitle = await buildSleepingProposalTitle(db, {
       proposerName: row.proposerName,
       intentionalSolo: row.intentionalSolo,
@@ -2476,17 +2408,16 @@ export async function getProposalDetailAction(
       id: row.id,
       title: detailTitle,
       description: userFacingDescription,
-      notes: masked
-        ? null
-        : isProposer || isInvitee || isAdmin || row.state === "resolved"
+      notes:
+        isProposer || isInvitee || isAdmin || row.state === "resolved"
           ? row.notes
           : null,
       proposalType: row.proposalType,
       state: row.state,
       proposerId: row.proposerId,
       proposerName: row.proposerName,
-      locationId: masked ? null : row.locationId ?? null,
-      locationText: masked ? null : row.locationText ?? null,
+      locationId: row.locationId ?? null,
+      locationText: row.locationText ?? null,
       locationName: display.locationName ?? display.locationText ?? null,
       intentionalSolo: row.intentionalSolo,
       isPoll: row.isPoll,
@@ -2494,15 +2425,15 @@ export async function getProposalDetailAction(
       scheduledStartAt: display.scheduledStartAt ?? null,
       scheduledEndAt: display.scheduledEndAt ?? null,
       atRisk: row.atRisk,
-      isContentMasked: masked,
+      isContentMasked: false,
       isRecurring: Boolean(recurrenceRule || row.parentProposalId),
       isRecurrenceParent: row.isRecurrenceParent,
       parentProposalId: row.parentProposalId ?? null,
       recurrenceRule,
       occurrenceIndex: row.occurrenceIndex ?? null,
-      bedroomIndex: masked ? null : row.bedroomIndex ?? null,
+      bedroomIndex: row.bedroomIndex ?? null,
       bedroomLabel:
-        masked || row.proposalType !== "sleeping" || row.bedroomIndex === null
+        row.proposalType !== "sleeping" || row.bedroomIndex === null
           ? null
           : (() => {
               const names = parseBedroomNames(row.locationBedroomNames);
@@ -2518,57 +2449,48 @@ export async function getProposalDetailAction(
       isBatchSleeping: row.isBatchSleeping,
       batchEntries,
       batchPlaceNames,
-      invitees: canViewSensitive
-        ? inviteeRows.map((invitee) => ({
-            userId: invitee.userId,
-            displayName: invitee.displayName,
-            role: invitee.role,
-            voteStatus: invitee.voteStatus,
-            viewedAt: invitee.viewedAt ?? null,
-            userRole: invitee.userRole,
-            addedByUserId: invitee.addedByUserId ?? null,
-            canProxyVote:
-              invitee.userRole === "passive" &&
-              (row.state === "proposed" || row.state === "resolved") &&
-              actorCanProxyVoteSync({
-                isAdmin,
-                actorUserId: session.user.id,
-                proposerId: row.proposerId,
-                sleepingPartnerIds: proxyPartnerIdsByUser.get(invitee.userId) ?? new Set(),
-              }),
-          }))
-        : [],
-      timeSlots: masked
-        ? []
-        : slotRows.map((slot) => ({
-            id: slot.id,
-            startAt: slot.startAt,
-            endAt: slot.endAt ?? null,
-            label: slot.label ?? null,
-            isAllDay: slot.isAllDay ?? false,
-          })),
-      slotVotes: masked
-        ? []
-        : slotVoteRows.map((vote) => ({
-            timeSlotId: vote.timeSlotId,
-            userId: vote.userId,
-            displayName: vote.displayName,
-            voteStatus: vote.voteStatus,
-          })),
+      invitees: inviteeRows.map((invitee) => ({
+        userId: invitee.userId,
+        displayName: invitee.displayName,
+        role: invitee.role,
+        voteStatus: invitee.voteStatus,
+        viewedAt: invitee.viewedAt ?? null,
+        userRole: invitee.userRole,
+        addedByUserId: invitee.addedByUserId ?? null,
+        canProxyVote:
+          invitee.userRole === "passive" &&
+          (row.state === "proposed" || row.state === "resolved") &&
+          actorCanProxyVoteSync({
+            isAdmin,
+            actorUserId: session.user.id,
+            proposerId: row.proposerId,
+            sleepingPartnerIds: proxyPartnerIdsByUser.get(invitee.userId) ?? new Set(),
+          }),
+      })),
+      timeSlots: slotRows.map((slot) => ({
+        id: slot.id,
+        startAt: slot.startAt,
+        endAt: slot.endAt ?? null,
+        label: slot.label ?? null,
+        isAllDay: slot.isAllDay ?? false,
+      })),
+      slotVotes: slotVoteRows.map((vote) => ({
+        timeSlotId: vote.timeSlotId,
+        userId: vote.userId,
+        displayName: vote.displayName,
+        voteStatus: vote.voteStatus,
+      })),
       winningSlotId: row.winningSlotId ?? null,
-      comments: canViewSensitive
-        ? commentRows.map((comment) => ({
-            id: comment.id,
-            authorName: comment.authorName,
-            body: comment.body,
-            createdAt: comment.createdAt,
-            sliceTag: comment.sliceTag ?? null,
-          }))
-        : [],
+      comments: commentRows.map((comment) => ({
+        id: comment.id,
+        authorName: comment.authorName,
+        body: comment.body,
+        createdAt: comment.createdAt,
+        sliceTag: comment.sliceTag ?? null,
+      })),
       stateLog: stateLogEntries,
       canEdit: row.state === "draft" && (isProposer || isAdmin),
       canVote:
-        !masked &&
         !isPollMatrix &&
         ((row.state === "proposed" &&
           viewerInvitee !== undefined &&
@@ -2585,19 +2507,16 @@ export async function getProposalDetailAction(
             viewerInvitee?.role === "optional" &&
             viewerInvitee.voteStatus === "not_seen")),
       canVoteSlots:
-        !masked &&
         isPollMatrix &&
         viewerInvitee !== undefined &&
         (row.state === "proposed" || (row.state === "resolved" && viewerInvitee.role === "optional")) &&
         pollSlotsIncomplete,
       canManageAttendees:
-        canViewSensitive &&
         row.state === "resolved" &&
         (row.proposalType === "sleeping"
           ? canManageSleepingAttendees(isProposer, isAdmin)
           : isProposer || isAdmin || isInvitee),
       canComment:
-        canViewSensitive &&
         row.state !== "draft" &&
         row.state !== "archived" &&
         viewerCanSeeProposalWithSleepingGate(session.user.id, isAdmin, row.proposerId, inviteeUserIds, {
@@ -2610,11 +2529,9 @@ export async function getProposalDetailAction(
       canRedraft: isProposer && row.state === "resolved",
       canReschedule:
         isAdmin &&
-        canViewSensitive &&
         (row.state === "proposed" || row.state === "resolved") &&
         !row.isBatchSleeping,
       canRevokeAcceptance:
-        !masked &&
         viewerInvitee?.role === "required" &&
         row.state === "resolved" &&
         !row.atRisk &&
@@ -2623,14 +2540,13 @@ export async function getProposalDetailAction(
             APPROVING_VOTES.includes(viewerInvitee.voteStatus as InviteeVoteStatus),
         ),
       viewerVoteStatus: viewerInvitee?.voteStatus ?? null,
-      viewerSlotVotes: masked ? {} : viewerSlotVotes,
+      viewerSlotVotes,
       hasOverlapWarning,
       canAcknowledgeOverlap: hasOverlapWarning,
       optionalRsvpPending,
       displayState,
       reminderOffsetMinutes: row.reminderOffsetMinutes ?? null,
-      eventIconKey:
-        masked || row.proposalType !== "event" ? null : row.eventIconKey ?? null,
+      eventIconKey: row.proposalType !== "event" ? null : row.eventIconKey ?? null,
       specialKind: getProposalSpecialKind(row.description) ?? undefined,
     },
   };

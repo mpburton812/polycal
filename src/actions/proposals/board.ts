@@ -206,15 +206,13 @@ export async function listProposalBoardAction(): Promise<ProposalBoard> {
       }
     }
 
-    // Privacy-level masking was removed (PC-280) — all proposals are "open".
-    const masked = false;
+    // Board never applies schedule sleeping mask (PC-306) — isContentMasked stays false.
     const display = row;
 
     const viewerInvitee = invitees.find((invitee) => invitee.userId === viewerId);
     const optionalRsvpPending = optionalInviteeVotesPending(row, viewerInvitee);
     const respondedCount = invitees.filter((inv) => inv.voteStatus !== "not_seen").length;
     const needsViewerAction =
-      !masked &&
       viewerInvitee !== undefined &&
       viewerInvitee.voteStatus === "not_seen" &&
       (row.state === "proposed" ||
@@ -228,7 +226,6 @@ export async function listProposalBoardAction(): Promise<ProposalBoard> {
       invitees.some((inv) => inv.role === "optional" && inv.voteStatus === "not_seen");
     const nudgeEligibleState = row.state === "proposed" || hasPendingOptional;
     const canNudge =
-      !masked &&
       nudgeEligibleState &&
       pendingVoteCount > 0 &&
       (isAdmin || row.proposerId === viewerId) &&
@@ -262,7 +259,7 @@ export async function listProposalBoardAction(): Promise<ProposalBoard> {
     );
 
     let cardTitle = display.title;
-    if (!masked && row.proposalType === "sleeping") {
+    if (row.proposalType === "sleeping") {
       cardTitle = formatSleepingDisplayTitle({
         proposerName: row.proposerName,
         inviteeNames: invitees.map((invitee) => invitee.displayName),
@@ -276,7 +273,7 @@ export async function listProposalBoardAction(): Promise<ProposalBoard> {
     const card: ProposalCard = {
       id: row.id,
       title: cardTitle,
-      description: masked ? display.description : proposalDescriptionForDisplay(row.description),
+      description: proposalDescriptionForDisplay(row.description),
       proposalType: row.proposalType,
       state: optionalRsvpPending ? "proposed" : row.state,
       proposerId: row.proposerId,
@@ -287,7 +284,7 @@ export async function listProposalBoardAction(): Promise<ProposalBoard> {
       atRisk: row.atRisk,
       isPoll: row.isPoll,
       isAllDay: row.isAllDay,
-      isContentMasked: masked,
+      isContentMasked: false,
       needsViewerAction,
       inviteeCount: invitees.length,
       respondedCount,
@@ -301,7 +298,7 @@ export async function listProposalBoardAction(): Promise<ProposalBoard> {
       isBatchSleeping: row.isBatchSleeping,
       isRecurring: Boolean(row.isRecurrenceParent || row.parentProposalId),
       bedroomLabel:
-        masked || row.proposalType !== "sleeping"
+        row.proposalType !== "sleeping"
           ? null
           : bedroomLabelFromPlace(
               row.bedroomIndex,
@@ -309,7 +306,7 @@ export async function listProposalBoardAction(): Promise<ProposalBoard> {
               row.locationBedroomCount,
             ),
       eventIconKey:
-        masked || row.proposalType !== "event" ? null : row.eventIconKey ?? null,
+        row.proposalType !== "event" ? null : row.eventIconKey ?? null,
       viewerIsInvitee: viewerInvitee !== undefined,
       notOnCalendar:
         row.state === "resolved" &&

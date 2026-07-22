@@ -20,7 +20,6 @@ import {
   proposalInvitees,
   proposalStateLog,
   proposals,
-  sleepingPartnerships,
   storedImages,
   users,
 } from "@/lib/db/schema";
@@ -62,6 +61,7 @@ import {
   viewerCanSeeAuditLog,
   viewerCanSeeProposalWithSleepingGate,
 } from "@/lib/proposals/access";
+import { getAcceptedSleepingPartnerIds } from "@/lib/proposals/partners";
 import { formatProposalLogLine } from "@/lib/proposals/state-log-format";
 import { canCommentOnProposal } from "@/lib/schedule/slice-auth";
 import { readFeedImageUploads } from "@/lib/feed/images";
@@ -225,26 +225,7 @@ async function loadAcceptedPartnerIds(
   db: Parameters<Parameters<typeof withDb>[0]>[0],
   viewerId: string,
 ): Promise<Set<string>> {
-  const rows = await db
-    .select({
-      userLowId: sleepingPartnerships.userLowId,
-      userHighId: sleepingPartnerships.userHighId,
-    })
-    .from(sleepingPartnerships)
-    .where(
-      and(
-        eq(sleepingPartnerships.status, "accepted"),
-        or(
-          eq(sleepingPartnerships.userLowId, viewerId),
-          eq(sleepingPartnerships.userHighId, viewerId),
-        ),
-      ),
-    );
-  const partners = new Set<string>();
-  for (const row of rows) {
-    partners.add(row.userLowId === viewerId ? row.userHighId : row.userLowId);
-  }
-  return partners;
+  return getAcceptedSleepingPartnerIds(db, viewerId);
 }
 
 /**
@@ -612,14 +593,13 @@ async function loadMilestoneBatch(
         ),
       });
 
-      // Privacy-level masking was removed (PC-280) — all proposals are "open".
-      const masked = false;
+      // Feed never applies schedule sleeping mask (PC-306) — content stays unmasked for visible rows.
       const display = { title: row.title };
 
       const headline = formatProposalLogLine({
         action: row.action,
         actorName: row.actorName,
-        details: masked ? null : row.details,
+        details: row.details,
         createdAt: row.createdAt,
       });
 
@@ -634,11 +614,11 @@ async function loadMilestoneBatch(
         proposalTitle: display.title,
         proposalType: row.proposalType,
         proposalState: row.state,
-        masked,
+        masked: false,
         visibleViaAdminOnly,
         canComment: canCommentOnProposal({
           state: row.state,
-          isContentMasked: masked,
+          isContentMasked: false,
         }),
         comments: [],
         likeCount: 0,

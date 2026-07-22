@@ -7,6 +7,7 @@ import { Box, Typography } from "@mui/material";
 import type { ScheduleEvent } from "@/actions/schedule";
 import { EventCategoryIcon } from "@/lib/event-icons/EventCategoryIcon";
 import { isEventIconKey } from "@/lib/event-icons/registry";
+import { MASKED_TITLE } from "@/lib/proposals/access";
 import { scheduleBlockSx, type ScheduleBlockVariant } from "@/lib/schedule/colors";
 import { GARDEN_TOKENS } from "@/theme/tokens";
 
@@ -21,7 +22,7 @@ interface MonthEventChipProps {
  */
 export function MonthEventIcon({ event, variant, onClick }: MonthEventChipProps) {
   const colors = scheduleBlockSx(variant, 0);
-  const label = event.isContentMasked ? "Busy" : event.title;
+  const label = event.isContentMasked ? MASKED_TITLE : event.title;
   const isSleeping = event.proposalType === "sleeping";
 
   return (
@@ -82,7 +83,7 @@ export function MonthEventIcon({ event, variant, onClick }: MonthEventChipProps)
  */
 export function MonthEventChip({ event, variant, onClick }: MonthEventChipProps) {
   const colors = scheduleBlockSx(variant, 0);
-  const label = event.isContentMasked ? "Busy" : event.title;
+  const label = event.isContentMasked ? MASKED_TITLE : event.title;
 
   return (
     <Box

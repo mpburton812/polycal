@@ -16,7 +16,7 @@ import {
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
-import { getPolyGroupSettingsAction, updatePolyGroupSettingsAction } from "@/actions/poly-group";
+import { updatePolyGroupSettingsAction } from "@/actions/poly-group";
 import { AdminCollapsibleSection } from "@/components/admin/AdminCollapsibleSection";
 import { LONG_TEXT_MAX } from "@/lib/validation/string-limits";
 import type { PolyGroupSettings } from "@/types/poly-group";
@@ -125,7 +125,7 @@ export function AdminPolyGroupSettingsPanel({
               }
             />
           }
-          label="Hide sleeping arrangements from non-sleeping partners on calendar"
+          label="Mask sleeping details for uninvolved admins on calendar"
         />
         <FormControl fullWidth>
           <InputLabel>Sleeping Partners tab visibility</InputLabel>
