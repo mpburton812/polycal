@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  MASKED_TITLE,
+  canViewProposalContent,
   viewerCanSeeProposal,
   viewerCanSeeProposalWithSleepingGate,
   viewerCanSeeSleepingProposal,
@@ -87,5 +89,70 @@ describe("proposal access helpers", () => {
         state: "resolved",
       }),
     ).toBe(true);
+  });
+
+  it("exports Busy as the masked title constant", () => {
+    expect(MASKED_TITLE).toBe("Busy");
+  });
+
+  it("canViewProposalContent omits uninvolved non-admins from sleeping proposals", () => {
+    expect(
+      canViewProposalContent({
+        viewerId: "u9",
+        isAdmin: false,
+        proposerId: "u1",
+        inviteeUserIds: ["u2"],
+        proposalType: "sleeping",
+        state: "resolved",
+      }),
+    ).toEqual({ visible: false, contentMasked: false });
+  });
+
+  it("canViewProposalContent masks sleeping for uninvolved admins when schedule mask is on", () => {
+    expect(
+      canViewProposalContent({
+        viewerId: "admin",
+        isAdmin: true,
+        proposerId: "u1",
+        inviteeUserIds: ["u2"],
+        proposalType: "sleeping",
+        state: "resolved",
+        adminCanSeeUninvolved: true,
+        applyScheduleMask: true,
+        hideSleeping: true,
+        acceptedPartnerIds: new Set(),
+      }),
+    ).toEqual({ visible: true, contentMasked: true });
+  });
+
+  it("canViewProposalContent does not mask when schedule mask is off (feed/board)", () => {
+    expect(
+      canViewProposalContent({
+        viewerId: "admin",
+        isAdmin: true,
+        proposerId: "u1",
+        inviteeUserIds: ["u2"],
+        proposalType: "sleeping",
+        state: "resolved",
+        applyScheduleMask: false,
+        hideSleeping: true,
+        acceptedPartnerIds: new Set(),
+      }),
+    ).toEqual({ visible: true, contentMasked: false });
+  });
+
+  it("canViewProposalContent does not mask partners of participants", () => {
+    expect(
+      canViewProposalContent({
+        viewerId: "partner",
+        isAdmin: true,
+        proposerId: "u1",
+        inviteeUserIds: ["u2"],
+        proposalType: "sleeping",
+        applyScheduleMask: true,
+        hideSleeping: true,
+        acceptedPartnerIds: new Set(["u1"]),
+      }),
+    ).toEqual({ visible: true, contentMasked: false });
   });
 });

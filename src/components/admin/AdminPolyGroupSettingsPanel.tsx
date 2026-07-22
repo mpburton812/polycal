@@ -125,7 +125,7 @@ export function AdminPolyGroupSettingsPanel({
               }
             />
           }
-          label="Hide sleeping arrangements from non-sleeping partners on calendar"
+          label="Mask sleeping details for uninvolved admins on calendar"
         />
         <FormControl fullWidth>
           <InputLabel>Sleeping Partners tab visibility</InputLabel>

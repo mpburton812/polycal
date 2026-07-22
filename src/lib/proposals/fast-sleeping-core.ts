@@ -1,16 +1,14 @@
 import { randomUUID } from "node:crypto";
-import { and, eq, inArray, or } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 
 import { userHasAdminAccess } from "@/lib/admin-access";
 import { getDb } from "@/lib/db/client";
 import {
   locations,
-  locationResidents,
   proposalInvitees,
   proposalSlotVotes,
   proposalTimeSlots,
   proposals,
-  sleepingPartnerships,
   users,
   type InviteeRole,
   type ProposalState,
@@ -23,6 +21,10 @@ import {
 import { logProposalTransition } from "@/lib/proposals/services/state-log";
 import { formatSleepingDisplayTitle } from "@/lib/proposals/sleeping-display";
 import { sleepingDateToStartIso } from "@/lib/proposals/sleeping-schedule";
+import {
+  getAcceptedSleepingPartnerIds,
+  getEligibleLocationIdsForUser,
+} from "@/lib/proposals/partners";
 import { resolveTimezone } from "@/lib/schedule/timezone";
 import type { UserRole } from "@/types/user";
 
@@ -30,57 +32,7 @@ export type BatchLocationPolicy = "network" | "exists";
 
 type Db = ReturnType<typeof getDb>;
 
-/** Accepted sleeping partner ids for invitee validation (PC-115). */
-export async function getAcceptedSleepingPartnerIds(
-  db: Db,
-  userId: string,
-): Promise<Set<string>> {
-  const partnershipRows = await db
-    .select({
-      userLowId: sleepingPartnerships.userLowId,
-      userHighId: sleepingPartnerships.userHighId,
-    })
-    .from(sleepingPartnerships)
-    .where(
-      and(
-        eq(sleepingPartnerships.status, "accepted"),
-        or(
-          eq(sleepingPartnerships.userLowId, userId),
-          eq(sleepingPartnerships.userHighId, userId),
-        ),
-      ),
-    );
-
-  return new Set(
-    partnershipRows.map((row) => (row.userLowId === userId ? row.userHighId : row.userLowId)),
-  );
-}
-
-async function getEligibleLocationIdsForUser(db: Db, userId: string): Promise<string[]> {
-  const directRows = await db
-    .select({ locationId: locationResidents.locationId })
-    .from(locationResidents)
-    .where(
-      and(eq(locationResidents.userId, userId), eq(locationResidents.status, "accepted")),
-    );
-
-  const partners = [...(await getAcceptedSleepingPartnerIds(db, userId))];
-  let networkLocationIds: string[] = [];
-  if (partners.length > 0) {
-    const partnerResidency = await db
-      .select({ locationId: locationResidents.locationId })
-      .from(locationResidents)
-      .where(
-        and(
-          inArray(locationResidents.userId, partners),
-          eq(locationResidents.status, "accepted"),
-        ),
-      );
-    networkLocationIds = partnerResidency.map((row) => row.locationId);
-  }
-
-  return [...new Set([...directRows.map((row) => row.locationId), ...networkLocationIds])];
-}
+export { getAcceptedSleepingPartnerIds, getEligibleLocationIdsForUser };
 
 /**
  * Validates sleeping invitees are accepted partners of the subject (or solo).

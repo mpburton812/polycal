@@ -13,7 +13,6 @@ import {
   proposalInvitees,
   proposalTimeSlots,
   proposals,
-  sleepingPartnerships,
   users,
   type ProposalType,
 } from "@/lib/db/schema";
@@ -26,11 +25,10 @@ import { parseBatchSlotMeta } from "@/lib/proposals/batch-sleeping";
 import { formatSleepingDisplayTitle } from "@/lib/proposals/sleeping-display";
 import {
   getAdminCanSeeUninvolved,
-  viewerCanSeeProposalWithSleepingGate,
+  MASKED_TITLE,
+  canViewProposalContent,
 } from "@/lib/proposals/access";
-import { applyScheduleMasking } from "@/lib/schedule/slice-auth";
-
-const HIDDEN_SLEEPING_TITLE = "Sleeping arrangement";
+import { getAcceptedSleepingPartnerIds } from "@/lib/proposals/partners";
 
 const rangeSchema = z.object({
   rangeStart: z.string().min(1),
@@ -108,34 +106,6 @@ function slotOverlapsRange(rangeStart: string, rangeEnd: string) {
   );
 }
 
-async function acceptedSleepingPartnerIds(
-  db: ReturnType<typeof getDb>,
-  viewerId: string,
-): Promise<Set<string>> {
-  const rows = await db
-    .select({
-      userLowId: sleepingPartnerships.userLowId,
-      userHighId: sleepingPartnerships.userHighId,
-      status: sleepingPartnerships.status,
-    })
-    .from(sleepingPartnerships)
-    .where(
-      and(
-        eq(sleepingPartnerships.status, "accepted"),
-        or(
-          eq(sleepingPartnerships.userLowId, viewerId),
-          eq(sleepingPartnerships.userHighId, viewerId),
-        ),
-      ),
-    );
-
-  const partnerIds = new Set<string>();
-  for (const row of rows) {
-    partnerIds.add(row.userLowId === viewerId ? row.userHighId : row.userLowId);
-  }
-  return partnerIds;
-}
-
 /**
  * Loads calendar blocks for proposed, resolved, and archived proposals in a date range (PC-42).
  */
@@ -170,7 +140,7 @@ export async function listScheduleEventsAction(
     .limit(1);
   const viewerTimeZone = resolveTimezone(viewerRow?.timezone);
   const privacyFlags = await getSchedulePrivacyFlags(db);
-  const partnerIds = await acceptedSleepingPartnerIds(db, viewerId);
+  const partnerIds = await getAcceptedSleepingPartnerIds(db, viewerId);
   const { rangeStart, rangeEnd } = parsed.data;
 
   const overlappingSlotRows = await db
@@ -289,26 +259,25 @@ export async function listScheduleEventsAction(
       ...invitees.map((invitee) => invitee.displayName),
     ];
 
-    if (row.state === "proposed" || row.state === "resolved" || row.state === "archived") {
-      if (
-        !viewerCanSeeProposalWithSleepingGate(viewerId, isAdmin, row.proposerId, inviteeUserIds, {
-          proposalType: row.proposalType,
-          state: row.state,
-          adminCanSeeUninvolved: privacyFlags.adminCanSeeUninvolved,
-        })
-      ) {
-        continue;
-      }
-    }
-
-    const { isContentMasked } = applyScheduleMasking({
+    const { visible, contentMasked: isContentMasked } = canViewProposalContent({
       viewerId,
+      isAdmin,
       proposerId: row.proposerId,
       inviteeUserIds,
       proposalType: row.proposalType,
-      privacyFlags,
+      state: row.state,
+      adminCanSeeUninvolved: privacyFlags.adminCanSeeUninvolved,
+      applyScheduleMask: true,
+      hideSleeping: privacyFlags.hideSleeping,
       acceptedPartnerIds: partnerIds,
     });
+
+    if (
+      (row.state === "proposed" || row.state === "resolved" || row.state === "archived") &&
+      !visible
+    ) {
+      continue;
+    }
 
     const windows: {
       startAt: string;
@@ -371,7 +340,7 @@ export async function listScheduleEventsAction(
       if (!eventInRange(window.startAt, window.endAt, rangeStart, rangeEnd)) continue;
 
       // Only sleeping-network masking remains (privacy levels removed PC-280).
-      const maskedTitle = HIDDEN_SLEEPING_TITLE;
+      const maskedTitle = MASKED_TITLE;
 
       let windowParticipantIds = participantIds;
       let windowParticipantNames = participantNames;

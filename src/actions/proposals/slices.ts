@@ -17,7 +17,6 @@ import {
   proposalStateLog,
   proposalTimeSlots,
   proposals,
-  sleepingPartnerships,
   users,
 } from "@/lib/db/schema";
 import { actorNotifyFields, notifyUser } from "@/lib/notifications";
@@ -28,22 +27,19 @@ import {
 } from "@/lib/proposals/batch-sleeping";
 import {
   applyProposalMask,
+  canViewProposalContent,
   getAdminCanSeeUninvolved,
-  viewerCanSeeProposalWithSleepingGate,
 } from "@/lib/proposals/access";
 import { formatSleepingDisplayTitle } from "@/lib/proposals/sleeping-display";
 import { proposalDescriptionForDisplay } from "@/lib/proposals/special-proposals";
+import { getAcceptedSleepingPartnerIds } from "@/lib/proposals/partners";
 import {
   allDayBoundsForDateKey,
   expandAllDayDateKeys,
   proposalHasSchedulableWindows,
 } from "@/lib/schedule/schedule-slices";
 import { formatSliceTag } from "@/lib/schedule/slice-types";
-import {
-  applyScheduleMasking,
-  canCommentOnProposal,
-  validateSliceMembership,
-} from "@/lib/schedule/slice-auth";
+import { canCommentOnProposal, validateSliceMembership } from "@/lib/schedule/slice-auth";
 import { localDateKey } from "@/lib/schedule/dates";
 import { resolveTimezone } from "@/lib/schedule/timezone";
 import type { ProposalSliceDetail } from "./slice-types";
@@ -74,48 +70,6 @@ async function getSlicePrivacyFlags(db: ReturnType<typeof getDb>) {
   return {
     hideSleeping: group?.hideSleepingArrangements ?? false,
   };
-}
-
-async function acceptedSleepingPartnerIds(
-  db: ReturnType<typeof getDb>,
-  viewerId: string,
-): Promise<Set<string>> {
-  const rows = await db
-    .select({
-      userLowId: sleepingPartnerships.userLowId,
-      userHighId: sleepingPartnerships.userHighId,
-    })
-    .from(sleepingPartnerships)
-    .where(
-      and(
-        eq(sleepingPartnerships.status, "accepted"),
-        eq(sleepingPartnerships.userLowId, viewerId),
-      ),
-    );
-
-  const partnerIds = new Set<string>();
-  for (const row of rows) {
-    partnerIds.add(row.userLowId === viewerId ? row.userHighId : row.userLowId);
-  }
-
-  const rowsHigh = await db
-    .select({
-      userLowId: sleepingPartnerships.userLowId,
-      userHighId: sleepingPartnerships.userHighId,
-    })
-    .from(sleepingPartnerships)
-    .where(
-      and(
-        eq(sleepingPartnerships.status, "accepted"),
-        eq(sleepingPartnerships.userHighId, viewerId),
-      ),
-    );
-
-  for (const row of rowsHigh) {
-    partnerIds.add(row.userLowId === viewerId ? row.userHighId : row.userLowId);
-  }
-
-  return partnerIds;
 }
 
 async function archiveParentIfScheduleEmpty(
@@ -241,7 +195,7 @@ export async function getProposalSliceDetailAction(
   const isAdmin = await userHasAdminAccess(session.user.role);
   const privacyFlags = await getSlicePrivacyFlags(db);
   const adminCanSeeUninvolved = await getAdminCanSeeUninvolved(db);
-  const partnerIds = await acceptedSleepingPartnerIds(db, session.user.id);
+  const partnerIds = await getAcceptedSleepingPartnerIds(db, session.user.id);
   const [viewerRow] = await db
     .select({ timezone: users.timezone })
     .from(users)
@@ -294,13 +248,19 @@ export async function getProposalSliceDetailAction(
     .where(eq(proposalInvitees.proposalId, rootProposalId));
 
   const inviteeUserIds = inviteeRows.map((invitee) => invitee.userId);
-  if (
-    !viewerCanSeeProposalWithSleepingGate(session.user.id, isAdmin, row.proposerId, inviteeUserIds, {
-      proposalType: row.proposalType,
-      state: row.state,
-      adminCanSeeUninvolved,
-    })
-  ) {
+  const { visible, contentMasked: isContentMasked } = canViewProposalContent({
+    viewerId: session.user.id,
+    isAdmin,
+    proposerId: row.proposerId,
+    inviteeUserIds,
+    proposalType: row.proposalType,
+    state: row.state,
+    adminCanSeeUninvolved,
+    applyScheduleMask: true,
+    hideSleeping: privacyFlags.hideSleeping,
+    acceptedPartnerIds: partnerIds,
+  });
+  if (!visible) {
     return { ok: false, message: "Proposal not found." };
   }
 
@@ -343,14 +303,6 @@ export async function getProposalSliceDetailAction(
     return { ok: false, message: membership.message };
   }
 
-  const { isContentMasked } = applyScheduleMasking({
-    viewerId: session.user.id,
-    proposerId: row.proposerId,
-    inviteeUserIds,
-    proposalType: row.proposalType,
-    privacyFlags,
-    acceptedPartnerIds: partnerIds,
-  });
   const display = applyProposalMask(row, isContentMasked);
 
   let startAt = row.scheduledStartAt ?? "";

@@ -6,6 +6,7 @@ import { Box, Typography } from "@mui/material";
 import type { ScheduleEvent } from "@/actions/schedule";
 import { EventCategoryIcon } from "@/lib/event-icons/EventCategoryIcon";
 import { isEventIconKey } from "@/lib/event-icons/registry";
+import { MASKED_TITLE } from "@/lib/proposals/access";
 import { scheduleBlockSx, scheduleBlockVariant } from "@/lib/schedule/colors";
 import { formatEventTime } from "@/lib/schedule/dates";
 import { fontFamilies } from "@/theme/fonts";
@@ -21,7 +22,7 @@ interface ScheduleEventBlockProps {
 
 /** Formats stakeholder names for calendar blocks, respecting privacy masking (PC-43). */
 function formatStakeholders(event: ScheduleEvent): string | null {
-  if (event.isContentMasked) return "Private";
+  if (event.isContentMasked) return MASKED_TITLE;
   if (event.intentionalSolo) {
     return event.proposerName;
   }

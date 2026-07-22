@@ -15,6 +15,7 @@ import {
 } from "@mui/material";
 
 import { type ProposalCard as ProposalCardData } from "@/actions/proposals";
+import { MASKED_TITLE } from "@/lib/proposals/access";
 import { fontFamilies } from "@/theme/fonts";
 import { GARDEN_TOKENS } from "@/theme/tokens";
 
@@ -158,7 +159,7 @@ export function ProposalCard({
     if (proposal.isRecurring) sparseBadges.push("Recurring");
     if (proposal.isPastSchedule) sparseBadges.push("Past");
   } else {
-    sparseBadges.push("Private");
+    sparseBadges.push(MASKED_TITLE);
   }
 
   const typeAccent =

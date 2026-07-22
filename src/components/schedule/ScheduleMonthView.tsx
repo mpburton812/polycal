@@ -14,6 +14,7 @@ import {
   MonthSpanBar,
   StateDotStrip,
 } from "@/components/schedule/MonthEventChip";
+import { MASKED_TITLE } from "@/lib/proposals/access";
 import { buildMonthLayout } from "@/lib/schedule/month-layout";
 import {
   buildMonthGrid,
@@ -242,7 +243,7 @@ export function ScheduleMonthView({
                 }}
               >
                 <MonthSpanBar
-                  title={segment.event.isContentMasked ? "Busy" : segment.event.title}
+                  title={segment.event.isContentMasked ? MASKED_TITLE : segment.event.title}
                   variant={segment.variant}
                   showTitle={segment.showTitle}
                   isStartSegment={segment.isStartSegment}
