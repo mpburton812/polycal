@@ -1036,18 +1036,55 @@ async function resolveProposal(
 
   const now = new Date().toISOString();
 
-  await db
-    .update(proposals)
-    .set({
+  if (proposal.proposalType === "sleeping") {
+    const [proposerRow] = await db
+      .select({ displayName: users.displayName })
+      .from(users)
+      .where(eq(users.id, proposal.proposerId))
+      .limit(1);
+    const inviteeRows = await db
+      .select({ userId: proposalInvitees.userId })
+      .from(proposalInvitees)
+      .where(eq(proposalInvitees.proposalId, proposal.id));
+    const batchEntries = parseBatchEntriesJson(proposal.batchEntriesJson);
+    const confirmedTitle = await buildSleepingProposalTitle(db, {
+      proposerName: proposerRow?.displayName ?? "User",
+      intentionalSolo: proposal.intentionalSolo,
+      locationId: proposal.locationId,
+      locationText: proposal.locationText,
       state: "resolved",
-      scheduledStartAt: scheduleStart,
-      scheduledEndAt: scheduleEnd,
-      winningSlotId,
       atRisk: false,
-      atRiskExpiresAt: null,
-      updatedAt: now,
-    })
-    .where(eq(proposals.id, proposal.id));
+      inviteeUserIds: inviteeRows.map((row) => row.userId),
+      batchEntries: proposal.isBatchSleeping ? batchEntries : undefined,
+    });
+    await db
+      .update(proposals)
+      .set({
+        state: "resolved",
+        title: confirmedTitle,
+        scheduledStartAt: scheduleStart,
+        scheduledEndAt: scheduleEnd,
+        winningSlotId,
+        atRisk: false,
+        atRiskExpiresAt: null,
+        updatedAt: now,
+      })
+      .where(eq(proposals.id, proposal.id));
+    proposal.title = confirmedTitle;
+  } else {
+    await db
+      .update(proposals)
+      .set({
+        state: "resolved",
+        scheduledStartAt: scheduleStart,
+        scheduledEndAt: scheduleEnd,
+        winningSlotId,
+        atRisk: false,
+        atRiskExpiresAt: null,
+        updatedAt: now,
+      })
+      .where(eq(proposals.id, proposal.id));
+  }
 
   await logProposalTransition(db, proposal.id, actorUserId, "proposal.resolved");
 

@@ -28,6 +28,17 @@ describe("formatSleepingDisplayTitle", () => {
     ).toBe("Sleeping: Leia Organa, Han Solo, Tentative, at Millennium Falcon");
   });
 
+  it("uses Confirmed status when resolved (PC-303)", () => {
+    expect(
+      formatSleepingDisplayTitle({
+        proposerName: "Leia Organa",
+        inviteeNames: ["Han Solo"],
+        locationName: "Millennium Falcon",
+        state: "resolved",
+      }),
+    ).toBe("Sleeping: Leia Organa, Han Solo, Confirmed, at Millennium Falcon");
+  });
+
   it("uses Proposed status for drafts", () => {
     expect(sleepingDisplayStatus({ state: "draft" })).toBe("Proposed");
   });

@@ -30,16 +30,16 @@ export function localInputToIso(value: string): string | undefined {
 
 export function localDateToStartIso(value: string): string | undefined {
   if (!value) return undefined;
-  const [y, m, d] = value.split("-").map(Number);
-  if (!y || !m || !d) return undefined;
-  return new Date(y, m - 1, d, 0, 0, 0, 0).toISOString();
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value.trim());
+  if (!match) return undefined;
+  // Noon-UTC civil bounds — stable across viewer timezones (PC-258 / PC-301).
+  return `${match[1]}-${match[2]}-${match[3]}T12:00:00.000Z`;
 }
 
 export function localDateToEndIso(value: string): string | undefined {
-  if (!value) return undefined;
-  const [y, m, d] = value.split("-").map(Number);
-  if (!y || !m || !d) return undefined;
-  return new Date(y, m - 1, d, 23, 59, 59, 999).toISOString();
+  // Same-day all-day uses identical start/end noon bounds so the event never
+  // spills into a second civil day in week/agenda placement (PC-239 / PC-301).
+  return localDateToStartIso(value);
 }
 
 export function slotStartInput(
