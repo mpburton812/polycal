@@ -34,6 +34,7 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - PC-270: Bottom FEED parrot matches sibling nav icons (24×24); feed like birds half that (12×12). Change control: `2026.07.21b`.
 
 ### Fixed
+- PC-301–PC-303: Single-day all-day events stay on one calendar day and open without Day not part of a multi-day span; slice detail/detach failures write System administrator log errors; resolving sleeping/batch proposals refreshes Tentative→Confirmed in the stored title. Change control: `2026.07.22c`.
 - PC-299: Actor-authored proposal, place, and user-lifecycle notifications name the initiating user (no more hardcoded “An admin” / “an administrator”); admin activity logs attribute `notification.*` rows to the actor while preserving the recipient in details. Change control: `2026.07.22b`.
 - PC-280: Sleeping proposals no longer show as "past" until the whole calendar day elapses (board + proposal cards); Schedule overlap/red-conflict check no longer flags a sleeping arrangement against an event on the same night (PC-59 parity). Change control: `2026.07.21g`.
 

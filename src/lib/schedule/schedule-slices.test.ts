@@ -95,6 +95,33 @@ describe("schedule-slices", () => {
     ]);
   });
 
+  it("collapses host end-of-day encode to one civil day across viewer TZs (PC-301)", () => {
+    // EDT Jul 25 00:00–23:59:59.999
+    const startAt = "2026-07-25T04:00:00.000Z";
+    const endAt = "2026-07-26T03:59:59.999Z";
+    expect(expandAllDayDateKeys(startAt, endAt, "UTC")).toEqual(["2026-07-25"]);
+    expect(expandAllDayDateKeys(startAt, endAt, "America/Los_Angeles")).toEqual(["2026-07-25"]);
+    expect(isMultiDayAllDaySpan(startAt, endAt, true, "UTC")).toBe(false);
+
+    const windows = buildScheduleWindows(
+      { ...baseRow, isAllDay: true },
+      [],
+      { startAt, endAt },
+      "UTC",
+    );
+    expect(windows).toHaveLength(1);
+    expect(windows[0]?.slice.sliceKind).toBe("standalone");
+    expect(windows[0]?.startAt).toBe("2026-07-25T12:00:00.000Z");
+    expect(windows[0]?.endAt).toBe("2026-07-25T12:00:00.000Z");
+  });
+
+  it("collapses UTC midnight–EOD storage to one NY civil day (PC-301)", () => {
+    const startAt = "2026-07-25T00:00:00.000Z";
+    const endAt = "2026-07-25T23:59:59.999Z";
+    expect(expandAllDayDateKeys(startAt, endAt, "America/New_York")).toEqual(["2026-07-25"]);
+    expect(isMultiDayAllDaySpan(startAt, endAt, true, "America/New_York")).toBe(false);
+  });
+
   it("uses noon-UTC bounds so NY local date is a single day", () => {
     const { startAt, endAt } = allDayBoundsForDateKey("2026-07-18");
     expect(startAt).toBe("2026-07-18T12:00:00.000Z");
