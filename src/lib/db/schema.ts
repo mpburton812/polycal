@@ -295,6 +295,8 @@ export const proposals = sqliteTable("proposals", {
   reminderOffsetMinutes: integer("reminder_offset_minutes"),
   /** ISO timestamp when reminder notifications were sent (PC-65). */
   reminderSentAt: text("reminder_sent_at"),
+  /** Last manual nudge to pending voters (PC-293). */
+  lastNudgeAt: text("last_nudge_at"),
   /** Optional category icon key for social events (PC-116). */
   eventIconKey: text("event_icon_key"),
   /** Parent proposal when this row was detached from a batch night or span day slice. */

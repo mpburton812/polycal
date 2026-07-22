@@ -35,6 +35,7 @@ export {
   listProposalPlaceOptionsAction,
   listResidencyPlaceOptionsAction,
   listSleepingLocationOptionsAction,
+  nudgePendingVotersAction,
   redraftProposalAction,
   rescheduleProposalAction,
   respondAttendeeUpdateAction,
@@ -50,4 +51,4 @@ export {
 } from "./proposals/slices";
 
 export { listProposalBoardAction } from "./proposals/board";
-export { deleteDraftProposalAction } from "./proposals/mutations";
+export { adminDeleteProposalAction, deleteDraftProposalAction } from "./proposals/mutations";

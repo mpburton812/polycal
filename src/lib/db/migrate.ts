@@ -9,7 +9,7 @@ import { applyPc280Migrations } from "./pc280-migrations";
 import { applyRateLimitMigrations } from "./rate-limit-migrations";
 
 /** Bump whenever bootstrap DDL or *-migrations.ts modules change (PC-143). */
-export const SCHEMA_VERSION = "33";
+export const SCHEMA_VERSION = "34";
 
 /**
  * True when the stored schema version already matches the app target — skip
