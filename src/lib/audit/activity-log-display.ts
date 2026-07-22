@@ -33,6 +33,8 @@ const ACTION_LABELS: Record<string, string> = {
   "proposals.admin_delete": "Admin deleted proposal",
   "proposals.draft_delete": "Deleted draft proposal",
   "proposal.admin_rescheduled": "Admin rescheduled proposal",
+  "schedule.slice_detail_error": "Schedule slice detail error",
+  "schedule.slice_detach_error": "Schedule slice detach error",
 };
 
 /**

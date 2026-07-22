@@ -21,6 +21,7 @@ import {
   users,
 } from "@/lib/db/schema";
 import { actorNotifyFields, notifyUser } from "@/lib/notifications";
+import { logUserActivity } from "@/lib/audit";
 import {
   parseBatchEntriesJson,
   parseBatchSlotMeta,
@@ -44,6 +45,7 @@ import {
   validateSliceMembership,
 } from "@/lib/schedule/slice-auth";
 import { localDateKey } from "@/lib/schedule/dates";
+import { resolveTimezone } from "@/lib/schedule/timezone";
 import type { ProposalSliceDetail } from "./slice-types";
 
 type DbExecutor = ReturnType<typeof getDb> | Parameters<Parameters<ReturnType<typeof getDb>["transaction"]>[0]>[0];
@@ -240,6 +242,12 @@ export async function getProposalSliceDetailAction(
   const privacyFlags = await getSlicePrivacyFlags(db);
   const adminCanSeeUninvolved = await getAdminCanSeeUninvolved(db);
   const partnerIds = await acceptedSleepingPartnerIds(db, session.user.id);
+  const [viewerRow] = await db
+    .select({ timezone: users.timezone })
+    .from(users)
+    .where(eq(users.id, session.user.id))
+    .limit(1);
+  const viewerTimeZone = resolveTimezone(viewerRow?.timezone);
   const { rootProposalId, sliceKind, sliceKey } = parsed.data;
   const sliceTag = formatSliceTag(sliceKind, sliceKey);
   if (!sliceTag) {
@@ -318,8 +326,20 @@ export async function getProposalSliceDetailAction(
     slotRows,
     sliceKind,
     sliceKey,
+    viewerTimeZone,
   );
   if (!membership.ok) {
+    await logUserActivity(
+      session.user.id,
+      "schedule.slice_detail_error",
+      JSON.stringify({
+        rootProposalId,
+        sliceKind,
+        sliceKey,
+        message: membership.message,
+      }),
+      "error",
+    );
     return { ok: false, message: membership.message };
   }
 
@@ -488,6 +508,13 @@ export async function detachProposalSliceAction(
     return { ok: false, message: "You cannot detach this slice." };
   }
 
+  const [viewerRow] = await db
+    .select({ timezone: users.timezone })
+    .from(users)
+    .where(eq(users.id, session.user.id))
+    .limit(1);
+  const viewerTimeZone = resolveTimezone(viewerRow?.timezone);
+
   const parentSlots = await db
     .select({
       id: proposalTimeSlots.id,
@@ -509,8 +536,20 @@ export async function detachProposalSliceAction(
     parentSlots,
     sliceKind,
     sliceKey,
+    viewerTimeZone,
   );
   if (!membership.ok) {
+    await logUserActivity(
+      session.user.id,
+      "schedule.slice_detach_error",
+      JSON.stringify({
+        rootProposalId,
+        sliceKind,
+        sliceKey,
+        message: membership.message,
+      }),
+      "error",
+    );
     return { ok: false, message: membership.message };
   }
 

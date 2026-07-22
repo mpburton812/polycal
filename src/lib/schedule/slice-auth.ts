@@ -4,6 +4,7 @@ import {
   expandAllDayDateKeys,
   isMultiDayAllDaySpan,
 } from "@/lib/schedule/schedule-slices";
+import { DEFAULT_VIEWER_TIMEZONE } from "@/lib/schedule/timezone";
 import { formatSliceTag, type ScheduleSliceKind } from "@/lib/schedule/slice-types";
 
 export interface SliceMembershipParent {
@@ -83,6 +84,7 @@ export function validateSliceMembership(
   slots: SliceMembershipSlot[],
   sliceKind: "batch_night" | "virtual_span_day",
   sliceKey: string,
+  timeZone: string = DEFAULT_VIEWER_TIMEZONE,
 ): { ok: true } | { ok: false; message: string } {
   if (sliceKind === "batch_night") {
     if (!parent.isBatchSleeping) {
@@ -106,7 +108,7 @@ export function validateSliceMembership(
   if (activeSlots.length > 0) {
     const spanSlot =
       activeSlots.find((slot) =>
-        expandAllDayDateKeys(slot.startAt, slot.endAt).includes(sliceKey),
+        expandAllDayDateKeys(slot.startAt, slot.endAt, timeZone).includes(sliceKey),
       ) ?? activeSlots[0]!;
     sourceStart = spanSlot.startAt;
     sourceEnd = spanSlot.endAt;
@@ -114,12 +116,12 @@ export function validateSliceMembership(
 
   if (
     !sourceStart ||
-    !isMultiDayAllDaySpan(sourceStart, sourceEnd ?? sourceStart, parent.isAllDay)
+    !isMultiDayAllDaySpan(sourceStart, sourceEnd ?? sourceStart, parent.isAllDay, timeZone)
   ) {
     return { ok: false, message: "Day not part of a multi-day span." };
   }
 
-  const allKeys = expandAllDayDateKeys(sourceStart, sourceEnd);
+  const allKeys = expandAllDayDateKeys(sourceStart, sourceEnd, timeZone);
   if (!allKeys.includes(sliceKey)) {
     return { ok: false, message: "Day not found in span." };
   }
@@ -160,6 +162,7 @@ export function validateSliceTagForProposal(
   sliceKind: ScheduleSliceKind | null,
   sliceKey: string | null,
   tag: string | null | undefined,
+  timeZone: string = DEFAULT_VIEWER_TIMEZONE,
 ): { ok: true } | { ok: false; message: string } {
   if (!tag) return { ok: true };
   if (!validateSliceTagValue(tag)) {
@@ -171,14 +174,20 @@ export function validateSliceTagForProposal(
     if (expected && tag !== expected) {
       return { ok: false, message: "Slice tag does not match this slice." };
     }
-    const membership = validateSliceMembership(parent, slots, sliceKind, sliceKey ?? "");
+    const membership = validateSliceMembership(
+      parent,
+      slots,
+      sliceKind,
+      sliceKey ?? "",
+      timeZone,
+    );
     if (!membership.ok) return membership;
     return { ok: true };
   }
 
   if (tag.startsWith("slot:")) {
     const slotId = tag.slice("slot:".length);
-    const membership = validateSliceMembership(parent, slots, "batch_night", slotId);
+    const membership = validateSliceMembership(parent, slots, "batch_night", slotId, timeZone);
     if (!membership.ok) return membership;
     return { ok: true };
   }
@@ -186,7 +195,13 @@ export function validateSliceTagForProposal(
   if (tag.startsWith("day:")) {
     const dayKey = tag.slice("day:".length);
     allDayBoundsForDateKey(dayKey);
-    const membership = validateSliceMembership(parent, slots, "virtual_span_day", dayKey);
+    const membership = validateSliceMembership(
+      parent,
+      slots,
+      "virtual_span_day",
+      dayKey,
+      timeZone,
+    );
     if (!membership.ok) return membership;
     return { ok: true };
   }

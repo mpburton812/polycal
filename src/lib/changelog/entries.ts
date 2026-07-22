@@ -26,6 +26,29 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "2026.07.22c",
+    date: "2026-07-22",
+    summary:
+      "Single-day all-day calendar span fix, slice error admin log, batch Tentative title on resolve.",
+    changes: [
+      {
+        type: "fixed",
+        description:
+          "Single-day all-day events no longer span two calendar days or fail open with Day not part of a multi-day span — noon civil bounds, sub-24h collapse, and viewer-TZ slice membership (PC-301).",
+      },
+      {
+        type: "fixed",
+        description:
+          "Schedule slice detail/detach failures are written to the System administrator log as error events (PC-302).",
+      },
+      {
+        type: "fixed",
+        description:
+          "Resolving sleeping/batch proposals refreshes the stored title from Tentative to Confirmed (PC-303).",
+      },
+    ],
+  },
+  {
     version: "2026.07.22b",
     date: "2026-07-22",
     summary:
