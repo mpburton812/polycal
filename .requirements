@@ -276,3 +276,6 @@
 2026-07-22 | 611ccf2 | PC-301 | all-day single-day span, slice admin errors, Tentative title | src/actions/proposals/_core.ts
 2026-07-22 | fcb6b10 | PC-305 | visibility/partners SSOT and Busy mask copy | src/actions/feed.ts
 2026-07-22 | 1a9cbe7 | PC-305 | restore getDb import in network-notify | src/actions/schedule.ts
+2026-07-22 | c1c18cf | PC-317 | date-only contract + conflict/calendar parity | src/actions/proposals/_core.ts
+2026-07-22 | c1c18cf | PC-318 | conflict parity via buildScheduleWindows + widened overlap windows | src/lib/proposals/conflict-windows.ts
+2026-07-22 | c1c18cf | PC-319 | unit tests: same-day all-day, same-night sleeping, event×sleeping PC-59, draft date contract | src/lib/proposals/conflict-windows.test.ts
