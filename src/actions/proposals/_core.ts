@@ -38,10 +38,17 @@ import {
   atRiskExpiresAtIso,
   computeAtRiskExpiresAt,
   detectViewerOverlapWarning,
-  intervalsOverlap,
   loadEnforcementSettings,
   runProposalEnforcement,
 } from "@/lib/proposals/enforcement";
+import { intervalsOverlap } from "@/lib/schedule/dates";
+import {
+  buildConflictWindows,
+  widenConflictWindow,
+  windowsConflict,
+  type ConflictWindow,
+} from "@/lib/proposals/conflict-windows";
+import { DEFAULT_VIEWER_TIMEZONE } from "@/lib/schedule/timezone";
 import {
   recordProposalInviteeView,
   shouldRecordProposalInviteeView,
@@ -783,26 +790,61 @@ async function revertProposalToDraft(
 }
 
 /**
- * Builds schedule windows for collision checks from slots or resolved times (PC-40).
+ * Overlap windows for collision checks, built from the SAME calendar windows
+ * (buildScheduleWindows) and widened for date-only kinds so conflict detection
+ * matches the calendar (PC-318, replaces the old raw slot/resolved compare).
+ *
+ * Loads the flags buildScheduleWindows needs (all-day, batch sleeping,
+ * recurrence, detached slots) plus the proposal type used for widening.
  */
-async function proposalScheduleWindows(
+async function proposalConflictWindows(
   db: ReturnType<typeof getDb>,
-  proposalId: string,
-  scheduledStartAt: string | null,
-  scheduledEndAt: string | null,
-): Promise<{ start: string; end: string | null }[]> {
+  proposal: {
+    id: string;
+    proposalType: string;
+    isAllDay: boolean;
+    isBatchSleeping: boolean;
+    parentProposalId: string | null;
+    isRecurrenceParent: boolean;
+    scheduledStartAt: string | null;
+    scheduledEndAt: string | null;
+  },
+  timeZone: string = DEFAULT_VIEWER_TIMEZONE,
+): Promise<ConflictWindow[]> {
   const slots = await db
-    .select({ startAt: proposalTimeSlots.startAt, endAt: proposalTimeSlots.endAt })
+    .select({
+      id: proposalTimeSlots.id,
+      startAt: proposalTimeSlots.startAt,
+      endAt: proposalTimeSlots.endAt,
+      label: proposalTimeSlots.label,
+      isDetached: proposalTimeSlots.isDetached,
+    })
     .from(proposalTimeSlots)
-    .where(eq(proposalTimeSlots.proposalId, proposalId));
+    .where(eq(proposalTimeSlots.proposalId, proposal.id));
 
-  if (slots.length > 0) {
-    return slots.map((slot) => ({ start: slot.startAt, end: slot.endAt }));
-  }
-  if (scheduledStartAt) {
-    return [{ start: scheduledStartAt, end: scheduledEndAt }];
-  }
-  return [];
+  const scheduled = proposal.scheduledStartAt
+    ? { startAt: proposal.scheduledStartAt, endAt: proposal.scheduledEndAt }
+    : null;
+
+  return buildConflictWindows(
+    {
+      id: proposal.id,
+      proposalType: proposal.proposalType,
+      isAllDay: proposal.isAllDay,
+      isBatchSleeping: proposal.isBatchSleeping,
+      parentProposalId: proposal.parentProposalId,
+      isRecurrenceParent: proposal.isRecurrenceParent,
+    },
+    slots.map((slot) => ({
+      id: slot.id,
+      startAt: slot.startAt,
+      endAt: slot.endAt,
+      label: slot.label,
+      isDetached: slot.isDetached,
+    })),
+    scheduled,
+    timeZone,
+  );
 }
 
 /**
@@ -817,6 +859,11 @@ async function autoDeclineCollidingProposals(
   actorUserId: string,
 ): Promise<void> {
   if (!scheduleStart) return;
+
+  // Build widened windows for the resolved item (parity with the calendar +
+  // board conflict logic; handles batch nights and null sleeping ends) (PC-318).
+  const resolvedWindows = await proposalConflictWindows(db, resolved);
+  if (resolvedWindows.length === 0) return;
 
   const resolvedInvitees = await db
     .select({ userId: proposalInvitees.userId })
@@ -851,6 +898,8 @@ async function autoDeclineCollidingProposals(
 
   for (const other of pending) {
     if (other.id === resolved.id) continue;
+    // Events never collide with sleeping arrangements (PC-59 parity).
+    if (other.proposalType !== resolved.proposalType) continue;
 
     const otherStakeholders = new Set<string>([
       other.proposerId,
@@ -861,16 +910,14 @@ async function autoDeclineCollidingProposals(
     );
     if (!sharesStakeholder) continue;
 
-    const otherWindows = await proposalScheduleWindows(
-      db,
-      other.id,
-      other.scheduledStartAt,
-      other.scheduledEndAt,
-    );
+    const otherWindows = await proposalConflictWindows(db, other);
     if (otherWindows.length === 0) continue;
 
-    const overlaps = otherWindows.some((window) =>
-      intervalsOverlap(scheduleStart, scheduleEnd, window.start, window.end),
+    const overlaps = windowsConflict(
+      resolved.proposalType,
+      resolvedWindows,
+      other.proposalType,
+      otherWindows,
     );
     if (!overlaps) continue;
 
@@ -1264,13 +1311,22 @@ async function checkPlaceAssetConflicts(
       proposal.bedroomIndex === other.bedroomIndex;
     if (!sameBedroom) continue;
 
+    // Both sides are sleeping — widen the other night to its civil day so a
+    // null/same-day end still overlaps the (already widened) check windows (PC-318).
+    const otherWindow = widenConflictWindow(
+      other.scheduledStartAt,
+      other.scheduledEndAt,
+      "sleeping",
+      false,
+    );
+
     for (const window of checkWindows) {
       if (
         intervalsOverlap(
           window.start,
           window.end,
-          other.scheduledStartAt,
-          other.scheduledEndAt,
+          otherWindow.start,
+          otherWindow.end,
         )
       ) {
         warnings.push({
@@ -1369,17 +1425,8 @@ async function gatherProposalConflictWarnings(
     .from(proposalInvitees)
     .where(eq(proposalInvitees.proposalId, proposalId));
 
-  const slots = await db
-    .select({ startAt: proposalTimeSlots.startAt, endAt: proposalTimeSlots.endAt })
-    .from(proposalTimeSlots)
-    .where(eq(proposalTimeSlots.proposalId, proposalId));
-
-  const checkWindows =
-    slots.length > 0
-      ? slots.map((s) => ({ start: s.startAt, end: s.endAt }))
-      : proposal.scheduledStartAt
-        ? [{ start: proposal.scheduledStartAt, end: proposal.scheduledEndAt }]
-        : [];
+  // Same calendar windows the schedule renders, widened for date-only kinds (PC-318).
+  const checkWindows = await proposalConflictWindows(db, proposal);
 
   if (checkWindows.length === 0) {
     return [];
@@ -1395,6 +1442,7 @@ async function gatherProposalConflictWarnings(
       state: proposals.state,
       proposerId: proposals.proposerId,
       proposalType: proposals.proposalType,
+      isAllDay: proposals.isAllDay,
       scheduledStartAt: proposals.scheduledStartAt,
       scheduledEndAt: proposals.scheduledEndAt,
     })
@@ -1431,13 +1479,22 @@ async function gatherProposalConflictWarnings(
     const affected = [...stakeholderIds].filter((id) => otherStakeholders.has(id));
     if (affected.length === 0) continue;
 
+    // Widen the other side too so same-night sleeping (null end) and same-day
+    // all-day (noon/noon) collide symmetrically with the current windows (PC-318).
+    const otherWindow = widenConflictWindow(
+      other.scheduledStartAt,
+      other.scheduledEndAt,
+      other.proposalType,
+      other.isAllDay,
+    );
+
     for (const window of checkWindows) {
       if (
         intervalsOverlap(
           window.start,
           window.end,
-          other.scheduledStartAt,
-          other.scheduledEndAt,
+          otherWindow.start,
+          otherWindow.end,
         )
       ) {
         for (const userId of affected) {
@@ -2363,6 +2420,8 @@ export async function getProposalDetailAction(
     viewerInvitee?.overlapAcknowledgedAt,
     display.scheduledStartAt ?? null,
     display.scheduledEndAt ?? null,
+    row.proposalType,
+    row.isAllDay,
   );
 
   const optionalRsvpPending = optionalInviteeVotesPending(row, viewerInvitee);
@@ -2609,6 +2668,8 @@ export async function acknowledgeProposalOverlapAction(
     invitee.overlapAcknowledgedAt,
     proposal.scheduledStartAt,
     proposal.scheduledEndAt,
+    proposal.proposalType,
+    proposal.isAllDay,
   );
 
   if (!hasOverlap) {

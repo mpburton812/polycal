@@ -10,6 +10,8 @@ import {
 } from "@/lib/notifications-draft-return";
 import { expirePendingRecoveryProposals } from "@/lib/proposals/pending-recovery";
 import { sleepingCalendarDayEnd } from "@/lib/proposals/sleeping-schedule";
+import { widenConflictWindow } from "@/lib/proposals/conflict-windows";
+import { intervalsOverlap } from "@/lib/schedule/dates";
 import {
   polyGroup,
   proposalInvitees,
@@ -519,22 +521,15 @@ export async function runProposalEnforcement(db: Db): Promise<void> {
   await expireSleepingPartnerProposals(db, settings);
 }
 
-/** Returns true when two ISO intervals overlap (open end uses start as instant). */
-export function intervalsOverlap(
-  aStart: string,
-  aEnd: string | null,
-  bStart: string,
-  bEnd: string | null,
-): boolean {
-  const aEndMs = aEnd ? new Date(aEnd).getTime() : new Date(aStart).getTime();
-  const bEndMs = bEnd ? new Date(bEnd).getTime() : new Date(bStart).getTime();
-  const aStartMs = new Date(aStart).getTime();
-  const bStartMs = new Date(bStart).getTime();
-  return aStartMs < bEndMs && bStartMs < aEndMs;
-}
+/** Re-export the single source-of-truth interval overlap check (PC-318). */
+export { intervalsOverlap };
 
 /**
  * Detects in-flight calendar overlap for a voter who already responded (PC-46).
+ *
+ * Windows are widened to whole-day bounds for sleeping/all-day kinds and only
+ * same-type pairs are compared so events never collide with sleeping (PC-59),
+ * matching the board conflict + calendar overlap logic (PC-318).
  */
 export async function detectViewerOverlapWarning(
   db: Db,
@@ -544,6 +539,8 @@ export async function detectViewerOverlapWarning(
   overlapAcknowledgedAt: string | null | undefined,
   scheduledStartAt: string | null,
   scheduledEndAt: string | null,
+  proposalType: string = "event",
+  isAllDay: boolean = false,
 ): Promise<boolean> {
   if (
     !scheduledStartAt ||
@@ -554,12 +551,21 @@ export async function detectViewerOverlapWarning(
     return false;
   }
 
+  const viewerWindow = widenConflictWindow(
+    scheduledStartAt,
+    scheduledEndAt,
+    proposalType,
+    isAllDay,
+  );
+
   const activeProposals = await db
     .select({
       id: proposals.id,
       scheduledStartAt: proposals.scheduledStartAt,
       scheduledEndAt: proposals.scheduledEndAt,
       proposerId: proposals.proposerId,
+      proposalType: proposals.proposalType,
+      isAllDay: proposals.isAllDay,
     })
     .from(proposals)
     .where(inArray(proposals.state, ["proposed", "resolved"]));
@@ -577,15 +583,24 @@ export async function detectViewerOverlapWarning(
 
   for (const other of activeProposals) {
     if (other.id === proposalId || !other.scheduledStartAt) continue;
+    // Sleeping arrangements never conflict with events (PC-59).
+    if (other.proposalType !== proposalType) continue;
     const stakeholders = new Set([other.proposerId, ...(inviteesByProposal.get(other.id) ?? [])]);
     if (!stakeholders.has(viewerId)) continue;
 
+    const otherWindow = widenConflictWindow(
+      other.scheduledStartAt,
+      other.scheduledEndAt,
+      other.proposalType,
+      other.isAllDay,
+    );
+
     if (
       intervalsOverlap(
-        scheduledStartAt,
-        scheduledEndAt,
-        other.scheduledStartAt,
-        other.scheduledEndAt,
+        viewerWindow.start,
+        viewerWindow.end,
+        otherWindow.start,
+        otherWindow.end,
       )
     ) {
       return true;

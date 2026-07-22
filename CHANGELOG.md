@@ -21,6 +21,7 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Changed
+- PC-317–PC-319: Date-only contract documented (sleeping = midnight-in-TZ, all-day = noon-UTC); conflict detection reuses the calendar's `buildScheduleWindows` with widened sleeping/all-day windows so same-night sleeping and same-day all-day collide while events never conflict with sleeping (PC-59); draft sleeping/batch preview uses the sleeping helper; single `intervalsOverlap` from `schedule/dates`; viewer TZ passed into slice-detach span expansion. Change control: `2026.07.22e`.
 - PC-305–PC-307: Shared partners/eligible-locations loaders; `canViewProposalContent` for schedule Busy masking; dead masked=false scaffolding removed; admin calendar toggle label matches uninvolved-admin masking. Change control: `2026.07.22d`.
 
 ### Added

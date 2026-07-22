@@ -1,3 +1,17 @@
+/**
+ * Calendar window construction for proposals — the single source of truth for
+ * where a proposal appears on the schedule (PC-258 / PC-301).
+ *
+ * - `allDayBoundsForDateKey(dateKey)` returns **noon-UTC** start/end for one
+ *   civil day so an all-day event resolves to a single local date in US
+ *   timezones (no false two-day bars).
+ * - `buildScheduleWindows(row, slots, scheduled, timeZone)` emits one
+ *   `RawScheduleWindow` per rendered block: batch-sleeping nights, recurrence
+ *   occurrences, per-day all-day spans (via `expandAllDayDateKeys`), and plain
+ *   timed intervals. Conflict detection reuses these windows (widened for
+ *   date-only kinds) via `@/lib/proposals/conflict-windows` so the board's
+ *   collision checks stay in parity with what the calendar draws (PC-318).
+ */
 import { localDateKey } from "@/lib/schedule/dates";
 import { DEFAULT_VIEWER_TIMEZONE } from "@/lib/schedule/timezone";
 import type { ScheduleSlice, ScheduleSliceKind } from "@/lib/schedule/slice-types";
