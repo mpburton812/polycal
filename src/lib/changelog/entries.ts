@@ -26,6 +26,24 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "2026.07.22e",
+    date: "2026-07-22",
+    summary:
+      "Playwright journeys for poll required/optional approve paths and midnight/11pm self-appointment day boundaries.",
+    changes: [
+      {
+        type: "added",
+        description:
+          "Poll journey: 3 slots, 2 required + 1 optional; one required opens via notification, the other via Proposed; optional declines with a note visible to the proposer (PC-325).",
+      },
+      {
+        type: "added",
+        description:
+          "Self-appointment day-boundary journey: 1h/2d at 12am and 11pm, one-shot and weekly×3, confirming calendar placement three days out (PC-326).",
+      },
+    ],
+  },
+  {
     version: "2026.07.22d",
     date: "2026-07-22",
     summary:

@@ -20,10 +20,8 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
-### Changed
-- PC-305–PC-307: Shared partners/eligible-locations loaders; `canViewProposalContent` for schedule Busy masking; dead masked=false scaffolding removed; admin calendar toggle label matches uninvolved-admin masking. Change control: `2026.07.22d`.
-
 ### Added
+- PC-325–PC-326: Playwright journeys for poll required/optional approve + decline-with-note paths, and self-appointment day boundaries at 12am/11pm (1h/2d, weekly×3). Change control: `2026.07.22e`.
 - PC-298: Feed pins currently-happening non-sleeping (resolved) events in a sticky **Happening now** highlight stack above the timeline; silent poll tracks active window changes. Change control: `2026.07.22b`.
 - PC-291–PC-296: Proposed Kanban **Nudge** for pending voters (1h cooldown); live proposed/at-risk expiry countdowns on summary cards; admin **hard-delete** of proposals in any state (including archived), with `proposal_admin_deleted` notify to all participants. Change control: `2026.07.22a`. SCHEMA_VERSION 34 (`last_nudge_at`).
 - PC-279: Feed URL embeds — linkify chat/comment bodies and show Facebook-style Open Graph preview cards (SSRF-safe cache). Change control: `2026.07.21f`. SCHEMA_VERSION 31.
@@ -31,6 +29,7 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **Production release `2026.07.21-prod` (PC-271):** Consolidated Code Status entry for this promote — Feed Controls (PC-264–268), six-item UX batch (PC-258–263), FEED/like parrot sizing (PC-270; supersedes interim PC-260/269 sizes), brace-expansion/js-yaml audit patches (PC-258).
 
 ### Changed
+- PC-305–PC-307: Shared partners/eligible-locations loaders; `canViewProposalContent` for schedule Busy masking; dead masked=false scaffolding removed; admin calendar toggle label matches uninvolved-admin masking. Change control: `2026.07.22d`.
 - PC-280: UX cleanup batch — removed Planning drawer, Clone proposal, group-name-change proposals, and admin power management ("all admins" toggle, impersonation unaffected); sleeping network visibility hard-defaulted to "involved" (admin toggle removed); private/super-private event privacy removed entirely (every proposal always open, admin privacy toggles removed, masking simplified); removed descriptive tab blurbs (Feed/Schedule/Proposals/People & Places/Admin; Profile "Signed in as" kept); draft Delete/Exit and proposal detail footer actions use pill outlined/contained styling; Feed composers default to 2 rows with Enter = newline. SCHEMA_VERSION 32 (privacy backfill, power-management + sleeping-visibility column cleanup). Change control: `2026.07.21g`.
 - PC-277: Feed like bird enlarged to 36×36 (3× the prior 12×12). Change control: `2026.07.21d`.
 - PC-273–PC-276: Proposal enforcement days units + sleeping-partner auto-delete TTL; admin draft delete + uninvolved visibility toggle; peach oversight only when uninvolved; higher-quality event icon watermarks on kanban; GitHub Actions bumped to Node 24 runtimes (`@v5`). SCHEMA_VERSION 30. Change control: `2026.07.21c`.
