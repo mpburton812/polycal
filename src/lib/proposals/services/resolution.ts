@@ -382,6 +382,10 @@ export async function resolveProposal(
   if (!isNonScheduleProposal(proposal.description)) {
     await autoDeclineCollidingProposals(db, proposal, scheduleStart, scheduleEnd, actorUserId);
   }
+
+  // External calendar sync (Option B) — fire-and-forget for configured invitees.
+  const { scheduleCalendarSync } = await import("@/lib/calendar/sync");
+  scheduleCalendarSync(proposal.id, "upsert");
 }
 
 /**
