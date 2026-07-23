@@ -4,23 +4,11 @@ import type { Client } from "@libsql/client";
  * Phase 3 admin/profile migrations — poly group settings, user prefs, audit log types.
  */
 export async function applyAdminMigrations(sql: Client): Promise<void> {
-  await ensureColumn(sql, "poly_group", "allow_group_name_proposals", "INTEGER NOT NULL DEFAULT 0");
-  await ensureColumn(sql, "poly_group", "group_name_change_mode", "TEXT NOT NULL DEFAULT 'admin_only'");
-  await ensureColumn(sql, "poly_group", "power_management_mode", "TEXT NOT NULL DEFAULT 'admin_user'");
-  await ensureColumn(sql, "poly_group", "role_snapshots_json", "TEXT");
-  await ensureColumn(sql, "poly_group", "event_privacy_open", "INTEGER NOT NULL DEFAULT 1");
-  await ensureColumn(sql, "poly_group", "event_privacy_private", "INTEGER NOT NULL DEFAULT 1");
-  await ensureColumn(sql, "poly_group", "event_privacy_super_private", "INTEGER NOT NULL DEFAULT 1");
-  await ensureColumn(sql, "poly_group", "admin_can_see_private", "INTEGER NOT NULL DEFAULT 0");
-  await ensureColumn(sql, "poly_group", "admin_can_see_super_private", "INTEGER NOT NULL DEFAULT 0");
+  // PC-332: retired columns (group name proposals, power management, per-level event
+  // privacy, sleeping network visibility) are no longer ensured. Existing DBs keep the
+  // columns; fresh DBs simply omit them. The app no longer reads them.
   await ensureColumn(sql, "poly_group", "audit_log_visibility", "TEXT NOT NULL DEFAULT 'admin_only'");
   await ensureColumn(sql, "poly_group", "hide_sleeping_arrangements", "INTEGER NOT NULL DEFAULT 0");
-  await ensureColumn(
-    sql,
-    "poly_group",
-    "sleeping_network_visibility",
-    "TEXT NOT NULL DEFAULT 'everyone'",
-  );
   await ensureColumn(sql, "poly_group", "places_map_visibility", "TEXT NOT NULL DEFAULT 'all'");
 
   await sql.execute(`
