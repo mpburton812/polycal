@@ -77,26 +77,12 @@ export const polyGroup = sqliteTable("poly_group", {
     .notNull()
     .default(false),
   /**
-   * Retired columns (PC-280): group name proposals, power management ("all admin"),
-   * and per-level event privacy toggles were removed from the app. Columns are kept
-   * (not dropped) to avoid risky SQLite ALTER TABLE DROP COLUMN migrations — the
-   * pc280-migrations backfill normalizes their values and the app no longer reads them.
+   * Retired columns (PC-280 / PC-332): group name proposals, power management ("all
+   * admin"), per-level event privacy toggles, and sleeping network visibility were
+   * removed from the app and are no longer modeled here. The underlying SQLite columns
+   * may still exist on legacy DBs (SQLite ALTER TABLE DROP COLUMN is intentionally not
+   * run); they are simply not ensured and not read by the app.
    */
-  allowGroupNameProposals: integer("allow_group_name_proposals", { mode: "boolean" })
-    .notNull()
-    .default(false),
-  groupNameChangeMode: text("group_name_change_mode").notNull().default("admin_only"),
-  powerManagementMode: text("power_management_mode").notNull().default("admin_user"),
-  roleSnapshotsJson: text("role_snapshots_json"),
-  eventPrivacyOpen: integer("event_privacy_open", { mode: "boolean" }).notNull().default(true),
-  eventPrivacyPrivate: integer("event_privacy_private", { mode: "boolean" }).notNull().default(true),
-  eventPrivacySuperPrivate: integer("event_privacy_super_private", { mode: "boolean" })
-    .notNull()
-    .default(true),
-  adminCanSeePrivate: integer("admin_can_see_private", { mode: "boolean" }).notNull().default(false),
-  adminCanSeeSuperPrivate: integer("admin_can_see_super_private", { mode: "boolean" })
-    .notNull()
-    .default(false),
   /**
    * When true, admins see proposals they are not proposer/invitee for (PC-274).
    * Peach oversight chrome still applies for those uninvolved views.
@@ -108,11 +94,6 @@ export const polyGroup = sqliteTable("poly_group", {
   hideSleepingArrangements: integer("hide_sleeping_arrangements", { mode: "boolean" })
     .notNull()
     .default(false),
-  /**
-   * Retired (PC-280): sleeping visibility is hard-defaulted to "involved" in app code
-   * regardless of this column's stored value; kept only to avoid a column drop.
-   */
-  sleepingNetworkVisibility: text("sleeping_network_visibility").notNull().default("everyone"),
   placesMapVisibility: text("places_map_visibility").notNull().default("all"),
   logTailLength: integer("log_tail_length").notNull().default(100),
   onboardingWelcomeMessage: text("onboarding_welcome_message"),

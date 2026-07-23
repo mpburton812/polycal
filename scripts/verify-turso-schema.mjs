@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Verifies remote Turso databases report schema_meta version 13 (PC-71).
+ * Verifies remote Turso databases report the current schema_meta version (PC-71).
  *
  * Usage:
  *   node scripts/verify-turso-schema.mjs              # uses process.env
@@ -9,7 +9,8 @@
 import { createClient } from "@libsql/client";
 import { readFileSync } from "node:fs";
 
-const EXPECTED_SCHEMA_VERSION = "19";
+// Keep in sync with SCHEMA_VERSION in src/lib/db/migrate.ts (PC-333).
+const EXPECTED_SCHEMA_VERSION = "35";
 
 function loadEnvFile(envFile) {
   return Object.fromEntries(
