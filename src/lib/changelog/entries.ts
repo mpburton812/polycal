@@ -26,6 +26,29 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "2026.07.22i",
+    date: "2026-07-22",
+    summary:
+      "Epic 5 schema hygiene: stop ensuring long-dead poly_group/hour columns, guard legacy backfills for fresh DBs, and bump SCHEMA_VERSION to 35 (behavior-preserving).",
+    changes: [
+      {
+        type: "changed",
+        description:
+          "admin-migrations no longer ensures the retired poly_group columns (allow_group_name_proposals, group_name_change_mode, power_management_mode, role_snapshots_json, event_privacy_open/private/super_private, admin_can_see_private/super_private, sleeping_network_visibility); proposals-migrations no longer ensures the legacy hour columns (recovery_max_hours, proposed_max_hours, at_risk_ttl_hours). Existing DBs keep the columns; fresh DBs simply omit them and the app no longer reads them (PC-332).",
+      },
+      {
+        type: "changed",
+        description:
+          "pc280 cleanup and the hours→days enforcement backfill now check column presence (PRAGMA table_info) before their UPDATEs, so fresh DBs without the retired/legacy columns no longer crash; the pc280_cleanup_v1 and enforcement_hours_to_days_v1 flags are still set so migrations never retry (PC-332).",
+      },
+      {
+        type: "changed",
+        description:
+          "Removed the retired poly_group fields from the Drizzle schema and bumped SCHEMA_VERSION 34→35 (with verify-turso-schema EXPECTED_SCHEMA_VERSION synced) (PC-333).",
+      },
+    ],
+  },
+  {
     version: "2026.07.22h",
     date: "2026-07-22",
     summary:
