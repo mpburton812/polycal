@@ -15,7 +15,11 @@ import {
 } from "./helpers/schedule";
 
 const COMMENT = "E2E self-appointment day boundary";
-const DAYS_OUT = 3;
+/**
+ * Prefer mid-week targets: DAYS_OUT=3 from Thu/Fri lands on Sun, and 11pm→midnight
+ * overnight events can fall off the visible week range (flake after local midnight).
+ */
+const DAYS_OUT = 5;
 const WEEKLY_OCCURRENCES = 3;
 
 type Case = {
