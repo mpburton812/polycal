@@ -285,3 +285,4 @@
 2026-07-22 | 956e1f8 | PC-325 | merge(dev): resync changelog for | n/a
 2026-07-22 | 2399786 | PC-327 | carve conflict/resolution + lifecycle/comment actions out of _core ( ) | src/actions/proposals.ts
 2026-07-22 | c984114 | PC-330 | bump next to 15.5.21 for audit GHSA patches | n/a
+2026-07-22 | acf8fb3 | PC-330 | log Next bump and Epic 4-6 backlog scripts | scripts/create-pc-auth-prefs-polish-backlog.mjs
