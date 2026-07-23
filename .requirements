@@ -292,3 +292,4 @@
 2026-07-23 | 61f2fe0 | PC-337 | Google OAuth sync and iCal/ICS delivery | src/actions/calendar.ts
 2026-07-23 | 4ae4b3b | PC-337 | bump next-auth/@auth/core for npm audit | n/a
 2026-07-23 | b6be286 | PC-337 | move OAuth cookie const out of use server | src/actions/calendar.ts
+2026-07-23 | 34aa7fa | PC-337 | disambiguate calendar vs quiet-hours locators | e2e/helpers/onboarding.ts
