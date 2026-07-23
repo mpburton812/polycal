@@ -21,6 +21,7 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- PC-337–PC-342: External calendar integration (Option B) — Google Calendar OAuth sync into an existing personal calendar; iCal/Other via Download / Email / Both (.ics); Profile settings + skippable onboarding Calendar step; sleeping events export as all-day free/transparent with the PolyCal sleeping title; pending ICS download + notification when email is unavailable. SCHEMA_VERSION 36. Change control: `2026.07.23a`.
 - PC-325–PC-326: Playwright journeys for poll required/optional approve + decline-with-note paths, and self-appointment day boundaries at 12am/11pm (1h/2d, weekly×3). Change control: `2026.07.22g`.
 - PC-298: Feed pins currently-happening non-sleeping (resolved) events in a sticky **Happening now** highlight stack above the timeline; silent poll tracks active window changes. Change control: `2026.07.22b`.
 - PC-291–PC-296: Proposed Kanban **Nudge** for pending voters (1h cooldown); live proposed/at-risk expiry countdowns on summary cards; admin **hard-delete** of proposals in any state (including archived), with `proposal_admin_deleted` notify to all participants. Change control: `2026.07.22a`. SCHEMA_VERSION 34 (`last_nudge_at`).

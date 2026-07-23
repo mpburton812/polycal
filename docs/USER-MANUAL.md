@@ -210,6 +210,9 @@ Vote options:
 - Submit, vote, resolve, decline, at-risk, recovery, partnership, **nudge**, and **admin delete** changes generate **notifications** (bell icon).
 - Optional **notification email** (Profile): verify the address to receive the same alerts by email when the email channel is enabled.
 - **Forgot password?** on the sign-in page emails a reset link only when that verified notification email is set.
+- **Calendar integration** (Profile, and optional onboarding step):
+  - **Google Calendar** — connect your Google account and pick an existing calendar. Confirmed events sync automatically (create/update/delete). Sleeping arrangements appear as all-day events marked free on your calendar, using the same title as in PolyCal.
+  - **iCal / Other** — choose Download, Email, or Both for `.ics` files (Apple Calendar, Outlook, etc.). If email is not available, PolyCal notifies you and offers a download when you next open the app.
 - Each proposal keeps an **activity / audit log** of state changes (who did what, when). Admins can configure how visible that log is (everyone → admin only).
 
 ---

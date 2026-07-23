@@ -572,6 +572,8 @@ export async function rescheduleProposalAction(
 
   revalidatePath("/proposals");
   revalidatePath("/schedule");
+  const { scheduleCalendarSync } = await import("@/lib/calendar/sync");
+  scheduleCalendarSync(proposal.id, "upsert");
   return { ok: true, message: "Event rescheduled." };
 }
 
@@ -607,6 +609,7 @@ export async function cancelProposalAction(
 
   const now = new Date().toISOString();
   const actorId = session.user.id;
+  const archivedIds: string[] = [];
 
   async function archiveOne(id: string): Promise<void> {
     await db
@@ -620,6 +623,7 @@ export async function cancelProposalAction(
       })
       .where(eq(proposals.id, id));
     await logProposalTransition(db, id, actorId, "proposal.cancelled");
+    archivedIds.push(id);
   }
 
   if (scope === "series" && (proposal.isRecurrenceParent || proposal.parentProposalId)) {
@@ -687,6 +691,11 @@ export async function cancelProposalAction(
 
   revalidatePath("/proposals");
   revalidatePath("/schedule");
+
+  const { scheduleCalendarSync } = await import("@/lib/calendar/sync");
+  for (const id of archivedIds) {
+    scheduleCalendarSync(id, "delete");
+  }
 
   return { ok: true, message: "Proposal cancelled and archived." };
 }
