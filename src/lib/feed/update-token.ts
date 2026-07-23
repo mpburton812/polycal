@@ -1,42 +1,69 @@
-import type { FeedActiveEvent, FeedItem } from "@/lib/feed/types";
+/**
+ * Aggregate fingerprint of one feed-bearing table: row count plus the newest
+ * created/deleted timestamps. Insert bumps count + maxCreatedAt; soft-delete
+ * bumps maxDeletedAt — so any content change moves the fingerprint (PC-336).
+ */
+export interface FeedFingerprintTable {
+  count: number;
+  maxCreatedAt: string | null;
+  /** Omit for tables without a soft-delete column (e.g. milestones). */
+  maxDeletedAt?: string | null;
+}
+
+/** Minimal active-event descriptor used to fingerprint the pinned stack. */
+export interface FeedFingerprintActiveEvent {
+  proposalId: string;
+  scheduledStartAt: string | null;
+  scheduledEndAt: string | null;
+  proposalState: string;
+}
 
 /**
- * Builds a compact token for the first-page Feed head and active-event pins.
- * Including pin timing/state lets silent polling refresh when an event enters,
- * leaves, or changes within the highlighted stack (PC-239 / PC-298).
+ * All cheap aggregates needed to detect a first-page feed change without loading
+ * the full feed list. Each field is a small COUNT/MAX query rather than a scan of
+ * hydrated rows (PC-336).
  */
-export function buildFeedUpdateToken(
-  items: FeedItem[],
-  activeEvents: FeedActiveEvent[],
-): string {
-  const itemToken = items
-    .map((item) => {
-      const commentPart = item.comments
-        .map((c) => `${c.id}:${c.likeCount}:${c.likedByMe ? 1 : 0}`)
-        .join(",");
-      return [
-        item.kind,
-        item.id,
-        item.createdAt,
-        String(item.likeCount),
-        item.likedByMe ? "1" : "0",
-        String(item.comments.length),
-        commentPart,
-      ].join(":");
-    })
-    .join("|");
+export interface FeedFingerprintInput {
+  milestones: FeedFingerprintTable;
+  /** Catches proposal title/time edits that reshape a visible milestone. */
+  proposals: { maxUpdatedAt: string | null };
+  chatMessages: FeedFingerprintTable;
+  chatComments: FeedFingerprintTable;
+  proposalComments: FeedFingerprintTable;
+  /** Global like activity + this viewer's own like count (multi-device safety). */
+  likes: FeedFingerprintTable & { viewerCount: number };
+  activeEvents: FeedFingerprintActiveEvent[];
+}
 
-  const activeEventToken = activeEvents
+function tablePart(table: FeedFingerprintTable): string {
+  return [table.count, table.maxCreatedAt ?? "", table.maxDeletedAt ?? ""].join(":");
+}
+
+/**
+ * Builds a compact, deterministic token from cheap feed aggregates. The Feed
+ * client compares the token between polls and skips a full reload when it is
+ * unchanged (PC-239 silent poll / PC-336 cheap query). Any add/delete/like/edit
+ * that could alter the first-page head or the active-event pins changes the token.
+ */
+export function composeFeedFingerprint(input: FeedFingerprintInput): string {
+  const activePart = input.activeEvents
     .map((event) =>
       [
         event.proposalId,
-        event.title,
-        event.scheduledStartAt,
+        event.scheduledStartAt ?? "",
         event.scheduledEndAt ?? "",
         event.proposalState,
       ].join(":"),
     )
-    .join("|");
+    .join(",");
 
-  return `${itemToken}#active:${activeEventToken}`;
+  return [
+    `m:${tablePart(input.milestones)}`,
+    `p:${input.proposals.maxUpdatedAt ?? ""}`,
+    `cm:${tablePart(input.chatMessages)}`,
+    `cc:${tablePart(input.chatComments)}`,
+    `pc:${tablePart(input.proposalComments)}`,
+    `l:${tablePart(input.likes)}:${input.likes.viewerCount}`,
+    `a:${activePart}`,
+  ].join("|");
 }

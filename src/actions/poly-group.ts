@@ -4,8 +4,8 @@ import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
-import { auth } from "@/lib/auth";
 import { logUserActivity } from "@/lib/audit";
+import { requireAdminAccess } from "@/lib/actions/context";
 import { getDb } from "@/lib/db/client";
 import { ensureDbReady } from "@/lib/db/ensure-ready";
 import { polyGroup } from "@/lib/db/schema";
@@ -69,14 +69,6 @@ function rowToSettings(row: typeof polyGroup.$inferSelect): PolyGroupSettings {
   };
 }
 
-async function requireAdmin() {
-  const session = await auth();
-  if (!session?.user || session.user.role !== "admin") {
-    return null;
-  }
-  return session;
-}
-
 /**
  * Loads the poly group display name for app chrome (all signed-in users).
  */
@@ -95,8 +87,8 @@ export async function getPolyGroupDisplayNameAction(): Promise<string> {
  * Loads poly group settings for the Admin tab (PC-30).
  */
 export async function getPolyGroupSettingsAction(): Promise<PolyGroupSettings | null> {
-  const session = await requireAdmin();
-  if (!session) return null;
+  const adminResult = await requireAdminAccess();
+  if (!adminResult.ok) return null;
 
   await ensureDbReady();
   const db = getDb();
@@ -112,9 +104,9 @@ export async function getPolyGroupSettingsAction(): Promise<PolyGroupSettings | 
 export async function updatePolyGroupSettingsAction(
   input: PolyGroupSettings,
 ): Promise<PolyGroupActionResult> {
-  const session = await requireAdmin();
-  if (!session) {
-    return { ok: false, message: "Admin access required." };
+  const adminResult = await requireAdminAccess();
+  if (!adminResult.ok) {
+    return { ok: false, message: adminResult.message };
   }
 
   const parsed = settingsSchema.safeParse(input);
@@ -152,7 +144,7 @@ export async function updatePolyGroupSettingsAction(
     .where(eq(polyGroup.id, 1));
 
   await logUserActivity(
-    session.user.id,
+    adminResult.user.id,
     "admin.poly_group_settings_update",
     JSON.stringify({ name: parsed.data.name }),
     "system",
