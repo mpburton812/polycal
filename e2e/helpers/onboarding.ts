@@ -31,7 +31,7 @@ export async function completeFirstLoginOnboarding(
   await page.getByRole("button", { name: "Continue" }).click();
 
   // Optional calendar integration step (PC-341) — skip for default e2e path.
-  await expect(page.getByText(/connect Google Calendar|iCal \/ Other/i)).toBeVisible({
+  await expect(page.getByText("Optional — connect Google Calendar")).toBeVisible({
     timeout: 15_000,
   });
   await page.getByRole("button", { name: "Skip for now" }).click();
