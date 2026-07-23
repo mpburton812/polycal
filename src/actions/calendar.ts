@@ -23,12 +23,10 @@ import {
   refreshGoogleAccessToken,
 } from "@/lib/calendar/google-oauth";
 import type { IcsDeliveryMode } from "@/lib/calendar/types";
-import { icsDeliveryModes } from "@/lib/calendar/types";
+import { icsDeliveryModes, GOOGLE_OAUTH_STATE_COOKIE } from "@/lib/calendar/types";
 import { getDb } from "@/lib/db/client";
 import { ensureDbReady } from "@/lib/db/ensure-ready";
 import { calendarConnections, calendarIcsPending } from "@/lib/db/schema";
-
-const OAUTH_STATE_COOKIE = "polycal_gcal_oauth_state";
 
 const icsDeliverySchema = z.enum(icsDeliveryModes);
 
@@ -118,7 +116,7 @@ export async function beginGoogleCalendarConnectAction(): Promise<
 
     const state = randomBytes(24).toString("base64url");
     const jar = await cookies();
-    jar.set(OAUTH_STATE_COOKIE, `${user.id}:${state}`, {
+    jar.set(GOOGLE_OAUTH_STATE_COOKIE, `${user.id}:${state}`, {
       httpOnly: true,
       sameSite: "lax",
       secure: process.env.NODE_ENV === "production",
@@ -355,6 +353,3 @@ export async function dismissPendingIcsAction(
     return { ok: false, message: err instanceof Error ? err.message : "Failed." };
   }
 }
-
-/** Cookie name exported for the OAuth callback route. */
-export const GOOGLE_OAUTH_STATE_COOKIE = OAUTH_STATE_COOKIE;

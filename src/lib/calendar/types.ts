@@ -15,3 +15,6 @@ export const icsMethods = ["PUBLISH", "REQUEST", "CANCEL"] as const;
 export type IcsMethod = (typeof icsMethods)[number];
 
 export type CalendarSyncAction = "upsert" | "delete";
+
+/** CSRF state cookie for Google Calendar OAuth connect (not a server-action export). */
+export const GOOGLE_OAUTH_STATE_COOKIE = "polycal_gcal_oauth_state";

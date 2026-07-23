@@ -6,7 +6,6 @@ import { eq } from "drizzle-orm";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 
-import { GOOGLE_OAUTH_STATE_COOKIE } from "@/actions/calendar";
 import { auth } from "@/lib/auth";
 import { logUserActivity } from "@/lib/audit";
 import { encryptSecret, isCalendarEncryptionConfigured } from "@/lib/calendar/crypto";
@@ -14,6 +13,7 @@ import {
   exchangeGoogleCode,
   fetchGoogleAccountEmail,
 } from "@/lib/calendar/google-oauth";
+import { GOOGLE_OAUTH_STATE_COOKIE } from "@/lib/calendar/types";
 import { getDb } from "@/lib/db/client";
 import { ensureDbReady } from "@/lib/db/ensure-ready";
 import { calendarConnections } from "@/lib/db/schema";
