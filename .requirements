@@ -286,3 +286,4 @@
 2026-07-22 | 2399786 | PC-327 | carve conflict/resolution + lifecycle/comment actions out of _core ( ) | src/actions/proposals.ts
 2026-07-22 | c984114 | PC-330 | bump next to 15.5.21 for audit GHSA patches | n/a
 2026-07-22 | acf8fb3 | PC-330 | log Next bump and Epic 4-6 backlog scripts | scripts/create-pc-auth-prefs-polish-backlog.mjs
+2026-07-22 | 6a72523 | PC-331 | schema hygiene - stop ensuring dead columns, guard legacy backfills, bump SCHEMA_VERSION 35 ( ) | src/lib/changelog/entries.ts
