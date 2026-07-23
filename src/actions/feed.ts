@@ -1,7 +1,7 @@
 "use server";
 
 import { randomUUID } from "node:crypto";
-import { and, asc, desc, eq, gte, inArray, isNull, lt, lte, or } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, isNull, lt, lte, or, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
@@ -53,7 +53,7 @@ import {
 } from "@/lib/feed/link-preview-store";
 import { extractFirstUrl, normalizeLinkUrl } from "@/lib/feed/link-preview";
 import { checkRateLimitPersistent } from "@/lib/rate-limit";
-import { buildFeedUpdateToken } from "@/lib/feed/update-token";
+import { composeFeedFingerprint } from "@/lib/feed/update-token";
 import { isFeedMilestoneVisibleViaAdminOnly } from "@/lib/feed/admin-only-visibility";
 import { notifyUser } from "@/lib/notifications";
 import {
@@ -395,6 +395,8 @@ export async function listFeedItemsAction(
   items?: FeedItem[];
   activeEvents?: FeedActiveEvent[];
   nextCursor?: string | null;
+  /** Cheap first-page fingerprint so the client can baseline silent polls (PC-336). */
+  updateToken?: string;
 }> {
   const sessionResult = await requireSession();
   if (!sessionResult.ok) return sessionResult;
@@ -453,28 +455,138 @@ export async function listFeedItemsAction(
         ? encodeFeedCursor(items[items.length - 1]!)
         : null;
 
-    return { ok: true, message: "OK", items, activeEvents, nextCursor };
+    const updateToken = await computeFeedFingerprint(db, viewerId);
+
+    return { ok: true, message: "OK", items, activeEvents, nextCursor, updateToken };
+  });
+}
+
+/**
+ * Computes the cheap feed fingerprint from COUNT/MAX aggregates and the current
+ * active-event set — no hydration of the full feed list (PC-336). Aggregates are
+ * global (not visibility-filtered): over-triggering an occasional extra reload is
+ * safe, whereas missing a change is not. Filtering here would require the same
+ * expensive per-row gates the token is meant to avoid.
+ */
+async function computeFeedFingerprint(
+  db: Parameters<Parameters<typeof withDb>[0]>[0],
+  viewerId: string,
+  now: Date = new Date(),
+): Promise<string> {
+  const [milestones] = await db
+    .select({
+      count: sql<number>`count(*)`,
+      maxCreatedAt: sql<string | null>`max(${proposalStateLog.createdAt})`,
+    })
+    .from(proposalStateLog);
+
+  const [proposalsAgg] = await db
+    .select({ maxUpdatedAt: sql<string | null>`max(${proposals.updatedAt})` })
+    .from(proposals);
+
+  const [chatMessagesAgg] = await db
+    .select({
+      count: sql<number>`count(*)`,
+      maxCreatedAt: sql<string | null>`max(${networkChatMessages.createdAt})`,
+      maxDeletedAt: sql<string | null>`max(${networkChatMessages.deletedAt})`,
+    })
+    .from(networkChatMessages);
+
+  const [chatCommentsAgg] = await db
+    .select({
+      count: sql<number>`count(*)`,
+      maxCreatedAt: sql<string | null>`max(${networkChatComments.createdAt})`,
+      maxDeletedAt: sql<string | null>`max(${networkChatComments.deletedAt})`,
+    })
+    .from(networkChatComments);
+
+  const [proposalCommentsAgg] = await db
+    .select({
+      count: sql<number>`count(*)`,
+      maxCreatedAt: sql<string | null>`max(${proposalComments.createdAt})`,
+      maxDeletedAt: sql<string | null>`max(${proposalComments.deletedAt})`,
+    })
+    .from(proposalComments);
+
+  const [likesAgg] = await db
+    .select({
+      count: sql<number>`count(*)`,
+      maxCreatedAt: sql<string | null>`max(${feedLikes.createdAt})`,
+    })
+    .from(feedLikes);
+
+  const [viewerLikesAgg] = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(feedLikes)
+    .where(eq(feedLikes.userId, viewerId));
+
+  const nowIso = now.toISOString();
+  const activeEventRows = await db
+    .select({
+      proposalId: proposals.id,
+      scheduledStartAt: proposals.scheduledStartAt,
+      scheduledEndAt: proposals.scheduledEndAt,
+      proposalState: proposals.state,
+    })
+    .from(proposals)
+    .where(
+      and(
+        eq(proposals.proposalType, "event"),
+        eq(proposals.state, "resolved"),
+        lte(proposals.scheduledStartAt, nowIso),
+        or(
+          gte(proposals.scheduledEndAt, nowIso),
+          and(isNull(proposals.scheduledEndAt), gte(proposals.scheduledStartAt, nowIso)),
+        ),
+      ),
+    )
+    .orderBy(asc(proposals.scheduledStartAt));
+
+  return composeFeedFingerprint({
+    milestones: {
+      count: Number(milestones?.count ?? 0),
+      maxCreatedAt: milestones?.maxCreatedAt ?? null,
+    },
+    proposals: { maxUpdatedAt: proposalsAgg?.maxUpdatedAt ?? null },
+    chatMessages: {
+      count: Number(chatMessagesAgg?.count ?? 0),
+      maxCreatedAt: chatMessagesAgg?.maxCreatedAt ?? null,
+      maxDeletedAt: chatMessagesAgg?.maxDeletedAt ?? null,
+    },
+    chatComments: {
+      count: Number(chatCommentsAgg?.count ?? 0),
+      maxCreatedAt: chatCommentsAgg?.maxCreatedAt ?? null,
+      maxDeletedAt: chatCommentsAgg?.maxDeletedAt ?? null,
+    },
+    proposalComments: {
+      count: Number(proposalCommentsAgg?.count ?? 0),
+      maxCreatedAt: proposalCommentsAgg?.maxCreatedAt ?? null,
+      maxDeletedAt: proposalCommentsAgg?.maxDeletedAt ?? null,
+    },
+    likes: {
+      count: Number(likesAgg?.count ?? 0),
+      maxCreatedAt: likesAgg?.maxCreatedAt ?? null,
+      viewerCount: Number(viewerLikesAgg?.count ?? 0),
+    },
+    activeEvents: activeEventRows,
   });
 }
 
 /**
  * Cheap first-page fingerprint so the Feed client can skip full reloads when
- * the head is unchanged (PC-239 silent poll).
+ * the head is unchanged (PC-239 silent poll). Uses COUNT/MAX aggregates instead
+ * of loading and hydrating the full feed list (PC-336).
  */
 export async function getFeedUpdateTokenAction(): Promise<{
   ok: boolean;
   message: string;
   token?: string;
 }> {
-  const result = await listFeedItemsAction({ cursor: null, limit: 20 });
-  if (!result.ok || !result.items) {
-    return { ok: false, message: result.message };
-  }
-  return {
-    ok: true,
-    message: "OK",
-    token: buildFeedUpdateToken(result.items, result.activeEvents ?? []),
-  };
+  const sessionResult = await requireSession();
+  if (!sessionResult.ok) return { ok: false, message: sessionResult.message };
+
+  const token = await withDb((db) => computeFeedFingerprint(db, sessionResult.user.id));
+  return { ok: true, message: "OK", token };
 }
 
 async function loadMilestoneBatch(

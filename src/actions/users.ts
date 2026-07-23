@@ -8,7 +8,7 @@ import { z } from "zod";
 
 import { auth } from "@/lib/auth";
 import { logUserActivity } from "@/lib/audit";
-import { requireSession, withDb } from "@/lib/actions/context";
+import { requireAdminAccess, requireSession, withDb } from "@/lib/actions/context";
 import { getDb } from "@/lib/db/client";
 import { ensureDbReady } from "@/lib/db/ensure-ready";
 import { checkRateLimit } from "@/lib/rate-limit";
@@ -111,17 +111,6 @@ export interface CreateUserResult {
 export interface UserActionResult {
   ok: boolean;
   message: string;
-}
-
-/**
- * Ensures the caller is an admin; used for user lifecycle management.
- */
-async function requireAdminSession() {
-  const session = await auth();
-  if (!session?.user || session.user.role !== "admin") {
-    return null;
-  }
-  return session;
 }
 
 /**
@@ -711,9 +700,9 @@ const adminUpdateUserSchema = z.object({
 export async function updateUserAction(
   input: z.infer<typeof adminUpdateUserSchema>,
 ): Promise<UserActionResult> {
-  const session = await requireAdminSession();
-  if (!session) {
-    return { ok: false, message: "Admin access required." };
+  const adminResult = await requireAdminAccess();
+  if (!adminResult.ok) {
+    return { ok: false, message: adminResult.message };
   }
 
   const parsed = adminUpdateUserSchema.safeParse(input);
@@ -771,7 +760,7 @@ export async function updateUserAction(
   await db.update(users).set(updates).where(eq(users.id, user.id));
 
   await logUserActivity(
-    session.user.id,
+    adminResult.user.id,
     "users.admin_update",
     JSON.stringify({ userId: user.id, updates }),
   );
@@ -788,12 +777,12 @@ export async function updateUserAction(
  * Soft-deletes a user and removes their graph edges (admin only, PC-35).
  */
 export async function deleteUserAction(userId: string): Promise<UserActionResult> {
-  const session = await requireAdminSession();
-  if (!session) {
-    return { ok: false, message: "Admin access required." };
+  const adminResult = await requireAdminAccess();
+  if (!adminResult.ok) {
+    return { ok: false, message: adminResult.message };
   }
 
-  if (userId === session.user.id) {
+  if (userId === adminResult.user.id) {
     return { ok: false, message: "You cannot delete your own account." };
   }
 
@@ -825,8 +814,8 @@ export async function deleteUserAction(userId: string): Promise<UserActionResult
 
   await deletePlacesOwnedByUser(db, userId);
 
-  await archiveProposalsForDeletedUser(db, userId, session.user.id);
-  await demoteOrRemoveInviteeFromActiveProposals(db, userId, session.user.id, "removed");
+  await archiveProposalsForDeletedUser(db, userId, adminResult.user.id);
+  await demoteOrRemoveInviteeFromActiveProposals(db, userId, adminResult.user.id, "removed");
 
   const now = new Date().toISOString();
   await db
@@ -844,7 +833,7 @@ export async function deleteUserAction(userId: string): Promise<UserActionResult
     .where(eq(users.id, userId));
 
   await logUserActivity(
-    session.user.id,
+    adminResult.user.id,
     "users.admin_delete",
     JSON.stringify({ userId, username: user.username }),
   );
@@ -863,8 +852,8 @@ export async function deleteUserAction(userId: string): Promise<UserActionResult
  * Soft-deleted ("Former User") rows are omitted from the management screen.
  */
 export async function listAdminUsersAction(): Promise<AdminUserRow[]> {
-  const session = await requireAdminSession();
-  if (!session) return [];
+  const adminResult = await requireAdminAccess();
+  if (!adminResult.ok) return [];
 
   await ensureDbReady();
   const db = getDb();
@@ -890,9 +879,9 @@ export async function listAdminUsersAction(): Promise<AdminUserRow[]> {
  * Pauses a user account and invalidates active sessions (PC-31).
  */
 export async function pauseUserAction(userId: string): Promise<UserActionResult> {
-  const session = await requireAdminSession();
-  if (!session) return { ok: false, message: "Admin access required." };
-  if (userId === session.user.id) {
+  const adminResult = await requireAdminAccess();
+  if (!adminResult.ok) return { ok: false, message: adminResult.message };
+  if (userId === adminResult.user.id) {
     return { ok: false, message: "You cannot pause your own account." };
   }
 
@@ -903,7 +892,7 @@ export async function pauseUserAction(userId: string): Promise<UserActionResult>
     return { ok: false, message: "User not found or not active." };
   }
 
-  await pauseUserProposalSideEffects(db, userId, session.user.id);
+  await pauseUserProposalSideEffects(db, userId, adminResult.user.id);
 
   const now = new Date().toISOString();
   await db
@@ -915,7 +904,7 @@ export async function pauseUserAction(userId: string): Promise<UserActionResult>
     })
     .where(eq(users.id, userId));
 
-  await logUserActivity(session.user.id, "users.admin_pause", JSON.stringify({ userId }));
+  await logUserActivity(adminResult.user.id, "users.admin_pause", JSON.stringify({ userId }));
   revalidatePath("/admin");
   revalidatePath("/people-places");
   revalidatePath("/proposals");
@@ -927,8 +916,8 @@ export async function pauseUserAction(userId: string): Promise<UserActionResult>
  * Resumes a paused user account (PC-31).
  */
 export async function resumeUserAction(userId: string): Promise<UserActionResult> {
-  const session = await requireAdminSession();
-  if (!session) return { ok: false, message: "Admin access required." };
+  const adminResult = await requireAdminAccess();
+  if (!adminResult.ok) return { ok: false, message: adminResult.message };
 
   await ensureDbReady();
   const db = getDb();
@@ -943,7 +932,7 @@ export async function resumeUserAction(userId: string): Promise<UserActionResult
     .set({ status: "active", updatedAt: now })
     .where(eq(users.id, userId));
 
-  await logUserActivity(session.user.id, "users.admin_resume", JSON.stringify({ userId }));
+  await logUserActivity(adminResult.user.id, "users.admin_resume", JSON.stringify({ userId }));
   revalidatePath("/admin");
   revalidatePath("/people-places");
   return { ok: true, message: `Resumed ${user.displayName}.` };
@@ -959,8 +948,8 @@ const adminResetPasswordSchema = z.object({
 export async function adminResetPasswordAction(
   input: z.infer<typeof adminResetPasswordSchema>,
 ): Promise<CreateUserResult> {
-  const session = await requireAdminSession();
-  if (!session) return { ok: false, message: "Admin access required." };
+  const adminResult = await requireAdminAccess();
+  if (!adminResult.ok) return { ok: false, message: adminResult.message };
 
   const parsed = adminResetPasswordSchema.safeParse(input);
   if (!parsed.success) return { ok: false, message: "Invalid input." };
@@ -992,14 +981,14 @@ export async function adminResetPasswordAction(
     .where(eq(users.id, user.id));
 
   await logUserActivity(
-    session.user.id,
+    adminResult.user.id,
     "users.admin_reset_password",
     JSON.stringify({ userId: user.id }),
   );
 
   const canEmail = Boolean(user.notificationEmail && user.emailVerifiedAt);
   const delivery = await deliverLoginCredentials({
-    actorUserId: session.user.id,
+    actorUserId: adminResult.user.id,
     targetUserId: user.id,
     username: user.username,
     password: tempPassword,

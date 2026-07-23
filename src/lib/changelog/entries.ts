@@ -26,6 +26,34 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "2026.07.22j",
+    date: "2026-07-22",
+    summary:
+      "Epic 6 auth/prefs polish: unify admin server actions on requireAdminAccess, drop the onboarding SMS channel UI, correct the quiet-hours copy, and make the feed update-token a cheap fingerprint query.",
+    changes: [
+      {
+        type: "changed",
+        description:
+          "Admin server actions now route through the shared requireAdminAccess helper instead of duplicating raw role===\"admin\" / local requireAdmin(session) checks: admin.ts (resetTestDatabase, logForceReload, listActivityLog, exportActivityLog), poly-group.ts (get/updatePolyGroupSettings), and users.ts (updateUser, deleteUser, listAdminUsers, pause/resumeUser, adminResetPassword). Access semantics are identical (userHasAdminAccess === role \"admin\"); provisioning paths that intentionally allow non-admins are unchanged (PC-335).",
+      },
+      {
+        type: "changed",
+        description:
+          "Removed the dead \"SMS (coming in a later release)\" channel checkbox from the first-login onboarding wizard; email and in-app/push preference paths are unchanged. The SMS backend field is left in place (no longer surfaced in onboarding UI) (PC-335).",
+      },
+      {
+        type: "fixed",
+        description:
+          "Corrected the Profile quiet-hours help text, which wrongly claimed email \"still delivers\" during quiet hours — email is in fact suppressed alongside in-app and push (urgent alerts still come through), matching shouldSuppressEmailDelivery (PC-335).",
+      },
+      {
+        type: "changed",
+        description:
+          "getFeedUpdateTokenAction no longer loads and hydrates the full first page to build a token; it now computes a cheap COUNT/MAX fingerprint (milestones, chat messages/comments, proposal comments, likes + viewer likes, proposal edits, and the current active-event set). listFeedItemsAction returns the same fingerprint so the client baselines silent polls without an extra round-trip (PC-336).",
+      },
+    ],
+  },
+  {
     version: "2026.07.22i",
     date: "2026-07-22",
     summary:

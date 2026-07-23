@@ -3,13 +3,11 @@
 import { desc, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 
-import { auth } from "@/lib/auth";
 import { logUserActivity } from "@/lib/audit";
 import {
   formatActivityLogDetails,
   getNotificationActivityActor,
 } from "@/lib/audit/activity-log-display";
-import { userHasAdminAccess } from "@/lib/admin-access";
 import { requireAdminAccess, withDb } from "@/lib/actions/context";
 import { getImpersonationSecret } from "@/lib/auth/impersonation";
 import { ensureDbReady } from "@/lib/db/ensure-ready";
@@ -39,14 +37,14 @@ export async function resetTestDatabaseAction(): Promise<ResetTestDatabaseResult
     return { ok: false, message: "Reset is disabled in production." };
   }
 
-  const session = await auth();
-  if (!session?.user || session.user.role !== "admin") {
-    return { ok: false, message: "Admin access required." };
+  const adminResult = await requireAdminAccess();
+  if (!adminResult.ok) {
+    return { ok: false, message: adminResult.message };
   }
 
   await ensureDbReady();
   const result = await resetTestDatabase();
-  await logUserActivity(session.user.id, "admin.reset_test_database", "Full reseed");
+  await logUserActivity(adminResult.user.id, "admin.reset_test_database", "Full reseed");
 
   revalidatePath("/admin");
   revalidatePath("/proposals");
@@ -65,14 +63,14 @@ export async function resetTestDatabaseAction(): Promise<ResetTestDatabaseResult
  * Records an admin-initiated force reload before the client clears PWA caches.
  */
 export async function logForceReloadAction(): Promise<AdminActionResult> {
-  const session = await auth();
-  if (!session?.user || session.user.role !== "admin") {
-    return { ok: false, message: "Admin access required." };
+  const adminResult = await requireAdminAccess();
+  if (!adminResult.ok) {
+    return { ok: false, message: adminResult.message };
   }
 
   await ensureDbReady();
   await logUserActivity(
-    session.user.id,
+    adminResult.user.id,
     "admin.force_reload",
     JSON.stringify({
       environment: getAppEnvironment(),
@@ -163,8 +161,8 @@ function withNotificationRecipient(
  * Lists recent system administrator log entries (PC-32).
  */
 export async function listActivityLogAction(): Promise<ActivityLogEntry[]> {
-  const session = await auth();
-  if (!session?.user || session.user.role !== "admin") {
+  const adminResult = await requireAdminAccess();
+  if (!adminResult.ok) {
     return [];
   }
 
@@ -228,9 +226,9 @@ export async function listActivityLogAction(): Promise<ActivityLogEntry[]> {
  * Exports the activity log as CSV text (PC-32).
  */
 export async function exportActivityLogAction(): Promise<{ ok: boolean; csv?: string; message: string }> {
-  const session = await auth();
-  if (!session?.user || session.user.role !== "admin") {
-    return { ok: false, message: "Admin access required." };
+  const adminResult = await requireAdminAccess();
+  if (!adminResult.ok) {
+    return { ok: false, message: adminResult.message };
   }
 
   const entries = await listActivityLogAction();
@@ -246,6 +244,6 @@ export async function exportActivityLogAction(): Promise<{ ok: boolean; csv?: st
     ].join(",");
   });
 
-  await logUserActivity(session.user.id, "admin.export_activity_log", undefined, "system");
+  await logUserActivity(adminResult.user.id, "admin.export_activity_log", undefined, "system");
   return { ok: true, csv: [header, ...lines].join("\n"), message: "Export ready." };
 }

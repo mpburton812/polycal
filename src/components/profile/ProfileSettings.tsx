@@ -585,7 +585,8 @@ export function ProfileSettings({
           Quiet hours
         </Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-          In-app and push alerts are paused during this window (email still delivers).
+          In-app, push, and email alerts are all paused during this window (urgent
+          alerts still come through).
         </Typography>
         <Stack direction="row" spacing={2} sx={{ mb: 2 }}>
           <TextField
