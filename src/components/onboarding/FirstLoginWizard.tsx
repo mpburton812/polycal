@@ -431,20 +431,6 @@ export function FirstLoginWizard({
               }
               label="Email (after you verify the address above)"
             />
-            <FormControlLabel
-              control={
-                <Checkbox
-                  checked={prefs.channels.sms}
-                  onChange={(e) =>
-                    setPrefs({
-                      ...prefs,
-                      channels: { ...prefs.channels, sms: e.target.checked },
-                    })
-                  }
-                />
-              }
-              label="SMS (coming in a later release)"
-            />
           </FormGroup>
           <Typography variant="subtitle2">Alert types</Typography>
           <FormGroup>
