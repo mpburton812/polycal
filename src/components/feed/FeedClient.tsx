@@ -51,7 +51,6 @@ import type {
   FeedLinkPreview,
 } from "@/lib/feed/types";
 import { extractFirstUrl } from "@/lib/feed/link-preview-core";
-import { buildFeedUpdateToken } from "@/lib/feed/update-token";
 import type { ChangelogEntry } from "@/lib/changelog/entries";
 import type { BuildInfo } from "@/lib/env";
 import { LONG_TEXT_MAX } from "@/lib/validation/string-limits";
@@ -403,7 +402,8 @@ export function FeedClient({
         if (!append) {
           const nextActiveEvents = result.activeEvents ?? [];
           setActiveEvents(nextActiveEvents);
-          updateTokenRef.current = buildFeedUpdateToken(result.items, nextActiveEvents);
+          // Baseline silent polls against the server's cheap fingerprint (PC-336).
+          updateTokenRef.current = result.updateToken ?? null;
         }
       }
       if (!silent || append) {
