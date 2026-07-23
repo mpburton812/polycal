@@ -19,7 +19,7 @@ import {
 } from "@mui/material";
 import { useRouter } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
-import { useState, useTransition } from "react";
+import { Suspense, useState, useTransition } from "react";
 
 import {
   changePasswordAction,
@@ -30,6 +30,7 @@ import {
   updateProfilePreferencesAction,
   uploadCustomAvatarAction,
 } from "@/actions/profile";
+import { CalendarIntegrationSettings } from "@/components/profile/CalendarIntegrationSettings";
 import { AVATAR_OPTIONS, avatarSrcForKey, isCustomAvatarKey } from "@/lib/constants/avatars";
 import { AvatarCropDialog } from "@/components/profile/AvatarCropDialog";
 import { ThemeAccentPicker } from "@/components/ui/ThemeAccentPicker";
@@ -645,6 +646,10 @@ export function ProfileSettings({
           {notifPending ? "Saving…" : "Save notification preferences"}
         </Button>
       </Paper>
+
+      <Suspense fallback={null}>
+        <CalendarIntegrationSettings />
+      </Suspense>
 
       <Paper elevation={0} sx={brutalPaperSx}>
         <Typography variant="h6" gutterBottom sx={brutalSectionTitleSx}>

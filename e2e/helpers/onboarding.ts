@@ -28,7 +28,13 @@ export async function completeFirstLoginOnboarding(
 
   await expect(page.getByText("Enable notifications")).toBeVisible({ timeout: 15_000 });
   await page.getByLabel("Notification email").fill("e2e-onboard@example.com");
-  await page.getByRole("button", { name: "Finish setup" }).click();
+  await page.getByRole("button", { name: "Continue" }).click();
+
+  // Optional calendar integration step (PC-341) — skip for default e2e path.
+  await expect(page.getByText("Optional — connect Google Calendar")).toBeVisible({
+    timeout: 15_000,
+  });
+  await page.getByRole("button", { name: "Skip for now" }).click();
 
   // Welcome must stay until OK — onboarding is not complete until acknowledge (PC-156).
   await expect(page.getByRole("heading", { name: "Welcome!", exact: true })).toBeVisible({

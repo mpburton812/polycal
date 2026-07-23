@@ -26,6 +26,10 @@ rules live in `.cursorrules`. Only the non-obvious, environment-specific gotchas
   without it): `AUTH_SECRET=$(openssl rand -base64 32)`. `AUTH_URL` defaults to
   `http://localhost:3000`. Everything else (Resend, VAPID push, Jira, cron) is optional
   and no-ops when unset.
+- **Google Calendar (optional):** `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`,
+  `GOOGLE_REDIRECT_URI` (e.g. `http://localhost:3000/api/calendar/google/callback`), and
+  `CALENDAR_TOKEN_ENCRYPTION_KEY` (e.g. `openssl rand -base64 32`). Enable Calendar API +
+  OAuth scopes `calendar.events` and `calendar.calendarlist.readonly` in GCP.
 
 ### Lint
 - `npm run lint` runs `next lint` with the committed root `eslint.config.mjs`
