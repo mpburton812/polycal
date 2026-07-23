@@ -289,3 +289,4 @@
 2026-07-22 | 6a72523 | PC-331 | schema hygiene - stop ensuring dead columns, guard legacy backfills, bump SCHEMA_VERSION 35 ( ) | src/lib/changelog/entries.ts
 2026-07-22 | 22a5dfe | PC-334 | unify admin gates on requireAdminAccess, drop onboarding SMS UI, fix quiet-hours copy, cheap feed update token ( ) | src/actions/admin.ts
 2026-07-23 | 683acb1 | PC-334 | avoid week-edge flake for 11pm self-appointment journeys () | e2e/self-appointment-day-boundary-journey.spec.ts
+2026-07-23 | 61f2fe0 | PC-337 | Google OAuth sync and iCal/ICS delivery | src/actions/calendar.ts
