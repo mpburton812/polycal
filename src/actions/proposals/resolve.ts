@@ -8,4 +8,4 @@ export {
   respondAttendeeUpdateAction,
   revokeResolvedAcceptanceAction,
   updateResolvedAttendeesAction,
-} from "./_core";
+} from "./lifecycle";

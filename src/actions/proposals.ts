@@ -21,29 +21,37 @@ export type { ProposalSliceDetail } from "./proposals/slice-types";
 
 export {
   acknowledgeProposalOverlapAction,
-  addProposalCommentAction,
   adminCheckProposalConflictsAction,
   adminForceResolveProposalAction,
-  cancelProposalAction,
   castProposalVoteAction,
   castSlotVoteAction,
   checkProposalConflictsAction,
   createDraftProposalAction,
-  deleteProposalCommentAction,
   getProposalDetailAction,
   listAcceptedSleepingPartnerIdsAction,
   listProposalPlaceOptionsAction,
   listResidencyPlaceOptionsAction,
   listSleepingLocationOptionsAction,
+  submitProposalAction,
+  updateDraftProposalAction,
+} from "./proposals/_core";
+
+// Comment + lifecycle actions were carved into dedicated modules (PC-329); they
+// are re-exported here so the public `@/actions/proposals` API is unchanged.
+export {
+  addProposalCommentAction,
+  deleteProposalCommentAction,
+} from "./proposals/comments";
+
+export {
+  cancelProposalAction,
   nudgePendingVotersAction,
   redraftProposalAction,
   rescheduleProposalAction,
   respondAttendeeUpdateAction,
   revokeResolvedAcceptanceAction,
-  submitProposalAction,
-  updateDraftProposalAction,
   updateResolvedAttendeesAction,
-} from "./proposals/_core";
+} from "./proposals/lifecycle";
 
 export {
   detachProposalSliceAction,
