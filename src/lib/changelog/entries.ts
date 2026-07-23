@@ -26,6 +26,29 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "2026.07.22h",
+    date: "2026-07-22",
+    summary:
+      "Epic 4 proposals core carve: conflict/resolution engine and lifecycle/comment actions split out of the _core god-module (behavior-preserving).",
+    changes: [
+      {
+        type: "changed",
+        description:
+          "Conflict detection + on-resolve collision handling moved into src/lib/proposals/services/conflicts.ts (proposalConflictWindows, checkPlaceAssetConflicts, gatherProposalConflictWarnings, autoDeclineCollidingProposals); the _core check/admin-check/force-resolve actions stay as thin wrappers with identical widened-window (PC-59/PC-318) behavior (PC-328).",
+      },
+      {
+        type: "changed",
+        description:
+          "Resolution engine (poll tallying, resolve/revert transitions, per-slot aggregate sync, sleeping title + schedule helpers) moved into src/lib/proposals/services/resolution.ts; APPROVING_VOTES/APPROVING_SLOT_VOTES now live in proposals/constants.ts. Poll-matrix rules, residency side-effects, and notify copy are byte-for-byte unchanged (PC-328).",
+      },
+      {
+        type: "changed",
+        description:
+          "Resolved-proposal lifecycle actions (attendees, respond, revoke, reschedule, cancel, redraft, nudge) moved into src/actions/proposals/lifecycle.ts and comment actions into src/actions/proposals/comments.ts; @/actions/proposals and the drafts/voting/resolve/read facades re-export them so the public server-action API is unchanged. _core.ts shrank ~1840 lines and dead partner-alias wrappers were removed in favor of importing @/lib/proposals/partners directly (PC-329/PC-330).",
+      },
+    ],
+  },
+  {
     version: "2026.07.22g",
     date: "2026-07-22",
     summary:
