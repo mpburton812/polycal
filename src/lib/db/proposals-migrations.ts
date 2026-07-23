@@ -30,10 +30,9 @@ export async function applyProposalsMigrations(sql: Client): Promise<void> {
   await ensureColumn(sql, "proposals", "detached_from_slot_id", "TEXT");
   await ensureColumn(sql, "proposals", "detached_at", "TEXT");
   await ensureColumn(sql, "proposals", "event_icon_key", "TEXT");
-  // Legacy hour columns retained for one-time migration to days (PC-273); no longer read by app.
-  await ensureColumn(sql, "poly_group", "recovery_max_hours", "INTEGER NOT NULL DEFAULT 48");
-  await ensureColumn(sql, "poly_group", "proposed_max_hours", "INTEGER NOT NULL DEFAULT 0");
-  await ensureColumn(sql, "poly_group", "at_risk_ttl_hours", "INTEGER NOT NULL DEFAULT 168");
+  // PC-332: legacy hour columns (recovery_max_hours, proposed_max_hours, at_risk_ttl_hours)
+  // are no longer ensured. Existing DBs keep them for the one-time hours→days backfill below,
+  // which is now guarded to skip when those columns are absent (fresh DBs).
 
   await sql.execute(`
     CREATE TABLE IF NOT EXISTS proposal_invitees (
@@ -84,17 +83,25 @@ export async function applyProposalsMigrations(sql: Client): Promise<void> {
     `SELECT value FROM schema_meta WHERE key = 'enforcement_hours_to_days_v1' LIMIT 1`,
   );
   if (hoursToDaysFlag.rows.length === 0) {
-    await sql.execute(`
-      UPDATE poly_group SET
-        proposed_max_days = CASE
-          WHEN COALESCE(proposed_max_hours, 0) <= 0 THEN 0
-          ELSE CAST((COALESCE(proposed_max_hours, 0) + 23) / 24 AS INTEGER)
-        END,
-        at_risk_ttl_days = CASE
-          WHEN COALESCE(at_risk_ttl_hours, 0) <= 0 THEN 7
-          ELSE CAST((COALESCE(at_risk_ttl_hours, 0) + 23) / 24 AS INTEGER)
-        END
-    `);
+    // PC-332: legacy hour columns are no longer ensured, so fresh DBs won't have them.
+    // Skip the backfill UPDATE when the source columns are absent, but still mark the
+    // migration complete so we never retry.
+    const hasHourColumns =
+      (await hasColumn(sql, "poly_group", "proposed_max_hours")) &&
+      (await hasColumn(sql, "poly_group", "at_risk_ttl_hours"));
+    if (hasHourColumns) {
+      await sql.execute(`
+        UPDATE poly_group SET
+          proposed_max_days = CASE
+            WHEN COALESCE(proposed_max_hours, 0) <= 0 THEN 0
+            ELSE CAST((COALESCE(proposed_max_hours, 0) + 23) / 24 AS INTEGER)
+          END,
+          at_risk_ttl_days = CASE
+            WHEN COALESCE(at_risk_ttl_hours, 0) <= 0 THEN 7
+            ELSE CAST((COALESCE(at_risk_ttl_hours, 0) + 23) / 24 AS INTEGER)
+          END
+      `);
+    }
     await sql.execute({
       sql: `INSERT INTO schema_meta (key, value) VALUES ('enforcement_hours_to_days_v1', '1')
             ON CONFLICT(key) DO NOTHING`,
@@ -186,4 +193,10 @@ async function ensureColumn(
   if (!exists) {
     await sql.execute(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
   }
+}
+
+/** True when `column` exists on `table` — used to guard legacy backfills (PC-332). */
+async function hasColumn(sql: Client, table: string, column: string): Promise<boolean> {
+  const info = await sql.execute(`PRAGMA table_info(${table})`);
+  return info.rows.some((row) => row.name === column);
 }
