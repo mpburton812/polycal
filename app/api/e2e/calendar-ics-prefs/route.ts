@@ -76,5 +76,64 @@ export async function POST(request: Request): Promise<NextResponse> {
     });
   }
 
-  return NextResponse.json({ ok: true, userId: user.id, delivery });
+  const [verify] = await db
+    .select({
+      provider: calendarConnections.provider,
+      icsDelivery: calendarConnections.icsDelivery,
+    })
+    .from(calendarConnections)
+    .where(eq(calendarConnections.userId, user.id))
+    .limit(1);
+
+  return NextResponse.json({
+    ok: true,
+    userId: user.id,
+    delivery,
+    provider: verify?.provider ?? null,
+    icsDelivery: verify?.icsDelivery ?? null,
+  });
+}
+
+/**
+ * Reads calendar connection for a username — E2E only (PC-345).
+ */
+export async function GET(request: Request): Promise<NextResponse> {
+  if (!isE2eApiAuthorized(request)) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  const username = new URL(request.url).searchParams.get("username")?.trim().toLowerCase();
+  if (!username) {
+    return NextResponse.json({ error: "username required." }, { status: 400 });
+  }
+
+  await ensureDbReady();
+  const db = getDb();
+  const [user] = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(eq(users.username, username))
+    .limit(1);
+  if (!user) {
+    return NextResponse.json({ error: "User not found." }, { status: 404 });
+  }
+
+  const [row] = await db
+    .select({
+      provider: calendarConnections.provider,
+      icsDelivery: calendarConnections.icsDelivery,
+      status: calendarConnections.status,
+    })
+    .from(calendarConnections)
+    .where(eq(calendarConnections.userId, user.id))
+    .limit(1);
+
+  return NextResponse.json({
+    ok: true,
+    userId: user.id,
+    configured: Boolean(row),
+    provider: row?.provider ?? null,
+    icsDelivery: row?.icsDelivery ?? null,
+    status: row?.status ?? null,
+  });
 }

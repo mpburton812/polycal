@@ -8,6 +8,7 @@ import { USERS } from "./helpers/constants";
 import { goToProposals, openProposalCard, selectProposalTab } from "./helpers/navigation";
 import { inboxRow, openNotificationInbox } from "./helpers/notifications";
 import { createAndSubmitSoloEvent, proposalCard } from "./helpers/proposals";
+import { E2E_API_SECRET } from "./e2e-env";
 
 /** Unfolds ICS lines (RFC 5545 folding) into a single string for assertions. */
 function unfoldIcs(raw: string): string {
@@ -15,10 +16,7 @@ function unfoldIcs(raw: string): string {
 }
 
 test.describe("Calendar ICS download journey", () => {
-  test("solo resolve queues ICS; card/inbox download matches PolyCal", async ({
-    page,
-    request,
-  }) => {
+  test("solo resolve queues ICS; card/inbox download matches PolyCal", async ({ page }) => {
     test.setTimeout(240_000);
 
     const tag = Date.now();
@@ -27,8 +25,23 @@ test.describe("Calendar ICS download journey", () => {
     const end = "2099-11-12T17:00";
     const titleEscaped = title.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
-    await seedIcsCalendarPrefs(request, USERS.luke.username, "download");
     await login(page, USERS.luke.username);
+    // Use page.request so the harness hits the same worker origin/DB as the browser (PC-345).
+    await seedIcsCalendarPrefs(page.request, USERS.luke.username, "download");
+
+    const verify = await page.request.get(
+      `/api/e2e/calendar-ics-prefs?username=${encodeURIComponent(USERS.luke.username)}`,
+      { headers: { "x-e2e-api-secret": E2E_API_SECRET } },
+    );
+    expect(verify.ok()).toBeTruthy();
+    const verifyBody = (await verify.json()) as {
+      configured?: boolean;
+      provider?: string;
+      icsDelivery?: string;
+    };
+    expect(verifyBody.configured).toBe(true);
+    expect(verifyBody.provider).toBe("ics");
+    expect(verifyBody.icsDelivery).toBe("download");
 
     await goToProposals(page);
     await createAndSubmitSoloEvent(page, { title, start, end });
@@ -40,7 +53,6 @@ test.describe("Calendar ICS download journey", () => {
     const card = proposalCard(page, title);
     await expect(card).toBeVisible({ timeout: 30_000 });
 
-    // Prefer accessible name on either link or button (MUI Button+href).
     const downloadBtn = card.getByRole("link", { name: "Download ICS" }).or(
       card.getByRole("button", { name: "Download ICS" }),
     );
@@ -74,7 +86,6 @@ test.describe("Calendar ICS download journey", () => {
     ).toBeVisible();
     await dialog.getByRole("button", { name: "Close" }).click();
 
-    // Inbox is SSR-seeded — reload so calendar_ics_pending appears (PC-345).
     await page.reload();
     await openNotificationInbox(page);
     const row = inboxRow(
