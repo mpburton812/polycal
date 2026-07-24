@@ -82,11 +82,25 @@ export function CalendarIntegrationSettings({
       setMessage("Google connected — pick which calendar to write into.");
       setProviderChoice("google");
       startTransition(() => {
-        void listGoogleCalendarsAction().then((result) => {
+        void listGoogleCalendarsAction().then(async (result) => {
           if (result.ok) {
             setCalendars(result.calendars);
             const primary = result.calendars.find((c) => c.primary) ?? result.calendars[0];
-            if (primary) setSelectedCalendarId(primary.id);
+            if (primary) {
+              setSelectedCalendarId(primary.id);
+              // Auto-save primary when OAuth just connected but no calendar chosen yet (PC-347).
+              const conn = await getCalendarConnectionAction();
+              if (conn?.provider === "google" && !conn.googleCalendarId) {
+                const saved = await setGoogleCalendarIdAction(primary.id);
+                if (saved.ok) {
+                  setMessage(
+                    `Google connected — using ${primary.summary}${primary.primary ? " (primary)" : ""}. You can change it below.`,
+                  );
+                  await refresh();
+                  router.refresh();
+                }
+              }
+            }
           } else {
             setError(result.message);
           }

@@ -62,7 +62,7 @@ Shared helpers: `src/lib/actions/context.ts` (`requireSession`, `requireAdminAcc
 |-------|------------|
 | Frontend | Next.js PWA, Material UI (Garden Brutalism tokens), WCAG 2.1 AA |
 | Auth | Auth.js credentials provider, HttpOnly JWT cookies, `sessionVersion` invalidation |
-| External calendars | Google Calendar API (OAuth connect, not login) + ICS download/email (Option B); tokens encrypted with `CALENDAR_TOKEN_ENCRYPTION_KEY` |
+| External calendars | Google Calendar API (OAuth connect, not login) + ICS download/email (Option B); tokens encrypted with `CALENDAR_TOKEN_ENCRYPTION_KEY`. See [GOOGLE-CALENDAR-SYNC.md](./GOOGLE-CALENDAR-SYNC.md) for sync notifications, triage, and recovery. |
 | Database | libSQL — `file:local.db` (local), Turso (`polycal-dev` / `polycal-test` / `polycal-prod`) |
 | Hosting | Vercel (+ Render cron for dev/test enforcement) |
 | Identity roles | Admin, User (active), Proxy (schedulable, upgrade path to User; DB role `passive`) |
