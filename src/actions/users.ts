@@ -13,6 +13,7 @@ import { getDb } from "@/lib/db/client";
 import { ensureDbReady } from "@/lib/db/ensure-ready";
 import { checkRateLimit } from "@/lib/rate-limit";
 import {
+  calendarConnections,
   locationResidents,
   locations,
   polyGroup,
@@ -816,6 +817,10 @@ export async function deleteUserAction(userId: string): Promise<UserActionResult
 
   await archiveProposalsForDeletedUser(db, userId, adminResult.user.id);
   await demoteOrRemoveInviteeFromActiveProposals(db, userId, adminResult.user.id, "removed");
+
+  const { purgeUserGoogleCalendarData } = await import("@/lib/calendar/purge-google");
+  await purgeUserGoogleCalendarData(db, userId);
+  await db.delete(calendarConnections).where(eq(calendarConnections.userId, userId));
 
   const now = new Date().toISOString();
   await db

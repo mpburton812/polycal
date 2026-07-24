@@ -11,6 +11,7 @@ import {
   FormGroup,
   FormLabel,
   InputLabel,
+  Link as MuiLink,
   MenuItem,
   Paper,
   Select,
@@ -21,6 +22,7 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
+import NextLink from "next/link";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { Suspense, useState, useTransition } from "react";
@@ -236,8 +238,15 @@ export function FirstLoginWizard({
       >
         Welcome to PolyCal
       </Typography>
-      <Typography sx={{ mb: 3, color: GARDEN_TOKENS.inkMuted }}>
+      <Typography sx={{ mb: 1.5, color: GARDEN_TOKENS.inkMuted }}>
         Complete these steps before using the app.
+      </Typography>
+      <Typography variant="body2" sx={{ mb: 3, color: GARDEN_TOKENS.inkMuted }}>
+        By continuing, you acknowledge how PolyCal handles group scheduling data. Read our{" "}
+        <MuiLink component={NextLink} href="/privacy" underline="hover" target="_blank" rel="noopener noreferrer">
+          Privacy Policy
+        </MuiLink>
+        .
       </Typography>
       <Stepper
         activeStep={activeStep}

@@ -299,3 +299,5 @@
 2026-07-23 | 473570c | PC-345 | seed ICS prefs via harness API for download journey | app/api/e2e/calendar-ics-prefs/route.ts
 2026-07-23 | f632822 | PC-345 | seed ICS prefs via page.request on worker DB | app/api/e2e/calendar-ics-prefs/route.ts
 2026-07-23 | 0303e6e | PC-345 | sync ICS on solo auto-resolve and harden download journey | src/actions/proposals/_core.ts
+2026-07-24 | 6df5a32 | PC-344 | public policy page and Google Limited Use alignment | src/actions/calendar.ts
+2026-07-24 | fa4d93a | PC-344 | expect isImpersonating on requireSession | src/lib/actions/context.test.ts

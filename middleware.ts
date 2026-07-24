@@ -21,6 +21,7 @@ export default edgeAuth((request) => {
     "/forgot-password",
     "/reset-password",
     "/verify-email",
+    "/privacy",
     "/paused",
     "/offline",
     "/api/auth",
@@ -28,6 +29,7 @@ export default edgeAuth((request) => {
     "/api/admin/alpha-feedback",
   ];
   const isPublic =
+    pathname === "/" ||
     publicPaths.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)) ||
     pathname.startsWith("/api/verify-email");
 

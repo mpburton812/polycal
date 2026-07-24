@@ -33,6 +33,7 @@ export const authConfig = {
         token.displayName = user.displayName;
         token.avatarKey = user.avatarKey;
         token.theme = user.theme;
+        token.isImpersonating = user.isImpersonating === true;
         token.dbRefreshedAt = Date.now();
         delete token.error;
       }
@@ -129,6 +130,7 @@ export const authConfig = {
         session.user.name = token.displayName as string;
         session.user.avatarKey = token.avatarKey as string | undefined;
         session.user.theme = token.theme as string | undefined;
+        session.user.isImpersonating = token.isImpersonating === true;
       }
       return session;
     },

@@ -7,6 +7,7 @@ import { randomUUID } from "node:crypto";
 import { and, eq, inArray, isNull } from "drizzle-orm";
 import { after } from "next/server";
 
+import { auth } from "@/lib/auth";
 import { decryptSecret, encryptSecret } from "@/lib/calendar/crypto";
 import {
   deleteGoogleEvent,
@@ -411,12 +412,23 @@ function escapeHtml(value: string): string {
 /**
  * Syncs (or removes) external calendar events for all configured participants.
  * Safe to call fire-and-forget; logs failures without throwing to callers.
+ * Pass `skipGoogle` when the triggering session is admin impersonation (PC-344).
  */
 export async function syncProposalToExternalCalendars(
   proposalId: string,
   action: CalendarSyncAction,
+  options?: { skipGoogle?: boolean },
 ): Promise<void> {
   try {
+    const skipGoogle = options?.skipGoogle === true;
+    if (skipGoogle) {
+      console.info(
+        "[calendar-sync] skip Google provider: impersonating session",
+        proposalId,
+        action,
+      );
+    }
+
     const db = getDb();
     const proposal = await loadProposal(db, proposalId);
     if (!proposal) {
@@ -459,6 +471,7 @@ export async function syncProposalToExternalCalendars(
     for (const connection of connections) {
       try {
         if (connection.provider === "google") {
+          if (skipGoogle) continue;
           await syncGoogleForUser(db, connection, proposal, action);
         } else if (connection.provider === "ics") {
           await syncIcsForUser(db, connection, proposal, action);
@@ -494,19 +507,31 @@ export async function syncProposalToExternalCalendars(
  * Schedules external calendar sync after the current response finishes.
  * Uses Next.js `after()` so Vercel `waitUntil` keeps the invocation alive.
  * In E2E (`E2E_TEST_MODE=1`), awaits sync so journeys can assert Download ICS immediately.
+ * Captures impersonation from the current request before `after()` so Google
+ * API calls stay disabled under admin impersonation (PC-344).
  */
 export async function scheduleCalendarSync(
   proposalId: string,
   action: CalendarSyncAction,
 ): Promise<void> {
+  const impersonationGate = auth()
+    .then((session) => session?.user?.isImpersonating === true)
+    .catch(() => false);
+
   if (process.env.E2E_TEST_MODE === "1") {
-    await syncProposalToExternalCalendars(proposalId, action);
+    const skipGoogle = await impersonationGate;
+    await syncProposalToExternalCalendars(proposalId, action, { skipGoogle });
     return;
   }
+
+  const run = async () => {
+    const skipGoogle = await impersonationGate;
+    await syncProposalToExternalCalendars(proposalId, action, { skipGoogle });
+  };
   try {
-    after(() => syncProposalToExternalCalendars(proposalId, action));
+    after(run);
   } catch {
     // No request context (unit tests / CLI): still perform the sync.
-    void syncProposalToExternalCalendars(proposalId, action);
+    void run();
   }
 }

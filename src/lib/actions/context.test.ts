@@ -39,7 +39,22 @@ describe("action context helpers", () => {
       expires: "",
     } as never);
     const result = await requireSession();
-    expect(result).toEqual({ ok: true, user: { id: "u1", role: "user" } });
+    expect(result).toEqual({
+      ok: true,
+      user: { id: "u1", role: "user", isImpersonating: false },
+    });
+  });
+
+  it("requireSession flags impersonating sessions", async () => {
+    vi.mocked(auth).mockResolvedValue({
+      user: { id: "u1", role: "user", isImpersonating: true },
+      expires: "",
+    } as never);
+    const result = await requireSession();
+    expect(result).toEqual({
+      ok: true,
+      user: { id: "u1", role: "user", isImpersonating: true },
+    });
   });
 
   it("requireAdminAccess checks userHasAdminAccess", async () => {
