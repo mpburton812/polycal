@@ -303,3 +303,4 @@
 2026-07-24 | fa4d93a | PC-344 | expect isImpersonating on requireSession | src/lib/actions/context.test.ts
 2026-07-24 | f1fdb0c | PC-346 | clear calendar and child FKs before hard-delete | src/actions/proposals/hard-delete-cascade.test.ts
 2026-07-24 | 38cbc3d | PC-346 | clear calendar and child FKs before hard-delete | src/actions/proposals/hard-delete-cascade.test.ts
+2026-07-24 | fa524c5 | PC-346 | notify Google sync outcomes and harden Fast sleeping push | src/actions/calendar.ts

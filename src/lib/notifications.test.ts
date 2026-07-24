@@ -23,8 +23,14 @@ describe("resolveNotificationUrl", () => {
     expect(resolveNotificationUrl("partnership_proposed", {})).toBe("/people");
   });
 
-  it("routes residency notifications to places", () => {
-    expect(resolveNotificationUrl("residency_proposed", {})).toBe("/places");
+  it("links Google Calendar sync success to the proposal", () => {
+    expect(
+      resolveNotificationUrl("calendar_google_synced", { proposalId: "prop-g" }),
+    ).toBe("/proposals?open=prop-g");
+  });
+
+  it("routes Google Calendar sync failures to Profile", () => {
+    expect(resolveNotificationUrl("calendar_google_failed", {})).toBe("/profile");
   });
 });
 

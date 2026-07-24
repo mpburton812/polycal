@@ -94,6 +94,48 @@ async function getValidGoogleAccessToken(
   }
 }
 
+/**
+ * Notifies the connection owner about Google sync success (PC-346).
+ * Batch sleeping is one multi-day all-day free block — call that out so users
+ * do not look for per-night timed events.
+ */
+async function notifyGoogleSynced(
+  connection: typeof calendarConnections.$inferSelect,
+  proposal: typeof proposals.$inferSelect,
+  kind: "added" | "updated" | "removed",
+): Promise<void> {
+  const batchNote =
+    proposal.isBatchSleeping && kind !== "removed"
+      ? " (all-day free block spanning the nights — not separate timed events)"
+      : "";
+  const verb =
+    kind === "added" ? "Added to" : kind === "updated" ? "Updated on" : "Removed from";
+  await notifyUser(
+    connection.userId,
+    "calendar_google_synced",
+    `${verb} Google Calendar: ${proposal.title}${batchNote}.`,
+    {
+      proposalId: proposal.id,
+      url: `/proposals?open=${encodeURIComponent(proposal.id)}`,
+      proposalType: proposal.proposalType,
+      kind,
+    },
+  );
+}
+
+/** Actionable failure / incomplete-connect notifications (PC-346). */
+async function notifyGoogleFailed(
+  userId: string,
+  proposal: typeof proposals.$inferSelect,
+  message: string,
+): Promise<void> {
+  await notifyUser(userId, "calendar_google_failed", message, {
+    proposalId: proposal.id,
+    url: "/profile",
+    proposalType: proposal.proposalType,
+  });
+}
+
 async function syncGoogleForUser(
   db: Db,
   connection: typeof calendarConnections.$inferSelect,
@@ -106,6 +148,11 @@ async function syncGoogleForUser(
       proposal.id,
       connection.userId,
     );
+    await notifyGoogleFailed(
+      connection.userId,
+      proposal,
+      `Google Calendar connect is incomplete for "${proposal.title}" — pick a calendar in Profile.`,
+    );
     return;
   }
   const accessToken = await getValidGoogleAccessToken(db, connection);
@@ -114,6 +161,11 @@ async function syncGoogleForUser(
       "[calendar-sync] skip google: no access token (needs reconnect?)",
       proposal.id,
       connection.userId,
+    );
+    await notifyGoogleFailed(
+      connection.userId,
+      proposal,
+      `Google Calendar needs reconnect before syncing "${proposal.title}". Open Profile to reconnect.`,
     );
     return;
   }
@@ -138,6 +190,7 @@ async function syncGoogleForUser(
     if (link) {
       await db.delete(calendarEventLinks).where(eq(calendarEventLinks.id, link.id));
     }
+    await notifyGoogleSynced(connection, proposal, "removed");
     return;
   }
 
@@ -161,6 +214,7 @@ async function syncGoogleForUser(
         updatedAt: now,
       })
       .where(eq(calendarEventLinks.id, link.id));
+    await notifyGoogleSynced(connection, proposal, "updated");
     return;
   }
 
@@ -191,6 +245,7 @@ async function syncGoogleForUser(
       updatedAt: now,
     });
   }
+  await notifyGoogleSynced(connection, proposal, "added");
 }
 
 async function queueIcsPending(
@@ -458,6 +513,20 @@ export async function syncProposalToExternalCalendars(
         action,
         `userIds=${userIds.join(",")}`,
       );
+      // Proposer gets a recoverable nudge — production Fast-add miss was this skip (PC-347).
+      if (action !== "delete") {
+        await notifyUser(
+          proposal.proposerId,
+          "calendar_google_failed",
+          `No calendar integration is connected for anyone on "${proposal.title}". Connect Google Calendar in Profile, then use Retry calendar sync on the proposal.`,
+          {
+            proposalId: proposal.id,
+            url: "/profile",
+            proposalType: proposal.proposalType,
+            reason: "no_connections",
+          },
+        );
+      }
       return;
     }
 
@@ -483,6 +552,7 @@ export async function syncProposalToExternalCalendars(
           connection.provider,
           err,
         );
+        const errorMessage = err instanceof Error ? err.message : "unknown";
         await logUserActivity(
           connection.userId,
           "calendar.sync_failed",
@@ -490,10 +560,17 @@ export async function syncProposalToExternalCalendars(
             proposalId,
             provider: connection.provider,
             action,
-            error: err instanceof Error ? err.message : "unknown",
+            error: errorMessage,
           }),
           "system",
         );
+        if (connection.provider === "google") {
+          await notifyGoogleFailed(
+            connection.userId,
+            proposal,
+            `Could not sync "${proposal.title}" to Google Calendar. Try reconnecting in Profile, then use Retry calendar sync on the proposal.`,
+          );
+        }
       }
     }
 
@@ -507,18 +584,21 @@ export async function syncProposalToExternalCalendars(
  * Schedules external calendar sync after the current response finishes.
  * Uses Next.js `after()` so Vercel `waitUntil` keeps the invocation alive.
  * In E2E (`E2E_TEST_MODE=1`), awaits sync so journeys can assert Download ICS immediately.
+ * Pass `awaitSync: true` for admin Fast sleeping (PC-347) so push does not rely solely
+ * on post-response work.
  * Captures impersonation from the current request before `after()` so Google
  * API calls stay disabled under admin impersonation (PC-344).
  */
 export async function scheduleCalendarSync(
   proposalId: string,
   action: CalendarSyncAction,
+  options?: { awaitSync?: boolean },
 ): Promise<void> {
   const impersonationGate = auth()
     .then((session) => session?.user?.isImpersonating === true)
     .catch(() => false);
 
-  if (process.env.E2E_TEST_MODE === "1") {
+  if (process.env.E2E_TEST_MODE === "1" || options?.awaitSync === true) {
     const skipGoogle = await impersonationGate;
     await syncProposalToExternalCalendars(proposalId, action, { skipGoogle });
     return;
