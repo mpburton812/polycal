@@ -298,3 +298,4 @@
 2026-07-23 | 7540b10 | PC-345 | await ICS sync in E2E so Download ICS is ready | src/actions/proposals/lifecycle.ts
 2026-07-23 | 473570c | PC-345 | seed ICS prefs via harness API for download journey | app/api/e2e/calendar-ics-prefs/route.ts
 2026-07-23 | f632822 | PC-345 | seed ICS prefs via page.request on worker DB | app/api/e2e/calendar-ics-prefs/route.ts
+2026-07-23 | 0303e6e | PC-345 | sync ICS on solo auto-resolve and harden download journey | src/actions/proposals/_core.ts
