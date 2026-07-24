@@ -293,6 +293,9 @@ async function archivePastResolvedProposals(db: Db, settings: EnforcementSetting
       "proposal.auto_archived",
       `Archived ${settings.archiveGraceHours}h after scheduled end.`,
     );
+
+    const { scheduleCalendarSync } = await import("@/lib/calendar/sync");
+    await scheduleCalendarSync(proposal.id, "delete");
   }
 }
 

@@ -26,6 +26,55 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "2026.07.23c",
+    date: "2026-07-23",
+    summary:
+      "Surface Download ICS on resolved proposal cards, detail dialog, and notification inbox (stays available after first download).",
+    changes: [
+      {
+        type: "added",
+        description:
+          "Resolved kanban cards and proposal detail show Download ICS when the viewer has a queued .ics for that proposal; inbox calendar_ics_pending rows include a Download ICS button; button remains after the first download (PC-345).",
+      },
+      {
+        type: "changed",
+        description:
+          "ICS ready notification copy is now “You have a calendar ics available for the event : [name].” and deep-links to the proposal (PC-345).",
+      },
+      {
+        type: "fixed",
+        description:
+          "Solo auto-resolve on submit now runs collision decline + scheduleCalendarSync (previously only special/residency proposals called resolveProposal, so Google/ICS never queued for intentional-solo events) (PC-345).",
+      },
+    ],
+  },
+  {
+    version: "2026.07.23b",
+    date: "2026-07-23",
+    summary:
+      "Fix external calendar sync on Vercel: keep the serverless invocation alive until Google/ICS work finishes after resolve.",
+    changes: [
+      {
+        type: "fixed",
+        description:
+          "scheduleCalendarSync now uses Next.js after() (Vercel waitUntil) instead of bare void Promise; fire-and-forget sync was being frozen when the resolve response returned, so solo resolved events never reached Google Calendar or ICS pending downloads (PC-337).",
+      },
+    ],
+  },
+  {
+    version: "2026.07.23a",
+    date: "2026-07-23",
+    summary:
+      "External calendar integration (Option B): Google OAuth sync into an existing calendar, iCal/Other .ics download/email/both, onboarding + Profile settings.",
+    changes: [
+      {
+        type: "added",
+        description:
+          "SCHEMA_VERSION 36: calendar_connections, calendar_event_links, calendar_ics_pending; Google Calendar OAuth connect (not login) with encrypted refresh tokens; sync on resolve/reschedule/cancel for all configured invitees; sleeping exports as all-day free/transparent with the PolyCal sleeping title; iCal Download/Email/Both with pending download + notification when email is unavailable; Profile and onboarding Calendar step (PC-337–PC-342).",
+      },
+    ],
+  },
+  {
     version: "2026.07.22j",
     date: "2026-07-22",
     summary:

@@ -24,6 +24,10 @@ export async function resetTestDatabase(): Promise<{
   // Ensure schema exists before wipe (e.g. alpha_feedback_submissions on v19+).
   const { runMigrations } = await import("@/lib/db/migrate");
   await runMigrations();
+  // Calendar tables reference users/proposals — wipe before those (PC-345).
+  await client.execute("DELETE FROM calendar_ics_pending");
+  await client.execute("DELETE FROM calendar_event_links");
+  await client.execute("DELETE FROM calendar_connections");
   await client.execute("DELETE FROM alpha_feedback_submissions");
   await client.execute("DELETE FROM proposal_slot_votes");
   await client.execute("DELETE FROM proposal_comment_images");

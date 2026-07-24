@@ -11,6 +11,7 @@ import {
   FormGroup,
   FormLabel,
   InputLabel,
+  Link as MuiLink,
   MenuItem,
   Paper,
   Select,
@@ -21,9 +22,10 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
+import NextLink from "next/link";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
-import { useState, useTransition } from "react";
+import { Suspense, useState, useTransition } from "react";
 
 import { completeOnboardingAction, prepareOnboardingWelcomeAction, saveOnboardingPreferencesAction } from "@/actions/onboarding";
 import { proposePartnershipAction } from "@/actions/partnerships";
@@ -33,6 +35,7 @@ import {
   updateNotificationEmailAction,
   updateNotificationPrefsAction,
 } from "@/actions/profile";
+import { CalendarIntegrationSettings } from "@/components/profile/CalendarIntegrationSettings";
 import { AVATAR_OPTIONS } from "@/lib/constants/avatars";
 import { ThemeAccentPicker } from "@/components/ui/ThemeAccentPicker";
 import { normalizeUserThemeId, type UserThemeId } from "@/lib/constants/themes";
@@ -54,7 +57,14 @@ interface PartnerOption {
   displayName: string;
 }
 
-const STEPS = ["Password", "Avatar & theme", "Sleeping partners", "Notifications", "Welcome"];
+const STEPS = [
+  "Password",
+  "Avatar & theme",
+  "Sleeping partners",
+  "Notifications",
+  "Calendar",
+  "Welcome",
+];
 
 /**
  * Multi-step first-login onboarding per spec §4 (PC-10 / PC-194).
@@ -138,7 +148,7 @@ export function FirstLoginWizard({
     });
   }
 
-  function finishOnboarding() {
+  function saveNotifications() {
     setError(null);
     setEmailStatus(null);
     const email = notificationEmail.trim();
@@ -162,15 +172,20 @@ export function FirstLoginWizard({
         setError(prefsResult.error);
         return;
       }
-      // Load welcome copy without marking onboarding complete (PC-156).
-      // Email verification is not required to finish (PC-194).
+      setActiveStep(4);
+    });
+  }
+
+  function continueFromCalendar() {
+    setError(null);
+    startTransition(async () => {
       const result = await prepareOnboardingWelcomeAction();
       if (!result.ok) {
         setError(result.message);
         return;
       }
       setWelcomeMessage(result.welcomeMessage ?? null);
-      setActiveStep(4);
+      setActiveStep(5);
     });
   }
 
@@ -187,7 +202,7 @@ export function FirstLoginWizard({
     });
   }
 
-  if (welcomeMessage !== null && activeStep === 4) {
+  if (welcomeMessage !== null && activeStep === 5) {
     return (
       <Paper elevation={0} sx={{ ...brutalPaperSx, maxWidth: 640, mx: "auto" }}>
         <Typography
@@ -223,8 +238,15 @@ export function FirstLoginWizard({
       >
         Welcome to PolyCal
       </Typography>
-      <Typography sx={{ mb: 3, color: GARDEN_TOKENS.inkMuted }}>
+      <Typography sx={{ mb: 1.5, color: GARDEN_TOKENS.inkMuted }}>
         Complete these steps before using the app.
+      </Typography>
+      <Typography variant="body2" sx={{ mb: 3, color: GARDEN_TOKENS.inkMuted }}>
+        By continuing, you acknowledge how PolyCal handles group scheduling data. Read our{" "}
+        <MuiLink component={NextLink} href="/privacy" underline="hover" target="_blank" rel="noopener noreferrer">
+          Privacy Policy
+        </MuiLink>
+        .
       </Typography>
       <Stepper
         activeStep={activeStep}
@@ -459,8 +481,26 @@ export function FirstLoginWizard({
               />
             ))}
           </FormGroup>
-          <Button variant="contained" onClick={finishOnboarding} disabled={pending}>
-            Finish setup
+          <Button variant="contained" onClick={saveNotifications} disabled={pending}>
+            Continue
+          </Button>
+        </Stack>
+      )}
+
+      {activeStep === 4 && (
+        <Stack spacing={2}>
+          <Typography variant="body2" color="text.secondary">
+            Optional — connect Google Calendar or choose how to receive .ics files for Apple /
+            Outlook. You can skip and configure later in Profile.
+          </Typography>
+          <Suspense fallback={<Typography variant="body2">Loading calendar options…</Typography>}>
+            <CalendarIntegrationSettings compact />
+          </Suspense>
+          <Button variant="contained" onClick={continueFromCalendar} disabled={pending}>
+            {pending ? "Loading…" : "Continue"}
+          </Button>
+          <Button variant="text" onClick={continueFromCalendar} disabled={pending}>
+            Skip for now
           </Button>
         </Stack>
       )}

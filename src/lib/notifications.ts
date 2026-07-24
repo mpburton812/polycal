@@ -116,6 +116,10 @@ function alertTypeAllowed(
     return prefs.alertTypes.eventProposals;
   }
 
+  if (notificationType === "calendar_ics_pending") {
+    return true;
+  }
+
   return true;
 }
 
@@ -128,6 +132,13 @@ export function resolveNotificationUrl(
 ): string {
   if (typeof metadata?.url === "string" && metadata.url.startsWith("/")) {
     return metadata.url;
+  }
+
+  if (notificationType === "calendar_ics_pending") {
+    if (typeof metadata?.proposalId === "string") {
+      return `/proposals?open=${encodeURIComponent(metadata.proposalId)}`;
+    }
+    return "/proposals";
   }
 
   if (notificationType === "feed_chat_reply") {

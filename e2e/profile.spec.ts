@@ -16,8 +16,8 @@ test.describe("Profile settings", () => {
 
   test("shows notification quiet hours and alert type controls", async ({ page }) => {
     await expect(page.getByText("Quiet hours")).toBeVisible();
-    await expect(page.getByLabel("Start")).toBeVisible();
-    await expect(page.getByLabel("End")).toBeVisible();
+    await expect(page.getByRole("textbox", { name: "Start" })).toBeVisible();
+    await expect(page.getByRole("textbox", { name: "End" })).toBeVisible();
     await expect(page.getByText("Alert types")).toBeVisible();
     await expect(page.getByRole("checkbox", { name: "Sleeping proposals" })).toBeVisible();
     await expect(page.getByRole("checkbox", { name: "Event proposals" })).toBeVisible();
@@ -26,8 +26,8 @@ test.describe("Profile settings", () => {
   });
 
   test("saves notification preferences", async ({ page }) => {
-    await page.getByLabel("Start").fill("22:00");
-    await page.getByLabel("End").fill("07:00");
+    await page.getByRole("textbox", { name: "Start" }).fill("22:00");
+    await page.getByRole("textbox", { name: "End" }).fill("07:00");
     await page.getByRole("button", { name: "Save notification preferences" }).click();
     await expect(page.getByText(/Notification preferences saved/i)).toBeVisible({
       timeout: 15_000,
