@@ -131,6 +131,6 @@ Non-production seeding scripts must never run in production. Startup validation 
 | Domain lib | Vitest | `src/lib/**/*.test.ts` |
 | Server actions | Vitest + mocked `auth()` | `src/actions/*.test.ts`, `src/lib/actions/test-harness.ts` |
 | User journeys | Playwright | `e2e/*journey*.spec.ts`, `e2e/mobile-smoke.spec.ts` |
-| CI E2E | Playwright (4 shards) | `.github/workflows/e2e.yml` |
+| CI E2E | Playwright (suite-scoped: serial×3 + safe×2) | `.github/workflows/e2e.yml` |
 
 Journey inventory and gaps: [E2E-PARALLEL-JOURNEYS.md](./E2E-PARALLEL-JOURNEYS.md).

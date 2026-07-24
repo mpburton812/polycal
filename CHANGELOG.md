@@ -87,6 +87,7 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - PC-204: Schedule Day period with 12a–12a hour grid and all-day strip.
 
 ### Changed
+- PC-350: Playwright CI shards by suite (serial×3 + safe×2) instead of flat `--shard=N/5`, so SERIAL_ONLY is not packed into early jobs; lean server topology per suite. Change control: `2026.07.24d`.
 - PC-205: Removed status legend from schedule View options (network filter remains).
 
 ## [2026.07.13c] - 2026-07-13
