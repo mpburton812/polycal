@@ -26,6 +26,19 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "2026.07.24d",
+    date: "2026-07-24",
+    summary:
+      "Rebalance Playwright CI shards by suite (serial×3 + safe×2) to cut wall-clock skew.",
+    changes: [
+      {
+        type: "changed",
+        description:
+          "E2E and production workflows shard chromium-serial and chromium-safe independently (3 + 2 jobs) instead of flat --shard=N/5, which packed SERIAL_ONLY into early jobs; lean server topology per suite (PC-350).",
+      },
+    ],
+  },
+  {
     version: "2026.07.24c",
     date: "2026-07-24",
     summary:

@@ -77,15 +77,47 @@ jobs:
             public
           retention-days: 1
 
+  # Suite-scoped shards: serial×3 + safe×2 so workers:1 serial is not packed into shards 1–2 (PC-350).
   playwright:
     needs: [decide, build]
     if: needs.decide.outputs.run_e2e == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    name: playwright (${{ matrix.suite }} ${{ matrix.shard }}/${{ matrix.shards }})
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4, 5]
+        include:
+          - suite: serial
+            shard: 1
+            shards: 3
+            workers: "1"
+            include_mobile: "0"
+            projects: "--project=chromium-serial"
+          - suite: serial
+            shard: 2
+            shards: 3
+            workers: "1"
+            include_mobile: "0"
+            projects: "--project=chromium-serial"
+          - suite: serial
+            shard: 3
+            shards: 3
+            workers: "1"
+            include_mobile: "0"
+            projects: "--project=chromium-serial"
+          - suite: safe
+            shard: 1
+            shards: 2
+            workers: "2"
+            include_mobile: "1"
+            projects: "--project=chromium-safe --project=mobile-chrome"
+          - suite: safe
+            shard: 2
+            shards: 2
+            workers: "2"
+            include_mobile: "1"
+            projects: "--project=chromium-safe --project=mobile-chrome"
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -107,16 +139,17 @@ jobs:
       - name: Install Playwright browsers
         run: npx playwright install chromium --with-deps
 
-      - name: Run Playwright shard ${{ matrix.shard }}/5
-        run: npm run test:e2e:ci -- --shard=${{ matrix.shard }}/5
+      - name: Run Playwright ${{ matrix.suite }} ${{ matrix.shard }}/${{ matrix.shards }}
+        run: npm run test:e2e:ci -- ${{ matrix.projects }} --shard=${{ matrix.shard }}/${{ matrix.shards }}
         env:
           CI: "1"
-          E2E_PARALLEL_WORKERS: "2"
+          E2E_PARALLEL_WORKERS: ${{ matrix.workers }}
+          E2E_INCLUDE_MOBILE: ${{ matrix.include_mobile }}
 
       - name: Upload Playwright report
         if: failure()
         uses: actions/upload-artifact@v5
         with:
-          name: playwright-report-shard-${{ matrix.shard }}
+          name: playwright-report-${{ matrix.suite }}-${{ matrix.shard }}
           path: playwright-report/
           retention-days: 7
