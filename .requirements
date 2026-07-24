@@ -305,3 +305,4 @@
 2026-07-24 | 38cbc3d | PC-346 | clear calendar and child FKs before hard-delete | src/actions/proposals/hard-delete-cascade.test.ts
 2026-07-24 | fa524c5 | PC-346 | notify Google sync outcomes and harden Fast sleeping push | src/actions/calendar.ts
 2026-07-24 | 5b800c2 | PC-348 | restore Calendar after Google OAuth and prune inbox | src/actions/calendar.ts
+2026-07-24 | d3e58ef | PC-348 | bump postcss override to clear GHSA-r28c audit gate | package.json
