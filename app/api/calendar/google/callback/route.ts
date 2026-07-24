@@ -30,6 +30,15 @@ export async function GET(request: Request) {
     return redirectProfile("calendarError=" + encodeURIComponent("Sign in required."));
   }
 
+  if (session.user.isImpersonating) {
+    return redirectProfile(
+      "calendarError=" +
+        encodeURIComponent(
+          "Calendar integration changes and Google Calendar API calls are disabled while impersonating another user.",
+        ),
+    );
+  }
+
   const url = new URL(request.url);
   const code = url.searchParams.get("code");
   const state = url.searchParams.get("state");

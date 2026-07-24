@@ -21,6 +21,7 @@ export const SAFE_PARALLEL_SPECS = [
   "navigation.spec.ts",
   "people-places.spec.ts",
   "privacy-masking.spec.ts",
+  "privacy-policy.spec.ts",
   "profile.spec.ts",
   "proposals-board.spec.ts",
   "proposals-draft.spec.ts",
