@@ -295,7 +295,7 @@ async function archivePastResolvedProposals(db: Db, settings: EnforcementSetting
     );
 
     const { scheduleCalendarSync } = await import("@/lib/calendar/sync");
-    scheduleCalendarSync(proposal.id, "delete");
+    await scheduleCalendarSync(proposal.id, "delete");
   }
 }
 

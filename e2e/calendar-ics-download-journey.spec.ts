@@ -20,7 +20,9 @@ import { createAndSubmitSoloEvent, proposalCard } from "./helpers/proposals";
  */
 async function enableIcsDownloadOnly(page: Page): Promise<void> {
   await goToProfile(page);
-  await page.getByLabel("iCal / Other (.ics file)").check();
+  const icsRadio = page.getByLabel("iCal / Other (.ics file)");
+  await icsRadio.scrollIntoViewIfNeeded();
+  await icsRadio.check();
   await page.getByLabel("Download only").check();
   await page.getByRole("button", { name: "Save iCal / Other preferences" }).click();
   await expect(page.getByText(/preferences saved/i)).toBeVisible({
@@ -53,17 +55,11 @@ test.describe("Calendar ICS download journey", () => {
     const card = proposalCard(page, title);
     await expect(card).toBeVisible({ timeout: 30_000 });
 
-    // Sync runs via after() — poll with reload until Download ICS appears on the card.
-    await expect(async () => {
-      await page.reload();
-      await goToProposals(page);
-      await selectProposalTab(page, "Resolved");
-      await expect(
-        proposalCard(page, title).getByRole("link", { name: "Download ICS" }),
-      ).toBeVisible({ timeout: 5_000 });
-    }).toPass({ timeout: 60_000 });
-
-    const downloadBtn = proposalCard(page, title).getByRole("link", { name: "Download ICS" });
+    // Prefer accessible name on either link or button (MUI Button+href).
+    const downloadBtn = card.getByRole("link", { name: "Download ICS" }).or(
+      card.getByRole("button", { name: "Download ICS" }),
+    );
+    await expect(downloadBtn).toBeVisible({ timeout: 30_000 });
 
     const firstDownloadPromise = page.waitForEvent("download");
     await downloadBtn.click();
@@ -86,7 +82,11 @@ test.describe("Calendar ICS download journey", () => {
 
     await openProposalCard(page, title);
     const dialog = page.getByRole("dialog");
-    await expect(dialog.getByRole("link", { name: "Download ICS" })).toBeVisible();
+    await expect(
+      dialog.getByRole("link", { name: "Download ICS" }).or(
+        dialog.getByRole("button", { name: "Download ICS" }),
+      ),
+    ).toBeVisible();
     await dialog.getByRole("button", { name: "Close" }).click();
 
     // Inbox is SSR-seeded — reload so calendar_ics_pending appears (PC-345).
@@ -97,6 +97,10 @@ test.describe("Calendar ICS download journey", () => {
       new RegExp(`You have a calendar ics available for the event : ${titleEscaped}`),
     );
     await expect(row).toBeVisible({ timeout: 20_000 });
-    await expect(row.getByRole("link", { name: "Download ICS" })).toBeVisible();
+    await expect(
+      row.getByRole("link", { name: "Download ICS" }).or(
+        row.getByRole("button", { name: "Download ICS" }),
+      ),
+    ).toBeVisible();
   });
 });

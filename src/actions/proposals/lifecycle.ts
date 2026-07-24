@@ -573,7 +573,7 @@ export async function rescheduleProposalAction(
   revalidatePath("/proposals");
   revalidatePath("/schedule");
   const { scheduleCalendarSync } = await import("@/lib/calendar/sync");
-  scheduleCalendarSync(proposal.id, "upsert");
+  await scheduleCalendarSync(proposal.id, "upsert");
   return { ok: true, message: "Event rescheduled." };
 }
 
@@ -694,7 +694,7 @@ export async function cancelProposalAction(
 
   const { scheduleCalendarSync } = await import("@/lib/calendar/sync");
   for (const id of archivedIds) {
-    scheduleCalendarSync(id, "delete");
+    await scheduleCalendarSync(id, "delete");
   }
 
   return { ok: true, message: "Proposal cancelled and archived." };
