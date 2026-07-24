@@ -37,6 +37,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 
 import { DownloadIcsButton } from "@/components/calendar/DownloadIcsButton";
+import { retryProposalCalendarSyncAction } from "@/actions/calendar";
 import {
   acknowledgeProposalOverlapAction,
   addProposalCommentAction,
@@ -1142,6 +1143,22 @@ export function ProposalDetailDialog({
             {detail?.pendingIcsId ? (
               <DownloadIcsButton pendingIcsId={detail.pendingIcsId} />
             ) : null}
+            {(detail?.state === "resolved" || detail?.state === "archived") && (
+              <Button
+                variant="outlined"
+                disabled={pending}
+                onClick={() => {
+                  startTransition(async () => {
+                    const result = await retryProposalCalendarSyncAction(detail.id);
+                    showToast(result.message, result.ok ? "success" : "error");
+                    if (result.ok) router.refresh();
+                  });
+                }}
+                sx={outlinedButtonSx}
+              >
+                Retry calendar sync
+              </Button>
+            )}
             <Button variant="outlined" onClick={onClose} sx={outlinedButtonSx}>
               Close
             </Button>

@@ -392,3 +392,67 @@ export async function dismissPendingIcsAction(
     return { ok: false, message: err instanceof Error ? err.message : "Failed." };
   }
 }
+
+/**
+ * Re-pushes a resolved proposal to the caller's external calendar (PC-347 recovery).
+ * Awaits sync so the inbox notification for Google success/failure is ready immediately.
+ */
+export async function retryProposalCalendarSyncAction(
+  proposalId: string,
+): Promise<{ ok: boolean; message: string }> {
+  try {
+    const user = await requireUser();
+    const blocked = await googleCalendarBlockedReason();
+    if (blocked) {
+      return { ok: false, message: blocked };
+    }
+
+    const id = proposalId.trim();
+    if (!id) return { ok: false, message: "Proposal required." };
+
+    await ensureDbReady();
+    const db = getDb();
+    const { proposals, proposalInvitees } = await import("@/lib/db/schema");
+    const [proposal] = await db.select().from(proposals).where(eq(proposals.id, id)).limit(1);
+    if (!proposal) return { ok: false, message: "Proposal not found." };
+    if (proposal.state !== "resolved" && proposal.state !== "archived") {
+      return { ok: false, message: "Only resolved or archived proposals can be re-synced." };
+    }
+
+    const invitees = await db
+      .select({ userId: proposalInvitees.userId })
+      .from(proposalInvitees)
+      .where(eq(proposalInvitees.proposalId, id));
+    const isParticipant =
+      proposal.proposerId === user.id || invitees.some((row) => row.userId === user.id);
+    if (!isParticipant && user.role !== "admin") {
+      return { ok: false, message: "Not a participant on this proposal." };
+    }
+
+    const [connection] = await db
+      .select()
+      .from(calendarConnections)
+      .where(eq(calendarConnections.userId, user.id))
+      .limit(1);
+    if (!connection) {
+      return {
+        ok: false,
+        message: "No calendar integration configured. Connect Google or iCal in Profile.",
+      };
+    }
+
+    const { scheduleCalendarSync } = await import("@/lib/calendar/sync");
+    await scheduleCalendarSync(id, "upsert", { awaitSync: true });
+    revalidatePath("/proposals");
+    revalidatePath("/profile");
+    return {
+      ok: true,
+      message:
+        connection.provider === "google"
+          ? "Google Calendar sync finished — check your inbox for confirmation."
+          : "Calendar sync finished — check pending ICS downloads if configured.",
+    };
+  } catch (err) {
+    return { ok: false, message: err instanceof Error ? err.message : "Failed." };
+  }
+}

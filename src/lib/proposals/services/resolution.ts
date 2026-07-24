@@ -238,11 +238,14 @@ export async function revertProposalToDraft(
 /**
  * Resolves a proposal when all required invitees have approved (PC-40).
  * Poll proposals pick the winning time slot from per-slot vote tallies.
+ * Pass `awaitCalendarSync` for admin Fast sleeping so Google/ICS push completes
+ * before the admin action returns (PC-347).
  */
 export async function resolveProposal(
   db: ReturnType<typeof getDb>,
   proposal: typeof proposals.$inferSelect,
   actorUserId: string,
+  options?: { awaitCalendarSync?: boolean },
 ): Promise<void> {
   const slots = await db
     .select({
@@ -383,9 +386,11 @@ export async function resolveProposal(
     await autoDeclineCollidingProposals(db, proposal, scheduleStart, scheduleEnd, actorUserId);
   }
 
-  // External calendar sync (Option B) — after() on Vercel; awaited in E2E.
+  // External calendar sync (Option B) — after() on Vercel; awaited in E2E / admin Fast add.
   const { scheduleCalendarSync } = await import("@/lib/calendar/sync");
-  await scheduleCalendarSync(proposal.id, "upsert");
+  await scheduleCalendarSync(proposal.id, "upsert", {
+    awaitSync: options?.awaitCalendarSync === true,
+  });
 }
 
 /**
