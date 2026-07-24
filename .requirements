@@ -294,3 +294,4 @@
 2026-07-23 | b6be286 | PC-337 | move OAuth cookie const out of use server | src/actions/calendar.ts
 2026-07-23 | 34aa7fa | PC-337 | disambiguate calendar vs quiet-hours locators | e2e/helpers/onboarding.ts
 2026-07-23 | e6020ae | PC-337 | keep Vercel alive for post-resolve sync | src/lib/calendar/sync.ts
+2026-07-23 | 87a2f6c | PC-345 | Download ICS on cards and inbox | src/actions/proposals/_core.ts
