@@ -26,6 +26,29 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "2026.07.24b",
+    date: "2026-07-24",
+    summary:
+      "Google Calendar sync confirmations in the inbox, awaited admin Fast sleeping push, and Retry calendar sync recovery.",
+    changes: [
+      {
+        type: "added",
+        description:
+          "Inbox notifications when Google Calendar add/update/remove succeeds, or when sync fails (no calendar selected, needs reconnect, API error) (PC-346).",
+      },
+      {
+        type: "fixed",
+        description:
+          "Admin Fast sleeping force-resolve awaits calendar sync so Google push does not rely solely on after(); OAuth connect auto-selects the primary calendar when none is saved yet; proposer is notified when no participant has a calendar connection (root cause of the production Fast-add miss) (PC-347).",
+      },
+      {
+        type: "added",
+        description:
+          "Resolved proposal detail includes Retry calendar sync for recovery after reconnect; docs cover one-sided Google participants and batch all-day free blocks (PC-347).",
+      },
+    ],
+  },
+  {
     version: "2026.07.24a",
     date: "2026-07-24",
     summary:

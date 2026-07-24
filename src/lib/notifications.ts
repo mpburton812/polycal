@@ -116,7 +116,11 @@ function alertTypeAllowed(
     return prefs.alertTypes.eventProposals;
   }
 
-  if (notificationType === "calendar_ics_pending") {
+  if (
+    notificationType === "calendar_ics_pending" ||
+    notificationType === "calendar_google_synced" ||
+    notificationType === "calendar_google_failed"
+  ) {
     return true;
   }
 
@@ -134,11 +138,18 @@ export function resolveNotificationUrl(
     return metadata.url;
   }
 
-  if (notificationType === "calendar_ics_pending") {
+  if (
+    notificationType === "calendar_ics_pending" ||
+    notificationType === "calendar_google_synced"
+  ) {
     if (typeof metadata?.proposalId === "string") {
       return `/proposals?open=${encodeURIComponent(metadata.proposalId)}`;
     }
     return "/proposals";
+  }
+
+  if (notificationType === "calendar_google_failed") {
+    return "/profile";
   }
 
   if (notificationType === "feed_chat_reply") {

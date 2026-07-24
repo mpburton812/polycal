@@ -675,7 +675,8 @@ export async function adminForceResolveProposalAction(
     return { ok: false, message: "Proposal not found." };
   }
 
-  await resolveProposal(db, proposal, actorUserId);
+  // Await calendar sync so admin Fast sleeping does not rely solely on after() (PC-347).
+  await resolveProposal(db, proposal, actorUserId, { awaitCalendarSync: true });
 
   return { ok: true, message: "Proposal resolved." };
 }
