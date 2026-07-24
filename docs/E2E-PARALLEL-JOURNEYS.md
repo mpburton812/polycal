@@ -66,7 +66,7 @@ Source of truth for SAFE list: `SAFE_PARALLEL_SPECS` in [`e2e/parallel.ts`](../e
 
 - **SAFE_PARALLEL**: Uses `_freshDb` per test (or creates isolated data); listed in `SAFE_PARALLEL_SPECS`.
 - **SERIAL_ONLY**: Multi-step / shared-persona flows — `chromium-serial`, workers=1.
-- **CI**: 5 shards × `E2E_PARALLEL_WORKERS=2`; each shard still boots the full server topology for that env.
+- **CI**: Suite-scoped matrix (PC-350) — `chromium-serial` × 3 shards (`E2E_PARALLEL_WORKERS=1`, no mobile server) and `chromium-safe` + `mobile-chrome` × 2 shards (`E2E_PARALLEL_WORKERS=2`). Avoids flat `--shard=N/5` packing all SERIAL_ONLY into jobs 1–2. Verify with `node scripts/verify-e2e-shard-list.mjs`.
 
 ## Flake classes (monitor)
 
