@@ -6,11 +6,25 @@ import { revalidateNotificationShellPaths } from "@/lib/notifications-revalidate
 import { auth } from "@/lib/auth";
 import { getDb } from "@/lib/db/client";
 import { ensureDbReady } from "@/lib/db/ensure-ready";
-import { notificationDismissals, userActivityLog } from "@/lib/db/schema";
+import {
+  locationResidents,
+  notificationDismissals,
+  proposalInvitees,
+  proposals,
+  proposalStateLog,
+  sleepingPartnerships,
+  userActivityLog,
+} from "@/lib/db/schema";
 import {
   INBOX_EXCLUDED_NOTIFICATION_TYPES,
   isActionableProposalNotification,
+  isAttendeeUpdateStillActionable,
+  isPartnershipStillActionable,
+  isProposalVoteStillActionable,
+  isResidencyStillActionable,
+  partnershipIdFromNotificationMetadata,
   proposalIdFromNotificationMetadata,
+  residencyIdFromNotificationMetadata,
 } from "@/lib/notifications-inbox";
 
 export interface NotificationItem {
@@ -232,4 +246,195 @@ export async function dismissNotificationsForProposal(
     revalidateNotificationShellPaths();
   }
   return cleared;
+}
+
+/**
+ * Soft-dismisses partnership_proposed inbox rows for a partnership (PC-349).
+ */
+export async function dismissNotificationsForPartnership(
+  userId: string,
+  partnershipId: string,
+): Promise<number> {
+  await ensureDbReady();
+  const db = getDb();
+
+  const dismissed = await db
+    .select({ logId: notificationDismissals.logId })
+    .from(notificationDismissals)
+    .where(eq(notificationDismissals.userId, userId));
+  const dismissedIds = dismissed.map((row) => row.logId);
+
+  const baseFilter = and(
+    eq(userActivityLog.userId, userId),
+    eq(userActivityLog.eventType, "system"),
+    like(userActivityLog.action, "notification.%"),
+  );
+
+  const rows =
+    dismissedIds.length > 0
+      ? await db
+          .select()
+          .from(userActivityLog)
+          .where(and(baseFilter, notInArray(userActivityLog.id, dismissedIds)))
+      : await db.select().from(userActivityLog).where(baseFilter);
+
+  const now = new Date().toISOString();
+  let cleared = 0;
+
+  for (const row of rows) {
+    const parsed = parseNotificationDetails(row.action, row.details);
+    if (INBOX_EXCLUDED_NOTIFICATION_TYPES.has(parsed.type)) continue;
+    if (parsed.type !== "partnership_proposed") continue;
+    if (partnershipIdFromNotificationMetadata(parsed.metadata) !== partnershipId) continue;
+
+    await db
+      .insert(notificationDismissals)
+      .values({ userId, logId: row.id, dismissedAt: now })
+      .onConflictDoNothing();
+    cleared += 1;
+  }
+
+  if (cleared > 0) {
+    revalidateNotificationShellPaths();
+  }
+  return cleared;
+}
+
+/**
+ * Soft-dismisses actionable inbox rows that are no longer actionable (PC-349).
+ * Called when the notification bell opens so stale Accept/Decline rows disappear.
+ */
+export async function reconcileInboxNotificationsAction(): Promise<{
+  ok: boolean;
+  cleared: number;
+  count: number;
+  items: NotificationItem[];
+}> {
+  const session = await auth();
+  if (!session?.user) {
+    return { ok: false, cleared: 0, count: 0, items: [] };
+  }
+
+  await ensureDbReady();
+  const db = getDb();
+  const userId = session.user.id;
+
+  const inbox = await getNotificationInboxAction();
+  if (!inbox.ok) {
+    return { ok: false, cleared: 0, count: 0, items: [] };
+  }
+
+  const now = new Date().toISOString();
+  let cleared = 0;
+
+  for (const item of inbox.items) {
+    let stale = false;
+
+    if (item.type === "partnership_proposed") {
+      const partnershipId = partnershipIdFromNotificationMetadata(item.metadata);
+      if (!partnershipId) {
+        stale = true;
+      } else {
+        const [row] = await db
+          .select({ status: sleepingPartnerships.status })
+          .from(sleepingPartnerships)
+          .where(eq(sleepingPartnerships.id, partnershipId))
+          .limit(1);
+        stale = !isPartnershipStillActionable(row?.status);
+      }
+    } else if (item.type === "residency_proposed") {
+      const residencyId = residencyIdFromNotificationMetadata(item.metadata);
+      if (!residencyId) {
+        stale = true;
+      } else {
+        const [row] = await db
+          .select({ status: locationResidents.status })
+          .from(locationResidents)
+          .where(eq(locationResidents.id, residencyId))
+          .limit(1);
+        stale = !isResidencyStillActionable(row?.status);
+      }
+    } else if (item.type === "proposal_attendee_update") {
+      const proposalId = proposalIdFromNotificationMetadata(item.metadata);
+      if (!proposalId) {
+        stale = true;
+      } else {
+        const [proposal] = await db
+          .select({ state: proposals.state })
+          .from(proposals)
+          .where(eq(proposals.id, proposalId))
+          .limit(1);
+        const [invitee] = await db
+          .select({ voteStatus: proposalInvitees.voteStatus })
+          .from(proposalInvitees)
+          .where(
+            and(eq(proposalInvitees.proposalId, proposalId), eq(proposalInvitees.userId, userId)),
+          )
+          .limit(1);
+        const [maintained] = await db
+          .select({ id: proposalStateLog.id })
+          .from(proposalStateLog)
+          .where(
+            and(
+              eq(proposalStateLog.proposalId, proposalId),
+              eq(proposalStateLog.actorUserId, userId),
+              eq(proposalStateLog.action, "proposal.attendee_update_maintained"),
+            ),
+          )
+          .limit(1);
+        stale = !isAttendeeUpdateStillActionable({
+          proposalState: proposal?.state,
+          voteStatus: invitee?.voteStatus,
+          maintainedAfterNotification: Boolean(maintained),
+        });
+      }
+    } else if (isActionableProposalNotification(item.type, item.metadata)) {
+      const proposalId = proposalIdFromNotificationMetadata(item.metadata);
+      if (!proposalId) {
+        stale = true;
+      } else {
+        const [proposal] = await db
+          .select({ state: proposals.state, atRisk: proposals.atRisk })
+          .from(proposals)
+          .where(eq(proposals.id, proposalId))
+          .limit(1);
+        const [invitee] = await db
+          .select({
+            voteStatus: proposalInvitees.voteStatus,
+            role: proposalInvitees.role,
+          })
+          .from(proposalInvitees)
+          .where(
+            and(eq(proposalInvitees.proposalId, proposalId), eq(proposalInvitees.userId, userId)),
+          )
+          .limit(1);
+        stale = !isProposalVoteStillActionable({
+          proposalState: proposal?.state,
+          voteStatus: invitee?.voteStatus,
+          atRisk: proposal?.atRisk,
+          role: invitee?.role,
+        });
+      }
+    }
+
+    if (!stale) continue;
+
+    await db
+      .insert(notificationDismissals)
+      .values({ userId, logId: item.id, dismissedAt: now })
+      .onConflictDoNothing();
+    cleared += 1;
+  }
+
+  if (cleared > 0) {
+    revalidateNotificationShellPaths();
+  }
+
+  const refreshed = await getNotificationInboxAction();
+  return {
+    ok: refreshed.ok,
+    cleared,
+    count: refreshed.count,
+    items: refreshed.items,
+  };
 }
