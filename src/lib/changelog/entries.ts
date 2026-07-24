@@ -26,6 +26,29 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "2026.07.23c",
+    date: "2026-07-23",
+    summary:
+      "Surface Download ICS on resolved proposal cards, detail dialog, and notification inbox (stays available after first download).",
+    changes: [
+      {
+        type: "added",
+        description:
+          "Resolved kanban cards and proposal detail show Download ICS when the viewer has a queued .ics for that proposal; inbox calendar_ics_pending rows include a Download ICS button; button remains after the first download (PC-345).",
+      },
+      {
+        type: "changed",
+        description:
+          "ICS ready notification copy is now “You have a calendar ics available for the event : [name].” and deep-links to the proposal (PC-345).",
+      },
+      {
+        type: "fixed",
+        description:
+          "Solo auto-resolve on submit now runs collision decline + scheduleCalendarSync (previously only special/residency proposals called resolveProposal, so Google/ICS never queued for intentional-solo events) (PC-345).",
+      },
+    ],
+  },
+  {
     version: "2026.07.23b",
     date: "2026-07-23",
     summary:

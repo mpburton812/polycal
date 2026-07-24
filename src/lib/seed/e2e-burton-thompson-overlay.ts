@@ -4,6 +4,7 @@ import { and, eq } from "drizzle-orm";
 
 import { getDb } from "@/lib/db/client";
 import {
+  calendarConnections,
   locationResidents,
   locations,
   sleepingPartnerships,
@@ -135,6 +136,39 @@ export async function seedE2eBurtonThompsonOverlay(): Promise<void> {
       updatedAt: now,
       respondedAt: now,
       passiveAutoAccepted: false,
+    });
+  }
+
+  // Luke iCal download prefs so resolve→ICS journeys do not depend on UI/API seed races (PC-345).
+  const [lukeConnection] = await db
+    .select({ id: calendarConnections.id })
+    .from(calendarConnections)
+    .where(eq(calendarConnections.userId, "sw-luke"))
+    .limit(1);
+  if (lukeConnection) {
+    await db
+      .update(calendarConnections)
+      .set({
+        provider: "ics",
+        icsDelivery: "download",
+        googleRefreshTokenEnc: null,
+        googleAccessTokenEnc: null,
+        googleTokenExpiresAt: null,
+        googleCalendarId: null,
+        googleAccountEmail: null,
+        status: "active",
+        updatedAt: now,
+      })
+      .where(eq(calendarConnections.id, lukeConnection.id));
+  } else {
+    await db.insert(calendarConnections).values({
+      id: randomUUID(),
+      userId: "sw-luke",
+      provider: "ics",
+      icsDelivery: "download",
+      status: "active",
+      createdAt: now,
+      updatedAt: now,
     });
   }
 }

@@ -15,6 +15,7 @@ import {
 } from "@mui/material";
 
 import { type ProposalCard as ProposalCardData } from "@/actions/proposals";
+import { DownloadIcsButton } from "@/components/calendar/DownloadIcsButton";
 import { MASKED_TITLE } from "@/lib/proposals/access";
 import { fontFamilies } from "@/theme/fonts";
 import { GARDEN_TOKENS } from "@/theme/tokens";
@@ -396,11 +397,15 @@ export function ProposalCard({
       </CardContent>
 
       {(proposal.state === "draft" && (onContinueEdit || onDeleteDraft)) ||
-      (proposal.canAdminDeleteProposal && onAdminDelete) ? (
+      (proposal.canAdminDeleteProposal && onAdminDelete) ||
+      Boolean(proposal.pendingIcsId) ? (
         <CardActions
           sx={{ px: 2, pb: 2, pt: 0, flexWrap: "wrap", gap: 1, position: "relative", zIndex: 1 }}
           onClick={(e) => e.stopPropagation()}
         >
+          {proposal.pendingIcsId ? (
+            <DownloadIcsButton pendingIcsId={proposal.pendingIcsId} stopPropagation />
+          ) : null}
           {proposal.state === "draft" && onContinueEdit && (
             <Button
               variant="contained"

@@ -36,6 +36,7 @@ import {
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 
+import { DownloadIcsButton } from "@/components/calendar/DownloadIcsButton";
 import {
   acknowledgeProposalOverlapAction,
   addProposalCommentAction,
@@ -1138,6 +1139,9 @@ export function ProposalDetailDialog({
                 Reschedule
               </Button>
             )}
+            {detail?.pendingIcsId ? (
+              <DownloadIcsButton pendingIcsId={detail.pendingIcsId} />
+            ) : null}
             <Button variant="outlined" onClick={onClose} sx={outlinedButtonSx}>
               Close
             </Button>

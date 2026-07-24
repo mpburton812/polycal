@@ -294,3 +294,8 @@
 2026-07-23 | b6be286 | PC-337 | move OAuth cookie const out of use server | src/actions/calendar.ts
 2026-07-23 | 34aa7fa | PC-337 | disambiguate calendar vs quiet-hours locators | e2e/helpers/onboarding.ts
 2026-07-23 | e6020ae | PC-337 | keep Vercel alive for post-resolve sync | src/lib/calendar/sync.ts
+2026-07-23 | 87a2f6c | PC-345 | Download ICS on cards and inbox | src/actions/proposals/_core.ts
+2026-07-23 | 7540b10 | PC-345 | await ICS sync in E2E so Download ICS is ready | src/actions/proposals/lifecycle.ts
+2026-07-23 | 473570c | PC-345 | seed ICS prefs via harness API for download journey | app/api/e2e/calendar-ics-prefs/route.ts
+2026-07-23 | f632822 | PC-345 | seed ICS prefs via page.request on worker DB | app/api/e2e/calendar-ics-prefs/route.ts
+2026-07-23 | 0303e6e | PC-345 | sync ICS on solo auto-resolve and harden download journey | src/actions/proposals/_core.ts

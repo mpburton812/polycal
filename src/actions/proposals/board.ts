@@ -33,6 +33,7 @@ import { buildPartnershipProposalCopy } from "@/lib/partnerships/copy";
 import { formatSleepingDisplayTitle } from "@/lib/proposals/sleeping-display";
 import { sleepingCalendarDayEnd } from "@/lib/proposals/sleeping-schedule";
 import { proposalHasSchedulableWindows } from "@/lib/schedule/schedule-slices";
+import { latestIcsPendingIdsByProposal } from "@/lib/calendar/pending-ics";
 
 import type { ProposalBoard, ProposalCard } from "./types";
 
@@ -184,6 +185,12 @@ export async function listProposalBoardAction(): Promise<ProposalBoard> {
     slotsByProposal.set(slot.proposalId, list);
   }
 
+  const pendingIcsByProposal = await latestIcsPendingIdsByProposal(
+    db,
+    viewerId,
+    visibleProposalIds,
+  );
+
   const empty: ProposalBoard = { draft: [], proposed: [], resolved: [], archived: [] };
 
   for (const row of rows) {
@@ -308,6 +315,7 @@ export async function listProposalBoardAction(): Promise<ProposalBoard> {
       eventIconKey:
         row.proposalType !== "event" ? null : row.eventIconKey ?? null,
       viewerIsInvitee: viewerInvitee !== undefined,
+      pendingIcsId: pendingIcsByProposal.get(row.id) ?? null,
       notOnCalendar:
         row.state === "resolved" &&
         !proposalHasSchedulableWindows(
