@@ -20,8 +20,8 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
-import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useMemo, useState, useTransition } from "react";
 
 import {
   checkUsernameAvailableAction,
@@ -375,11 +375,13 @@ function PersonDetail({
   people,
   currentUserId,
   isAdmin,
+  highlightPartnershipId,
 }: {
   person: PersonSummary;
   people: PersonSummary[];
   currentUserId: string;
   isAdmin: boolean;
+  highlightPartnershipId?: string | null;
 }) {
   const router = useRouter();
   const [partnerships, setPartnerships] = useState<PartnershipView[]>([]);
@@ -426,7 +428,26 @@ function PersonDetail({
             </Typography>
           )}
           {partnerships.map((row) => (
-            <Stack key={row.id} direction="row" spacing={1} alignItems="center">
+            <Stack
+              key={row.id}
+              direction="row"
+              spacing={1}
+              alignItems="center"
+              data-testid={
+                highlightPartnershipId === row.id ? "partnership-deep-link-target" : undefined
+              }
+              sx={
+                highlightPartnershipId === row.id
+                  ? {
+                      outline: "2px solid",
+                      outlineColor: "primary.main",
+                      borderRadius: 1,
+                      px: 1,
+                      py: 0.5,
+                    }
+                  : undefined
+              }
+            >
               <Chip
                 size="small"
                 label={row.status}
@@ -1051,8 +1072,17 @@ function CreatePlaceDialog({
 
 /**
  * Client shell for People & Places tab (PC-35–37).
+ * Suspense wraps useSearchParams for partnership deep-links from the inbox (PC-349).
  */
-export function PeoplePlacesClient({
+export function PeoplePlacesClient(props: PeoplePlacesClientProps) {
+  return (
+    <Suspense fallback={<Typography variant="body2">Loading people & places…</Typography>}>
+      <PeoplePlacesClientInner {...props} />
+    </Suspense>
+  );
+}
+
+function PeoplePlacesClientInner({
   people,
   places,
   currentUserId,
@@ -1062,12 +1092,26 @@ export function PeoplePlacesClient({
   mapEdges,
 }: PeoplePlacesClientProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [tab, setTab] = useState(0);
   const showMapTab =
     placesMapVisibility === "all" || (placesMapVisibility === "admins" && isAdmin);
   const [createOpen, setCreateOpen] = useState(false);
   const [createPlaceOpen, setCreatePlaceOpen] = useState(false);
   const [selectedPersonId, setSelectedPersonId] = useState<string | null>(null);
+  const [highlightPartnershipId, setHighlightPartnershipId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const partnershipId = searchParams.get("partnership");
+    if (!partnershipId) return;
+    setTab(0);
+    setSelectedPersonId(currentUserId);
+    setHighlightPartnershipId(partnershipId);
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete("partnership");
+    const qs = params.toString();
+    router.replace(qs ? `/people-places?${qs}` : "/people-places");
+  }, [searchParams, currentUserId, router]);
 
   const selectedPerson = people.find((row) => row.id === selectedPersonId) ?? null;
   const existingPlaceNames = useMemo(() => places.map((place) => place.name), [places]);
@@ -1171,6 +1215,9 @@ export function PeoplePlacesClient({
                   people={people}
                   currentUserId={currentUserId}
                   isAdmin={isAdmin}
+                  highlightPartnershipId={
+                    person.id === currentUserId ? highlightPartnershipId : null
+                  }
                 />
               )}
             </Box>

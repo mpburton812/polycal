@@ -1,5 +1,5 @@
 /**
- * Google Calendar OAuth callback — stores encrypted refresh token (PC-339).
+ * Google Calendar OAuth callback — stores encrypted refresh token (PC-339 / PC-348).
  */
 import { randomUUID } from "node:crypto";
 import { eq } from "drizzle-orm";
@@ -19,19 +19,48 @@ import { ensureDbReady } from "@/lib/db/ensure-ready";
 import { calendarConnections } from "@/lib/db/schema";
 import { getPublicAppUrl } from "@/lib/env";
 
-function redirectProfile(query: string): NextResponse {
+type OAuthReturnTo = "onboarding" | "profile";
+
+function parseState(state: string): {
+  userId: string;
+  nonce: string;
+  returnTo: OAuthReturnTo;
+} | null {
+  const parts = state.split(":");
+  if (parts.length < 2) return null;
+  const userId = parts[0];
+  const nonce = parts[1];
+  const returnTo = parts[2] === "onboarding" ? "onboarding" : "profile";
+  if (!userId || !nonce) return null;
+  return { userId, nonce, returnTo };
+}
+
+function redirectAfterOAuth(
+  returnTo: OAuthReturnTo,
+  query: string,
+): NextResponse {
   const base = getPublicAppUrl().replace(/\/$/, "");
+  if (returnTo === "onboarding") {
+    // Incomplete onboarding still mounts FirstLoginWizard; restore Calendar step (PC-348).
+    return NextResponse.redirect(`${base}/feed?onboardingStep=4&${query}`);
+  }
   return NextResponse.redirect(`${base}/profile?${query}`);
 }
 
 export async function GET(request: Request) {
   const session = await auth();
+  let returnTo: OAuthReturnTo = "profile";
+
   if (!session?.user) {
-    return redirectProfile("calendarError=" + encodeURIComponent("Sign in required."));
+    return redirectAfterOAuth(
+      returnTo,
+      "calendarError=" + encodeURIComponent("Sign in required."),
+    );
   }
 
   if (session.user.isImpersonating) {
-    return redirectProfile(
+    return redirectAfterOAuth(
+      returnTo,
       "calendarError=" +
         encodeURIComponent(
           "Calendar integration changes and Google Calendar API calls are disabled while impersonating another user.",
@@ -44,31 +73,41 @@ export async function GET(request: Request) {
   const state = url.searchParams.get("state");
   const oauthError = url.searchParams.get("error");
 
-  if (oauthError) {
-    return redirectProfile(
-      "calendarError=" + encodeURIComponent(`Google denied access: ${oauthError}`),
-    );
-  }
-
   const jar = await cookies();
   const expected = jar.get(GOOGLE_OAUTH_STATE_COOKIE)?.value;
   jar.delete(GOOGLE_OAUTH_STATE_COOKIE);
 
+  const parsedExpected = expected ? parseState(expected) : null;
+  if (parsedExpected) {
+    returnTo = parsedExpected.returnTo;
+  }
+
+  if (oauthError) {
+    return redirectAfterOAuth(
+      returnTo,
+      "calendarError=" + encodeURIComponent(`Google denied access: ${oauthError}`),
+    );
+  }
+
   if (!code || !state || !expected || state !== expected) {
-    return redirectProfile(
+    return redirectAfterOAuth(
+      returnTo,
       "calendarError=" + encodeURIComponent("Invalid OAuth state. Try connecting again."),
     );
   }
 
-  const [userId] = state.split(":");
-  if (userId !== session.user.id) {
-    return redirectProfile(
+  const parsedState = parseState(state);
+  if (!parsedState || parsedState.userId !== session.user.id) {
+    return redirectAfterOAuth(
+      returnTo,
       "calendarError=" + encodeURIComponent("OAuth session mismatch."),
     );
   }
+  returnTo = parsedState.returnTo;
 
   if (!isCalendarEncryptionConfigured()) {
-    return redirectProfile(
+    return redirectAfterOAuth(
+      returnTo,
       "calendarError=" + encodeURIComponent("Encryption key not configured."),
     );
   }
@@ -76,7 +115,8 @@ export async function GET(request: Request) {
   try {
     const tokens = await exchangeGoogleCode(code);
     if (!tokens.refresh_token) {
-      return redirectProfile(
+      return redirectAfterOAuth(
+        returnTo,
         "calendarError=" +
           encodeURIComponent(
             "Google did not return a refresh token. Remove PolyCal access in Google Account settings and try again.",
@@ -132,9 +172,10 @@ export async function GET(request: Request) {
       JSON.stringify({ email }),
     );
 
-    return redirectProfile("calendarGoogle=1");
+    return redirectAfterOAuth(returnTo, "calendarGoogle=1");
   } catch (err) {
-    return redirectProfile(
+    return redirectAfterOAuth(
+      returnTo,
       "calendarError=" +
         encodeURIComponent(err instanceof Error ? err.message : "Google connect failed."),
     );
