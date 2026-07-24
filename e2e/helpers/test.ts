@@ -38,8 +38,11 @@ const workerScoped = base.extend<WorkerScoped>({
  */
 export const test = workerScoped.extend<{ _freshDb: void }>({
   _freshDb: [
-    async ({ request }, use) => {
-      await resetE2eDatabase(request);
+    async ({ request }, use, testInfo) => {
+      // Absolute origin avoids project-level baseURL sticking to worker 0 (PC-345).
+      const index = dbIndexForProject(testInfo.project.name, testInfo.workerIndex);
+      const origin = `http://localhost:${E2E_PORT + index}`;
+      await resetE2eDatabase(request, origin);
       await use();
     },
     { auto: true },

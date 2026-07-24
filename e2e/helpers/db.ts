@@ -7,12 +7,17 @@ const E2E_HEADERS = { "x-e2e-api-secret": E2E_API_SECRET };
 /**
  * Resets the E2E database to Star Wars + demo proposal seed via test-only API.
  * Retries briefly when the serial worker's server is still recovering (PC-224).
+ * Pass absolute `origin` when the shared request fixture may not match the worker DB (PC-345).
  */
-export async function resetE2eDatabase(request: APIRequestContext): Promise<void> {
+export async function resetE2eDatabase(
+  request: APIRequestContext,
+  origin?: string,
+): Promise<void> {
+  const resetUrl = origin ? `${origin.replace(/\/$/, "")}/api/e2e/reset` : "/api/e2e/reset";
   let lastError: unknown;
   for (let attempt = 0; attempt < 5; attempt += 1) {
     try {
-      const response = await request.post("/api/e2e/reset", {
+      const response = await request.post(resetUrl, {
         headers: E2E_HEADERS,
         timeout: 60_000,
       });

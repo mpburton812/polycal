@@ -383,9 +383,9 @@ export async function resolveProposal(
     await autoDeclineCollidingProposals(db, proposal, scheduleStart, scheduleEnd, actorUserId);
   }
 
-  // External calendar sync (Option B) — fire-and-forget for configured invitees.
+  // External calendar sync (Option B) — after() on Vercel; awaited in E2E.
   const { scheduleCalendarSync } = await import("@/lib/calendar/sync");
-  scheduleCalendarSync(proposal.id, "upsert");
+  await scheduleCalendarSync(proposal.id, "upsert");
 }
 
 /**

@@ -384,12 +384,12 @@ async function syncIcsForUser(
       connection.userId,
       "calendar_ics_pending",
       action === "delete"
-        ? `Download the cancellation calendar file for "${proposal.title}".`
-        : `Download the calendar file for "${proposal.title}".`,
+        ? `You have a calendar ics available for the cancelled event : ${proposal.title}.`
+        : `You have a calendar ics available for the event : ${proposal.title}.`,
       {
         proposalId: proposal.id,
         pendingId,
-        url: "/profile?calendarPending=1",
+        url: `/proposals?open=${encodeURIComponent(proposal.id)}`,
         proposalType: proposal.proposalType,
       },
     );
@@ -444,6 +444,7 @@ export async function syncProposalToExternalCalendars(
         "[calendar-sync] skip: no calendar connections for participants",
         proposalId,
         action,
+        `userIds=${userIds.join(",")}`,
       );
       return;
     }
@@ -491,15 +492,21 @@ export async function syncProposalToExternalCalendars(
 
 /**
  * Schedules external calendar sync after the current response finishes.
- * Uses Next.js `after()` so Vercel `waitUntil` keeps the invocation alive;
- * falls back to an awaited run when called outside a request (scripts/tests).
+ * Uses Next.js `after()` so Vercel `waitUntil` keeps the invocation alive.
+ * In E2E (`E2E_TEST_MODE=1`), awaits sync so journeys can assert Download ICS immediately.
  */
-export function scheduleCalendarSync(proposalId: string, action: CalendarSyncAction): void {
-  const run = () => syncProposalToExternalCalendars(proposalId, action);
+export async function scheduleCalendarSync(
+  proposalId: string,
+  action: CalendarSyncAction,
+): Promise<void> {
+  if (process.env.E2E_TEST_MODE === "1") {
+    await syncProposalToExternalCalendars(proposalId, action);
+    return;
+  }
   try {
-    after(run);
+    after(() => syncProposalToExternalCalendars(proposalId, action));
   } catch {
     // No request context (unit tests / CLI): still perform the sync.
-    void run();
+    void syncProposalToExternalCalendars(proposalId, action);
   }
 }

@@ -7,6 +7,7 @@ import { z } from "zod";
 
 import { auth } from "@/lib/auth";
 import { userHasAdminAccess } from "@/lib/admin-access";
+import { latestIcsPendingIdsByProposal } from "@/lib/calendar/pending-ics";
 import { getDb } from "@/lib/db/client";
 import { ensureDbReady } from "@/lib/db/ensure-ready";
 import {
@@ -1256,6 +1257,23 @@ export async function submitProposalAction(
     } else if (residencyMeta && !autoResolve) {
       await syncResidencyRowOnSubmit(db, updatedProposal);
     }
+
+    // Intentional-solo auto-resolve flips state above without resolveProposal();
+    // still decline collisions and push Google/ICS (PC-337 / PC-345).
+    if (autoResolve && !isSpecial) {
+      const { autoDeclineCollidingProposals } = await import(
+        "@/lib/proposals/services/conflicts"
+      );
+      await autoDeclineCollidingProposals(
+        db,
+        updatedProposal,
+        updatedProposal.scheduledStartAt,
+        updatedProposal.scheduledEndAt,
+        session.user.id,
+      );
+      const { scheduleCalendarSync } = await import("@/lib/calendar/sync");
+      await scheduleCalendarSync(updatedProposal.id, "upsert");
+    }
   }
 
   const notificationMessage = autoResolve
@@ -1676,6 +1694,9 @@ export async function getProposalDetailAction(
       reminderOffsetMinutes: row.reminderOffsetMinutes ?? null,
       eventIconKey: row.proposalType !== "event" ? null : row.eventIconKey ?? null,
       specialKind: getProposalSpecialKind(row.description) ?? undefined,
+      pendingIcsId: (
+        await latestIcsPendingIdsByProposal(db, session.user.id, [row.id])
+      ).get(row.id) ?? null,
     },
   };
 }
