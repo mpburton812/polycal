@@ -1,9 +1,11 @@
 /**
  * One-way PolyCal → external calendar sync orchestrator (PC-338 / PC-342).
- * Non-blocking: callers should void/catch so vote/resolve UX is never blocked.
+ * Non-blocking via Next.js `after()` so Vercel keeps the serverless invocation
+ * alive until Google/ICS work finishes (bare `void` is dropped after the response).
  */
 import { randomUUID } from "node:crypto";
 import { and, eq, inArray, isNull } from "drizzle-orm";
+import { after } from "next/server";
 
 import { decryptSecret, encryptSecret } from "@/lib/calendar/crypto";
 import {
@@ -97,9 +99,23 @@ async function syncGoogleForUser(
   proposal: typeof proposals.$inferSelect,
   action: CalendarSyncAction,
 ): Promise<void> {
-  if (!connection.googleCalendarId) return;
+  if (!connection.googleCalendarId) {
+    console.warn(
+      "[calendar-sync] skip google: no calendar selected",
+      proposal.id,
+      connection.userId,
+    );
+    return;
+  }
   const accessToken = await getValidGoogleAccessToken(db, connection);
-  if (!accessToken) return;
+  if (!accessToken) {
+    console.warn(
+      "[calendar-sync] skip google: no access token (needs reconnect?)",
+      proposal.id,
+      connection.userId,
+    );
+    return;
+  }
 
   const [link] = await db
     .select()
@@ -125,7 +141,13 @@ async function syncGoogleForUser(
   }
 
   const payload = buildCalendarEventPayload(proposal);
-  if (!payload) return;
+  if (!payload) {
+    console.warn(
+      "[calendar-sync] skip google: missing scheduledStartAt",
+      proposal.id,
+    );
+    return;
+  }
 
   const calendarId = connection.googleCalendarId;
   if (link?.googleEventId) {
@@ -397,8 +419,14 @@ export async function syncProposalToExternalCalendars(
   try {
     const db = getDb();
     const proposal = await loadProposal(db, proposalId);
-    if (!proposal) return;
-    if (isNonScheduleProposal(proposal.description)) return;
+    if (!proposal) {
+      console.warn("[calendar-sync] skip: proposal not found", proposalId);
+      return;
+    }
+    if (isNonScheduleProposal(proposal.description)) {
+      console.info("[calendar-sync] skip: non-schedule proposal", proposalId);
+      return;
+    }
 
     // At-risk / recovery: keep existing events (no delete on soft state changes).
     // Delete only when explicitly cancelled/archived (action === "delete").
@@ -411,6 +439,22 @@ export async function syncProposalToExternalCalendars(
       .from(calendarConnections)
       .where(inArray(calendarConnections.userId, userIds));
 
+    if (connections.length === 0) {
+      console.info(
+        "[calendar-sync] skip: no calendar connections for participants",
+        proposalId,
+        action,
+      );
+      return;
+    }
+
+    console.info(
+      "[calendar-sync] start",
+      proposalId,
+      action,
+      connections.map((c) => `${c.provider}:${c.userId}`).join(","),
+    );
+
     for (const connection of connections) {
       try {
         if (connection.provider === "google") {
@@ -419,6 +463,12 @@ export async function syncProposalToExternalCalendars(
           await syncIcsForUser(db, connection, proposal, action);
         }
       } catch (err) {
+        console.error(
+          "[calendar-sync] provider failed",
+          proposalId,
+          connection.provider,
+          err,
+        );
         await logUserActivity(
           connection.userId,
           "calendar.sync_failed",
@@ -432,14 +482,24 @@ export async function syncProposalToExternalCalendars(
         );
       }
     }
+
+    console.info("[calendar-sync] done", proposalId, action);
   } catch (err) {
     console.error("[calendar-sync]", proposalId, action, err);
   }
 }
 
 /**
- * Fire-and-forget wrapper so proposal lifecycle never awaits Google/ICS latency.
+ * Schedules external calendar sync after the current response finishes.
+ * Uses Next.js `after()` so Vercel `waitUntil` keeps the invocation alive;
+ * falls back to an awaited run when called outside a request (scripts/tests).
  */
 export function scheduleCalendarSync(proposalId: string, action: CalendarSyncAction): void {
-  void syncProposalToExternalCalendars(proposalId, action);
+  const run = () => syncProposalToExternalCalendars(proposalId, action);
+  try {
+    after(run);
+  } catch {
+    // No request context (unit tests / CLI): still perform the sync.
+    void run();
+  }
 }

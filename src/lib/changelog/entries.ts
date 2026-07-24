@@ -26,6 +26,19 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "2026.07.23b",
+    date: "2026-07-23",
+    summary:
+      "Fix external calendar sync on Vercel: keep the serverless invocation alive until Google/ICS work finishes after resolve.",
+    changes: [
+      {
+        type: "fixed",
+        description:
+          "scheduleCalendarSync now uses Next.js after() (Vercel waitUntil) instead of bare void Promise; fire-and-forget sync was being frozen when the resolve response returned, so solo resolved events never reached Google Calendar or ICS pending downloads (PC-337).",
+      },
+    ],
+  },
+  {
     version: "2026.07.23a",
     date: "2026-07-23",
     summary:
