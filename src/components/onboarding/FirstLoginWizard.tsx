@@ -23,9 +23,9 @@ import {
   Typography,
 } from "@mui/material";
 import NextLink from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useSession } from "next-auth/react";
-import { Suspense, useState, useTransition } from "react";
+import { Suspense, useEffect, useState, useTransition } from "react";
 
 import { completeOnboardingAction, prepareOnboardingWelcomeAction, saveOnboardingPreferencesAction } from "@/actions/onboarding";
 import { proposePartnershipAction } from "@/actions/partnerships";
@@ -51,6 +51,10 @@ import {
   DEFAULT_NOTIFICATION_PREFS,
   type NotificationPrefs,
 } from "@/types/notification-prefs";
+import {
+  ONBOARDING_STEP_STORAGE_KEY,
+  resolveOnboardingStartStep,
+} from "@/lib/onboarding/wizard-step";
 
 interface PartnerOption {
   id: string;
@@ -68,8 +72,28 @@ const STEPS = [
 
 /**
  * Multi-step first-login onboarding per spec §4 (PC-10 / PC-194).
+ * Suspense wraps useSearchParams for the OAuth Calendar restore path (PC-348).
  */
-export function FirstLoginWizard({
+export function FirstLoginWizard(props: {
+  mustChangePassword: boolean;
+  initialAvatarKey: string | null;
+  initialTheme: string;
+  partnerOptions: PartnerOption[];
+}) {
+  return (
+    <Suspense
+      fallback={
+        <Paper elevation={0} sx={{ ...brutalPaperSx, maxWidth: 640, mx: "auto" }}>
+          <Typography variant="body2">Loading setup…</Typography>
+        </Paper>
+      }
+    >
+      <FirstLoginWizardInner {...props} />
+    </Suspense>
+  );
+}
+
+function FirstLoginWizardInner({
   mustChangePassword,
   initialAvatarKey,
   initialTheme,
@@ -81,9 +105,11 @@ export function FirstLoginWizard({
   partnerOptions: PartnerOption[];
 }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { update } = useSession();
-  const startStep = mustChangePassword ? 0 : 1;
-  const [activeStep, setActiveStep] = useState(startStep);
+  // SSR-safe default; OAuth remount restores Calendar via effect + sessionStorage (PC-348).
+  const [activeStep, setActiveStep] = useState(mustChangePassword ? 0 : 1);
+  const [stepRestored, setStepRestored] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [avatarKey, setAvatarKey] = useState(initialAvatarKey ?? "bird_blue");
   const [theme, setTheme] = useState<UserThemeId>(normalizeUserThemeId(initialTheme));
@@ -95,6 +121,40 @@ export function FirstLoginWizard({
   const [emailStatus, setEmailStatus] = useState<string | null>(null);
   const [welcomeMessage, setWelcomeMessage] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+
+  useEffect(() => {
+    if (stepRestored) return;
+    let storedStep: string | null = null;
+    try {
+      storedStep = window.sessionStorage.getItem(ONBOARDING_STEP_STORAGE_KEY);
+    } catch {
+      storedStep = null;
+    }
+    const queryStep = searchParams.get("onboardingStep");
+    const next = resolveOnboardingStartStep({
+      mustChangePassword,
+      queryStep,
+      storedStep,
+    });
+    setActiveStep(next);
+    setStepRestored(true);
+    // Drop one-shot query after restore so refresh does not stick on Calendar.
+    if (queryStep) {
+      const params = new URLSearchParams(searchParams.toString());
+      params.delete("onboardingStep");
+      const qs = params.toString();
+      router.replace(qs ? `/feed?${qs}` : "/feed");
+    }
+  }, [mustChangePassword, searchParams, stepRestored, router]);
+
+  useEffect(() => {
+    if (!stepRestored) return;
+    try {
+      window.sessionStorage.setItem(ONBOARDING_STEP_STORAGE_KEY, String(activeStep));
+    } catch {
+      // sessionStorage may be unavailable in private mode — ignore.
+    }
+  }, [activeStep, stepRestored]);
 
   function handlePasswordSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -195,6 +255,11 @@ export function FirstLoginWizard({
       if (!result.ok) {
         setError(result.message);
         return;
+      }
+      try {
+        window.sessionStorage.removeItem(ONBOARDING_STEP_STORAGE_KEY);
+      } catch {
+        // ignore
       }
       await update({ user: { onboardingComplete: true } });
       // Full navigation so layout re-reads onboardingComplete from the session (PC-225).

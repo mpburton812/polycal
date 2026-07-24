@@ -235,7 +235,11 @@ export function CalendarIntegrationSettings({
           )}
           <Button
             variant="outlined"
-            href="/api/calendar/google/start"
+            href={
+              compact
+                ? "/api/calendar/google/start?return=onboarding"
+                : "/api/calendar/google/start"
+            }
             disabled={!connection?.googleConfigured || Boolean(connection?.impersonating)}
           >
             {connection?.provider === "google" ? "Reconnect Google" : "Connect Google Calendar"}

@@ -106,10 +106,11 @@ export async function getCalendarConnectionAction(): Promise<CalendarConnectionV
 
 /**
  * Starts Google OAuth by setting a CSRF state cookie and returning the authorize URL.
+ * Pass `returnTo: "onboarding"` so the callback restores FirstLoginWizard Calendar step (PC-348).
  */
-export async function beginGoogleCalendarConnectAction(): Promise<
-  { ok: true; url: string } | { ok: false; message: string }
-> {
+export async function beginGoogleCalendarConnectAction(
+  options?: { returnTo?: "onboarding" | "profile" },
+): Promise<{ ok: true; url: string } | { ok: false; message: string }> {
   try {
     const user = await requireUser();
     const blocked = await googleCalendarBlockedReason();
@@ -123,9 +124,12 @@ export async function beginGoogleCalendarConnectAction(): Promise<
       return { ok: false, message: "Calendar token encryption key is not configured." };
     }
 
-    const state = randomBytes(24).toString("base64url");
+    const nonce = randomBytes(24).toString("base64url");
+    const returnTo = options?.returnTo === "onboarding" ? "onboarding" : "profile";
+    // Cookie value: userId:nonce:returnTo — returnTo restored after Google redirects (PC-348).
+    const state = `${user.id}:${nonce}:${returnTo}`;
     const jar = await cookies();
-    jar.set(GOOGLE_OAUTH_STATE_COOKIE, `${user.id}:${state}`, {
+    jar.set(GOOGLE_OAUTH_STATE_COOKIE, state, {
       httpOnly: true,
       sameSite: "lax",
       secure: process.env.NODE_ENV === "production",
@@ -133,7 +137,7 @@ export async function beginGoogleCalendarConnectAction(): Promise<
       maxAge: 600,
     });
 
-    return { ok: true, url: buildGoogleAuthorizeUrl(`${user.id}:${state}`) };
+    return { ok: true, url: buildGoogleAuthorizeUrl(state) };
   } catch (err) {
     return { ok: false, message: err instanceof Error ? err.message : "Sign in required." };
   }

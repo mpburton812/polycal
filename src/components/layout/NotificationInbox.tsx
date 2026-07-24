@@ -31,6 +31,7 @@ import { RESIDENCY_CARD_PREFIX } from "@/lib/proposals/constants";
 import {
   clearAllNotificationsAction,
   dismissNotificationAction,
+  reconcileInboxNotificationsAction,
   type NotificationItem,
 } from "@/actions/notifications";
 import { DownloadIcsButton } from "@/components/calendar/DownloadIcsButton";
@@ -117,6 +118,16 @@ export function NotificationInbox({
 
   function handleOpen(event: MouseEvent<HTMLElement>) {
     setAnchorEl(event.currentTarget);
+    // Prune stale actionable rows (e.g. accepted outside the inbox) before display (PC-349).
+    startTransition(async () => {
+      const result = await reconcileInboxNotificationsAction();
+      if (!result.ok) return;
+      setItems(result.items);
+      setCount(result.count);
+      if (result.cleared > 0) {
+        router.refresh();
+      }
+    });
   }
 
   function handleClose() {
@@ -139,6 +150,20 @@ export function NotificationInbox({
           typeof item.metadata.proposalId === "string" ? item.metadata.proposalId : null;
         if (rowProposalId !== proposalId) return true;
         return !isActionableProposalNotification(item.type, item.metadata);
+      });
+      const removed = current.length - next.length;
+      if (removed > 0) {
+        setCount((c) => Math.max(0, c - removed));
+      }
+      return next;
+    });
+  }
+
+  function removePartnershipRows(partnershipId: string) {
+    setItems((current) => {
+      const next = current.filter((item) => {
+        if (item.type !== "partnership_proposed") return true;
+        return item.metadata.partnershipId !== partnershipId;
       });
       const removed = current.length - next.length;
       if (removed > 0) {
@@ -181,6 +206,17 @@ export function NotificationInbox({
     });
   }
 
+  function openPartnershipTarget(logId: number, partnershipId: string) {
+    startTransition(async () => {
+      const result = await dismissNotificationAction(logId);
+      if (!result.ok) return;
+      removeFromList(logId);
+      handleClose();
+      router.push(`/people-places?partnership=${encodeURIComponent(partnershipId)}`);
+      router.refresh();
+    });
+  }
+
   function voteFromInbox(proposalId: string, vote: "accept" | "decline") {
     startTransition(async () => {
       const result = await castProposalVoteAction({ proposalId, vote });
@@ -207,7 +243,8 @@ export function NotificationInbox({
     startTransition(async () => {
       const result = await respondPartnershipAction({ partnershipId, accept });
       if (!result.ok) return;
-      await dismissNotificationAction(logId);
+      // respondPartnershipAction already soft-dismisses partnership rows (PC-349).
+      removePartnershipRows(partnershipId);
       removeFromList(logId);
       router.refresh();
     });
@@ -394,6 +431,14 @@ export function NotificationInbox({
                         >
                           Accept
                         </Button>
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          disabled={pending}
+                          onClick={() => openPartnershipTarget(item.id, partnershipId)}
+                        >
+                          Open Proposal
+                        </Button>
                       </>
                     )}
                     {item.type === "proposal_attendee_update" && proposalId && (
@@ -448,7 +493,7 @@ export function NotificationInbox({
                         disabled={pending}
                         onClick={() => openProposalTarget(item.id, openTarget)}
                       >
-                        Open Notification
+                        Open Proposal
                       </Button>
                     )}
                   </Stack>

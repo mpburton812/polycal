@@ -19,8 +19,14 @@ describe("resolveNotificationUrl", () => {
     );
   });
 
-  it("routes partnership notifications to people", () => {
-    expect(resolveNotificationUrl("partnership_proposed", {})).toBe("/people");
+  it("routes partnership notifications to people-places", () => {
+    expect(resolveNotificationUrl("partnership_proposed", {})).toBe("/people-places");
+  });
+
+  it("deep-links partnership notifications with partnershipId", () => {
+    expect(
+      resolveNotificationUrl("partnership_proposed", { partnershipId: "pship-1" }),
+    ).toBe("/people-places?partnership=pship-1");
   });
 
   it("links Google Calendar sync success to the proposal", () => {

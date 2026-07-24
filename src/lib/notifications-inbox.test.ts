@@ -3,6 +3,8 @@ import { describe, expect, it } from "vitest";
 import {
   INBOX_EXCLUDED_NOTIFICATION_TYPES,
   isActionableProposalNotification,
+  isPartnershipStillActionable,
+  isProposalVoteStillActionable,
   proposalIdFromNotificationMetadata,
 } from "./notifications-inbox";
 
@@ -75,5 +77,30 @@ describe("proposalIdFromNotificationMetadata", () => {
   it("returns null when proposalId is missing or non-string", () => {
     expect(proposalIdFromNotificationMetadata({})).toBeNull();
     expect(proposalIdFromNotificationMetadata({ proposalId: 12 })).toBeNull();
+  });
+});
+
+describe("isPartnershipStillActionable", () => {
+  it("is actionable only while proposed", () => {
+    expect(isPartnershipStillActionable("proposed")).toBe(true);
+    expect(isPartnershipStillActionable("accepted")).toBe(false);
+    expect(isPartnershipStillActionable(null)).toBe(false);
+  });
+});
+
+describe("isProposalVoteStillActionable", () => {
+  it("requires not_seen vote on a proposed proposal", () => {
+    expect(
+      isProposalVoteStillActionable({
+        proposalState: "proposed",
+        voteStatus: "not_seen",
+      }),
+    ).toBe(true);
+    expect(
+      isProposalVoteStillActionable({
+        proposalState: "proposed",
+        voteStatus: "accept",
+      }),
+    ).toBe(false);
   });
 });
