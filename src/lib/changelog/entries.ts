@@ -26,6 +26,29 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "2026.07.24c",
+    date: "2026-07-24",
+    summary:
+      "Onboarding returns to Calendar after Google OAuth; inbox Open Proposal + prune stale rows on bell open.",
+    changes: [
+      {
+        type: "fixed",
+        description:
+          "Google Calendar connect during first-login restores the Calendar wizard step (query + sessionStorage) instead of resetting near Sleeping partners (PC-348).",
+      },
+      {
+        type: "added",
+        description:
+          "Sleeping-partner inbox rows include Open Proposal (People & Places deep-link); proposal/residency Open Notification renamed to Open Proposal (PC-349).",
+      },
+      {
+        type: "fixed",
+        description:
+          "Opening the notification bell reconciles/dismisses actionable rows that are no longer actionable; accepting a partnership outside the inbox dismisses matching partnership_proposed rows (PC-349).",
+      },
+    ],
+  },
+  {
     version: "2026.07.24b",
     date: "2026-07-24",
     summary:

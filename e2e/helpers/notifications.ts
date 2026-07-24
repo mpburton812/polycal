@@ -29,7 +29,7 @@ export async function acceptFromInbox(
 }
 
 /**
- * Opens a proposal from an inbox row via "Open Notification".
+ * Opens a proposal from an inbox row via "Open Proposal".
  * Multi-slot polls cannot use Accept from the inbox (per-slot voting required).
  * Retries with reload — SSR notification props can lag right after login (PC-325).
  */
@@ -42,7 +42,7 @@ export async function openProposalFromInbox(
     await openNotificationInbox(page);
     const row = inboxRow(page, message);
     await expect(row).toBeVisible({ timeout: 8_000 });
-    await row.getByRole("button", { name: "Open Notification" }).click();
+    await row.getByRole("button", { name: "Open Proposal" }).click();
   }).toPass({ timeout: 60_000 });
   await expect(page.getByRole("dialog")).toBeVisible({ timeout: 20_000 });
 }

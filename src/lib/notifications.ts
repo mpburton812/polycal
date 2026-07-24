@@ -161,14 +161,14 @@ export function resolveNotificationUrl(
   }
 
   if (typeof metadata?.partnershipId === "string") {
-    return "/people";
+    return `/people-places?partnership=${encodeURIComponent(metadata.partnershipId)}`;
   }
 
   if (typeof metadata?.placeId === "string") {
     return "/places";
   }
 
-  if (notificationType.startsWith("partnership")) return "/people";
+  if (notificationType.startsWith("partnership")) return "/people-places";
   if (notificationType.startsWith("residency")) return "/places";
   if (notificationType.startsWith("place")) return "/places";
   if (notificationType.startsWith("proposal")) return "/proposals";
@@ -218,7 +218,7 @@ export async function notifyUser(
       proposalId && canAcceptFromNotification(notificationType, metadata)
         ? [
             { action: "accept", title: "Accept" },
-            { action: "open", title: "Open Notification" },
+            { action: "open", title: "Open Proposal" },
           ]
         : undefined;
 

@@ -36,3 +36,69 @@ export function proposalIdFromNotificationMetadata(
 ): string | null {
   return typeof metadata.proposalId === "string" ? metadata.proposalId : null;
 }
+
+/**
+ * Extracts partnershipId from notification metadata when present.
+ */
+export function partnershipIdFromNotificationMetadata(
+  metadata: Record<string, unknown>,
+): string | null {
+  return typeof metadata.partnershipId === "string" ? metadata.partnershipId : null;
+}
+
+/**
+ * Extracts residencyId from notification metadata when present.
+ */
+export function residencyIdFromNotificationMetadata(
+  metadata: Record<string, unknown>,
+): string | null {
+  return typeof metadata.residencyId === "string" ? metadata.residencyId : null;
+}
+
+/**
+ * True when a partnership_proposed row should still appear as actionable (PC-349).
+ */
+export function isPartnershipStillActionable(status: string | null | undefined): boolean {
+  return status === "proposed";
+}
+
+/**
+ * True when a residency_proposed row should still appear as actionable (PC-349).
+ */
+export function isResidencyStillActionable(status: string | null | undefined): boolean {
+  return status === "proposed";
+}
+
+/**
+ * True when a vote-style proposal inbox row is still actionable for this invitee (PC-349).
+ */
+export function isProposalVoteStillActionable(options: {
+  proposalState: string | null | undefined;
+  voteStatus: string | null | undefined;
+  atRisk?: boolean | null;
+  role?: string | null;
+}): boolean {
+  if (!options.proposalState || !options.voteStatus) return false;
+  if (options.voteStatus !== "not_seen") return false;
+  if (options.proposalState === "proposed") return true;
+  if (options.proposalState === "resolved") {
+    // Optional RSVP / at-risk required vote still needs a response.
+    if (options.role === "optional") return true;
+    if (options.atRisk && options.role === "required") return true;
+  }
+  return false;
+}
+
+/**
+ * True when a proposal_attendee_update row is still actionable (PC-349).
+ */
+export function isAttendeeUpdateStillActionable(options: {
+  proposalState: string | null | undefined;
+  voteStatus: string | null | undefined;
+  maintainedAfterNotification: boolean;
+}): boolean {
+  if (options.maintainedAfterNotification) return false;
+  if (options.proposalState !== "resolved") return false;
+  if (options.voteStatus === "decline") return false;
+  return true;
+}

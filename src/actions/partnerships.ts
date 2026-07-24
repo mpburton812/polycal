@@ -8,6 +8,7 @@ import { z } from "zod";
 import { auth } from "@/lib/auth";
 import { userHasAdminAccess } from "@/lib/admin-access";
 import { logUserActivity } from "@/lib/audit";
+import { dismissNotificationsForPartnership } from "@/actions/notifications";
 import { getDb } from "@/lib/db/client";
 import { ensureDbReady } from "@/lib/db/ensure-ready";
 import { sleepingPartnerships, users } from "@/lib/db/schema";
@@ -382,6 +383,9 @@ export async function respondPartnershipAction(
       JSON.stringify({ partnershipId: row.id, body: parsed.data.comment.trim() }),
     );
   }
+
+  // Clear actionable inbox rows even when Accept/Decline happens outside the bell (PC-349).
+  await dismissNotificationsForPartnership(session.user.id, row.id);
 
   revalidatePath("/people-places");
   revalidatePath("/proposals");
