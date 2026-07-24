@@ -26,6 +26,19 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "2026.07.24a",
+    date: "2026-07-24",
+    summary:
+      "Fix hard-delete of proposals blocked by calendar/residency/recurrence foreign keys.",
+    changes: [
+      {
+        type: "fixed",
+        description:
+          "Draft and admin delete now clear calendar_event_links, calendar_ics_pending, location_residents.proposal_id, and child parent_proposal_id before removing the proposal row (PC-346).",
+      },
+    ],
+  },
+  {
     version: "2026.07.23c",
     date: "2026-07-23",
     summary:
@@ -36,6 +49,7 @@ export const CHANGELOG: ChangelogEntry[] = [
         description:
           "Resolved kanban cards and proposal detail show Download ICS when the viewer has a queued .ics for that proposal; inbox calendar_ics_pending rows include a Download ICS button; button remains after the first download (PC-345).",
       },
+
       {
         type: "changed",
         description:

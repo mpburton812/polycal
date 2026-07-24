@@ -10,6 +10,10 @@ import { logUserActivity } from "@/lib/audit";
 import { getDb } from "@/lib/db/client";
 import { ensureDbReady } from "@/lib/db/ensure-ready";
 import {
+  calendarEventLinks,
+  calendarIcsPending,
+  locationResidents,
+  proposalCommentImages,
   proposalComments,
   proposalInvitees,
   proposalSlotVotes,
@@ -23,17 +27,52 @@ import { actorNotifyFields, notifyUser } from "@/lib/notifications";
 type Db = ReturnType<typeof getDb>;
 
 /**
- * Hard-deletes a proposal row and dependent invitee/slot/comment/log rows (PC-295).
+ * Hard-deletes a proposal and every row that holds an FK to it (PC-295, PC-346).
+ * Calendar / residency / recurrence-child FKs must be cleared before the proposal row
+ * or SQLite raises SQLITE_CONSTRAINT (seen on production digest deletes).
  */
 async function hardDeleteProposalCascade(
   db: Db,
   proposal: typeof proposals.$inferSelect,
 ): Promise<void> {
+  // Best-effort external calendar cancel while the proposal row still exists.
+  try {
+    const { syncProposalToExternalCalendars } = await import("@/lib/calendar/sync");
+    await syncProposalToExternalCalendars(proposal.id, "delete");
+  } catch (syncErr) {
+    console.error("[hardDelete] calendar sync delete failed", proposal.id, syncErr);
+  }
+  await db.delete(calendarEventLinks).where(eq(calendarEventLinks.proposalId, proposal.id));
+  await db.delete(calendarIcsPending).where(eq(calendarIcsPending.proposalId, proposal.id));
+
   await cleanupResidencyProposalLinkage(db, proposal, true);
+  await db
+    .update(locationResidents)
+    .set({ proposalId: null, updatedAt: new Date().toISOString() })
+    .where(eq(locationResidents.proposalId, proposal.id));
+
+  // Occurrence delete of a recurrence parent must not leave children pointing at it.
+  await db
+    .update(proposals)
+    .set({ parentProposalId: null, updatedAt: new Date().toISOString() })
+    .where(eq(proposals.parentProposalId, proposal.id));
+
   await dismissAllNotificationsForProposal(proposal.id);
   await db.delete(proposalSlotVotes).where(eq(proposalSlotVotes.proposalId, proposal.id));
   await db.delete(proposalTimeSlots).where(eq(proposalTimeSlots.proposalId, proposal.id));
   await db.delete(proposalInvitees).where(eq(proposalInvitees.proposalId, proposal.id));
+
+  const commentIds = (
+    await db
+      .select({ id: proposalComments.id })
+      .from(proposalComments)
+      .where(eq(proposalComments.proposalId, proposal.id))
+  ).map((r) => r.id);
+  if (commentIds.length > 0) {
+    await db
+      .delete(proposalCommentImages)
+      .where(inArray(proposalCommentImages.commentId, commentIds));
+  }
   await db.delete(proposalComments).where(eq(proposalComments.proposalId, proposal.id));
   await db.delete(proposalStateLog).where(eq(proposalStateLog.proposalId, proposal.id));
   await db.delete(proposals).where(eq(proposals.id, proposal.id));
