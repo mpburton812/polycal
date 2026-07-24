@@ -3,7 +3,7 @@ import fs from "node:fs/promises";
 import { expect, test } from "./helpers/test";
 
 import { login } from "./helpers/auth";
-import { seedIcsCalendarPrefs } from "./helpers/calendar-ics";
+import { forceIcsCalendarSync, seedIcsCalendarPrefs } from "./helpers/calendar-ics";
 import { USERS } from "./helpers/constants";
 import { goToProposals, openProposalCard, selectProposalTab } from "./helpers/navigation";
 import { inboxRow, openNotificationInbox } from "./helpers/notifications";
@@ -16,7 +16,10 @@ function unfoldIcs(raw: string): string {
 }
 
 test.describe("Calendar ICS download journey", () => {
-  test("solo resolve queues ICS; card/inbox download matches PolyCal", async ({ page }) => {
+  test("solo resolve queues ICS; card/inbox download matches PolyCal", async ({
+    page,
+    baseURL,
+  }) => {
     test.setTimeout(240_000);
 
     const tag = Date.now();
@@ -24,13 +27,14 @@ test.describe("Calendar ICS download journey", () => {
     const start = "2099-11-12T15:00";
     const end = "2099-11-12T17:00";
     const titleEscaped = title.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const origin = baseURL!;
 
     await login(page, USERS.luke.username);
-    // Use page.request so the harness hits the same worker origin/DB as the browser (PC-345).
-    await seedIcsCalendarPrefs(page.request, USERS.luke.username, "download");
+    // Absolute origin keeps harness writes on the same worker DB as the browser (PC-345).
+    await seedIcsCalendarPrefs(page.request, USERS.luke.username, "download", origin);
 
     const verify = await page.request.get(
-      `/api/e2e/calendar-ics-prefs?username=${encodeURIComponent(USERS.luke.username)}`,
+      `${origin}/api/e2e/calendar-ics-prefs?username=${encodeURIComponent(USERS.luke.username)}`,
       { headers: { "x-e2e-api-secret": E2E_API_SECRET } },
     );
     expect(verify.ok()).toBeTruthy();
@@ -46,7 +50,9 @@ test.describe("Calendar ICS download journey", () => {
     await goToProposals(page);
     await createAndSubmitSoloEvent(page, { title, start, end });
 
-    // Board must refetch after awaited sync so pendingIcsId is present (PC-345).
+    // Re-sync after create so pending ICS is guaranteed on this worker DB (PC-345).
+    await forceIcsCalendarSync(page.request, USERS.luke.username, title, origin);
+
     await page.reload();
     await goToProposals(page);
     await selectProposalTab(page, "Resolved");
@@ -91,7 +97,7 @@ test.describe("Calendar ICS download journey", () => {
     const row = inboxRow(
       page,
       new RegExp(`You have a calendar ics available for the event : ${titleEscaped}`),
-    );
+    ).first();
     await expect(row).toBeVisible({ timeout: 20_000 });
     await expect(
       row.getByRole("link", { name: "Download ICS" }).or(

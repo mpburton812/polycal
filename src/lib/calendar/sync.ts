@@ -444,6 +444,7 @@ export async function syncProposalToExternalCalendars(
         "[calendar-sync] skip: no calendar connections for participants",
         proposalId,
         action,
+        `userIds=${userIds.join(",")}`,
       );
       return;
     }

@@ -41,6 +41,11 @@ export const CHANGELOG: ChangelogEntry[] = [
         description:
           "ICS ready notification copy is now “You have a calendar ics available for the event : [name].” and deep-links to the proposal (PC-345).",
       },
+      {
+        type: "fixed",
+        description:
+          "Solo auto-resolve on submit now runs collision decline + scheduleCalendarSync (previously only special/residency proposals called resolveProposal, so Google/ICS never queued for intentional-solo events) (PC-345).",
+      },
     ],
   },
   {
