@@ -1,34 +1,13 @@
 import fs from "node:fs/promises";
 
-import { type Page } from "@playwright/test";
-
 import { expect, test } from "./helpers/test";
 
 import { login } from "./helpers/auth";
+import { seedIcsCalendarPrefs } from "./helpers/calendar-ics";
 import { USERS } from "./helpers/constants";
-import {
-  goToProfile,
-  goToProposals,
-  openProposalCard,
-  selectProposalTab,
-} from "./helpers/navigation";
+import { goToProposals, openProposalCard, selectProposalTab } from "./helpers/navigation";
 import { inboxRow, openNotificationInbox } from "./helpers/notifications";
 import { createAndSubmitSoloEvent, proposalCard } from "./helpers/proposals";
-
-/**
- * Enables iCal / Other download-only delivery for the signed-in user (PC-345).
- */
-async function enableIcsDownloadOnly(page: Page): Promise<void> {
-  await goToProfile(page);
-  const icsRadio = page.getByLabel("iCal / Other (.ics file)");
-  await icsRadio.scrollIntoViewIfNeeded();
-  await icsRadio.check();
-  await page.getByLabel("Download only").check();
-  await page.getByRole("button", { name: "Save iCal / Other preferences" }).click();
-  await expect(page.getByText(/preferences saved/i)).toBeVisible({
-    timeout: 15_000,
-  });
-}
 
 /** Unfolds ICS lines (RFC 5545 folding) into a single string for assertions. */
 function unfoldIcs(raw: string): string {
@@ -36,7 +15,10 @@ function unfoldIcs(raw: string): string {
 }
 
 test.describe("Calendar ICS download journey", () => {
-  test("solo resolve queues ICS; card/inbox download matches PolyCal", async ({ page }) => {
+  test("solo resolve queues ICS; card/inbox download matches PolyCal", async ({
+    page,
+    request,
+  }) => {
     test.setTimeout(240_000);
 
     const tag = Date.now();
@@ -45,12 +27,15 @@ test.describe("Calendar ICS download journey", () => {
     const end = "2099-11-12T17:00";
     const titleEscaped = title.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
+    await seedIcsCalendarPrefs(request, USERS.luke.username, "download");
     await login(page, USERS.luke.username);
-    await enableIcsDownloadOnly(page);
 
     await goToProposals(page);
     await createAndSubmitSoloEvent(page, { title, start, end });
 
+    // Board must refetch after awaited sync so pendingIcsId is present (PC-345).
+    await page.reload();
+    await goToProposals(page);
     await selectProposalTab(page, "Resolved");
     const card = proposalCard(page, title);
     await expect(card).toBeVisible({ timeout: 30_000 });
