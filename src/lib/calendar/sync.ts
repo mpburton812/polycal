@@ -384,12 +384,12 @@ async function syncIcsForUser(
       connection.userId,
       "calendar_ics_pending",
       action === "delete"
-        ? `Download the cancellation calendar file for "${proposal.title}".`
-        : `Download the calendar file for "${proposal.title}".`,
+        ? `You have a calendar ics available for the cancelled event : ${proposal.title}.`
+        : `You have a calendar ics available for the event : ${proposal.title}.`,
       {
         proposalId: proposal.id,
         pendingId,
-        url: "/profile?calendarPending=1",
+        url: `/proposals?open=${encodeURIComponent(proposal.id)}`,
         proposalType: proposal.proposalType,
       },
     );

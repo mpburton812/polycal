@@ -135,7 +135,10 @@ export function resolveNotificationUrl(
   }
 
   if (notificationType === "calendar_ics_pending") {
-    return "/profile?calendarPending=1";
+    if (typeof metadata?.proposalId === "string") {
+      return `/proposals?open=${encodeURIComponent(metadata.proposalId)}`;
+    }
+    return "/proposals";
   }
 
   if (notificationType === "feed_chat_reply") {

@@ -7,6 +7,7 @@ import { z } from "zod";
 
 import { auth } from "@/lib/auth";
 import { userHasAdminAccess } from "@/lib/admin-access";
+import { latestIcsPendingIdsByProposal } from "@/lib/calendar/pending-ics";
 import { getDb } from "@/lib/db/client";
 import { ensureDbReady } from "@/lib/db/ensure-ready";
 import {
@@ -1676,6 +1677,9 @@ export async function getProposalDetailAction(
       reminderOffsetMinutes: row.reminderOffsetMinutes ?? null,
       eventIconKey: row.proposalType !== "event" ? null : row.eventIconKey ?? null,
       specialKind: getProposalSpecialKind(row.description) ?? undefined,
+      pendingIcsId: (
+        await latestIcsPendingIdsByProposal(db, session.user.id, [row.id])
+      ).get(row.id) ?? null,
     },
   };
 }

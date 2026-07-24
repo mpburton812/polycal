@@ -62,6 +62,11 @@ export interface ProposalCard {
   isRecurring?: boolean;
   /** Resolved bedroom label when sleeping + bedroomIndex set (PC-124). */
   bedroomLabel?: string | null;
+  /**
+   * Latest non-dismissed ICS pending id for the current viewer (PC-345).
+   * Present after download so Download ICS remains available.
+   */
+  pendingIcsId?: string | null;
 }
 
 export type RecurrencePattern = "daily" | "weekly" | "monthly" | "yearly";
@@ -192,6 +197,11 @@ export interface ProposalDetail {
   /** Optional category icon for social events (PC-116). */
   eventIconKey: string | null;
   specialKind?: "residency";
+  /**
+   * Latest non-dismissed ICS pending id for the current viewer (PC-345).
+   * Present after download so Download ICS remains available.
+   */
+  pendingIcsId: string | null;
 }
 
 export interface ProposalCommentView {

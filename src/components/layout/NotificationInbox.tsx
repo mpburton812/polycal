@@ -33,6 +33,7 @@ import {
   dismissNotificationAction,
   type NotificationItem,
 } from "@/actions/notifications";
+import { DownloadIcsButton } from "@/components/calendar/DownloadIcsButton";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { brutalPopoverPaperSx } from "@/theme/brutalUi";
 import { fontFamilies } from "@/theme/fonts";
@@ -53,6 +54,7 @@ const NOTIFICATION_TYPE_LABELS: Record<string, string> = {
   partnership_accepted: "Partnership accepted",
   partnership_declined: "Partnership declined",
   alpha_feedback_update: "Feedback update",
+  calendar_ics_pending: "Calendar ICS",
 };
 
 function formatNotificationType(type: string): string {
@@ -415,6 +417,10 @@ export function NotificationInbox({
                         </Button>
                       </>
                     )}
+                    {item.type === "calendar_ics_pending" &&
+                      typeof item.metadata.pendingId === "string" && (
+                        <DownloadIcsButton pendingIcsId={item.metadata.pendingId} />
+                      )}
                     {showAccept && proposalId && (
                       <>
                         <Button
