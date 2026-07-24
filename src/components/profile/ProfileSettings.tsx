@@ -10,6 +10,7 @@ import {
   FormControlLabel,
   FormGroup,
   FormLabel,
+  Link as MuiLink,
   MenuItem,
   Paper,
   Select,
@@ -17,6 +18,7 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
+import NextLink from "next/link";
 import { useRouter } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
 import { Suspense, useState, useTransition } from "react";
@@ -44,6 +46,7 @@ import { PROFILE_BIO_MAX_LENGTH } from "@/lib/users/profile-bio";
 import { LONG_TEXT_MAX } from "@/lib/validation/string-limits";
 import { subscribeToWebPush } from "@/lib/push-client";
 import { brutalPaperSx, brutalSectionTitleSx } from "@/theme/brutalUi";
+import { GARDEN_TOKENS } from "@/theme/tokens";
 
 const ALERT_TYPE_LABELS: Record<keyof NotificationPrefs["alertTypes"], string> = {
   sleepingProposals: "Sleeping proposals",
@@ -663,6 +666,16 @@ export function ProfileSettings({
           Log out
         </Button>
       </Paper>
+
+      <Typography
+        component="footer"
+        variant="body2"
+        sx={{ pt: 1, pb: 2, textAlign: "center", color: GARDEN_TOKENS.inkMuted }}
+      >
+        <MuiLink component={NextLink} href="/privacy" underline="hover" color="inherit">
+          Privacy Policy
+        </MuiLink>
+      </Typography>
 
       <AvatarCropDialog
         open={cropOpen}

@@ -22,6 +22,8 @@ import {
   isGoogleCalendarConfigured,
   refreshGoogleAccessToken,
 } from "@/lib/calendar/google-oauth";
+import { googleCalendarBlockedReason } from "@/lib/calendar/impersonation-guard";
+import { purgeUserGoogleCalendarData } from "@/lib/calendar/purge-google";
 import type { IcsDeliveryMode } from "@/lib/calendar/types";
 import { icsDeliveryModes, GOOGLE_OAUTH_STATE_COOKIE } from "@/lib/calendar/types";
 import { getDb } from "@/lib/db/client";
@@ -39,6 +41,8 @@ export type CalendarConnectionView = {
   icsDelivery: IcsDeliveryMode | null;
   googleConfigured: boolean;
   encryptionConfigured: boolean;
+  /** When true, Google connect / list / sync actions are blocked (PC-344). */
+  impersonating: boolean;
 };
 
 export type PendingIcsView = {
@@ -74,6 +78,7 @@ export async function getCalendarConnectionAction(): Promise<CalendarConnectionV
   const flags = {
     googleConfigured: isGoogleCalendarConfigured() && isCalendarEncryptionConfigured(),
     encryptionConfigured: isCalendarEncryptionConfigured(),
+    impersonating: user.isImpersonating,
   };
 
   if (!row) {
@@ -107,6 +112,10 @@ export async function beginGoogleCalendarConnectAction(): Promise<
 > {
   try {
     const user = await requireUser();
+    const blocked = await googleCalendarBlockedReason();
+    if (blocked) {
+      return { ok: false, message: blocked };
+    }
     if (!isGoogleCalendarConfigured()) {
       return { ok: false, message: "Google Calendar is not configured on this server." };
     }
@@ -138,6 +147,10 @@ export async function setGoogleCalendarIdAction(
 ): Promise<{ ok: boolean; message: string }> {
   try {
     const user = await requireUser();
+    const blocked = await googleCalendarBlockedReason();
+    if (blocked) {
+      return { ok: false, message: blocked };
+    }
     const id = calendarId.trim();
     if (!id) return { ok: false, message: "Choose a calendar." };
 
@@ -183,6 +196,10 @@ export async function listGoogleCalendarsAction(): Promise<
 > {
   try {
     const user = await requireUser();
+    const blocked = await googleCalendarBlockedReason();
+    if (blocked) {
+      return { ok: false, message: blocked };
+    }
     await ensureDbReady();
     const db = getDb();
     const [row] = await db
@@ -230,6 +247,10 @@ export async function saveIcsCalendarPrefsAction(
 ): Promise<{ ok: boolean; message: string }> {
   try {
     const user = await requireUser();
+    const blocked = await googleCalendarBlockedReason();
+    if (blocked) {
+      return { ok: false, message: blocked };
+    }
     const parsed = icsDeliverySchema.safeParse(delivery);
     if (!parsed.success) {
       return { ok: false, message: "Invalid delivery preference." };
@@ -244,7 +265,18 @@ export async function saveIcsCalendarPrefsAction(
       .where(eq(calendarConnections.userId, user.id))
       .limit(1);
 
-    if (existing) {
+    // Leaving Google for iCal — revoke tokens and drop event-link mappings first.
+    if (existing?.provider === "google" || existing?.googleRefreshTokenEnc) {
+      await purgeUserGoogleCalendarData(db, user.id);
+    }
+
+    const [afterPurge] = await db
+      .select()
+      .from(calendarConnections)
+      .where(eq(calendarConnections.userId, user.id))
+      .limit(1);
+
+    if (afterPurge) {
       await db
         .update(calendarConnections)
         .set({
@@ -258,7 +290,7 @@ export async function saveIcsCalendarPrefsAction(
           status: "active",
           updatedAt: now,
         })
-        .where(eq(calendarConnections.id, existing.id));
+        .where(eq(calendarConnections.id, afterPurge.id));
     } else {
       await db.insert(calendarConnections).values({
         id: randomUUID(),
@@ -285,12 +317,19 @@ export async function saveIcsCalendarPrefsAction(
 
 /**
  * Removes the user's calendar connection (stops future sync).
+ * For Google: revokes the OAuth token and deletes local tokens + event-id mappings.
+ * Events already written to Google Calendar remain until the user deletes them there.
  */
 export async function disconnectCalendarAction(): Promise<{ ok: boolean; message: string }> {
   try {
     const user = await requireUser();
+    const blocked = await googleCalendarBlockedReason();
+    if (blocked) {
+      return { ok: false, message: blocked };
+    }
     await ensureDbReady();
     const db = getDb();
+    await purgeUserGoogleCalendarData(db, user.id);
     await db.delete(calendarConnections).where(eq(calendarConnections.userId, user.id));
     await logUserActivity(user.id, "calendar.disconnected", "{}");
     revalidatePath("/profile");

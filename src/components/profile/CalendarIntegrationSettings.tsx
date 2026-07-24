@@ -9,6 +9,7 @@ import {
   FormControl,
   FormControlLabel,
   FormLabel,
+  Link as MuiLink,
   MenuItem,
   Radio,
   RadioGroup,
@@ -16,6 +17,7 @@ import {
   Stack,
   Typography,
 } from "@mui/material";
+import NextLink from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 
@@ -107,6 +109,25 @@ export function CalendarIntegrationSettings({
         already have, or gives you a file to add yourself.
       </Typography>
 
+      {connection?.impersonating && (
+        <Alert severity="info">
+          Google Calendar connect, list, sync, and disconnect are disabled while impersonating.
+          Sign back in as yourself to manage calendar integration.
+        </Alert>
+      )}
+
+      {providerChoice === "google" && !connection?.impersonating && (
+        <Typography variant="body2" color="text.secondary">
+          Connecting Google lets PolyCal create and update events on a calendar you choose. Tokens
+          are encrypted at rest; admins cannot access your Google Calendar data. See how we handle
+          Google user data in our{" "}
+          <MuiLink component={NextLink} href="/privacy#google" underline="hover">
+            Privacy Policy
+          </MuiLink>
+          .
+        </Typography>
+      )}
+
       {error && (
         <Alert severity="error" onClose={() => setError(null)}>
           {error}
@@ -172,14 +193,21 @@ export function CalendarIntegrationSettings({
           <FormControlLabel
             value="google"
             control={<Radio />}
-            disabled={!connection?.googleConfigured}
+            disabled={!connection?.googleConfigured || Boolean(connection?.impersonating)}
             label={
-              connection?.googleConfigured
-                ? "Google Calendar (automatic sync)"
-                : "Google Calendar (not configured on server)"
+              connection?.impersonating
+                ? "Google Calendar (disabled while impersonating)"
+                : connection?.googleConfigured
+                  ? "Google Calendar (automatic sync)"
+                  : "Google Calendar (not configured on server)"
             }
           />
-          <FormControlLabel value="ics" control={<Radio />} label="iCal / Other (.ics file)" />
+          <FormControlLabel
+            value="ics"
+            control={<Radio />}
+            disabled={Boolean(connection?.impersonating)}
+            label="iCal / Other (.ics file)"
+          />
         </RadioGroup>
       </FormControl>
 
@@ -194,7 +222,7 @@ export function CalendarIntegrationSettings({
           <Button
             variant="outlined"
             href="/api/calendar/google/start"
-            disabled={!connection?.googleConfigured}
+            disabled={!connection?.googleConfigured || Boolean(connection?.impersonating)}
           >
             {connection?.provider === "google" ? "Reconnect Google" : "Connect Google Calendar"}
           </Button>
@@ -222,7 +250,7 @@ export function CalendarIntegrationSettings({
               )}
               <Button
                 variant="contained"
-                disabled={pendingUi || !selectedCalendarId}
+                disabled={pendingUi || !selectedCalendarId || Boolean(connection?.impersonating)}
                 onClick={() => {
                   startTransition(async () => {
                     const result = await setGoogleCalendarIdAction(selectedCalendarId);
@@ -240,7 +268,7 @@ export function CalendarIntegrationSettings({
               {calendars.length === 0 && connection?.provider === "google" && (
                 <Button
                   size="small"
-                  disabled={pendingUi}
+                  disabled={pendingUi || Boolean(connection?.impersonating)}
                   onClick={() => {
                     startTransition(async () => {
                       const result = await listGoogleCalendarsAction();
@@ -285,7 +313,7 @@ export function CalendarIntegrationSettings({
           </Typography>
           <Button
             variant="contained"
-            disabled={pendingUi}
+            disabled={pendingUi || Boolean(connection?.impersonating)}
             onClick={() => {
               startTransition(async () => {
                 const result = await saveIcsCalendarPrefsAction(icsDelivery);
@@ -308,7 +336,7 @@ export function CalendarIntegrationSettings({
           connection.icsDelivery)) ? (
         <Button
           color="warning"
-          disabled={pendingUi}
+          disabled={pendingUi || Boolean(connection?.impersonating)}
           onClick={() => {
             startTransition(async () => {
               await disconnectCalendarAction();

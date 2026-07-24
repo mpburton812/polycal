@@ -213,6 +213,7 @@ Vote options:
 - **Calendar integration** (Profile, and optional onboarding step):
   - **Google Calendar** — connect your Google account and pick an existing calendar. Confirmed events sync automatically (create/update/delete). Sleeping arrangements appear as all-day events marked free on your calendar, using the same title as in PolyCal.
   - **iCal / Other** — choose Download, Email, or Both for `.ics` files (Apple Calendar, Outlook, etc.). If email is not available, PolyCal notifies you and offers a download when you next open the app.
+- **Privacy Policy** — public page at `/privacy` (also linked from the homepage, the start of first-login setup, and the bottom of Profile & Settings). Describes account data, group sharing, Google Calendar access/use/storage/deletion (Limited Use), email, and push.
 - Each proposal keeps an **activity / audit log** of state changes (who did what, when). Admins can configure how visible that log is (everyone → admin only).
 
 ---
@@ -254,4 +255,4 @@ Admins can also toggle **Admins can see proposals they are not involved in** (de
 - [ARCHITECTURE.md](./ARCHITECTURE.md) — technical environment map  
 - [REQUIREMENTS-WORKFLOW.md](./REQUIREMENTS-WORKFLOW.md) — development & Jira process (for builders)
 
-*Last updated for PC-282 (post-280 audit: timezone-safe sleeping nights, feed-image ACL, impersonation admin gate, Playwright accuracy). Builds on PC-280 removals (Planning, Clone, group-name, power management, private/super-private; sleeping involved-only).*
+*Last updated for PC-344 (public Privacy Policy at `/privacy`, linked from Profile and guided setup). Prior: PC-282 (post-280 audit: timezone-safe sleeping nights, feed-image ACL, impersonation admin gate, Playwright accuracy). Builds on PC-280 removals (Planning, Clone, group-name, power management, private/super-private; sleeping involved-only).*

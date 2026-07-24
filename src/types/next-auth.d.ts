@@ -13,6 +13,8 @@ declare module "next-auth" {
       avatarKey?: string;
       theme?: string;
       sessionVersion?: number;
+      /** True when an admin signed in as this user via impersonation (PC-344). */
+      isImpersonating?: boolean;
     } & DefaultSession["user"];
   }
 
@@ -25,6 +27,7 @@ declare module "next-auth" {
     displayName: string;
     avatarKey?: string;
     theme?: string;
+    isImpersonating?: boolean;
   }
 }
 
@@ -42,6 +45,7 @@ declare module "next-auth/jwt" {
     error?: string;
     /** Epoch ms of last DB user-row refresh in the jwt callback (PC-144). */
     dbRefreshedAt?: number;
+    isImpersonating?: boolean;
   }
 }
 

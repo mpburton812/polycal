@@ -7,6 +7,8 @@ import type { UserRole } from "@/types/user";
 export interface SessionUser {
   id: string;
   role: UserRole;
+  /** True when an admin is impersonating this account (PC-344). */
+  isImpersonating: boolean;
 }
 
 export type ActionContextError = { ok: false; message: string };
@@ -22,7 +24,11 @@ export async function requireSession():
   }
   return {
     ok: true,
-    user: { id: session.user.id, role: session.user.role as UserRole },
+    user: {
+      id: session.user.id,
+      role: session.user.role as UserRole,
+      isImpersonating: session.user.isImpersonating === true,
+    },
   };
 }
 

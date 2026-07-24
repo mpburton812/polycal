@@ -112,6 +112,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             displayName: row.displayName,
             avatarKey: row.avatarKey ?? undefined,
             theme: row.theme,
+            // Marks JWT so Google Calendar API calls stay disabled (PC-344).
+            isImpersonating: true,
           };
         }
 
@@ -151,6 +153,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           displayName: row.displayName,
           avatarKey: row.avatarKey ?? undefined,
           theme: row.theme,
+          isImpersonating: false,
         };
       },
     }),
