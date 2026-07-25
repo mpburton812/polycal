@@ -37,8 +37,6 @@ import {
 import { DEFAULT_ONBOARDING_WELCOME_MESSAGE } from "@/types/poly-group";
 import { auth } from "@/lib/auth";
 
-export { importResidencesAndPassiveSleeping } from "@/lib/networks/import-on-join";
-
 const SETUP_TOKEN_TTL_MS = 15 * 60 * 1000;
 
 function newSetupToken(): string {
