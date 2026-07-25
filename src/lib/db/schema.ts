@@ -597,7 +597,7 @@ export const calendarConnections = sqliteTable(
   },
 );
 
-/** Maps a PolyCal proposal to an external calendar event per user — PC-338. */
+/** Maps a PolyCal proposal to an external calendar event per user (+ night) — PC-338 / PC-351. */
 export const calendarEventLinks = sqliteTable(
   "calendar_event_links",
   {
@@ -613,11 +613,13 @@ export const calendarEventLinks = sqliteTable(
     googleCalendarId: text("google_calendar_id"),
     icsUid: text("ics_uid"),
     icsSequence: integer("ics_sequence").notNull().default(0),
+    /** Empty for single-span events; YYYY-MM-DD for each batch night (PC-351). */
+    nightKey: text("night_key").notNull().default(""),
     lastSyncedAt: text("last_synced_at").notNull(),
     createdAt: text("created_at").notNull(),
     updatedAt: text("updated_at").notNull(),
   },
-  (table) => [unique().on(table.userId, table.proposalId)],
+  (table) => [unique().on(table.userId, table.proposalId, table.nightKey)],
 );
 
 /** Queued ICS downloads when email is unavailable or Both is selected — PC-340. */

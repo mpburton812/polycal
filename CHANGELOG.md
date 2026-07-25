@@ -20,6 +20,9 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Changed
+- PC-351: Batch sleeping syncs one all-day free Google/ICS event per night (LOCATION field + `, at Location` in title); non-batch multi-day sleeping stays one span; resolved sleeping titles omit Confirmed; SCHEMA_VERSION 37 (`calendar_event_links.night_key`). Change control: `2026.07.24e`.
+
 ### Added
 - PC-348 / PC-349: Onboarding Google OAuth restores Calendar step; inbox Open Proposal for partnerships; prune stale actionable notifications when the bell opens. Change control: `2026.07.24c`.
 - PC-344: Public `/privacy` policy (auth, Turso/DB fields, Google Calendar encrypted tokens + Limited Use, Resend, web push, in-group sharing); middleware allowlist; links at bottom of Profile & Settings and front of first-login guided setup. Follow-up: Google access/use/store/share/delete + Limited Use / human-access language; token revoke + event-link purge on disconnect and account delete; public homepage with privacy link; connect-time disclosure; impersonation disables Google Calendar API/OAuth calls. Change control: `2026.07.23b`.
