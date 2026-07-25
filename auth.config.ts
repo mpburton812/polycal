@@ -34,6 +34,10 @@ export const authConfig = {
         token.avatarKey = user.avatarKey;
         token.theme = user.theme;
         token.isImpersonating = user.isImpersonating === true;
+        token.activeNetworkId = user.activeNetworkId;
+        token.activeNetworkRole = user.activeNetworkRole;
+        token.isPlatformAdmin = user.isPlatformAdmin === true;
+        token.networkIds = user.networkIds ?? [];
         token.dbRefreshedAt = Date.now();
         delete token.error;
       }
@@ -53,6 +57,12 @@ export const authConfig = {
         if (session.user.theme) token.theme = session.user.theme;
         if (typeof session.user.sessionVersion === "number") {
           token.sessionVersion = session.user.sessionVersion;
+        }
+        if (typeof session.user.activeNetworkId === "string") {
+          token.activeNetworkId = session.user.activeNetworkId;
+        }
+        if (session.user.activeNetworkRole) {
+          token.activeNetworkRole = session.user.activeNetworkRole;
         }
         // Force a DB re-check after client session.update (password / onboarding).
         token.dbRefreshedAt = 0;
@@ -93,6 +103,7 @@ export const authConfig = {
             displayName: users.displayName,
             avatarKey: users.avatarKey,
             theme: users.theme,
+            isPlatformAdmin: users.isPlatformAdmin,
           })
           .from(users)
           .where(eq(users.id, token.id as string))
@@ -115,6 +126,35 @@ export const authConfig = {
         token.displayName = row.displayName;
         token.avatarKey = row.avatarKey ?? undefined;
         token.theme = row.theme;
+        token.isPlatformAdmin = row.isPlatformAdmin === true;
+
+        // Reconcile active network when JWT points at a wiped/recreated tenant
+        // (E2E per-test reset) or membership was removed (PC-357).
+        try {
+          const { listActiveMemberships } = await import("@/lib/networks/membership");
+          const memberships = await listActiveMemberships(token.id as string);
+          const usable = memberships.filter(
+            (m) => m.networkStatus === "active" || m.role === "network_admin",
+          );
+          const preferred =
+            typeof token.activeNetworkId === "string"
+              ? usable.find((m) => m.networkId === token.activeNetworkId) ??
+                memberships.find((m) => m.networkId === token.activeNetworkId)
+              : undefined;
+          const next = preferred ?? usable[0] ?? memberships[0];
+          if (next) {
+            token.activeNetworkId = next.networkId;
+            token.activeNetworkRole = next.role;
+            token.networkIds = memberships.map((m) => m.networkId);
+          } else {
+            delete token.activeNetworkId;
+            delete token.activeNetworkRole;
+            token.networkIds = [];
+          }
+        } catch {
+          /* networks table may be mid-migration — keep prior claims */
+        }
+
         token.dbRefreshedAt = Date.now();
         delete token.error;
       }
@@ -137,6 +177,10 @@ export const authConfig = {
         session.user.avatarKey = token.avatarKey as string | undefined;
         session.user.theme = token.theme as string | undefined;
         session.user.isImpersonating = token.isImpersonating === true;
+        session.user.activeNetworkId = token.activeNetworkId as string | undefined;
+        session.user.activeNetworkRole = token.activeNetworkRole;
+        session.user.isPlatformAdmin = token.isPlatformAdmin === true;
+        session.user.networkIds = token.networkIds ?? [];
       }
       return session;
     },

@@ -50,8 +50,16 @@ export async function resetTestDatabase(): Promise<{
   await client.execute("DELETE FROM network_chat_messages");
   await client.execute("DELETE FROM stored_images");
   await client.execute("DELETE FROM locations");
+  // Multi-network tables reference users — wipe before users (PC-357).
+  await client.execute("DELETE FROM network_setup_tokens");
+  await client.execute("DELETE FROM network_members");
+  await client.execute("DELETE FROM networks");
   await client.execute("DELETE FROM users");
   await client.execute("DELETE FROM poly_group");
+  // Allow networks backfill to re-run after reseed (PC-357).
+  await client.execute(
+    `DELETE FROM schema_meta WHERE key = 'networks_backfill_v1'`,
+  );
 
   let usersSeeded = false;
   let proposalCount = 0;
@@ -70,6 +78,10 @@ export async function resetTestDatabase(): Promise<{
   if (!usersSeeded) {
     throw new Error(`${seedProfile} seed failed after reset.`);
   }
+
+  // Rebuild the default network + memberships for the freshly seeded rows (PC-357).
+  const { applyNetworksMigrations } = await import("@/lib/db/networks-migrations");
+  await applyNetworksMigrations(client);
 
   await client.execute({
     sql: `INSERT INTO schema_meta (key, value) VALUES ('seed_reset_at', ?)

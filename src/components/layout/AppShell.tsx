@@ -24,6 +24,7 @@ export function AppShell({
   notificationCount = 0,
   notificationItems = [],
   notificationPrefs,
+  isPlatformAdmin = false,
 }: {
   children: React.ReactNode;
   displayName: string;
@@ -33,6 +34,7 @@ export function AppShell({
   notificationCount?: number;
   notificationItems?: NotificationItem[];
   notificationPrefs: NotificationPrefs;
+  isPlatformAdmin?: boolean;
 }) {
   const avatarSrc = avatarSrcForKey(avatarKey);
   const vapidPublicKey = getVapidPublicKey();
@@ -60,6 +62,7 @@ export function AppShell({
           notificationCount={notificationCount}
           notificationItems={notificationItems}
           avatarSrc={avatarSrc}
+          isPlatformAdmin={isPlatformAdmin}
         />
       </Box>
       <Container
