@@ -43,6 +43,18 @@ const serwist = new Serwist({
     ...defaultCache,
   ],
 
+  // Offline navigations render the precached /offline route instead of the browser's
+  // network-error page (PC-354). Scoped to document requests so failed API/asset fetches
+  // still surface as real errors rather than a page of HTML.
+  fallbacks: {
+    entries: [
+      {
+        url: "/offline",
+        matcher: ({ request }) => request.destination === "document",
+      },
+    ],
+  },
+
 });
 
 

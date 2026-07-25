@@ -307,7 +307,11 @@ function FirstLoginWizardInner({
         Complete these steps before using the app.
       </Typography>
       <Typography variant="body2" sx={{ mb: 3, color: GARDEN_TOKENS.inkMuted }}>
-        By continuing, you acknowledge how PolyCal handles group scheduling data. Read our{" "}
+        By continuing, you agree to our{" "}
+        <MuiLink component={NextLink} href="/terms" underline="hover" target="_blank" rel="noopener noreferrer">
+          Terms of Service
+        </MuiLink>{" "}
+        and acknowledge how PolyCal handles group scheduling data, described in our{" "}
         <MuiLink component={NextLink} href="/privacy" underline="hover" target="_blank" rel="noopener noreferrer">
           Privacy Policy
         </MuiLink>

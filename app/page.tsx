@@ -75,6 +75,10 @@ export default async function HomePage() {
             <MuiLink component={NextLink} href="/privacy" underline="hover" color="inherit">
               Privacy Policy
             </MuiLink>
+            {" · "}
+            <MuiLink component={NextLink} href="/terms" underline="hover" color="inherit">
+              Terms of Service
+            </MuiLink>
           </Typography>
         </Stack>
       </Paper>
