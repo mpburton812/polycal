@@ -4,17 +4,18 @@ import {
   formatSleepingDisplayTitle,
   formatSleepingParticipantNames,
   sleepingDisplayStatus,
+  stripConfirmedFromSleepingTitle,
 } from "@/lib/proposals/sleeping-display";
 
 describe("formatSleepingDisplayTitle", () => {
-  it("formats solo sleeping with proposer name only", () => {
+  it("formats solo sleeping without Confirmed when resolved (PC-351)", () => {
     expect(
       formatSleepingDisplayTitle({
         proposerName: "Han Solo",
         intentionalSolo: true,
         state: "resolved",
       }),
-    ).toBe("Sleeping: Han Solo, Confirmed");
+    ).toBe("Sleeping: Han Solo");
   });
 
   it("formats multi-participant sleeping with location inline (PC-150)", () => {
@@ -28,7 +29,7 @@ describe("formatSleepingDisplayTitle", () => {
     ).toBe("Sleeping: Leia Organa, Han Solo, Tentative, at Millennium Falcon");
   });
 
-  it("uses Confirmed status when resolved (PC-303)", () => {
+  it("omits Confirmed when resolved but keeps at Location (PC-351)", () => {
     expect(
       formatSleepingDisplayTitle({
         proposerName: "Leia Organa",
@@ -36,11 +37,15 @@ describe("formatSleepingDisplayTitle", () => {
         locationName: "Millennium Falcon",
         state: "resolved",
       }),
-    ).toBe("Sleeping: Leia Organa, Han Solo, Confirmed, at Millennium Falcon");
+    ).toBe("Sleeping: Leia Organa, Han Solo, at Millennium Falcon");
   });
 
   it("uses Proposed status for drafts", () => {
     expect(sleepingDisplayStatus({ state: "draft" })).toBe("Proposed");
+  });
+
+  it("returns null status when resolved (PC-351)", () => {
+    expect(sleepingDisplayStatus({ state: "resolved" })).toBeNull();
   });
 
   it("uses At risk when flagged", () => {
@@ -54,5 +59,16 @@ describe("formatSleepingDisplayTitle", () => {
         inviteeNames: ["A", "B"],
       }),
     ).toEqual(["A", "B"]);
+  });
+
+  it("strips Confirmed from legacy titles without removing location", () => {
+    expect(
+      stripConfirmedFromSleepingTitle(
+        "Sleeping: Morgan B., Doc KT, Confirmed, at Katie's Swingin' Pad",
+      ),
+    ).toBe("Sleeping: Morgan B., Doc KT, at Katie's Swingin' Pad");
+    expect(stripConfirmedFromSleepingTitle("Sleeping: Han Solo, Confirmed")).toBe(
+      "Sleeping: Han Solo",
+    );
   });
 });

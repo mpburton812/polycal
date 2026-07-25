@@ -3,7 +3,9 @@
 ## Expected behavior
 
 - Sync runs for **each participant who has** a `calendar_connections` row (Google or ICS). Missing Google for an invitee does **not** block the proposer.
-- Sleeping (including batch) → **one** all-day free/transparent Google event from `scheduledStartAt` → `scheduledEndAt` (first→last night for batch).
+- Non-batch sleeping → **one** all-day free/transparent Google event spanning `scheduledStartAt` → `scheduledEndAt`.
+- Batch sleeping → **one all-day free event per night** (per-night LOCATION + title with `, at Location`; no “Confirmed” in resolved titles). Each night syncs only for the proposer and that night’s invitees (PC-351).
+- `calendar_event_links` keys events by `(user_id, proposal_id, night_key)` (empty `night_key` for single-span events).
 - Admin **Fast sleeping plan add** force-resolves with **awaited** calendar sync (not only `after()`).
 - Success / skip / failure surfaces as inbox notifications: `calendar_google_synced` / `calendar_google_failed`.
 
@@ -22,8 +24,8 @@ When PolyCal shows nights but Google does not:
    - `provider failed` / `calendar.sync_failed` audit
 3. **Database** (Turso production), for the affected user / proposal:
    - `calendar_connections`: `provider`, `status`, `google_calendar_id`
-   - `calendar_event_links`: row with `google_event_id` for that `proposal_id` + `user_id`
-4. **Google UI**: look for an **all-day free** block spanning the night range (easy to miss vs timed events).
+   - `calendar_event_links`: row(s) with `google_event_id` for that `proposal_id` + `user_id` (one row per `night_key` for batch)
+4. **Google UI**: look for **all-day free** night(s) — batch plans show one block per night (easy to miss vs timed events).
 
 ### Confirmed production root cause (2026-07-24)
 

@@ -26,6 +26,19 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "2026.07.24e",
+    date: "2026-07-24",
+    summary:
+      "Batch sleeping syncs one all-day free Google/ICS night each; drop Confirmed from resolved titles.",
+    changes: [
+      {
+        type: "changed",
+        description:
+          "Batch sleeping exports one all-day free external calendar event per night (per-night LOCATION + title keeps `, at Location`); non-batch multi-day sleeping stays one span; resolved/archived sleeping titles omit Confirmed; SCHEMA_VERSION 37 adds calendar_event_links.night_key (PC-351).",
+      },
+    ],
+  },
+  {
     version: "2026.07.24d",
     date: "2026-07-24",
     summary:

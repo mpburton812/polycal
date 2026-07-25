@@ -10,7 +10,7 @@ import { applyRateLimitMigrations } from "./rate-limit-migrations";
 import { applyCalendarMigrations } from "./calendar-migrations";
 
 /** Bump whenever bootstrap DDL or *-migrations.ts modules change (PC-143). */
-export const SCHEMA_VERSION = "36";
+export const SCHEMA_VERSION = "37";
 
 /**
  * True when the stored schema version already matches the app target — skip

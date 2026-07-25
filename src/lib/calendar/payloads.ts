@@ -1,7 +1,15 @@
 /**
- * Builds Google Calendar / ICS event payloads from PolyCal proposals (PC-338).
+ * Builds Google Calendar / ICS event payloads from PolyCal proposals (PC-338 / PC-351).
  */
 import type { proposals } from "@/lib/db/schema";
+import {
+  parseBatchEntriesJson,
+  type BatchSleepingEntry,
+} from "@/lib/proposals/batch-sleeping";
+import {
+  formatSleepingDisplayTitle,
+  stripConfirmedFromSleepingTitle,
+} from "@/lib/proposals/sleeping-display";
 
 export type ProposalRow = typeof proposals.$inferSelect;
 
@@ -15,13 +23,54 @@ export interface CalendarEventPayload {
   /** When true, mark free/transparent (sleeping arrangements). */
   transparencyFree: boolean;
   proposalType: "event" | "sleeping";
+  /**
+   * Stable key for multi-event sync (PC-351).
+   * Empty string for non-batch / single span; YYYY-MM-DD for each batch night.
+   */
+  nightKey: string;
+}
+
+/** Names needed to build per-night sleeping titles during sync. */
+export interface CalendarPayloadNameContext {
+  proposerName: string;
+  /** displayName by userId for invitees (and proposer if useful). */
+  displayNameByUserId: Record<string, string>;
+  /** Proposal-level invitee display names (non-batch sleeping titles). */
+  proposalInviteeNames?: string[];
 }
 
 /**
- * Maps a resolved proposal to an external calendar payload.
- * Sleeping: all-day + free/transparent; title is the PolyCal sleeping title as stored.
+ * Maps a resolved proposal to external calendar payload(s).
+ * Non-batch sleeping / events → one payload. Batch sleeping → one all-day free payload per night.
  */
-export function buildCalendarEventPayload(proposal: ProposalRow): CalendarEventPayload | null {
+export function buildCalendarEventPayloads(
+  proposal: ProposalRow,
+  nameCtx?: CalendarPayloadNameContext,
+  recipientUserId?: string,
+): CalendarEventPayload[] {
+  if (proposal.proposalType === "sleeping" && proposal.isBatchSleeping) {
+    return buildBatchSleepingPayloads(proposal, nameCtx, recipientUserId);
+  }
+
+  const single = buildSingleCalendarEventPayload(proposal, nameCtx);
+  return single ? [single] : [];
+}
+
+/**
+ * Backward-compatible single-payload helper (non-batch paths / tests).
+ */
+export function buildCalendarEventPayload(
+  proposal: ProposalRow,
+  nameCtx?: CalendarPayloadNameContext,
+): CalendarEventPayload | null {
+  const list = buildCalendarEventPayloads(proposal, nameCtx);
+  return list[0] ?? null;
+}
+
+function buildSingleCalendarEventPayload(
+  proposal: ProposalRow,
+  nameCtx?: CalendarPayloadNameContext,
+): CalendarEventPayload | null {
   if (!proposal.scheduledStartAt) return null;
 
   const isSleeping = proposal.proposalType === "sleeping";
@@ -31,29 +80,127 @@ export function buildCalendarEventPayload(proposal: ProposalRow): CalendarEventP
 
   if (isSleeping) {
     isAllDay = true;
-    // All-day exclusive end: if only a night start, span that calendar day.
     if (!endAt || endAt === startAt) {
       const day = startAt.slice(0, 10);
       endAt = `${day}T00:00:00.000Z`;
-      // Caller formats all-day end as next day exclusive in adapters.
     }
   }
 
+  const location = proposal.locationText?.trim() || null;
+  const title = isSleeping
+    ? sleepingCalendarTitle(proposal, location, nameCtx)
+    : proposal.title;
+
   return {
-    title: proposal.title,
+    title,
     description: proposal.description ?? undefined,
-    location: proposal.locationText,
+    location,
     startAt,
     endAt,
     isAllDay,
     transparencyFree: isSleeping,
     proposalType: proposal.proposalType,
+    nightKey: "",
   };
 }
 
-/** Stable ICS UID per user + proposal. */
-export function buildIcsUid(userId: string, proposalId: string): string {
-  return `polycal-${proposalId}-${userId}@polycal.app`;
+function buildBatchSleepingPayloads(
+  proposal: ProposalRow,
+  nameCtx?: CalendarPayloadNameContext,
+  recipientUserId?: string,
+): CalendarEventPayload[] {
+  const entries = parseBatchEntriesJson(proposal.batchEntriesJson);
+  if (entries.length === 0) {
+    // Fallback: treat as single span using scheduled bounds.
+    const single = buildSingleCalendarEventPayload(proposal, nameCtx);
+    return single ? [single] : [];
+  }
+
+  const sorted = [...entries].sort((a, b) => a.nightDate.localeCompare(b.nightDate));
+  const payloads: CalendarEventPayload[] = [];
+
+  for (const entry of sorted) {
+    if (recipientUserId && !userOnBatchNight(proposal.proposerId, entry, recipientUserId)) {
+      continue;
+    }
+    const nightKey = entry.nightDate.slice(0, 10);
+    const startAt = `${nightKey}T00:00:00.000Z`;
+    const location = entry.locationText?.trim() || null;
+    const title = batchNightTitle(proposal, entry, location, nameCtx);
+
+    payloads.push({
+      title,
+      description: entry.comment?.trim() || proposal.description || undefined,
+      location,
+      startAt,
+      endAt: startAt,
+      isAllDay: true,
+      transparencyFree: true,
+      proposalType: "sleeping",
+      nightKey,
+    });
+  }
+
+  return payloads;
+}
+
+function userOnBatchNight(
+  proposerId: string,
+  entry: BatchSleepingEntry,
+  userId: string,
+): boolean {
+  if (userId === proposerId) return true;
+  if (entry.intentionalSolo) return false;
+  return entry.invitees.some((inv) => inv.userId === userId);
+}
+
+function sleepingCalendarTitle(
+  proposal: ProposalRow,
+  location: string | null,
+  nameCtx?: CalendarPayloadNameContext,
+): string {
+  if (nameCtx?.proposerName) {
+    return formatSleepingDisplayTitle({
+      proposerName: nameCtx.proposerName,
+      inviteeNames: proposal.intentionalSolo ? [] : (nameCtx.proposalInviteeNames ?? []),
+      intentionalSolo: proposal.intentionalSolo,
+      locationName: location,
+      state: proposal.state,
+      atRisk: proposal.atRisk,
+    });
+  }
+  return stripConfirmedFromSleepingTitle(proposal.title);
+}
+
+function batchNightTitle(
+  proposal: ProposalRow,
+  entry: BatchSleepingEntry,
+  location: string | null,
+  nameCtx?: CalendarPayloadNameContext,
+): string {
+  if (!nameCtx?.proposerName) {
+    return stripConfirmedFromSleepingTitle(proposal.title);
+  }
+  const inviteeNames = entry.intentionalSolo
+    ? []
+    : entry.invitees
+        .map((inv) => nameCtx.displayNameByUserId[inv.userId])
+        .filter((n): n is string => Boolean(n?.trim()));
+
+  return formatSleepingDisplayTitle({
+    proposerName: nameCtx.proposerName,
+    inviteeNames,
+    intentionalSolo: Boolean(entry.intentionalSolo),
+    locationName: location,
+    state: proposal.state,
+    atRisk: proposal.atRisk,
+  });
+}
+
+/** Stable ICS UID per user + proposal (+ optional night key for batch). */
+export function buildIcsUid(userId: string, proposalId: string, nightKey = ""): string {
+  const night = nightKey.trim() ? `-${nightKey.trim()}` : "";
+  return `polycal-${proposalId}${night}-${userId}@polycal.app`;
 }
 
 /** YYYYMMDD for all-day ICS/Google date fields. */
