@@ -312,3 +312,4 @@
 2026-07-25 | 09f3a10 | PC-355 | indexes, FK pragma, bounded scans, sync concurrency | src/actions/notifications.ts
 2026-07-25 | 1644a50 | PC-354 | retrigger Jira commit validation after rebase | n/a
 2026-07-25 | 354b811 | PC-356 | retrigger Jira commit validation after rebase | n/a
+2026-07-25 | 48dd5d5 | PC-356 | fall back Jira range after force-push | scripts/ci-validate-jira-commits.sh
