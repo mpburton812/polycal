@@ -89,7 +89,7 @@ async function readAvatarUpload(
   if (!isCroppedAvatarLargeEnough(file.size)) {
     return {
       ok: false,
-      error: "Image is too small after crop. Zoom in or choose a larger photo.",
+      message: "Image is too small after crop. Zoom in or choose a larger photo.",
     };
   }
 
