@@ -1,5 +1,5 @@
 /**
- * One-way PolyCal → external calendar sync orchestrator (PC-338 / PC-342).
+ * One-way PolyCal → external calendar sync orchestrator (PC-338 / PC-342 / PC-351).
  * Non-blocking via Next.js `after()` so Vercel keeps the serverless invocation
  * alive until Google/ICS work finishes (bare `void` is dropped after the response).
  */
@@ -15,8 +15,13 @@ import {
   patchGoogleEvent,
 } from "@/lib/calendar/google-api";
 import { refreshGoogleAccessToken } from "@/lib/calendar/google-oauth";
-import { buildIcsDocument } from "@/lib/calendar/ics";
-import { buildCalendarEventPayload, buildIcsUid } from "@/lib/calendar/payloads";
+import { buildIcsMultiDocument } from "@/lib/calendar/ics";
+import {
+  buildCalendarEventPayloads,
+  buildIcsUid,
+  type CalendarEventPayload,
+  type CalendarPayloadNameContext,
+} from "@/lib/calendar/payloads";
 import type { CalendarSyncAction, IcsDeliveryMode } from "@/lib/calendar/types";
 import { getDb } from "@/lib/db/client";
 import {
@@ -29,10 +34,14 @@ import {
 } from "@/lib/db/schema";
 import { sendEmail } from "@/lib/email/send";
 import { notifyUser } from "@/lib/notifications";
+import { parseBatchEntriesJson } from "@/lib/proposals/batch-sleeping";
 import { isNonScheduleProposal } from "@/lib/proposals/special-proposals";
 import { logUserActivity } from "@/lib/audit";
 
 type Db = ReturnType<typeof getDb>;
+type ProposalRow = typeof proposals.$inferSelect;
+type LinkRow = typeof calendarEventLinks.$inferSelect;
+type ConnectionRow = typeof calendarConnections.$inferSelect;
 
 async function loadProposal(db: Db, proposalId: string) {
   const [row] = await db.select().from(proposals).where(eq(proposals.id, proposalId)).limit(1);
@@ -48,9 +57,45 @@ async function participantUserIds(db: Db, proposalId: string, proposerId: string
   return [...new Set([proposerId, ...invitees.map((r) => r.userId)])];
 }
 
+/**
+ * Loads display names for sleeping calendar titles (proposal + batch night invitees).
+ */
+async function loadCalendarNameContext(
+  db: Db,
+  proposal: ProposalRow,
+  inviteeIds: string[],
+): Promise<CalendarPayloadNameContext> {
+  const batchIds = parseBatchEntriesJson(proposal.batchEntriesJson).flatMap((entry) =>
+    entry.invitees.map((inv) => inv.userId),
+  );
+  const ids = [...new Set([proposal.proposerId, ...inviteeIds, ...batchIds])];
+  if (ids.length === 0) {
+    return { proposerName: "Someone", displayNameByUserId: {}, proposalInviteeNames: [] };
+  }
+
+  const rows = await db
+    .select({ id: users.id, displayName: users.displayName })
+    .from(users)
+    .where(inArray(users.id, ids));
+
+  const displayNameByUserId: Record<string, string> = {};
+  for (const row of rows) {
+    if (row.displayName?.trim()) {
+      displayNameByUserId[row.id] = row.displayName.trim();
+    }
+  }
+
+  const proposerName = displayNameByUserId[proposal.proposerId] ?? "Someone";
+  const proposalInviteeNames = inviteeIds
+    .map((id) => displayNameByUserId[id])
+    .filter((name): name is string => Boolean(name?.trim()));
+
+  return { proposerName, displayNameByUserId, proposalInviteeNames };
+}
+
 async function getValidGoogleAccessToken(
   db: Db,
-  connection: typeof calendarConnections.$inferSelect,
+  connection: ConnectionRow,
 ): Promise<string | null> {
   if (!connection.googleRefreshTokenEnc) return null;
   const now = Date.now();
@@ -94,20 +139,23 @@ async function getValidGoogleAccessToken(
   }
 }
 
+function batchNightNotifySuffix(proposal: ProposalRow, nightCount: number): string {
+  if (!proposal.isBatchSleeping || nightCount <= 0) return "";
+  const label = nightCount === 1 ? "1 all-day free night" : `${nightCount} all-day free nights`;
+  return ` (${label})`;
+}
+
 /**
- * Notifies the connection owner about Google sync success (PC-346).
- * Batch sleeping is one multi-day all-day free block — call that out so users
- * do not look for per-night timed events.
+ * Notifies the connection owner about Google sync success (PC-346 / PC-351).
  */
 async function notifyGoogleSynced(
-  connection: typeof calendarConnections.$inferSelect,
-  proposal: typeof proposals.$inferSelect,
+  connection: ConnectionRow,
+  proposal: ProposalRow,
   kind: "added" | "updated" | "removed",
+  nightCount = 0,
 ): Promise<void> {
   const batchNote =
-    proposal.isBatchSleeping && kind !== "removed"
-      ? " (all-day free block spanning the nights — not separate timed events)"
-      : "";
+    kind !== "removed" ? batchNightNotifySuffix(proposal, nightCount) : "";
   const verb =
     kind === "added" ? "Added to" : kind === "updated" ? "Updated on" : "Removed from";
   await notifyUser(
@@ -126,7 +174,7 @@ async function notifyGoogleSynced(
 /** Actionable failure / incomplete-connect notifications (PC-346). */
 async function notifyGoogleFailed(
   userId: string,
-  proposal: typeof proposals.$inferSelect,
+  proposal: ProposalRow,
   message: string,
 ): Promise<void> {
   await notifyUser(userId, "calendar_google_failed", message, {
@@ -136,11 +184,33 @@ async function notifyGoogleFailed(
   });
 }
 
+async function loadLinksForProposal(
+  db: Db,
+  userId: string,
+  proposalId: string,
+): Promise<LinkRow[]> {
+  return db
+    .select()
+    .from(calendarEventLinks)
+    .where(
+      and(eq(calendarEventLinks.userId, userId), eq(calendarEventLinks.proposalId, proposalId)),
+    );
+}
+
+function linkByNightKey(links: LinkRow[]): Map<string, LinkRow> {
+  const map = new Map<string, LinkRow>();
+  for (const link of links) {
+    map.set(link.nightKey ?? "", link);
+  }
+  return map;
+}
+
 async function syncGoogleForUser(
   db: Db,
-  connection: typeof calendarConnections.$inferSelect,
-  proposal: typeof proposals.$inferSelect,
+  connection: ConnectionRow,
+  proposal: ProposalRow,
   action: CalendarSyncAction,
+  nameCtx: CalendarPayloadNameContext,
 ): Promise<void> {
   if (!connection.googleCalendarId) {
     console.warn(
@@ -170,82 +240,102 @@ async function syncGoogleForUser(
     return;
   }
 
-  const [link] = await db
-    .select()
-    .from(calendarEventLinks)
-    .where(
-      and(
-        eq(calendarEventLinks.userId, connection.userId),
-        eq(calendarEventLinks.proposalId, proposal.id),
-      ),
-    )
-    .limit(1);
-
+  const links = await loadLinksForProposal(db, connection.userId, proposal.id);
   const now = new Date().toISOString();
+  const calendarId = connection.googleCalendarId;
 
   if (action === "delete") {
-    if (link?.googleEventId && link.googleCalendarId) {
-      await deleteGoogleEvent(accessToken, link.googleCalendarId, link.googleEventId);
-    }
-    if (link) {
+    for (const link of links) {
+      if (link.googleEventId && link.googleCalendarId) {
+        await deleteGoogleEvent(accessToken, link.googleCalendarId, link.googleEventId);
+      }
       await db.delete(calendarEventLinks).where(eq(calendarEventLinks.id, link.id));
     }
     await notifyGoogleSynced(connection, proposal, "removed");
     return;
   }
 
-  const payload = buildCalendarEventPayload(proposal);
-  if (!payload) {
+  const payloads = buildCalendarEventPayloads(proposal, nameCtx, connection.userId);
+  if (payloads.length === 0) {
     console.warn(
-      "[calendar-sync] skip google: missing scheduledStartAt",
+      "[calendar-sync] skip google: missing scheduledStartAt / empty batch nights",
       proposal.id,
     );
     return;
   }
 
-  const calendarId = connection.googleCalendarId;
-  if (link?.googleEventId) {
-    await patchGoogleEvent(accessToken, link.googleCalendarId ?? calendarId, link.googleEventId, payload);
-    await db
-      .update(calendarEventLinks)
-      .set({
-        googleCalendarId: calendarId,
-        lastSyncedAt: now,
-        updatedAt: now,
-      })
-      .where(eq(calendarEventLinks.id, link.id));
-    await notifyGoogleSynced(connection, proposal, "updated");
-    return;
-  }
+  const existing = linkByNightKey(links);
+  const desiredKeys = new Set(payloads.map((p) => p.nightKey));
+  let created = 0;
+  let updated = 0;
 
-  const eventId = await insertGoogleEvent(accessToken, calendarId, payload);
-  if (link) {
-    await db
-      .update(calendarEventLinks)
-      .set({
+  for (const payload of payloads) {
+    const link = existing.get(payload.nightKey);
+    if (link?.googleEventId) {
+      await patchGoogleEvent(
+        accessToken,
+        link.googleCalendarId ?? calendarId,
+        link.googleEventId,
+        payload,
+      );
+      await db
+        .update(calendarEventLinks)
+        .set({
+          googleCalendarId: calendarId,
+          nightKey: payload.nightKey,
+          lastSyncedAt: now,
+          updatedAt: now,
+        })
+        .where(eq(calendarEventLinks.id, link.id));
+      updated += 1;
+      continue;
+    }
+
+    const eventId = await insertGoogleEvent(accessToken, calendarId, payload);
+    if (link) {
+      await db
+        .update(calendarEventLinks)
+        .set({
+          provider: "google",
+          googleEventId: eventId,
+          googleCalendarId: calendarId,
+          nightKey: payload.nightKey,
+          lastSyncedAt: now,
+          updatedAt: now,
+        })
+        .where(eq(calendarEventLinks.id, link.id));
+    } else {
+      await db.insert(calendarEventLinks).values({
+        id: randomUUID(),
+        userId: connection.userId,
+        proposalId: proposal.id,
         provider: "google",
         googleEventId: eventId,
         googleCalendarId: calendarId,
+        icsUid: null,
+        icsSequence: 0,
+        nightKey: payload.nightKey,
         lastSyncedAt: now,
+        createdAt: now,
         updatedAt: now,
-      })
-      .where(eq(calendarEventLinks.id, link.id));
-  } else {
-    await db.insert(calendarEventLinks).values({
-      id: randomUUID(),
-      userId: connection.userId,
-      proposalId: proposal.id,
-      provider: "google",
-      googleEventId: eventId,
-      googleCalendarId: calendarId,
-      icsUid: null,
-      icsSequence: 0,
-      lastSyncedAt: now,
-      createdAt: now,
-      updatedAt: now,
-    });
+      });
+    }
+    created += 1;
   }
-  await notifyGoogleSynced(connection, proposal, "added");
+
+  // Reconcile: drop Google events for nights no longer in the payload set
+  // (includes migrating legacy single-span night_key='' when batch expands).
+  for (const link of links) {
+    const key = link.nightKey ?? "";
+    if (desiredKeys.has(key)) continue;
+    if (link.googleEventId && link.googleCalendarId) {
+      await deleteGoogleEvent(accessToken, link.googleCalendarId, link.googleEventId);
+    }
+    await db.delete(calendarEventLinks).where(eq(calendarEventLinks.id, link.id));
+  }
+
+  const kind = created > 0 && updated === 0 ? "added" : "updated";
+  await notifyGoogleSynced(connection, proposal, kind, payloads.length);
 }
 
 async function queueIcsPending(
@@ -294,84 +384,144 @@ async function queueIcsPending(
   return id;
 }
 
+function cancelPayloadFromLink(proposal: ProposalRow, link: LinkRow): CalendarEventPayload {
+  return {
+    title: proposal.title,
+    description: undefined,
+    location: proposal.locationText,
+    startAt: proposal.scheduledStartAt ?? new Date().toISOString(),
+    endAt: proposal.scheduledEndAt,
+    isAllDay: proposal.proposalType === "sleeping" || proposal.isAllDay,
+    transparencyFree: proposal.proposalType === "sleeping",
+    proposalType: proposal.proposalType,
+    nightKey: link.nightKey ?? "",
+  };
+}
+
 async function syncIcsForUser(
   db: Db,
-  connection: typeof calendarConnections.$inferSelect,
-  proposal: typeof proposals.$inferSelect,
+  connection: ConnectionRow,
+  proposal: ProposalRow,
   action: CalendarSyncAction,
+  nameCtx: CalendarPayloadNameContext,
 ): Promise<void> {
   const delivery = (connection.icsDelivery ?? "download") as IcsDeliveryMode;
-  const [link] = await db
-    .select()
-    .from(calendarEventLinks)
-    .where(
-      and(
-        eq(calendarEventLinks.userId, connection.userId),
-        eq(calendarEventLinks.proposalId, proposal.id),
-      ),
-    )
-    .limit(1);
-
+  const links = await loadLinksForProposal(db, connection.userId, proposal.id);
+  const existing = linkByNightKey(links);
   const now = new Date().toISOString();
-  const uid = link?.icsUid ?? buildIcsUid(connection.userId, proposal.id);
-  const nextSequence =
-    action === "delete"
-      ? (link?.icsSequence ?? 0) + 1
-      : link
-        ? link.icsSequence + 1
-        : 0;
-
-  const payload =
-    action === "delete"
-      ? {
-          title: proposal.title,
-          description: undefined,
-          location: proposal.locationText,
-          startAt: proposal.scheduledStartAt ?? now,
-          endAt: proposal.scheduledEndAt,
-          isAllDay: proposal.proposalType === "sleeping" || proposal.isAllDay,
-          transparencyFree: proposal.proposalType === "sleeping",
-          proposalType: proposal.proposalType,
-        }
-      : buildCalendarEventPayload(proposal);
-
-  if (!payload) return;
 
   const method = action === "delete" ? "CANCEL" : delivery === "download" ? "PUBLISH" : "REQUEST";
-  const doc = buildIcsDocument({
-    userId: connection.userId,
-    proposalId: proposal.id,
-    payload,
-    sequence: nextSequence,
+
+  type EventSpec = {
+    uid: string;
+    sequence: number;
+    payload: CalendarEventPayload;
+    status?: "CONFIRMED" | "CANCELLED";
+    nightKey: string;
+    link?: LinkRow;
+    removeAfter?: boolean;
+  };
+
+  const events: EventSpec[] = [];
+
+  if (action === "delete") {
+    for (const link of links) {
+      const uid = link.icsUid ?? buildIcsUid(connection.userId, proposal.id, link.nightKey ?? "");
+      const sequence = (link.icsSequence ?? 0) + 1;
+      events.push({
+        uid,
+        sequence,
+        payload: cancelPayloadFromLink(proposal, link),
+        status: "CANCELLED",
+        nightKey: link.nightKey ?? "",
+        link,
+        removeAfter: true,
+      });
+    }
+    if (events.length === 0) return;
+  } else {
+    const payloads = buildCalendarEventPayloads(proposal, nameCtx, connection.userId);
+    if (payloads.length === 0) return;
+
+    const desiredKeys = new Set(payloads.map((p) => p.nightKey));
+
+    for (const payload of payloads) {
+      const link = existing.get(payload.nightKey);
+      const uid =
+        link?.icsUid ?? buildIcsUid(connection.userId, proposal.id, payload.nightKey);
+      const sequence = link ? link.icsSequence + 1 : 0;
+      events.push({
+        uid,
+        sequence,
+        payload,
+        nightKey: payload.nightKey,
+        link,
+      });
+    }
+
+    for (const link of links) {
+      const key = link.nightKey ?? "";
+      if (desiredKeys.has(key)) continue;
+      const uid = link.icsUid ?? buildIcsUid(connection.userId, proposal.id, key);
+      const sequence = (link.icsSequence ?? 0) + 1;
+      events.push({
+        uid,
+        sequence,
+        payload: cancelPayloadFromLink(proposal, link),
+        status: "CANCELLED",
+        nightKey: key,
+        link,
+        removeAfter: true,
+      });
+    }
+  }
+
+  const doc = buildIcsMultiDocument({
     method,
-    uid,
+    events: events.map((e) => ({
+      uid: e.uid,
+      sequence: e.sequence,
+      payload: e.payload,
+      status: e.status,
+    })),
+    filenameTitle: proposal.title,
   });
 
-  if (link) {
-    await db
-      .update(calendarEventLinks)
-      .set({
+  for (const event of events) {
+    if (event.removeAfter) {
+      if (event.link) {
+        await db.delete(calendarEventLinks).where(eq(calendarEventLinks.id, event.link.id));
+      }
+      continue;
+    }
+    if (event.link) {
+      await db
+        .update(calendarEventLinks)
+        .set({
+          provider: "ics",
+          icsUid: event.uid,
+          icsSequence: event.sequence,
+          nightKey: event.nightKey,
+          lastSyncedAt: now,
+          updatedAt: now,
+        })
+        .where(eq(calendarEventLinks.id, event.link.id));
+    } else {
+      await db.insert(calendarEventLinks).values({
+        id: randomUUID(),
+        userId: connection.userId,
+        proposalId: proposal.id,
         provider: "ics",
-        icsUid: uid,
-        icsSequence: nextSequence,
+        googleEventId: null,
+        googleCalendarId: null,
+        icsUid: event.uid,
+        icsSequence: event.sequence,
+        nightKey: event.nightKey,
         lastSyncedAt: now,
+        createdAt: now,
         updatedAt: now,
-      })
-      .where(eq(calendarEventLinks.id, link.id));
-  } else if (action !== "delete") {
-    await db.insert(calendarEventLinks).values({
-      id: randomUUID(),
-      userId: connection.userId,
-      proposalId: proposal.id,
-      provider: "ics",
-      googleEventId: null,
-      googleCalendarId: null,
-      icsUid: uid,
-      icsSequence: nextSequence,
-      lastSyncedAt: now,
-      createdAt: now,
-      updatedAt: now,
-    });
+      });
+    }
   }
 
   const [userRow] = await db
@@ -426,11 +576,12 @@ async function syncIcsForUser(
     delivery === "download" || delivery === "both" || !emailed;
 
   if (needsPending) {
+    const maxSequence = Math.max(...events.map((e) => e.sequence), 0);
     const pendingId = await queueIcsPending(db, {
       userId: connection.userId,
       proposalId: proposal.id,
-      uid: doc.uid,
-      sequence: nextSequence,
+      uid: doc.primaryUid,
+      sequence: maxSequence,
       method,
       filename: doc.filename,
       body: doc.body,
@@ -449,10 +600,6 @@ async function syncIcsForUser(
         proposalType: proposal.proposalType,
       },
     );
-  }
-
-  if (action === "delete" && link) {
-    await db.delete(calendarEventLinks).where(eq(calendarEventLinks.id, link.id));
   }
 }
 
@@ -501,6 +648,9 @@ export async function syncProposalToExternalCalendars(
     const userIds = await participantUserIds(db, proposal.id, proposal.proposerId);
     if (userIds.length === 0) return;
 
+    const inviteeIds = userIds.filter((id) => id !== proposal.proposerId);
+    const nameCtx = await loadCalendarNameContext(db, proposal, inviteeIds);
+
     const connections = await db
       .select()
       .from(calendarConnections)
@@ -541,9 +691,9 @@ export async function syncProposalToExternalCalendars(
       try {
         if (connection.provider === "google") {
           if (skipGoogle) continue;
-          await syncGoogleForUser(db, connection, proposal, action);
+          await syncGoogleForUser(db, connection, proposal, action, nameCtx);
         } else if (connection.provider === "ics") {
-          await syncIcsForUser(db, connection, proposal, action);
+          await syncIcsForUser(db, connection, proposal, action, nameCtx);
         }
       } catch (err) {
         console.error(

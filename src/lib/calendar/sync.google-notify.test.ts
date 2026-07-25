@@ -34,6 +34,7 @@ vi.mock("@/lib/calendar/google-oauth", () => ({
 }));
 vi.mock("@/lib/calendar/ics", () => ({
   buildIcsDocument: vi.fn(),
+  buildIcsMultiDocument: vi.fn(),
 }));
 vi.mock("@/lib/email/send", () => ({
   sendEmail: vi.fn(),
@@ -60,6 +61,10 @@ type ProposalFixture = {
   locationText: string | null;
   isAllDay: boolean;
   isBatchSleeping: boolean;
+  batchEntriesJson: string | null;
+  intentionalSolo?: boolean;
+  state?: string;
+  atRisk?: boolean;
 };
 
 type ConnectionFixture = {
@@ -86,6 +91,10 @@ function baseProposal(overrides: Partial<ProposalFixture> = {}): ProposalFixture
     locationText: null,
     isAllDay: true,
     isBatchSleeping: true,
+    batchEntriesJson: null,
+    intentionalSolo: false,
+    state: "resolved",
+    atRisk: false,
     ...overrides,
   };
 }
@@ -111,6 +120,8 @@ function googleConnection(
 /**
  * Queue-based drizzle stub: each `select().from().where()...` consumes the next
  * queued result. Mutations are no-ops that resolve.
+ *
+ * Select order after PC-351: proposal → invitees → users(names) → connections → links…
  */
 function createQueuedDb(selectResults: unknown[][]) {
   let selectIndex = 0;
@@ -154,7 +165,12 @@ function createQueuedDb(selectResults: unknown[][]) {
   };
 }
 
-describe("syncProposalToExternalCalendars Google notify matrix (PC-346 / PC-347)", () => {
+const nameRows = [
+  { id: "user-michael", displayName: "Michael" },
+  { id: "user-katie", displayName: "Katie" },
+];
+
+describe("syncProposalToExternalCalendars Google notify matrix (PC-346 / PC-347 / PC-351)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     auth.mockResolvedValue({ user: { isImpersonating: false } });
@@ -170,10 +186,10 @@ describe("syncProposalToExternalCalendars Google notify matrix (PC-346 / PC-347)
   it("upserts only for the connected proposer when invitee has no Google (one-sided)", async () => {
     const proposal = baseProposal();
     const michael = googleConnection("user-michael");
-    // Selects: proposal, invitees, connections, event link (michael)
     const { db, insertedLinks } = createQueuedDb([
       [proposal],
       [{ userId: "user-katie" }],
+      nameRows,
       [michael],
       [], // no existing link
     ]);
@@ -205,6 +221,7 @@ describe("syncProposalToExternalCalendars Google notify matrix (PC-346 / PC-347)
     const { db } = createQueuedDb([
       [proposal],
       [{ userId: "user-katie" }],
+      nameRows,
       [michael, katie],
       [], // michael link
       [], // katie link
@@ -222,7 +239,7 @@ describe("syncProposalToExternalCalendars Google notify matrix (PC-346 / PC-347)
     expect(notifyUser).toHaveBeenCalledWith(
       "user-michael",
       "calendar_google_synced",
-      expect.stringContaining("all-day free block"),
+      expect.stringContaining("all-day free night"),
       expect.any(Object),
     );
     expect(notifyUser).toHaveBeenCalledWith(
@@ -233,12 +250,55 @@ describe("syncProposalToExternalCalendars Google notify matrix (PC-346 / PC-347)
     );
   });
 
+  it("inserts one Google event per batch night (PC-351)", async () => {
+    const proposal = baseProposal({
+      batchEntriesJson: JSON.stringify([
+        {
+          id: "n1",
+          nightDate: "2026-08-01",
+          locationText: "Pad A",
+          invitees: [{ userId: "user-katie", role: "required" }],
+        },
+        {
+          id: "n2",
+          nightDate: "2026-08-02",
+          locationText: "Pad B",
+          invitees: [{ userId: "user-katie", role: "required" }],
+        },
+      ]),
+    });
+    const michael = googleConnection("user-michael");
+    const { db, insertedLinks } = createQueuedDb([
+      [proposal],
+      [{ userId: "user-katie" }],
+      nameRows,
+      [michael],
+      [],
+    ]);
+    getDb.mockReturnValue(db);
+    insertGoogleEvent
+      .mockResolvedValueOnce("g1")
+      .mockResolvedValueOnce("g2");
+
+    await syncProposalToExternalCalendars("prop-1", "upsert");
+
+    expect(insertGoogleEvent).toHaveBeenCalledTimes(2);
+    expect(insertedLinks).toHaveLength(2);
+    expect(notifyUser).toHaveBeenCalledWith(
+      "user-michael",
+      "calendar_google_synced",
+      expect.stringContaining("2 all-day free nights"),
+      expect.any(Object),
+    );
+  });
+
   it("notifies failure and skips insert when googleCalendarId is null", async () => {
     const proposal = baseProposal({ isBatchSleeping: false });
     const incomplete = googleConnection("user-michael", { googleCalendarId: null });
     const { db } = createQueuedDb([
       [proposal],
       [{ userId: "user-katie" }],
+      nameRows,
       [incomplete],
     ]);
     getDb.mockReturnValue(db);
@@ -255,9 +315,9 @@ describe("syncProposalToExternalCalendars Google notify matrix (PC-346 / PC-347)
   });
 
   it("notifies failure when Google API insert throws", async () => {
-    const proposal = baseProposal({ title: "Dinner" });
+    const proposal = baseProposal({ title: "Dinner", isBatchSleeping: false });
     const michael = googleConnection("user-michael");
-    const { db } = createQueuedDb([[proposal], [], [michael], []]);
+    const { db } = createQueuedDb([[proposal], [], nameRows, [michael], []]);
     getDb.mockReturnValue(db);
     insertGoogleEvent.mockRejectedValue(new Error("Google events.insert failed: 403"));
 
@@ -282,6 +342,7 @@ describe("syncProposalToExternalCalendars Google notify matrix (PC-346 / PC-347)
     const { db } = createQueuedDb([
       [proposal],
       [{ userId: "user-katie" }],
+      nameRows,
       [], // no connections
     ]);
     getDb.mockReturnValue(db);

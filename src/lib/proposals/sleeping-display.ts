@@ -1,9 +1,11 @@
 /**
- * Shared sleeping arrangement title and participant formatting (PC-66 / PC-150).
+ * Shared sleeping arrangement title and participant formatting (PC-66 / PC-150 / PC-351).
  *
  * Format:
- *   Sleeping: Name1, Name2, Status
- *   Sleeping: Name1, Name2, Status, at Location
+ *   Sleeping: Name1, Name2[, Status]
+ *   Sleeping: Name1, Name2[, Status], at Location
+ *
+ * Resolved/archived omit status (no "Confirmed"); keep Tentative / Proposed / At risk.
  */
 
 export type SleepingDisplayStatus = "Confirmed" | "Tentative" | "Proposed" | "At risk";
@@ -17,12 +19,15 @@ export interface SleepingDisplayInput {
   atRisk?: boolean;
 }
 
-/** Derives the status fragment for sleeping display titles. */
+/**
+ * Derives the status fragment for sleeping display titles.
+ * Returns null when resolved/archived (and not at-risk) so Confirmed is omitted (PC-351).
+ */
 export function sleepingDisplayStatus(
   input: Pick<SleepingDisplayInput, "state" | "atRisk">,
-): SleepingDisplayStatus {
+): SleepingDisplayStatus | null {
   if (input.atRisk) return "At risk";
-  if (input.state === "resolved" || input.state === "archived") return "Confirmed";
+  if (input.state === "resolved" || input.state === "archived") return null;
   if (input.state === "proposed") return "Tentative";
   return "Proposed";
 }
@@ -37,15 +42,25 @@ export function formatSleepingParticipantNames(input: SleepingDisplayInput): str
 }
 
 /**
- * Builds the canonical sleeping title string used on cards, schedule, and detail views.
+ * Builds the canonical sleeping title string used on cards, schedule, detail, and calendar sync.
  */
 export function formatSleepingDisplayTitle(input: SleepingDisplayInput): string {
   const names = formatSleepingParticipantNames(input);
   const status = sleepingDisplayStatus(input);
-  let title = `Sleeping: ${names.join(", ")}, ${status}`;
+  let title = status
+    ? `Sleeping: ${names.join(", ")}, ${status}`
+    : `Sleeping: ${names.join(", ")}`;
   const location = input.locationName?.trim();
   if (location) {
     title += `, at ${location}`;
   }
   return title;
+}
+
+/**
+ * Strips a trailing ", Confirmed" segment from legacy stored titles before calendar sync (PC-351).
+ * Does not remove ", at Location".
+ */
+export function stripConfirmedFromSleepingTitle(title: string): string {
+  return title.replace(/, Confirmed(?=, at |$)/g, "");
 }
