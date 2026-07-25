@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { timingSafeEqualStrings } from "@/lib/crypto/timing-safe-equal";
 import { getDb } from "@/lib/db/client";
 import { ensureDbReady } from "@/lib/db/ensure-ready";
 import { runProposalEnforcement } from "@/lib/proposals/enforcement";
@@ -16,7 +17,7 @@ export async function GET(request: Request): Promise<NextResponse> {
   }
 
   const authHeader = request.headers.get("authorization");
-  if (authHeader !== `Bearer ${secret}`) {
+  if (!timingSafeEqualStrings(authHeader, `Bearer ${secret}`)) {
     return NextResponse.json({ ok: false, error: "Unauthorized." }, { status: 401 });
   }
 

@@ -1,3 +1,8 @@
+import {
+  fileMatchesImageMagicBytes,
+  IMAGE_CONTENT_MISMATCH_MESSAGE,
+} from "@/lib/uploads/image-magic-bytes";
+
 /** Max images per feed message or comment (PC-236). */
 export const MAX_FEED_IMAGES = 4;
 
@@ -56,6 +61,12 @@ export async function readFeedImageUpload(
   const mimeType = file.type || guessImageMime(file.name);
   if (!ALLOWED_FEED_IMAGE_MIMES.has(mimeType)) {
     return { ok: false, error: "Use JPEG, PNG, WebP, or GIF." };
+  }
+
+  // Feed images are served back with their stored MIME, so the declared type
+  // must match the actual bytes (PC-353).
+  if (!(await fileMatchesImageMagicBytes(file, mimeType))) {
+    return { ok: false, error: IMAGE_CONTENT_MISMATCH_MESSAGE };
   }
 
   return {
