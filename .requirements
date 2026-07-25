@@ -319,3 +319,4 @@
 2026-07-25 | ccd31ed | PC-357 | drop unused schema imports | src/actions/networks.ts
 2026-07-25 | 4c048ba | PC-357 | do not re-export lib helpers from use server | src/actions/networks.ts
 2026-07-25 | 23e9567 | PC-357 | scope sleeping partnership unique by networkId | src/lib/db/migrate.ts
+2026-07-25 | c294f44 | PC-357 | restore places and admin delete after tenant reset | src/actions/places.ts
