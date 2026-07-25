@@ -127,6 +127,34 @@ export const authConfig = {
         token.avatarKey = row.avatarKey ?? undefined;
         token.theme = row.theme;
         token.isPlatformAdmin = row.isPlatformAdmin === true;
+
+        // Reconcile active network when JWT points at a wiped/recreated tenant
+        // (E2E per-test reset) or membership was removed (PC-357).
+        try {
+          const { listActiveMemberships } = await import("@/lib/networks/membership");
+          const memberships = await listActiveMemberships(token.id as string);
+          const usable = memberships.filter(
+            (m) => m.networkStatus === "active" || m.role === "network_admin",
+          );
+          const preferred =
+            typeof token.activeNetworkId === "string"
+              ? usable.find((m) => m.networkId === token.activeNetworkId) ??
+                memberships.find((m) => m.networkId === token.activeNetworkId)
+              : undefined;
+          const next = preferred ?? usable[0] ?? memberships[0];
+          if (next) {
+            token.activeNetworkId = next.networkId;
+            token.activeNetworkRole = next.role;
+            token.networkIds = memberships.map((m) => m.networkId);
+          } else {
+            delete token.activeNetworkId;
+            delete token.activeNetworkRole;
+            token.networkIds = [];
+          }
+        } catch {
+          /* networks table may be mid-migration — keep prior claims */
+        }
+
         token.dbRefreshedAt = Date.now();
         delete token.error;
       }

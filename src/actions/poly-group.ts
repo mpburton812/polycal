@@ -77,14 +77,14 @@ export async function getPolyGroupDisplayNameAction(): Promise<string> {
   await ensureDbReady();
   const db = getDb();
   try {
-    const { auth } = await import("@/lib/auth");
+    const { requireNetworkSession } = await import("@/lib/networks/context");
     const { networks } = await import("@/lib/db/schema");
-    const session = await auth();
-    if (session?.user?.activeNetworkId) {
+    const networkSession = await requireNetworkSession();
+    if (networkSession.ok) {
       const [net] = await db
         .select({ name: networks.name })
         .from(networks)
-        .where(eq(networks.id, session.user.activeNetworkId))
+        .where(eq(networks.id, networkSession.user.activeNetworkId))
         .limit(1);
       if (net?.name?.trim()) return net.name.trim();
     }

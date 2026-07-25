@@ -29,6 +29,7 @@ import {
   type UserRole,
 } from "@/lib/db/schema";
 import {
+  listActiveMemberships,
   removeMembership,
   upsertMembership,
 } from "@/lib/networks/membership";
@@ -902,11 +903,12 @@ function revalidateAfterAccountRemoval(): void {
 }
 
 /**
- * Soft-deletes a user and removes their graph edges (admin only, PC-35 / PC-354).
- */
-/**
- * Removes a user from the active network only (scoped delete).
- * Platform-wide ban is `banUserFromAllNetworksAction` (PC-362).
+ * Soft-deletes a user from the active network (admin only, PC-35 / PC-354 / PC-357).
+ *
+ * Removes membership first. When the user has no remaining active memberships,
+ * erases personal graph edges and anonymizes the account (same as legacy delete).
+ * Users who remain in other networks are only removed from this one — use
+ * `banUserFromAllNetworksAction` for a platform-wide ban (PC-362).
  */
 export async function deleteUserAction(userId: string): Promise<UserActionResult> {
   const adminResult = await requireAdminAccess();
@@ -927,26 +929,27 @@ export async function deleteUserAction(userId: string): Promise<UserActionResult
 
   const networkSession = await requireNetworkSession();
   if (networkSession.ok) {
-    const removed = await removeMembership(userId, networkSession.user.activeNetworkId);
-    if (removed) {
-      await logUserActivity(
-        adminResult.user.id,
-        "users.network_remove",
-        JSON.stringify({
-          userId,
-          username: user.username,
-          networkId: networkSession.user.activeNetworkId,
-        }),
-      );
-      revalidateAfterAccountRemoval();
-      return {
-        ok: true,
-        message: `Removed ${user.displayName} from this network.`,
-      };
-    }
+    await removeMembership(userId, networkSession.user.activeNetworkId);
   }
 
-  // Fallback for pre-membership installs: full erase (legacy single-network).
+  const remaining = await listActiveMemberships(userId);
+  if (remaining.length > 0) {
+    await logUserActivity(
+      adminResult.user.id,
+      "users.network_remove",
+      JSON.stringify({
+        userId,
+        username: user.username,
+        networkId: networkSession.ok ? networkSession.user.activeNetworkId : null,
+      }),
+    );
+    revalidateAfterAccountRemoval();
+    return {
+      ok: true,
+      message: `Removed ${user.displayName} from this network.`,
+    };
+  }
+
   await eraseAccount(db, user, adminResult.user.id);
 
   await logUserActivity(
