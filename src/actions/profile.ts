@@ -9,6 +9,7 @@ import { z } from "zod";
 import { auth } from "@/lib/auth";
 import { logUserActivity } from "@/lib/audit";
 import { requireSession, withDb } from "@/lib/actions/context";
+import { type ActionResult } from "@/lib/actions/result";
 import { hashLinkToken } from "@/lib/crypto/token-hash";
 import {
   newEmailVerificationToken,
@@ -62,10 +63,10 @@ const ALLOWED_AVATAR_MIMES = new Set(["image/jpeg", "image/png", "image/webp", "
  */
 async function readAvatarUpload(
   formData: FormData,
-): Promise<{ ok: true; file: File } | { ok: false; error: string }> {
+): Promise<{ ok: true; file: File } | { ok: false; message: string }> {
   const entry = formData.get("avatar");
   if (!entry) {
-    return { ok: false, error: "Choose an image file." };
+    return { ok: false, message: "Choose an image file." };
   }
 
   let file: File;
@@ -75,31 +76,31 @@ async function readAvatarUpload(
     const blob = entry as Blob;
     file = new File([blob], "avatar", { type: blob.type || "application/octet-stream" });
   } else {
-    return { ok: false, error: "Choose an image file." };
+    return { ok: false, message: "Choose an image file." };
   }
 
   if (file.size === 0) {
-    return { ok: false, error: "Choose an image file." };
+    return { ok: false, message: "Choose an image file." };
   }
   if (file.size > MAX_AVATAR_BYTES) {
-    return { ok: false, error: "Image must be 2 MB or smaller." };
+    return { ok: false, message: "Image must be 2 MB or smaller." };
   }
 
   if (!isCroppedAvatarLargeEnough(file.size)) {
     return {
       ok: false,
-      error: "Image is too small after crop. Zoom in or choose a larger photo.",
+      message: "Image is too small after crop. Zoom in or choose a larger photo.",
     };
   }
 
   const mimeType = file.type || guessImageMime(file.name);
   if (!ALLOWED_AVATAR_MIMES.has(mimeType)) {
-    return { ok: false, error: "Use JPEG, PNG, WebP, or GIF." };
+    return { ok: false, message: "Use JPEG, PNG, WebP, or GIF." };
   }
 
   const magicOk = await fileMatchesImageMagicBytes(file, mimeType);
   if (!magicOk) {
-    return { ok: false, error: IMAGE_CONTENT_MISMATCH_MESSAGE };
+    return { ok: false, message: IMAGE_CONTENT_MISMATCH_MESSAGE };
   }
 
   return { ok: true, file: mimeType === file.type ? file : new File([file], file.name, { type: mimeType }) };
@@ -125,11 +126,11 @@ const preferencesSchema = z.object({
   timezone: z.string().min(1).max(64),
 });
 
-export type ActionResult = { ok: true } | { ok: false; error: string };
+export type { ActionResult } from "@/lib/actions/result";
 
 export type PasswordActionResult =
   | { ok: true; sessionVersion: number }
-  | { ok: false; error: string };
+  | { ok: false; message: string };
 
 /**
  * Changes the signed-in user's password and clears must-change flag (PC-33).
@@ -139,7 +140,7 @@ export async function changePasswordAction(
 ): Promise<PasswordActionResult> {
   const session = await auth();
   if (!session?.user?.id) {
-    return { ok: false, error: "Not signed in." };
+    return { ok: false, message: "Not signed in." };
   }
 
   const parsed = passwordSchema.safeParse({
@@ -148,7 +149,7 @@ export async function changePasswordAction(
     confirmPassword: formData.get("confirmPassword"),
   });
   if (!parsed.success) {
-    return { ok: false, error: formatPasswordErrors(parsed.error) };
+    return { ok: false, message: formatPasswordErrors(parsed.error) };
   }
 
   await ensureDbReady();
@@ -159,12 +160,12 @@ export async function changePasswordAction(
     .where(eq(users.id, session.user.id))
     .limit(1);
   if (!row) {
-    return { ok: false, error: "User not found." };
+    return { ok: false, message: "User not found." };
   }
 
   const valid = await compare(parsed.data.currentPassword, row.passwordHash);
   if (!valid) {
-    return { ok: false, error: "Current password is incorrect." };
+    return { ok: false, message: "Current password is incorrect." };
   }
 
   const passwordHash = await hash(parsed.data.newPassword, 12);
@@ -194,7 +195,7 @@ export async function updateProfilePreferencesAction(
 ): Promise<ActionResult> {
   const session = await auth();
   if (!session?.user?.id) {
-    return { ok: false, error: "Not signed in." };
+    return { ok: false, message: "Not signed in." };
   }
 
   const parsed = preferencesSchema.safeParse({
@@ -203,7 +204,7 @@ export async function updateProfilePreferencesAction(
     timezone: formData.get("timezone") ?? "UTC",
   });
   if (!parsed.success) {
-    return { ok: false, error: "Invalid avatar, theme, or timezone selection." };
+    return { ok: false, message: "Invalid avatar, theme, or timezone selection." };
   }
 
   const timezone = resolveTimezone(parsed.data.timezone);
@@ -237,10 +238,10 @@ export async function updateProfilePreferencesAction(
  */
 export async function uploadCustomAvatarAction(
   formData: FormData,
-): Promise<{ ok: true; avatarKey: string } | { ok: false; error: string }> {
+): Promise<{ ok: true; avatarKey: string } | { ok: false; message: string }> {
   const session = await auth();
   if (!session?.user?.id) {
-    return { ok: false, error: "Not signed in." };
+    return { ok: false, message: "Not signed in." };
   }
 
   const upload = await readAvatarUpload(formData);
@@ -286,7 +287,7 @@ export async function uploadCustomAvatarAction(
     return { ok: true, avatarKey };
   } catch (error) {
     console.error("uploadCustomAvatarAction failed:", error);
-    return { ok: false, error: "Could not save avatar. Try a smaller image or another format." };
+    return { ok: false, message: "Could not save avatar. Try a smaller image or another format." };
   }
 }
 
@@ -302,12 +303,12 @@ const displayNameSchema = z
 export async function updateDisplayNameAction(displayName: string): Promise<ActionResult> {
   const sessionResult = await requireSession();
   if (!sessionResult.ok) {
-    return { ok: false, error: sessionResult.message };
+    return { ok: false, message: sessionResult.message };
   }
 
   const parsed = displayNameSchema.safeParse(displayName);
   if (!parsed.success) {
-    return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid display name." };
+    return { ok: false, message: parsed.error.issues[0]?.message ?? "Invalid display name." };
   }
 
   await withDb(async (db) => {
@@ -330,12 +331,12 @@ export async function updateDisplayNameAction(displayName: string): Promise<Acti
 export async function updateProfileBioAction(profileBio: string): Promise<ActionResult> {
   const sessionResult = await requireSession();
   if (!sessionResult.ok) {
-    return { ok: false, error: sessionResult.message };
+    return { ok: false, message: sessionResult.message };
   }
 
   const parsed = profileBioSchema.safeParse(profileBio);
   if (!parsed.success) {
-    return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid bio." };
+    return { ok: false, message: parsed.error.issues[0]?.message ?? "Invalid bio." };
   }
 
   await withDb(async (db) => {
@@ -378,7 +379,7 @@ export async function updateNotificationPrefsAction(
 ): Promise<ActionResult> {
   const session = await auth();
   if (!session?.user?.id) {
-    return { ok: false, error: "Not signed in." };
+    return { ok: false, message: "Not signed in." };
   }
 
   await ensureDbReady();
@@ -404,19 +405,19 @@ const notificationEmailSchema = z.string().trim().email("Enter a valid email add
  */
 export async function updateNotificationEmailAction(
   email: string,
-): Promise<{ ok: true; verificationUrl?: string } | { ok: false; error: string }> {
+): Promise<{ ok: true; verificationUrl?: string } | { ok: false; message: string }> {
   const session = await auth();
   if (!session?.user?.id) {
-    return { ok: false, error: "Not signed in." };
+    return { ok: false, message: "Not signed in." };
   }
 
   const parsed = notificationEmailSchema.safeParse(email);
   if (!parsed.success) {
-    return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid email." };
+    return { ok: false, message: parsed.error.issues[0]?.message ?? "Invalid email." };
   }
 
   if (!checkRateLimit(`notification-email:${session.user.id}`, 5, 60_000)) {
-    return { ok: false, error: "Too many verification requests. Try again in a minute." };
+    return { ok: false, message: "Too many verification requests. Try again in a minute." };
   }
 
   await ensureDbReady();
@@ -512,7 +513,7 @@ export async function setInitialPasswordAction(
 ): Promise<PasswordActionResult> {
   const session = await auth();
   if (!session?.user?.id) {
-    return { ok: false, error: "Not signed in." };
+    return { ok: false, message: "Not signed in." };
   }
 
   const newPassword = String(formData.get("newPassword") ?? "");
@@ -533,7 +534,7 @@ export async function setInitialPasswordAction(
 
   const parsed = initialPasswordSchema.safeParse({ newPassword, confirmPassword });
   if (!parsed.success) {
-    return { ok: false, error: formatPasswordErrors(parsed.error) };
+    return { ok: false, message: formatPasswordErrors(parsed.error) };
   }
 
   await ensureDbReady();
@@ -544,10 +545,10 @@ export async function setInitialPasswordAction(
     .where(eq(users.id, session.user.id))
     .limit(1);
   if (!row) {
-    return { ok: false, error: "User not found." };
+    return { ok: false, message: "User not found." };
   }
   if (!row.mustChangePassword) {
-    return { ok: false, error: "Use the profile page to change your password." };
+    return { ok: false, message: "Use the profile page to change your password." };
   }
 
   const passwordHash = await hash(parsed.data.newPassword, 12);

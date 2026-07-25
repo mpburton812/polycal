@@ -30,7 +30,10 @@ test.describe("App navigation (admin)", () => {
     await expect(nav.getByRole("link", { name: "People & Places" })).toBeVisible();
     await expect(nav.getByRole("link", { name: "Admin" })).toBeVisible();
     await expect(page.getByText("Rebel Alliance")).toBeVisible();
-    await expect(page.getByText("PolyCal", { exact: true })).toBeVisible();
+    // Scope to the app banner — document <title> also reads "PolyCal" and fails strict mode.
+    await expect(
+      page.getByRole("banner").getByText("PolyCal", { exact: true }),
+    ).toBeVisible();
   });
 
   test("login lands on Feed as default home tab", async ({ page }) => {

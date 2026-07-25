@@ -13,8 +13,10 @@ vi.mock("@/lib/db/client", () => ({
 }));
 
 import { auth } from "@/lib/auth";
+import { exportMyDataAction } from "@/actions/account";
 import { castProposalVoteAction } from "@/actions/proposals";
 import { listScheduleEventsAction } from "@/actions/schedule";
+import { deleteMyAccountAction } from "@/actions/users";
 
 describe("server action auth guards", () => {
   beforeEach(() => {
@@ -38,6 +40,21 @@ describe("server action auth guards", () => {
       proposalId: "00000000-0000-0000-0000-000000000001",
       vote: "accept",
     });
+    expect(result).toEqual({ ok: false, message: "Sign in required." });
+  });
+
+  it("deleteMyAccountAction requires sign-in", async () => {
+    vi.mocked(auth).mockResolvedValue(null);
+    const result = await deleteMyAccountAction({
+      password: "hunter2hunter2",
+      confirmation: "DELETE MY ACCOUNT",
+    });
+    expect(result).toEqual({ ok: false, message: "Sign in required." });
+  });
+
+  it("exportMyDataAction requires sign-in", async () => {
+    vi.mocked(auth).mockResolvedValue(null);
+    const result = await exportMyDataAction();
     expect(result).toEqual({ ok: false, message: "Sign in required." });
   });
 });

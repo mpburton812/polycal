@@ -266,21 +266,66 @@ export default function PrivacyPolicyPage() {
           </Typography>
         </Section>
 
-        <Section title="8. Retention and deletion">
-          <Typography paragraph>
-            We retain account and scheduling data for as long as your account remains in the group
-            database and the service is operated. Administrators can pause or delete accounts
-            according to admin tools. Password-reset and email-verification tokens expire
-            automatically. When you disconnect Google Calendar or an administrator deletes your
-            account, PolyCal revokes Google OAuth tokens when possible and deletes Google-related
-            connection fields and event-id mappings. Activity logs and feedback submissions may be
-            retained for operational history. Events previously synced into Google Calendar are not
-            automatically removed from Google.
+        <Section id="retention" title="8. Retention and deletion">
+          <Typography fontWeight={600} sx={{ mb: 0.5 }}>
+            Delete your account yourself
           </Typography>
           <Typography paragraph>
-            To request correction or deletion of your account data, contact your PolyCal group
-            administrator. They can update profile fields and change account status through the
-            admin tools.
+            In <strong>Profile &amp; Settings → Your data</strong> you can permanently delete your
+            own account. You confirm with your password and a typed confirmation phrase; no
+            administrator involvement is required. Deletion is immediate and cannot be undone, and
+            you are signed out on every device.
+          </Typography>
+          <Typography paragraph>When you delete your account, PolyCal:</Typography>
+          <Box component="ul" sx={{ mt: 0, mb: 2, pl: 2.5 }}>
+            <li>
+              Erases your profile fields — display name (replaced with &quot;Former User&quot;),
+              username, bio, gender, uploaded avatar image, notification and feed preferences,
+              notification email, and verification status
+            </li>
+            <li>
+              Deletes your browser push subscriptions, so no further push notifications are
+              delivered to your devices
+            </li>
+            <li>
+              Revokes and deletes your Google Calendar connection (encrypted tokens, selected
+              calendar, account email) and the local event-id mappings
+            </li>
+            <li>Deletes your sleeping-partnership links and residency records</li>
+            <li>Deletes places you created and archives proposals you authored</li>
+            <li>
+              Replaces your password with an unusable value and invalidates all existing sessions
+            </li>
+          </Box>
+          <Typography fontWeight={600} sx={{ mb: 0.5 }}>
+            What remains, and why
+          </Typography>
+          <Typography paragraph>
+            PolyCal is a shared group tool, so a small anonymized tombstone record is kept instead
+            of hard-deleting your row: group history — past feed posts and comments, resolved
+            schedule history, and the append-only activity log — references your account, and
+            removing that reference would corrupt other members&apos; records. The tombstone
+            carries no profile content. Product-feedback submissions you sent may also be retained
+            for operational history. Events already synced into your Google Calendar stay in
+            Google until you delete them there.
+          </Typography>
+          <Typography fontWeight={600} sx={{ mb: 0.5 }}>
+            Export and correction
+          </Typography>
+          <Typography paragraph>
+            Before deleting, use <strong>Download my data</strong> in Profile &amp; Settings to
+            save a JSON copy of your profile, preferences, authored proposals, and partnership
+            summary. Most profile fields can be corrected directly in Profile &amp; Settings; for
+            anything you cannot change yourself, contact your group administrator.
+          </Typography>
+          <Typography fontWeight={600} sx={{ mb: 0.5 }}>
+            Ongoing retention
+          </Typography>
+          <Typography paragraph>
+            While your account is active, we retain account and scheduling data for as long as the
+            service is operated. Password-reset and email-verification tokens expire automatically
+            and are cleared on deletion. Administrators can also pause or delete accounts through
+            the admin tools, which performs the same erasure described above.
           </Typography>
         </Section>
 
@@ -317,6 +362,10 @@ export default function PrivacyPolicyPage() {
         </Section>
 
         <Typography sx={{ mt: 4 }}>
+          <MuiLink component={NextLink} href="/terms" underline="hover">
+            Terms of Service
+          </MuiLink>
+          {" · "}
           <MuiLink component={NextLink} href="/login" underline="hover">
             Back to sign in
           </MuiLink>
