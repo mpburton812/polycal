@@ -99,7 +99,72 @@ export async function applyNetworksMigrations(sql: Client): Promise<void> {
     `CREATE INDEX IF NOT EXISTS idx_network_chat_network ON network_chat_messages(network_id, created_at)`,
   );
 
+  await rebuildSleepingPartnershipsUnique(sql);
   await backfillLegacyNetwork(sql);
+}
+
+/**
+ * Partnerships are per-network; replace UNIQUE(user_low, user_high) with
+ * UNIQUE(network_id, user_low, user_high) so the same pair can exist in two
+ * tenants after optional import (PC-361).
+ */
+async function rebuildSleepingPartnershipsUnique(sql: Client): Promise<void> {
+  const flag = await sql.execute(
+    `SELECT value FROM schema_meta WHERE key = 'sleeping_partnerships_network_unique_v1' LIMIT 1`,
+  );
+  if (flag.rows.length > 0) return;
+
+  await sql.execute(`
+    CREATE TABLE IF NOT EXISTS sleeping_partnerships_networked (
+      id TEXT PRIMARY KEY NOT NULL,
+      network_id TEXT,
+      user_low_id TEXT NOT NULL REFERENCES users(id),
+      user_high_id TEXT NOT NULL REFERENCES users(id),
+      status TEXT NOT NULL,
+      proposed_by_id TEXT NOT NULL REFERENCES users(id),
+      initiated_by_user_id TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      responded_at TEXT,
+      passive_auto_accepted INTEGER NOT NULL DEFAULT 0,
+      UNIQUE(network_id, user_low_id, user_high_id)
+    )
+  `);
+
+  await sql.execute(`
+    INSERT OR IGNORE INTO sleeping_partnerships_networked (
+      id, network_id, user_low_id, user_high_id, status, proposed_by_id,
+      initiated_by_user_id, created_at, updated_at, responded_at, passive_auto_accepted
+    )
+    SELECT
+      id, network_id, user_low_id, user_high_id, status, proposed_by_id,
+      initiated_by_user_id, created_at, updated_at, responded_at,
+      COALESCE(passive_auto_accepted, 0)
+    FROM sleeping_partnerships
+  `);
+
+  await sql.execute(`DROP TABLE sleeping_partnerships`);
+  await sql.execute(
+    `ALTER TABLE sleeping_partnerships_networked RENAME TO sleeping_partnerships`,
+  );
+  await sql.execute(
+    `CREATE INDEX IF NOT EXISTS idx_sleeping_partnerships_status ON sleeping_partnerships(status)`,
+  );
+  await sql.execute(
+    `CREATE INDEX IF NOT EXISTS idx_sleeping_partnerships_low_status ON sleeping_partnerships(user_low_id, status)`,
+  );
+  await sql.execute(
+    `CREATE INDEX IF NOT EXISTS idx_sleeping_partnerships_high_status ON sleeping_partnerships(user_high_id, status)`,
+  );
+  await sql.execute(
+    `CREATE INDEX IF NOT EXISTS idx_sleeping_partnerships_network ON sleeping_partnerships(network_id)`,
+  );
+
+  await sql.execute({
+    sql: `INSERT INTO schema_meta (key, value) VALUES ('sleeping_partnerships_network_unique_v1', '1')
+          ON CONFLICT(key) DO NOTHING`,
+    args: [],
+  });
 }
 
 /**
