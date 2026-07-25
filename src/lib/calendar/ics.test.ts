@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { buildIcsDocument } from "@/lib/calendar/ics";
+import { buildIcsDocument, buildIcsMultiDocument } from "@/lib/calendar/ics";
 import {
   buildCalendarEventPayload,
   buildIcsUid,
@@ -47,7 +47,7 @@ function proposal(overrides: Partial<ProposalRow>): ProposalRow {
     createdAt: "2026-07-01T00:00:00.000Z",
     updatedAt: "2026-07-01T00:00:00.000Z",
     ...overrides,
-  };
+  } as ProposalRow;
 }
 
 describe("calendar payloads", () => {
@@ -58,7 +58,7 @@ describe("calendar payloads", () => {
     expect(payload?.isAllDay).toBe(false);
   });
 
-  it("builds sleeping payloads as all-day free with PolyCal title", () => {
+  it("strips Confirmed from legacy sleeping titles (PC-351)", () => {
     const title = "Sleeping: Morgan B., Doc KT, Confirmed, at Katie's Swingin' Pad";
     const payload = buildCalendarEventPayload(
       proposal({
@@ -69,13 +69,17 @@ describe("calendar payloads", () => {
         isAllDay: false,
       }),
     );
-    expect(payload?.title).toBe(title);
+    expect(payload?.title).toBe("Sleeping: Morgan B., Doc KT, at Katie's Swingin' Pad");
     expect(payload?.isAllDay).toBe(true);
     expect(payload?.transparencyFree).toBe(true);
+    expect(payload?.location).toBe("Home");
   });
 
-  it("builds stable ICS UIDs", () => {
+  it("builds stable ICS UIDs including night keys", () => {
     expect(buildIcsUid("user-a", "prop-1")).toBe("polycal-prop-1-user-a@polycal.app");
+    expect(buildIcsUid("user-a", "prop-1", "2026-08-01")).toBe(
+      "polycal-prop-1-2026-08-01-user-a@polycal.app",
+    );
   });
 
   it("advances all-day exclusive end dates", () => {
@@ -84,8 +88,8 @@ describe("calendar payloads", () => {
 });
 
 describe("ICS builder", () => {
-  it("emits TRANSPARENT for sleeping and SUMMARY from PolyCal title", () => {
-    const title = "Sleeping: Morgan B., Doc KT, Confirmed, at Katie's Swingin' Pad";
+  it("emits TRANSPARENT, LOCATION, and SUMMARY without Confirmed (PC-351)", () => {
+    const title = "Sleeping: Morgan B., Doc KT, at Katie's Swingin' Pad";
     const { body, uid } = buildIcsDocument({
       userId: "u1",
       proposalId: "prop-1",
@@ -93,17 +97,60 @@ describe("ICS builder", () => {
       method: "PUBLISH",
       payload: {
         title,
+        location: "Katie's Swingin' Pad",
         startAt: "2026-08-02T04:00:00.000Z",
         endAt: null,
         isAllDay: true,
         transparencyFree: true,
         proposalType: "sleeping",
+        nightKey: "",
       },
     });
     expect(uid).toContain("prop-1");
     expect(body).toContain("TRANSP:TRANSPARENT");
-    expect(body).toContain("SUMMARY:Sleeping: Morgan B.\\, Doc KT\\, Confirmed\\, at Katie's Swingin' Pad");
+    expect(body).toContain("LOCATION:Katie's Swingin' Pad");
+    expect(body).toContain("SUMMARY:Sleeping: Morgan B.\\, Doc KT\\, at Katie's Swingin' Pad");
+    expect(body).not.toContain("Confirmed");
     expect(body).toContain("DTSTART;VALUE=DATE:");
+  });
+
+  it("emits multiple VEVENTs for batch nights (PC-351)", () => {
+    const { body } = buildIcsMultiDocument({
+      method: "PUBLISH",
+      events: [
+        {
+          uid: "polycal-prop-1-2026-08-01-u1@polycal.app",
+          sequence: 0,
+          payload: {
+            title: "Sleeping: Luke, Leia, at Pad A",
+            location: "Pad A",
+            startAt: "2026-08-01T00:00:00.000Z",
+            endAt: "2026-08-01T00:00:00.000Z",
+            isAllDay: true,
+            transparencyFree: true,
+            proposalType: "sleeping",
+            nightKey: "2026-08-01",
+          },
+        },
+        {
+          uid: "polycal-prop-1-2026-08-02-u1@polycal.app",
+          sequence: 0,
+          payload: {
+            title: "Sleeping: Luke, Leia, at Pad B",
+            location: "Pad B",
+            startAt: "2026-08-02T00:00:00.000Z",
+            endAt: "2026-08-02T00:00:00.000Z",
+            isAllDay: true,
+            transparencyFree: true,
+            proposalType: "sleeping",
+            nightKey: "2026-08-02",
+          },
+        },
+      ],
+    });
+    expect(body.match(/BEGIN:VEVENT/g)?.length).toBe(2);
+    expect(body).toContain("LOCATION:Pad A");
+    expect(body).toContain("LOCATION:Pad B");
   });
 
   it("increments SEQUENCE and marks CANCEL", () => {
@@ -119,6 +166,7 @@ describe("ICS builder", () => {
         isAllDay: false,
         transparencyFree: false,
         proposalType: "event",
+        nightKey: "",
       },
     });
     expect(body).toContain("SEQUENCE:3");
