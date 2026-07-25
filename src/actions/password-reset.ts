@@ -16,7 +16,7 @@ import { getDb } from "@/lib/db/client";
 import { ensureDbReady } from "@/lib/db/ensure-ready";
 import { users } from "@/lib/db/schema";
 import { checkRateLimitPersistent } from "@/lib/rate-limit";
-import { type ActionResult } from "@/lib/actions/result";
+import { type ActionFailure, type ActionResult } from "@/lib/actions/result";
 
 const GENERIC_REQUEST_MESSAGE =
   "If that account has a verified notification email, we sent a reset link.";
@@ -47,7 +47,7 @@ const resetPasswordSchema = z
  */
 export async function requestPasswordResetAction(
   usernameRaw: string,
-): Promise<{ ok: true; message: string } | ActionResult> {
+): Promise<{ ok: true; message: string } | ActionFailure> {
   const parsed = usernameSchema.safeParse(usernameRaw);
   if (!parsed.success) {
     return { ok: false, message: parsed.error.issues[0]?.message ?? "Invalid username." };
