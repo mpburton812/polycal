@@ -34,7 +34,7 @@ export function ResetPasswordForm({ token }: ResetPasswordFormProps) {
         confirmPassword,
       });
       if (!result.ok) {
-        setError(result.error);
+        setError(result.message);
         return;
       }
       router.replace("/login?reset=1");
