@@ -2,17 +2,21 @@
 
 import { hash } from "bcryptjs";
 import { eq } from "drizzle-orm";
+import { headers } from "next/headers";
 import { z } from "zod";
 
 import { logUserActivity } from "@/lib/audit";
+import { hashLinkToken } from "@/lib/crypto/token-hash";
 import { newPasswordResetToken } from "@/lib/email/credentials";
 import { sendEmail } from "@/lib/email/send";
 import { buildPasswordResetEmailContent } from "@/lib/email/templates";
 import { getPublicAppUrl } from "@/lib/env";
+import { getClientIpFromHeaders } from "@/lib/http/client-ip";
 import { getDb } from "@/lib/db/client";
 import { ensureDbReady } from "@/lib/db/ensure-ready";
 import { users } from "@/lib/db/schema";
 import { checkRateLimitPersistent } from "@/lib/rate-limit";
+import { type ActionFailure, type ActionResult } from "@/lib/actions/result";
 
 const GENERIC_REQUEST_MESSAGE =
   "If that account has a verified notification email, we sent a reset link.";
@@ -43,19 +47,21 @@ const resetPasswordSchema = z
  */
 export async function requestPasswordResetAction(
   usernameRaw: string,
-  clientIp = "unknown",
-): Promise<{ ok: true; message: string } | { ok: false; error: string }> {
+): Promise<{ ok: true; message: string } | ActionFailure> {
   const parsed = usernameSchema.safeParse(usernameRaw);
   if (!parsed.success) {
-    return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid username." };
+    return { ok: false, message: parsed.error.issues[0]?.message ?? "Invalid username." };
   }
 
+  // Derived from proxy headers only — a client-supplied IP would let a caller
+  // rotate the rate-limit key at will (PC-353).
+  const clientIp = getClientIpFromHeaders(await headers());
   const username = parsed.data.toLowerCase();
   if (
     !(await checkRateLimitPersistent(`password-reset-ip:${clientIp}`, 10, 60_000)) ||
     !(await checkRateLimitPersistent(`password-reset-user:${username}`, 5, 60_000))
   ) {
-    return { ok: false, error: "Too many reset requests. Try again in a minute." };
+    return { ok: false, message: "Too many reset requests. Try again in a minute." };
   }
 
   await ensureDbReady();
@@ -86,7 +92,8 @@ export async function requestPasswordResetAction(
     await db
       .update(users)
       .set({
-        passwordResetToken: token,
+        // Only the digest is stored; the raw token lives in the emailed link.
+        passwordResetToken: hashLinkToken(token),
         passwordResetTokenExpiresAt: expiresAt,
         updatedAt: now,
       })
@@ -126,20 +133,22 @@ export async function requestPasswordResetAction(
  */
 export async function resetPasswordWithTokenAction(
   input: z.infer<typeof resetPasswordSchema>,
-): Promise<{ ok: true } | { ok: false; error: string }> {
+): Promise<ActionResult> {
   const parsed = resetPasswordSchema.safeParse(input);
   if (!parsed.success) {
-    return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid input." };
+    return { ok: false, message: parsed.error.issues[0]?.message ?? "Invalid input." };
   }
 
+  const tokenHash = hashLinkToken(parsed.data.token);
   if (
     !(await checkRateLimitPersistent(
-      `password-reset-redeem:${parsed.data.token.slice(0, 16)}`,
+      // Keyed on the digest so the raw token never reaches the rate-limit store.
+      `password-reset-redeem:${tokenHash.slice(0, 16)}`,
       10,
       60_000,
     ))
   ) {
-    return { ok: false, error: "Too many attempts. Try again shortly." };
+    return { ok: false, message: "Too many attempts. Try again shortly." };
   }
 
   await ensureDbReady();
@@ -147,17 +156,17 @@ export async function resetPasswordWithTokenAction(
   const [user] = await db
     .select()
     .from(users)
-    .where(eq(users.passwordResetToken, parsed.data.token))
+    .where(eq(users.passwordResetToken, tokenHash))
     .limit(1);
 
   if (!user || user.status !== "active" || user.role === "passive") {
-    return { ok: false, error: "Invalid or expired reset link." };
+    return { ok: false, message: "Invalid or expired reset link." };
   }
 
   if (user.passwordResetTokenExpiresAt) {
     const expiresAt = new Date(user.passwordResetTokenExpiresAt).getTime();
     if (Number.isNaN(expiresAt) || Date.now() > expiresAt) {
-      return { ok: false, error: "Invalid or expired reset link." };
+      return { ok: false, message: "Invalid or expired reset link." };
     }
   }
 

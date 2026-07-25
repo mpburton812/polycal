@@ -1,5 +1,6 @@
 import {
   blob,
+  index,
   integer,
   sqliteTable,
   text,
@@ -51,8 +52,10 @@ export const users = sqliteTable("users", {
   gender: text("gender"),
   notificationEmail: text("notification_email"),
   emailVerifiedAt: text("email_verified_at"),
+  /** SHA-256 digest of the emailed verification token — never the raw value (PC-353). */
   emailVerificationToken: text("email_verification_token"),
   emailVerificationTokenExpiresAt: text("email_verification_token_expires_at"),
+  /** SHA-256 digest of the emailed reset token — never the raw value (PC-353). */
   passwordResetToken: text("password_reset_token"),
   passwordResetTokenExpiresAt: text("password_reset_token_expires_at"),
   notificationPrefsJson: text("notification_prefs_json"),
@@ -137,7 +140,14 @@ export const userActivityLog = sqliteTable("user_activity_log", {
   details: text("details"),
   eventType: text("event_type").notNull().default("user"),
   createdAt: text("created_at").notNull(),
-});
+}, (table) => [
+  // Notification inbox reads: per-user system rows ordered by recency (PC-355).
+  index("idx_user_activity_log_user_event_created").on(
+    table.userId,
+    table.eventType,
+    table.createdAt,
+  ),
+]);
 
 /** Runtime image storage in Turso BLOB column per architecture decision. */
 export const storedImages = sqliteTable("stored_images", {
@@ -286,7 +296,13 @@ export const proposals = sqliteTable("proposals", {
   detachedAt: text("detached_at"),
   createdAt: text("created_at").notNull(),
   updatedAt: text("updated_at").notNull(),
-});
+}, (table) => [
+  // Board columns, enforcement sweeps, schedule ranges, and recurrence children (PC-355).
+  index("idx_proposals_state").on(table.state),
+  index("idx_proposals_state_scheduled_start").on(table.state, table.scheduledStartAt),
+  index("idx_proposals_proposer_state").on(table.proposerId, table.state),
+  index("idx_proposals_parent").on(table.parentProposalId),
+]);
 
 /** Users invited to a proposal — voting queue and notifications (PC-40). */
 export const proposalInvitees = sqliteTable(
@@ -311,7 +327,11 @@ export const proposalInvitees = sqliteTable(
     addedByUserId: text("added_by_user_id").references(() => users.id),
     createdAt: text("created_at").notNull(),
   },
-  (table) => [unique().on(table.proposalId, table.userId)],
+  (table) => [
+    unique().on(table.proposalId, table.userId),
+    // Reverse lookup: which proposals a viewer is invited to (PC-355).
+    index("idx_proposal_invitees_user").on(table.userId),
+  ],
 );
 
 /** Poll or single-slot scheduling options attached to a draft/proposed item. */
@@ -329,7 +349,11 @@ export const proposalTimeSlots = sqliteTable("proposal_time_slots", {
   /** Tombstoned when a batch night or span day was detached into its own proposal. */
   isDetached: integer("is_detached", { mode: "boolean" }).notNull().default(false),
   createdAt: text("created_at").notNull(),
-});
+}, (table) => [
+  // Batched slot loads by proposal + calendar range scans (PC-355).
+  index("idx_proposal_time_slots_proposal").on(table.proposalId),
+  index("idx_proposal_time_slots_start_end").on(table.startAt, table.endAt),
+]);
 
 /** Per-slot poll votes — matrix voting for multi-slot polls (PC-40). */
 export const proposalSlotVotes = sqliteTable(
@@ -436,7 +460,12 @@ export const sleepingPartnerships = sqliteTable("sleeping_partnerships", {
   passiveAutoAccepted: integer("passive_auto_accepted", { mode: "boolean" })
     .notNull()
     .default(false),
-});
+}, (table) => [
+  // Undirected edge lookups by status for both endpoints (PC-355).
+  index("idx_sleeping_partnerships_status").on(table.status),
+  index("idx_sleeping_partnerships_low_status").on(table.userLowId, table.status),
+  index("idx_sleeping_partnerships_high_status").on(table.userHighId, table.status),
+]);
 
 /** User residency at a place — active users must accept (PC-37). */
 export const locationResidents = sqliteTable("location_residents", {
@@ -458,7 +487,11 @@ export const locationResidents = sqliteTable("location_residents", {
   createdAt: text("created_at").notNull(),
   updatedAt: text("updated_at").notNull(),
   respondedAt: text("responded_at"),
-});
+}, (table) => [
+  // Eligible-location and residency-approval filters (PC-355).
+  index("idx_location_residents_user_status").on(table.userId, table.status),
+  index("idx_location_residents_location_status").on(table.locationId, table.status),
+]);
 
 /** Network-wide chat messages on the Feed tab (PC-228). */
 export const networkChatMessages = sqliteTable("network_chat_messages", {

@@ -19,7 +19,12 @@ vi.mock("@/lib/db/client", () => ({
 import { auth } from "@/lib/auth";
 import { userHasAdminAccess } from "@/lib/admin-access";
 import { getDb } from "@/lib/db/client";
-import { requireAdminAccess, requireSession, withDb } from "./context";
+import {
+  PAUSED_ACCOUNT_MESSAGE,
+  requireAdminAccess,
+  requireSession,
+  withDb,
+} from "./context";
 
 describe("action context helpers", () => {
   beforeEach(() => {
@@ -55,6 +60,26 @@ describe("action context helpers", () => {
       ok: true,
       user: { id: "u1", role: "user", isImpersonating: true },
     });
+  });
+
+  it("requireSession rejects paused accounts (PC-353)", async () => {
+    vi.mocked(auth).mockResolvedValue({
+      user: { id: "u1", role: "user", accountStatus: "paused" },
+      expires: "",
+    } as never);
+    const result = await requireSession();
+    expect(result).toEqual({ ok: false, message: PAUSED_ACCOUNT_MESSAGE });
+  });
+
+  it("requireAdminAccess denies a paused admin (PC-353)", async () => {
+    vi.mocked(auth).mockResolvedValue({
+      user: { id: "u1", role: "admin", accountStatus: "paused" },
+      expires: "",
+    } as never);
+    vi.mocked(userHasAdminAccess).mockResolvedValue(true);
+    const result = await requireAdminAccess();
+    expect(result).toEqual({ ok: false, message: PAUSED_ACCOUNT_MESSAGE });
+    expect(userHasAdminAccess).not.toHaveBeenCalled();
   });
 
   it("requireAdminAccess checks userHasAdminAccess", async () => {

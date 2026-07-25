@@ -947,7 +947,7 @@ export async function uploadFeedImageAction(
   if (!sessionResult.ok) return sessionResult;
 
   const uploads = await readFeedImageUploads(formData);
-  if (!uploads.ok) return { ok: false, message: uploads.error };
+  if (!uploads.ok) return { ok: false, message: uploads.message };
   if (uploads.files.length !== 1) {
     return { ok: false, message: "Upload one image at a time." };
   }

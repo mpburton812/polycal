@@ -4,13 +4,7 @@ import { login } from "./helpers/auth";
 import { fillProposalDateTimeField, selectDraftScheduleMode } from "./helpers/datePickers";
 import { DEMO, USERS } from "./helpers/constants";
 import { goToProposals, openProposalCard, selectProposalTab } from "./helpers/navigation";
-import { exitDraftDialog, expandDraftMoreOptions, openEventOrSleepingProposalDraft } from "./helpers/proposals";
-
-function proposalCard(page: import("@playwright/test").Page, title: string) {
-  return page.locator(".MuiCard-root").filter({
-    has: page.getByRole("heading", { name: title, level: 2 }),
-  });
-}
+import { exitDraftDialog, expandDraftMoreOptions, openEventOrSleepingProposalDraft, proposalCard } from "./helpers/proposals";
 
 test.describe("Resolved proposal actions", () => {
   test.beforeEach(async ({ page }) => {

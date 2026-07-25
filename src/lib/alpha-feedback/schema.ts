@@ -5,6 +5,10 @@ import {
   alphaFeedbackStatuses,
 } from "@/lib/db/schema";
 import {
+  IMAGE_MAGIC_BYTE_LENGTH,
+  matchesImageMagicBytes,
+} from "@/lib/uploads/image-magic-bytes";
+import {
   LONG_TEXT_MAX,
   maxCharsMessage,
   requiredLimitedString,
@@ -89,7 +93,13 @@ export function parseOsLabel(userAgent: string | undefined): string {
   return "Unknown";
 }
 
-/** Decodes a base64 screenshot and enforces size/mime limits. */
+/**
+ * Decodes a base64 screenshot and enforces size, MIME, and content limits.
+ *
+ * The MIME arrives in the request body and the stored bytes are later served
+ * back under it, so the decoded header is checked against the declared type to
+ * keep a disguised HTML/script payload out of the screenshot store (PC-353).
+ */
 export function decodeScreenshotPayload(
   base64: string | undefined,
   mimeType: string | undefined,
@@ -102,6 +112,9 @@ export function decodeScreenshotPayload(
     return null;
   }
   if (data.length === 0 || data.length > ALPHA_FEEDBACK_MAX_SCREENSHOT_BYTES) {
+    return null;
+  }
+  if (!matchesImageMagicBytes(new Uint8Array(data.subarray(0, IMAGE_MAGIC_BYTE_LENGTH)), mimeType)) {
     return null;
   }
   return { mimeType, data };

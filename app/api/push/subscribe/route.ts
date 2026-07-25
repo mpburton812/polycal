@@ -37,16 +37,24 @@ export async function POST(request: Request) {
   const userId = session.user.id;
 
   const [existing] = await db
-    .select({ id: pushSubscriptions.id })
+    .select({ id: pushSubscriptions.id, userId: pushSubscriptions.userId })
     .from(pushSubscriptions)
     .where(eq(pushSubscriptions.endpoint, parsed.data.endpoint))
     .limit(1);
 
   if (existing) {
+    // Endpoints are unique per browser install. Re-pointing someone else's
+    // endpoint at the caller would silently redirect their push notifications,
+    // so a conflicting owner is rejected rather than reassigned (PC-353).
+    if (existing.userId !== userId) {
+      return NextResponse.json(
+        { ok: false, message: "Subscription belongs to another account." },
+        { status: 409 },
+      );
+    }
     await db
       .update(pushSubscriptions)
       .set({
-        userId,
         p256dh: parsed.data.keys.p256dh,
         auth: parsed.data.keys.auth,
         updatedAt: now,

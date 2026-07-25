@@ -1,3 +1,9 @@
+import {
+  fileMatchesImageMagicBytes,
+  IMAGE_CONTENT_MISMATCH_MESSAGE,
+} from "@/lib/uploads/image-magic-bytes";
+import { type ActionFailure } from "@/lib/actions/result";
+
 /** Max images per feed message or comment (PC-236). */
 export const MAX_FEED_IMAGES = 4;
 
@@ -31,9 +37,9 @@ function guessImageMime(filename: string): string {
  */
 export async function readFeedImageUpload(
   entry: FormDataEntryValue | null,
-): Promise<{ ok: true; file: File } | { ok: false; error: string }> {
+): Promise<{ ok: true; file: File } | ActionFailure> {
   if (!entry) {
-    return { ok: false, error: "Choose an image file." };
+    return { ok: false, message: "Choose an image file." };
   }
 
   let file: File;
@@ -43,19 +49,25 @@ export async function readFeedImageUpload(
     const blob = entry as Blob;
     file = new File([blob], "feed-image", { type: blob.type || "application/octet-stream" });
   } else {
-    return { ok: false, error: "Choose an image file." };
+    return { ok: false, message: "Choose an image file." };
   }
 
   if (file.size === 0) {
-    return { ok: false, error: "Choose an image file." };
+    return { ok: false, message: "Choose an image file." };
   }
   if (file.size > MAX_FEED_IMAGE_BYTES) {
-    return { ok: false, error: "Image must be 4 MB or smaller." };
+    return { ok: false, message: "Image must be 4 MB or smaller." };
   }
 
   const mimeType = file.type || guessImageMime(file.name);
   if (!ALLOWED_FEED_IMAGE_MIMES.has(mimeType)) {
-    return { ok: false, error: "Use JPEG, PNG, WebP, or GIF." };
+    return { ok: false, message: "Use JPEG, PNG, WebP, or GIF." };
+  }
+
+  // Feed images are served back with their stored MIME, so the declared type
+  // must match the actual bytes (PC-353).
+  if (!(await fileMatchesImageMagicBytes(file, mimeType))) {
+    return { ok: false, message: IMAGE_CONTENT_MISMATCH_MESSAGE };
   }
 
   return {
@@ -69,7 +81,7 @@ export async function readFeedImageUpload(
  */
 export async function readFeedImageUploads(
   formData: FormData,
-): Promise<{ ok: true; files: File[] } | { ok: false; error: string }> {
+): Promise<{ ok: true; files: File[] } | ActionFailure> {
   const files: File[] = [];
   for (let i = 0; i < MAX_FEED_IMAGES; i += 1) {
     const entry = formData.get(`image${i}`);
@@ -79,7 +91,7 @@ export async function readFeedImageUploads(
     files.push(parsed.file);
   }
   if (files.length > MAX_FEED_IMAGES) {
-    return { ok: false, error: `At most ${MAX_FEED_IMAGES} images allowed.` };
+    return { ok: false, message: `At most ${MAX_FEED_IMAGES} images allowed.` };
   }
   return { ok: true, files };
 }

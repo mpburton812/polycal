@@ -1,6 +1,6 @@
 "use server";
 
-import { hash } from "bcryptjs";
+import { compare, hash } from "bcryptjs";
 import { randomUUID } from "node:crypto";
 import { and, asc, eq, inArray, ne, or } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
@@ -9,6 +9,7 @@ import { z } from "zod";
 import { auth } from "@/lib/auth";
 import { logUserActivity } from "@/lib/audit";
 import { requireAdminAccess, requireSession, withDb } from "@/lib/actions/context";
+import { isCustomAvatarKey } from "@/lib/constants/avatars";
 import { getDb } from "@/lib/db/client";
 import { ensureDbReady } from "@/lib/db/ensure-ready";
 import { checkRateLimit } from "@/lib/rate-limit";
@@ -20,16 +21,24 @@ import {
   proposalInvitees,
   proposalSlotVotes,
   proposals,
+  pushSubscriptions,
   sleepingPartnerships,
+  storedImages,
   users,
   type UserRole,
 } from "@/lib/db/schema";
+import {
+  ACCOUNT_DELETE_CONFIRMATION_PHRASE,
+  anonymizedUserFields,
+  matchesDeleteConfirmation,
+} from "@/lib/users/account-deletion";
 import { actorNotifyFields, notifyUser } from "@/lib/notifications";
 import {
   dismissAllNotificationsForProposal,
   formatDraftReturnNotification,
 } from "@/lib/notifications-draft-return";
 import { enterPendingRecoveryIfNeeded } from "@/lib/proposals/pending-recovery";
+import { hashLinkToken } from "@/lib/crypto/token-hash";
 import {
   deliverLoginCredentials,
   newEmailVerificationToken,
@@ -486,7 +495,8 @@ export async function createActiveUserAction(
     onboardingComplete: false,
     notificationEmail,
     emailVerifiedAt: null,
-    emailVerificationToken: verifyToken,
+    // Digest at rest; `verifyToken` (raw) is handed to the email sender below.
+    emailVerificationToken: verifyToken ? hashLinkToken(verifyToken) : null,
     emailVerificationTokenExpiresAt: verifyExpires,
     createdAt: now,
     updatedAt: now,
@@ -775,24 +785,19 @@ export async function updateUserAction(
 }
 
 /**
- * Soft-deletes a user and removes their graph edges (admin only, PC-35).
+ * Tears down a departing member's graph edges and erases their personal data (PC-354).
+ *
+ * Shared by the admin delete tool and self-service deletion so both routes purge exactly
+ * the same surface. The `users` row survives as an anonymized tombstone because proposals,
+ * feed posts, and activity logs hold foreign keys to it — see `anonymizedUserFields` for
+ * the column-level contract.
  */
-export async function deleteUserAction(userId: string): Promise<UserActionResult> {
-  const adminResult = await requireAdminAccess();
-  if (!adminResult.ok) {
-    return { ok: false, message: adminResult.message };
-  }
-
-  if (userId === adminResult.user.id) {
-    return { ok: false, message: "You cannot delete your own account." };
-  }
-
-  await ensureDbReady();
-  const db = getDb();
-  const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
-  if (!user || (user.status !== "active" && user.status !== "paused")) {
-    return { ok: false, message: "User not found." };
-  }
+async function eraseAccount(
+  db: ReturnType<typeof getDb>,
+  user: typeof users.$inferSelect,
+  actorUserId: string,
+): Promise<void> {
+  const userId = user.id;
 
   await db
     .delete(sleepingPartnerships)
@@ -815,27 +820,66 @@ export async function deleteUserAction(userId: string): Promise<UserActionResult
 
   await deletePlacesOwnedByUser(db, userId);
 
-  await archiveProposalsForDeletedUser(db, userId, adminResult.user.id);
-  await demoteOrRemoveInviteeFromActiveProposals(db, userId, adminResult.user.id, "removed");
+  await archiveProposalsForDeletedUser(db, userId, actorUserId);
+  await demoteOrRemoveInviteeFromActiveProposals(db, userId, actorUserId, "removed");
 
   const { purgeUserGoogleCalendarData } = await import("@/lib/calendar/purge-google");
   await purgeUserGoogleCalendarData(db, userId);
   await db.delete(calendarConnections).where(eq(calendarConnections.userId, userId));
 
-  const now = new Date().toISOString();
+  // Push endpoints are device credentials: leaving them would keep delivering notifications
+  // to a browser whose account no longer exists.
+  await db.delete(pushSubscriptions).where(eq(pushSubscriptions.userId, userId));
+
+  if (isCustomAvatarKey(user.avatarKey)) {
+    const imageId = user.avatarKey!.slice("custom:".length);
+    await db.delete(storedImages).where(eq(storedImages.id, imageId));
+  }
+
   await db
     .update(users)
-    .set({
-      status: "deleted",
-      displayName: "Former User",
-      username: `deleted-${userId.slice(-8)}`,
-      passwordHash: await hash(randomUUID(), 12),
-      notificationEmail: null,
-      emailVerifiedAt: null,
-      sessionVersion: user.sessionVersion + 1,
-      updatedAt: now,
-    })
+    .set(
+      anonymizedUserFields({
+        userId,
+        sessionVersion: user.sessionVersion,
+        // Random secret nobody holds — the column is NOT NULL and must stay unusable.
+        passwordHash: await hash(randomUUID(), 12),
+        now: new Date().toISOString(),
+      }),
+    )
     .where(eq(users.id, userId));
+}
+
+/** Revalidates every surface that renders member names or their proposals. */
+function revalidateAfterAccountRemoval(): void {
+  revalidatePath("/people-places");
+  revalidatePath("/admin");
+  revalidatePath("/api/dev/users");
+  revalidatePath("/proposals");
+  revalidatePath("/schedule");
+}
+
+/**
+ * Soft-deletes a user and removes their graph edges (admin only, PC-35 / PC-354).
+ */
+export async function deleteUserAction(userId: string): Promise<UserActionResult> {
+  const adminResult = await requireAdminAccess();
+  if (!adminResult.ok) {
+    return { ok: false, message: adminResult.message };
+  }
+
+  if (userId === adminResult.user.id) {
+    return { ok: false, message: "You cannot delete your own account." };
+  }
+
+  await ensureDbReady();
+  const db = getDb();
+  const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+  if (!user || (user.status !== "active" && user.status !== "paused")) {
+    return { ok: false, message: "User not found." };
+  }
+
+  await eraseAccount(db, user, adminResult.user.id);
 
   await logUserActivity(
     adminResult.user.id,
@@ -843,13 +887,96 @@ export async function deleteUserAction(userId: string): Promise<UserActionResult
     JSON.stringify({ userId, username: user.username }),
   );
 
-  revalidatePath("/people-places");
-  revalidatePath("/admin");
-  revalidatePath("/api/dev/users");
-  revalidatePath("/proposals");
-  revalidatePath("/schedule");
+  revalidateAfterAccountRemoval();
 
   return { ok: true, message: `Deleted ${user.displayName}.` };
+}
+
+const deleteMyAccountSchema = z.object({
+  password: z.string().min(1, "Enter your password to confirm."),
+  confirmation: z.string().min(1, "Type the confirmation phrase."),
+});
+
+/**
+ * Erases the signed-in member's own account (PC-354).
+ *
+ * Two independent confirmations are required — the current password (proves the person at
+ * the keyboard owns the session) and a typed phrase (proves the destruction is intended) —
+ * because the operation is irreversible and reachable from a normal settings screen.
+ * Callers must sign out afterwards; the bumped `sessionVersion` also invalidates the JWT.
+ */
+export async function deleteMyAccountAction(
+  input: z.infer<typeof deleteMyAccountSchema>,
+): Promise<UserActionResult> {
+  const sessionResult = await requireSession();
+  if (!sessionResult.ok) {
+    return { ok: false, message: sessionResult.message };
+  }
+
+  // An impersonating admin holds the target's session but not their password or consent.
+  if (sessionResult.user.isImpersonating) {
+    return { ok: false, message: "Account deletion is unavailable while impersonating." };
+  }
+
+  const parsed = deleteMyAccountSchema.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, message: formatZodError(parsed.error) };
+  }
+
+  if (!matchesDeleteConfirmation(parsed.data.confirmation)) {
+    return {
+      ok: false,
+      message: `Type "${ACCOUNT_DELETE_CONFIRMATION_PHRASE}" to confirm.`,
+    };
+  }
+
+  if (!checkRateLimit(`account-delete:${sessionResult.user.id}`, 5, 60_000)) {
+    return { ok: false, message: "Too many attempts. Try again in a minute." };
+  }
+
+  await ensureDbReady();
+  const db = getDb();
+  const [user] = await db
+    .select()
+    .from(users)
+    .where(eq(users.id, sessionResult.user.id))
+    .limit(1);
+  if (!user || user.status === "deleted") {
+    return { ok: false, message: "Account not found." };
+  }
+
+  const passwordValid = await compare(parsed.data.password, user.passwordHash);
+  if (!passwordValid) {
+    await logUserActivity(user.id, "users.self_delete_bad_password");
+    return { ok: false, message: "Password is incorrect." };
+  }
+
+  // Losing the last administrator would leave the group with no way to manage accounts.
+  if (user.role === "admin") {
+    const remainingAdmins = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(and(eq(users.role, "admin"), eq(users.status, "active"), ne(users.id, user.id)));
+    if (remainingAdmins.length === 0) {
+      return {
+        ok: false,
+        message:
+          "You are the only active administrator. Promote another admin before deleting your account.",
+      };
+    }
+  }
+
+  await eraseAccount(db, user, user.id);
+
+  await logUserActivity(
+    user.id,
+    "users.self_delete",
+    JSON.stringify({ userId: user.id, username: user.username }),
+  );
+
+  revalidateAfterAccountRemoval();
+
+  return { ok: true, message: "Your account has been deleted." };
 }
 
 /**
@@ -1090,7 +1217,8 @@ export async function activatePassiveUserAction(
       activatedFromPassiveAt: now,
       notificationEmail,
       emailVerifiedAt: null,
-      emailVerificationToken: verifyToken,
+      // Digest at rest; `verifyToken` (raw) is handed to the email sender below.
+      emailVerificationToken: verifyToken ? hashLinkToken(verifyToken) : null,
       emailVerificationTokenExpiresAt: verifyExpires,
       updatedAt: now,
     })

@@ -166,7 +166,7 @@ function FirstLoginWizardInner({
         ? await setInitialPasswordAction(formData)
         : await changePasswordAction(formData);
       if (!result.ok) {
-        setError(result.error);
+        setError(result.message);
         return;
       }
       await update({
@@ -220,7 +220,7 @@ function FirstLoginWizardInner({
     startTransition(async () => {
       const emailResult = await updateNotificationEmailAction(email);
       if (!emailResult.ok) {
-        setError(emailResult.error);
+        setError(emailResult.message);
         return;
       }
       setEmailStatus(
@@ -229,7 +229,7 @@ function FirstLoginWizardInner({
 
       const prefsResult = await updateNotificationPrefsAction(prefs);
       if (!prefsResult.ok) {
-        setError(prefsResult.error);
+        setError(prefsResult.message);
         return;
       }
       setActiveStep(4);
@@ -307,7 +307,11 @@ function FirstLoginWizardInner({
         Complete these steps before using the app.
       </Typography>
       <Typography variant="body2" sx={{ mb: 3, color: GARDEN_TOKENS.inkMuted }}>
-        By continuing, you acknowledge how PolyCal handles group scheduling data. Read our{" "}
+        By continuing, you agree to our{" "}
+        <MuiLink component={NextLink} href="/terms" underline="hover" target="_blank" rel="noopener noreferrer">
+          Terms of Service
+        </MuiLink>{" "}
+        and acknowledge how PolyCal handles group scheduling data, described in our{" "}
         <MuiLink component={NextLink} href="/privacy" underline="hover" target="_blank" rel="noopener noreferrer">
           Privacy Policy
         </MuiLink>

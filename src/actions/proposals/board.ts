@@ -1,6 +1,6 @@
 "use server";
 
-import { and, asc, eq, inArray, ne, or } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, ne, or } from "drizzle-orm";
 
 import { auth } from "@/lib/auth";
 import { userHasAdminAccess } from "@/lib/admin-access";
@@ -36,6 +36,13 @@ import { proposalHasSchedulableWindows } from "@/lib/schedule/schedule-slices";
 import { latestIcsPendingIdsByProposal } from "@/lib/calendar/pending-ics";
 
 import type { ProposalBoard, ProposalCard } from "./types";
+
+/**
+ * Soft cap on the archived column (PC-355). Archived proposals accumulate
+ * forever and the board previously loaded every one of them on each render;
+ * the newest slice is what the column actually shows.
+ */
+const ARCHIVE_COLUMN_SOFT_CAP = 100;
 
 /** Parses bedroom label JSON stored on locations for card display (PC-124). */
 function bedroomLabelFromPlace(
@@ -106,39 +113,54 @@ export async function listProposalBoardAction(): Promise<ProposalBoard> {
         ),
       );
 
-  const rows = await db
-    .select({
-      id: proposals.id,
-      title: proposals.title,
-      description: proposals.description,
-      proposalType: proposals.proposalType,
-      state: proposals.state,
-      proposerId: proposals.proposerId,
-      proposerName: users.displayName,
-      locationName: locations.name,
-      locationText: proposals.locationText,
-      scheduledStartAt: proposals.scheduledStartAt,
-      scheduledEndAt: proposals.scheduledEndAt,
-      atRisk: proposals.atRisk,
-      atRiskExpiresAt: proposals.atRiskExpiresAt,
-      lastNudgeAt: proposals.lastNudgeAt,
-      updatedAt: proposals.updatedAt,
-      isPoll: proposals.isPoll,
-      isAllDay: proposals.isAllDay,
-      intentionalSolo: proposals.intentionalSolo,
-      isBatchSleeping: proposals.isBatchSleeping,
-      isRecurrenceParent: proposals.isRecurrenceParent,
-      parentProposalId: proposals.parentProposalId,
-      eventIconKey: proposals.eventIconKey,
-      bedroomIndex: proposals.bedroomIndex,
-      locationBedroomNames: locations.bedroomNames,
-      locationBedroomCount: locations.bedroomCount,
-    })
+  const cardColumns = {
+    id: proposals.id,
+    title: proposals.title,
+    description: proposals.description,
+    proposalType: proposals.proposalType,
+    state: proposals.state,
+    proposerId: proposals.proposerId,
+    proposerName: users.displayName,
+    locationName: locations.name,
+    locationText: proposals.locationText,
+    scheduledStartAt: proposals.scheduledStartAt,
+    scheduledEndAt: proposals.scheduledEndAt,
+    atRisk: proposals.atRisk,
+    atRiskExpiresAt: proposals.atRiskExpiresAt,
+    lastNudgeAt: proposals.lastNudgeAt,
+    updatedAt: proposals.updatedAt,
+    isPoll: proposals.isPoll,
+    isAllDay: proposals.isAllDay,
+    intentionalSolo: proposals.intentionalSolo,
+    isBatchSleeping: proposals.isBatchSleeping,
+    isRecurrenceParent: proposals.isRecurrenceParent,
+    parentProposalId: proposals.parentProposalId,
+    eventIconKey: proposals.eventIconKey,
+    bedroomIndex: proposals.bedroomIndex,
+    locationBedroomNames: locations.bedroomNames,
+    locationBedroomCount: locations.bedroomCount,
+  };
+
+  const activeRows = await db
+    .select(cardColumns)
     .from(proposals)
     .innerJoin(users, eq(proposals.proposerId, users.id))
     .leftJoin(locations, eq(proposals.locationId, locations.id))
-    .where(boardVisibilityFilter)
+    .where(and(ne(proposals.state, "archived"), boardVisibilityFilter))
     .orderBy(asc(proposals.updatedAt));
+
+  // Archived is network-visible and unbounded — take the newest slice, then flip
+  // back to ascending so the column keeps its existing oldest-first order (PC-355).
+  const archivedRows = await db
+    .select(cardColumns)
+    .from(proposals)
+    .innerJoin(users, eq(proposals.proposerId, users.id))
+    .leftJoin(locations, eq(proposals.locationId, locations.id))
+    .where(and(eq(proposals.state, "archived"), boardVisibilityFilter))
+    .orderBy(desc(proposals.updatedAt))
+    .limit(ARCHIVE_COLUMN_SOFT_CAP);
+
+  const rows = [...activeRows, ...archivedRows.reverse()];
 
   const visibleProposalIds = rows.map((row) => row.id);
   const inviteeRows =

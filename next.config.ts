@@ -20,6 +20,9 @@ const nextConfig: NextConfig = {
     serverActions: {
       bodySizeLimit: "4mb",
     },
+    // Rewrites barrel imports to deep paths so MUI/dayjs only ship what is used,
+    // cutting dev compile time and client bundle size (PC-355).
+    optimizePackageImports: ["@mui/material", "@mui/icons-material", "dayjs"],
   },
   env: {
     NEXT_PUBLIC_BUILD_SHA:

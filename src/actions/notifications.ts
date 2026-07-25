@@ -1,6 +1,6 @@
 "use server";
 
-import { and, desc, eq, like, notInArray } from "drizzle-orm";
+import { and, desc, eq, like, notExists, sql } from "drizzle-orm";
 import { revalidateNotificationShellPaths } from "@/lib/notifications-revalidate";
 
 import { auth } from "@/lib/auth";
@@ -33,6 +33,43 @@ export interface NotificationItem {
   message: string;
   createdAt: string;
   metadata: Record<string, unknown>;
+}
+
+/**
+ * Upper bound for the targeted dismissal sweeps (PC-355). They only ever act on
+ * rows referencing one proposal/partnership, so scanning the newest slice of the
+ * activity log is enough — older rows are already dismissed or irrelevant.
+ */
+const DISMISSAL_SCAN_LIMIT = 200;
+
+/**
+ * Correlated NOT EXISTS against notification_dismissals.
+ *
+ * Replaces loading every dismissed log id into a `NOT IN (…)` list, which grew
+ * without bound for long-lived accounts (PC-355).
+ */
+function notDismissedByUser(userId: string) {
+  return notExists(
+    getDb()
+      .select({ dismissed: sql`1` })
+      .from(notificationDismissals)
+      .where(
+        and(
+          eq(notificationDismissals.userId, userId),
+          eq(notificationDismissals.logId, userActivityLog.id),
+        ),
+      ),
+  );
+}
+
+/** Shared inbox predicate: this user's undismissed system notifications. */
+function undismissedNotificationFilter(userId: string) {
+  return and(
+    eq(userActivityLog.userId, userId),
+    eq(userActivityLog.eventType, "system"),
+    like(userActivityLog.action, "notification.%"),
+    notDismissedByUser(userId),
+  );
 }
 
 /**
@@ -77,32 +114,12 @@ export async function getNotificationInboxAction(): Promise<{
   const db = getDb();
   const userId = session.user.id;
 
-  const dismissed = await db
-    .select({ logId: notificationDismissals.logId })
-    .from(notificationDismissals)
-    .where(eq(notificationDismissals.userId, userId));
-  const dismissedIds = dismissed.map((row) => row.logId);
-
-  const baseFilter = and(
-    eq(userActivityLog.userId, userId),
-    eq(userActivityLog.eventType, "system"),
-    like(userActivityLog.action, "notification.%"),
-  );
-
-  const rows =
-    dismissedIds.length > 0
-      ? await db
-          .select()
-          .from(userActivityLog)
-          .where(and(baseFilter, notInArray(userActivityLog.id, dismissedIds)))
-          .orderBy(desc(userActivityLog.createdAt))
-          .limit(50)
-      : await db
-          .select()
-          .from(userActivityLog)
-          .where(baseFilter)
-          .orderBy(desc(userActivityLog.createdAt))
-          .limit(50);
+  const rows = await db
+    .select()
+    .from(userActivityLog)
+    .where(undismissedNotificationFilter(userId))
+    .orderBy(desc(userActivityLog.createdAt))
+    .limit(50);
 
   const items: NotificationItem[] = rows
     .map((row) => {
@@ -206,25 +223,19 @@ export async function dismissNotificationsForProposal(
   await ensureDbReady();
   const db = getDb();
 
-  const dismissed = await db
-    .select({ logId: notificationDismissals.logId })
-    .from(notificationDismissals)
-    .where(eq(notificationDismissals.userId, userId));
-  const dismissedIds = dismissed.map((row) => row.logId);
-
-  const baseFilter = and(
-    eq(userActivityLog.userId, userId),
-    eq(userActivityLog.eventType, "system"),
-    like(userActivityLog.action, "notification.%"),
-  );
-
-  const rows =
-    dismissedIds.length > 0
-      ? await db
-          .select()
-          .from(userActivityLog)
-          .where(and(baseFilter, notInArray(userActivityLog.id, dismissedIds)))
-      : await db.select().from(userActivityLog).where(baseFilter);
+  // Scoped to rows whose payload mentions this proposal, newest first, and
+  // capped — the old query walked every undismissed row ever written (PC-355).
+  const rows = await db
+    .select()
+    .from(userActivityLog)
+    .where(
+      and(
+        undismissedNotificationFilter(userId),
+        like(userActivityLog.details, `%${proposalId}%`),
+      ),
+    )
+    .orderBy(desc(userActivityLog.createdAt))
+    .limit(DISMISSAL_SCAN_LIMIT);
 
   const now = new Date().toISOString();
   let cleared = 0;
@@ -258,25 +269,18 @@ export async function dismissNotificationsForPartnership(
   await ensureDbReady();
   const db = getDb();
 
-  const dismissed = await db
-    .select({ logId: notificationDismissals.logId })
-    .from(notificationDismissals)
-    .where(eq(notificationDismissals.userId, userId));
-  const dismissedIds = dismissed.map((row) => row.logId);
-
-  const baseFilter = and(
-    eq(userActivityLog.userId, userId),
-    eq(userActivityLog.eventType, "system"),
-    like(userActivityLog.action, "notification.%"),
-  );
-
-  const rows =
-    dismissedIds.length > 0
-      ? await db
-          .select()
-          .from(userActivityLog)
-          .where(and(baseFilter, notInArray(userActivityLog.id, dismissedIds)))
-      : await db.select().from(userActivityLog).where(baseFilter);
+  const rows = await db
+    .select()
+    .from(userActivityLog)
+    .where(
+      and(
+        undismissedNotificationFilter(userId),
+        eq(userActivityLog.action, "notification.partnership_proposed"),
+        like(userActivityLog.details, `%${partnershipId}%`),
+      ),
+    )
+    .orderBy(desc(userActivityLog.createdAt))
+    .limit(DISMISSAL_SCAN_LIMIT);
 
   const now = new Date().toISOString();
   let cleared = 0;

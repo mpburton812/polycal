@@ -7,7 +7,7 @@ import { cookies } from "next/headers";
 import { z } from "zod";
 
 import { recordSuccessfulLogin } from "@/lib/audit";
-import { getImpersonationSecret } from "@/lib/auth/impersonation";
+import { isValidImpersonationSecret } from "@/lib/auth/impersonation";
 import { authConfig } from "../../auth.config";
 import { getDb } from "@/lib/db/client";
 import { ensureDbReady } from "@/lib/db/ensure-ready";
@@ -75,13 +75,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         await ensureDbReady();
 
         if (raw?.impersonateUserId) {
-          const impersonationSecret = getImpersonationSecret();
-          const secretOk =
-            impersonationSecret &&
-            typeof raw.impersonateSecret === "string" &&
-            raw.impersonateSecret === impersonationSecret;
-
-          if (!secretOk) {
+          // Constant-time compare, and denied outright on production unless
+          // ALLOW_PROD_IMPERSONATION=1 is set explicitly (PC-353).
+          if (!isValidImpersonationSecret(raw.impersonateSecret)) {
             return null;
           }
 

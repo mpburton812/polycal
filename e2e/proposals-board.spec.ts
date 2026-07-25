@@ -3,13 +3,7 @@ import { expect, test } from "./helpers/test";
 import { login } from "./helpers/auth";
 import { DEMO, USERS } from "./helpers/constants";
 import { goToProposals, selectProposalTab } from "./helpers/navigation";
-import { openEventOrSleepingProposalDraft, sleepingProposalCardsFor } from "./helpers/proposals";
-
-function proposalCard(page: import("@playwright/test").Page, title: string) {
-  return page.locator(".MuiCard-root").filter({
-    has: page.getByRole("heading", { name: title, level: 2 }),
-  });
-}
+import { openEventOrSleepingProposalDraft, proposalCard, sleepingProposalCardsFor } from "./helpers/proposals";
 
 test.describe("Proposals board", () => {
   test.beforeEach(async ({ page }) => {

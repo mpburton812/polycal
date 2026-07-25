@@ -1,6 +1,7 @@
 import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
+import { hashLinkToken } from "@/lib/crypto/token-hash";
 import { getDb } from "@/lib/db/client";
 import { ensureDbReady } from "@/lib/db/ensure-ready";
 import { users } from "@/lib/db/schema";
@@ -8,6 +9,8 @@ import { isE2eApiAuthorized } from "@/lib/e2e-api";
 
 /**
  * Seeds a password-reset token for E2E forgot/reset journeys (PC-162).
+ * The caller keeps the raw token for the reset link; only its digest is stored,
+ * matching the production flow (PC-353).
  */
 export async function POST(request: Request): Promise<NextResponse> {
   if (!isE2eApiAuthorized(request)) {
@@ -34,7 +37,7 @@ export async function POST(request: Request): Promise<NextResponse> {
   await db
     .update(users)
     .set({
-      passwordResetToken: token,
+      passwordResetToken: hashLinkToken(token),
       passwordResetTokenExpiresAt: expiresAt,
       updatedAt: now,
     })
