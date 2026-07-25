@@ -3,7 +3,7 @@ import { randomUUID } from "crypto";
 import { and, eq } from "drizzle-orm";
 import { hash } from "bcryptjs";
 
-import { importResidencesAndPassiveSleeping } from "@/actions/networks";
+import { importResidencesAndPassiveSleeping } from "@/lib/networks/import-on-join";
 import { isE2eApiAuthorized } from "@/lib/e2e-api";
 import { getDb } from "@/lib/db/client";
 import { ensureDbReady } from "@/lib/db/ensure-ready";

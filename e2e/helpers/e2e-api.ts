@@ -12,8 +12,11 @@ export async function e2eApiPost<T extends { ok?: boolean }>(
     headers: { "x-e2e-api-secret": E2E_API_SECRET },
     data,
   });
-  expect(response.ok()).toBeTruthy();
-  const body = (await response.json()) as T;
+  const body = (await response.json().catch(() => ({}))) as T & { error?: string };
+  expect(
+    response.ok(),
+    `E2E API ${path} failed: ${response.status()} ${JSON.stringify(body)}`,
+  ).toBeTruthy();
   expect(body.ok).toBe(true);
   return body;
 }
