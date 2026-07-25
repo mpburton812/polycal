@@ -90,18 +90,43 @@ async function getSchedulePrivacyFlags(
   };
 }
 
+/**
+ * Padding for the SQL range prefilters (PC-355).
+ *
+ * `buildScheduleWindows` can shift a window by up to one civil day (all-day
+ * noon-UTC normalisation, sleeping day bounds) plus the viewer's UTC offset, so
+ * rows are fetched with two days of slack and the exact `eventInRange` check
+ * still decides what renders.
+ */
+const SCHEDULE_RANGE_PAD_MS = 2 * 24 * 60 * 60 * 1000;
+
+function shiftIso(iso: string, deltaMs: number): string {
+  const ms = Date.parse(iso);
+  if (Number.isNaN(ms)) return iso;
+  return new Date(ms + deltaMs).toISOString();
+}
+
 function proposalScheduledOverlapsRange(rangeStart: string, rangeEnd: string) {
   return and(
     isNotNull(proposals.scheduledStartAt),
     lte(proposals.scheduledStartAt, rangeEnd),
-    or(isNull(proposals.scheduledEndAt), gte(proposals.scheduledEndAt, rangeStart)),
+    or(
+      gte(proposals.scheduledEndAt, rangeStart),
+      // Open-ended rows (single sleeping nights) occupy their start day only —
+      // an ancient night must not be dragged into every future range.
+      and(isNull(proposals.scheduledEndAt), gte(proposals.scheduledStartAt, rangeStart)),
+    ),
   );
 }
 
 function slotOverlapsRange(rangeStart: string, rangeEnd: string) {
   return and(
     lte(proposalTimeSlots.startAt, rangeEnd),
-    or(isNull(proposalTimeSlots.endAt), gte(proposalTimeSlots.endAt, rangeStart)),
+    or(
+      gte(proposalTimeSlots.endAt, rangeStart),
+      // A slot with no end occupies its start instant/day only.
+      and(isNull(proposalTimeSlots.endAt), gte(proposalTimeSlots.startAt, rangeStart)),
+    ),
   );
 }
 
@@ -142,6 +167,12 @@ export async function listScheduleEventsAction(
   const partnerIds = await getAcceptedSleepingPartnerIds(db, viewerId);
   const { rangeStart, rangeEnd } = parsed.data;
 
+  // Every rendered window derives from a time slot or the proposal's own
+  // scheduled bounds, so a padded range prefilter on those two sources replaces
+  // the old fully-global proposed / batch / recurrence branches (PC-355).
+  const paddedStart = shiftIso(rangeStart, -SCHEDULE_RANGE_PAD_MS);
+  const paddedEnd = shiftIso(rangeEnd, SCHEDULE_RANGE_PAD_MS);
+
   const overlappingSlotRows = await db
     .select({
       id: proposalTimeSlots.id,
@@ -153,18 +184,12 @@ export async function listScheduleEventsAction(
       isDetached: proposalTimeSlots.isDetached,
     })
     .from(proposalTimeSlots)
-    .where(slotOverlapsRange(rangeStart, rangeEnd))
+    .where(slotOverlapsRange(paddedStart, paddedEnd))
     .orderBy(asc(proposalTimeSlots.sortOrder));
 
   const slotProposalIds = [...new Set(overlappingSlotRows.map((slot) => slot.proposalId))];
 
-  const rangeFilters = [
-    eq(proposals.state, "proposed"),
-    eq(proposals.isBatchSleeping, true),
-    eq(proposals.isRecurrenceParent, true),
-    isNotNull(proposals.parentProposalId),
-    proposalScheduledOverlapsRange(rangeStart, rangeEnd),
-  ];
+  const rangeFilters = [proposalScheduledOverlapsRange(paddedStart, paddedEnd)];
   if (slotProposalIds.length > 0) {
     rangeFilters.push(inArray(proposals.id, slotProposalIds));
   }
