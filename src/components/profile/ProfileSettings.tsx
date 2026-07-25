@@ -32,6 +32,7 @@ import {
   updateProfilePreferencesAction,
   uploadCustomAvatarAction,
 } from "@/actions/profile";
+import { AccountDataSettings } from "@/components/profile/AccountDataSettings";
 import { CalendarIntegrationSettings } from "@/components/profile/CalendarIntegrationSettings";
 import { AVATAR_OPTIONS, avatarSrcForKey, isCustomAvatarKey } from "@/lib/constants/avatars";
 import { AvatarCropDialog } from "@/components/profile/AvatarCropDialog";
@@ -667,6 +668,8 @@ export function ProfileSettings({
         </Button>
       </Paper>
 
+      <AccountDataSettings />
+
       <Typography
         component="footer"
         variant="body2"
@@ -674,6 +677,10 @@ export function ProfileSettings({
       >
         <MuiLink component={NextLink} href="/privacy" underline="hover" color="inherit">
           Privacy Policy
+        </MuiLink>
+        {" · "}
+        <MuiLink component={NextLink} href="/terms" underline="hover" color="inherit">
+          Terms of Service
         </MuiLink>
       </Typography>
 
