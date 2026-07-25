@@ -32,7 +32,7 @@ export function MustChangePasswordForm() {
     startTransition(async () => {
       const result = await changePasswordAction(formData);
       if (!result.ok) {
-        setError(result.error);
+        setError(result.message);
         return;
       }
       await update({

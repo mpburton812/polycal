@@ -25,7 +25,7 @@ export function ForgotPasswordForm() {
     startTransition(async () => {
       const result = await requestPasswordResetAction(username);
       if (!result.ok) {
-        setError(result.error);
+        setError(result.message);
         return;
       }
       setMessage(result.message);

@@ -125,7 +125,7 @@ export function ProfileSettings({
     startPasswordTransition(async () => {
       const result = await changePasswordAction(formData);
       if (!result.ok) {
-        setPasswordError(result.error);
+        setPasswordError(result.message);
         return;
       }
       setPasswordMessage("Password updated.");
@@ -154,7 +154,7 @@ export function ProfileSettings({
     startPrefsTransition(async () => {
       const result = await updateProfilePreferencesAction(formData);
       if (!result.ok) {
-        setPrefsError(result.error);
+        setPrefsError(result.message);
         return;
       }
       setPrefsMessage("Preferences saved.");
@@ -169,7 +169,7 @@ export function ProfileSettings({
     startNameTransition(async () => {
       const result = await updateDisplayNameAction(displayName);
       if (!result.ok) {
-        setNameError(result.error);
+        setNameError(result.message);
         return;
       }
       setNameMessage("Display name updated.");
@@ -184,7 +184,7 @@ export function ProfileSettings({
     startBioTransition(async () => {
       const result = await updateProfileBioAction(profileBio);
       if (!result.ok) {
-        setBioError(result.error);
+        setBioError(result.message);
         return;
       }
       setBioMessage("Bio updated.");
@@ -198,7 +198,7 @@ export function ProfileSettings({
     startNotifTransition(async () => {
       const result = await updateNotificationPrefsAction(notificationPrefs);
       if (!result.ok) {
-        setNotifError(result.error);
+        setNotifError(result.message);
         return;
       }
       setNotifMessage("Notification preferences saved.");
@@ -220,7 +220,7 @@ export function ProfileSettings({
     startAvatarUploadTransition(async () => {
       const result = await uploadCustomAvatarAction(formData);
       if (!result.ok) {
-        setAvatarUploadError(result.error);
+        setAvatarUploadError(result.message);
         return;
       }
       setAvatarKey(result.avatarKey);
@@ -235,7 +235,7 @@ export function ProfileSettings({
     startNotifTransition(async () => {
       const result = await updateNotificationEmailAction(notificationEmail);
       if (!result.ok) {
-        setNotifError(result.error);
+        setNotifError(result.message);
         return;
       }
       setEmailVerified(false);
@@ -268,7 +268,7 @@ export function ProfileSettings({
       };
       const result = await updateNotificationPrefsAction(updatedPrefs);
       if (!result.ok) {
-        setPushError(result.error);
+        setPushError(result.message);
         return;
       }
 
@@ -288,7 +288,7 @@ export function ProfileSettings({
     startNotifTransition(async () => {
       const result = await updateNotificationPrefsAction(updatedPrefs);
       if (!result.ok) {
-        setPushError(result.error);
+        setPushError(result.message);
         return;
       }
       setPushMessage("Push notifications disabled.");

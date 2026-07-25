@@ -16,6 +16,7 @@ import { getDb } from "@/lib/db/client";
 import { ensureDbReady } from "@/lib/db/ensure-ready";
 import { users } from "@/lib/db/schema";
 import { checkRateLimitPersistent } from "@/lib/rate-limit";
+import { type ActionResult } from "@/lib/actions/result";
 
 const GENERIC_REQUEST_MESSAGE =
   "If that account has a verified notification email, we sent a reset link.";
@@ -46,10 +47,10 @@ const resetPasswordSchema = z
  */
 export async function requestPasswordResetAction(
   usernameRaw: string,
-): Promise<{ ok: true; message: string } | { ok: false; error: string }> {
+): Promise<{ ok: true; message: string } | ActionResult> {
   const parsed = usernameSchema.safeParse(usernameRaw);
   if (!parsed.success) {
-    return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid username." };
+    return { ok: false, message: parsed.error.issues[0]?.message ?? "Invalid username." };
   }
 
   // Derived from proxy headers only — a client-supplied IP would let a caller
@@ -60,7 +61,7 @@ export async function requestPasswordResetAction(
     !(await checkRateLimitPersistent(`password-reset-ip:${clientIp}`, 10, 60_000)) ||
     !(await checkRateLimitPersistent(`password-reset-user:${username}`, 5, 60_000))
   ) {
-    return { ok: false, error: "Too many reset requests. Try again in a minute." };
+    return { ok: false, message: "Too many reset requests. Try again in a minute." };
   }
 
   await ensureDbReady();
@@ -132,10 +133,10 @@ export async function requestPasswordResetAction(
  */
 export async function resetPasswordWithTokenAction(
   input: z.infer<typeof resetPasswordSchema>,
-): Promise<{ ok: true } | { ok: false; error: string }> {
+): Promise<ActionResult> {
   const parsed = resetPasswordSchema.safeParse(input);
   if (!parsed.success) {
-    return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid input." };
+    return { ok: false, message: parsed.error.issues[0]?.message ?? "Invalid input." };
   }
 
   const tokenHash = hashLinkToken(parsed.data.token);
@@ -147,7 +148,7 @@ export async function resetPasswordWithTokenAction(
       60_000,
     ))
   ) {
-    return { ok: false, error: "Too many attempts. Try again shortly." };
+    return { ok: false, message: "Too many attempts. Try again shortly." };
   }
 
   await ensureDbReady();
@@ -159,13 +160,13 @@ export async function resetPasswordWithTokenAction(
     .limit(1);
 
   if (!user || user.status !== "active" || user.role === "passive") {
-    return { ok: false, error: "Invalid or expired reset link." };
+    return { ok: false, message: "Invalid or expired reset link." };
   }
 
   if (user.passwordResetTokenExpiresAt) {
     const expiresAt = new Date(user.passwordResetTokenExpiresAt).getTime();
     if (Number.isNaN(expiresAt) || Date.now() > expiresAt) {
-      return { ok: false, error: "Invalid or expired reset link." };
+      return { ok: false, message: "Invalid or expired reset link." };
     }
   }
 

@@ -166,7 +166,7 @@ function FirstLoginWizardInner({
         ? await setInitialPasswordAction(formData)
         : await changePasswordAction(formData);
       if (!result.ok) {
-        setError(result.error);
+        setError(result.message);
         return;
       }
       await update({
@@ -220,7 +220,7 @@ function FirstLoginWizardInner({
     startTransition(async () => {
       const emailResult = await updateNotificationEmailAction(email);
       if (!emailResult.ok) {
-        setError(emailResult.error);
+        setError(emailResult.message);
         return;
       }
       setEmailStatus(
@@ -229,7 +229,7 @@ function FirstLoginWizardInner({
 
       const prefsResult = await updateNotificationPrefsAction(prefs);
       if (!prefsResult.ok) {
-        setError(prefsResult.error);
+        setError(prefsResult.message);
         return;
       }
       setActiveStep(4);

@@ -4,14 +4,8 @@ import { login, logout } from "./helpers/auth";
 import { fillProposalDateTimeField } from "./helpers/datePickers";
 import { USERS } from "./helpers/constants";
 import { goToProposals, openProposalCard, selectProposalTab } from "./helpers/navigation";
-import { expandDraftMoreOptions, openEventOrSleepingProposalDraft, setInviteeRequired } from "./helpers/proposals";
+import { expandDraftMoreOptions, openEventOrSleepingProposalDraft, proposalCard, setInviteeRequired } from "./helpers/proposals";
 import { expectToast } from "./helpers/toast";
-
-function proposalCard(page: import("@playwright/test").Page, title: string) {
-  return page.locator(".MuiCard-root").filter({
-    has: page.getByRole("heading", { name: title, level: 2 }),
-  });
-}
 
 test.describe("Proposal invitee journey", () => {
   test("proposer submits, invitee adds attendee and accepts, new invitee abstains", async ({
