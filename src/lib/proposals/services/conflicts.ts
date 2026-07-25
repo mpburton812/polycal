@@ -7,7 +7,7 @@
  * on-resolve auto-decline sweep, preserving the PC-59/PC-318 conflict contract.
  */
 import { randomUUID } from "node:crypto";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, gte, inArray, isNotNull, isNull, lte, ne, or } from "drizzle-orm";
 
 import { getDb } from "@/lib/db/client";
 import {
@@ -19,6 +19,11 @@ import {
   users,
   type ProposalState,
 } from "@/lib/db/schema";
+import {
+  chunkIds,
+  loadSlotsByProposalIds,
+  type ProposalSlotRow,
+} from "@/lib/proposals/services/slot-loader";
 import { notifyUser } from "@/lib/notifications";
 import {
   atRiskExpiresAtIso,
@@ -36,6 +41,81 @@ import { logProposalTransition } from "@/lib/proposals/services/state-log";
 import { resetInviteeVotes } from "@/lib/proposals/services/votes";
 import type { ProposalConflictWarning } from "@/actions/proposals/types";
 
+type Db = ReturnType<typeof getDb>;
+
+/**
+ * Slack applied to SQL date prefilters so rows that only overlap AFTER window
+ * widening (sleeping / all-day windows grow to their civil-day end, at most one
+ * day plus timezone offset) are still fetched (PC-355).
+ */
+const CONFLICT_PREFILTER_PAD_MS = 2 * 24 * 60 * 60 * 1000;
+
+function shiftIso(iso: string, deltaMs: number): string {
+  const ms = Date.parse(iso);
+  if (Number.isNaN(ms)) return iso;
+  return new Date(ms + deltaMs).toISOString();
+}
+
+/** Widest [start, end] envelope covering every conflict window. */
+function windowEnvelope(windows: ConflictWindow[]): { start: string; end: string } | null {
+  let start: string | null = null;
+  let end: string | null = null;
+  for (const window of windows) {
+    const windowEnd = window.end ?? window.start;
+    if (start === null || window.start < start) start = window.start;
+    if (end === null || windowEnd > end) end = windowEnd;
+  }
+  if (start === null || end === null) return null;
+  return { start, end };
+}
+
+/**
+ * SQL bound keeping only rows whose scheduled span can still reach `envelope`
+ * once widened. Returns `undefined` (no filter) when there is nothing to bound.
+ */
+function scheduledWithinEnvelope(envelope: { start: string; end: string } | null) {
+  if (!envelope) return undefined;
+  const paddedStart = shiftIso(envelope.start, -CONFLICT_PREFILTER_PAD_MS);
+  const paddedEnd = shiftIso(envelope.end, CONFLICT_PREFILTER_PAD_MS);
+  return and(
+    lte(proposals.scheduledStartAt, paddedEnd),
+    or(
+      gte(proposals.scheduledEndAt, paddedStart),
+      and(isNull(proposals.scheduledEndAt), gte(proposals.scheduledStartAt, paddedStart)),
+    ),
+  );
+}
+
+/**
+ * Proposal ids any of `userIds` is invited to — the invitee half of "shares a
+ * stakeholder". Chunked so a large stakeholder set cannot blow the SQL variable
+ * limit (PC-355).
+ */
+async function proposalIdsForInvitees(db: Db, userIds: string[]): Promise<string[]> {
+  const ids = new Set<string>();
+  for (const chunk of chunkIds(userIds)) {
+    const rows = await db
+      .select({ proposalId: proposalInvitees.proposalId })
+      .from(proposalInvitees)
+      .where(inArray(proposalInvitees.userId, chunk));
+    for (const row of rows) ids.add(row.proposalId);
+  }
+  return [...ids];
+}
+
+/**
+ * True when a proposal is reachable from `stakeholderIds` — proposer match or a
+ * shared invitee. Used as a SQL prefilter so conflict checks scan the viewer's
+ * neighbourhood instead of every proposal in the network (PC-355).
+ */
+function stakeholderReachFilter(stakeholderIds: string[], sharedProposalIds: string[]) {
+  const clauses = [inArray(proposals.proposerId, stakeholderIds)];
+  for (const chunk of chunkIds(sharedProposalIds)) {
+    clauses.push(inArray(proposals.id, chunk));
+  }
+  return or(...clauses);
+}
+
 /**
  * Overlap windows for collision checks, built from the SAME calendar windows
  * (buildScheduleWindows) and widened for date-only kinds so conflict detection
@@ -45,17 +125,8 @@ import type { ProposalConflictWarning } from "@/actions/proposals/types";
  * recurrence, detached slots) plus the proposal type used for widening.
  */
 export async function proposalConflictWindows(
-  db: ReturnType<typeof getDb>,
-  proposal: {
-    id: string;
-    proposalType: string;
-    isAllDay: boolean;
-    isBatchSleeping: boolean;
-    parentProposalId: string | null;
-    isRecurrenceParent: boolean;
-    scheduledStartAt: string | null;
-    scheduledEndAt: string | null;
-  },
+  db: Db,
+  proposal: ConflictWindowSource,
   timeZone: string = DEFAULT_VIEWER_TIMEZONE,
 ): Promise<ConflictWindow[]> {
   const slots = await db
@@ -69,6 +140,30 @@ export async function proposalConflictWindows(
     .from(proposalTimeSlots)
     .where(eq(proposalTimeSlots.proposalId, proposal.id));
 
+  return conflictWindowsFromSlots(proposal, slots, timeZone);
+}
+
+/** Proposal fields {@link conflictWindowsFromSlots} needs to shape its windows. */
+export interface ConflictWindowSource {
+  id: string;
+  proposalType: string;
+  isAllDay: boolean;
+  isBatchSleeping: boolean;
+  parentProposalId: string | null;
+  isRecurrenceParent: boolean;
+  scheduledStartAt: string | null;
+  scheduledEndAt: string | null;
+}
+
+/**
+ * Window builder for callers that already batch-loaded slots (PC-355) — same
+ * output as {@link proposalConflictWindows} without the per-proposal SELECT.
+ */
+export function conflictWindowsFromSlots(
+  proposal: ConflictWindowSource,
+  slots: Pick<ProposalSlotRow, "id" | "startAt" | "endAt" | "label" | "isDetached">[],
+  timeZone: string = DEFAULT_VIEWER_TIMEZONE,
+): ConflictWindow[] {
   const scheduled = proposal.scheduledStartAt
     ? { startAt: proposal.scheduledStartAt, endAt: proposal.scheduledEndAt }
     : null;
@@ -99,7 +194,7 @@ export async function proposalConflictWindows(
  * Conflicting items revert to draft with at-risk flag and a system comment.
  */
 export async function autoDeclineCollidingProposals(
-  db: ReturnType<typeof getDb>,
+  db: Db,
   resolved: typeof proposals.$inferSelect,
   scheduleStart: string | null,
   scheduleEnd: string | null,
@@ -116,48 +211,38 @@ export async function autoDeclineCollidingProposals(
     .select({ userId: proposalInvitees.userId })
     .from(proposalInvitees)
     .where(eq(proposalInvitees.proposalId, resolved.id));
-  const resolvedStakeholders = new Set<string>([
-    resolved.proposerId,
-    ...resolvedInvitees.map((row) => row.userId),
-  ]);
+  const resolvedStakeholders = [
+    ...new Set<string>([resolved.proposerId, ...resolvedInvitees.map((row) => row.userId)]),
+  ];
 
+  // Only proposals sharing a stakeholder can collide, so let SQL discard the
+  // rest instead of loading every proposed row and every invitee (PC-355).
+  const sharedProposalIds = await proposalIdsForInvitees(db, resolvedStakeholders);
   const pending = await db
     .select()
     .from(proposals)
-    .where(eq(proposals.state, "proposed"));
+    .where(
+      and(
+        eq(proposals.state, "proposed"),
+        // Events never collide with sleeping arrangements (PC-59 parity).
+        eq(proposals.proposalType, resolved.proposalType),
+        ne(proposals.id, resolved.id),
+        stakeholderReachFilter(resolvedStakeholders, sharedProposalIds),
+      ),
+    );
+  if (pending.length === 0) return;
 
-  const allInvitees = await db
-    .select({
-      proposalId: proposalInvitees.proposalId,
-      userId: proposalInvitees.userId,
-    })
-    .from(proposalInvitees);
-  const inviteesByProposal = new Map<string, string[]>();
-  for (const row of allInvitees) {
-    const list = inviteesByProposal.get(row.proposalId) ?? [];
-    list.push(row.userId);
-    inviteesByProposal.set(row.proposalId, list);
-  }
+  const slotsByProposal = await loadSlotsByProposalIds(
+    db,
+    pending.map((row) => row.id),
+  );
 
   const now = new Date().toISOString();
   const enforcement = await loadEnforcementSettings(db);
   const expiresAt = atRiskExpiresAtIso(enforcement);
 
   for (const other of pending) {
-    if (other.id === resolved.id) continue;
-    // Events never collide with sleeping arrangements (PC-59 parity).
-    if (other.proposalType !== resolved.proposalType) continue;
-
-    const otherStakeholders = new Set<string>([
-      other.proposerId,
-      ...(inviteesByProposal.get(other.id) ?? []),
-    ]);
-    const sharesStakeholder = [...resolvedStakeholders].some((id) =>
-      otherStakeholders.has(id),
-    );
-    if (!sharesStakeholder) continue;
-
-    const otherWindows = await proposalConflictWindows(db, other);
+    const otherWindows = conflictWindowsFromSlots(other, slotsByProposal.get(other.id) ?? []);
     if (otherWindows.length === 0) continue;
 
     const overlaps = windowsConflict(
@@ -212,7 +297,7 @@ export async function autoDeclineCollidingProposals(
  * Detects bedroom/place occupancy conflicts for sleeping proposals (PC-40 MVP).
  */
 export async function checkPlaceAssetConflicts(
-  db: ReturnType<typeof getDb>,
+  db: Db,
   proposal: typeof proposals.$inferSelect,
   checkWindows: { start: string; end: string | null }[],
   excludeProposalId?: string,
@@ -228,6 +313,11 @@ export async function checkPlaceAssetConflicts(
     .limit(1);
   if (!place) return [];
 
+  // Same place + scheduled + date-bounded: the loop's own guards, pushed into
+  // SQL so a network-wide sleeping history is never materialised (PC-355).
+  const envelope = windowEnvelope(
+    checkWindows.map((window) => ({ start: window.start, end: window.end })),
+  );
   const sleepingActive = await db
     .select({
       id: proposals.id,
@@ -243,13 +333,15 @@ export async function checkPlaceAssetConflicts(
       and(
         eq(proposals.proposalType, "sleeping"),
         inArray(proposals.state, ["proposed", "resolved"]),
+        eq(proposals.locationId, proposal.locationId),
+        isNotNull(proposals.scheduledStartAt),
+        scheduledWithinEnvelope(envelope),
       ),
     );
 
   const warnings: ProposalConflictWarning[] = [];
   for (const other of sleepingActive) {
     if (other.id === excludeProposalId || other.id === proposal.id) continue;
-    if (other.locationId !== proposal.locationId) continue;
     if (!other.scheduledStartAt) continue;
 
     const sameBedroom =
@@ -297,7 +389,7 @@ export async function checkPlaceAssetConflicts(
  * Gathers stakeholder schedule overlaps for a proposal (shared by submit and admin fast-add).
  */
 export async function gatherProposalConflictWarnings(
-  db: ReturnType<typeof getDb>,
+  db: Db,
   proposal: typeof proposals.$inferSelect,
   proposalId: string,
 ): Promise<ProposalConflictWarning[]> {
@@ -313,9 +405,14 @@ export async function gatherProposalConflictWarnings(
     return [];
   }
 
-  const stakeholderIds = new Set([proposal.proposerId, ...invitees.map((i) => i.userId)]);
+  const stakeholderIds = [
+    ...new Set([proposal.proposerId, ...invitees.map((i) => i.userId)]),
+  ];
   const warnings: ProposalConflictWarning[] = [];
 
+  // Candidates are narrowed in SQL to same-type, scheduled, stakeholder-reachable
+  // rows inside the padded window instead of every active proposal (PC-355).
+  const sharedProposalIds = await proposalIdsForInvitees(db, stakeholderIds);
   const activeProposals = await db
     .select({
       id: proposals.id,
@@ -328,36 +425,52 @@ export async function gatherProposalConflictWarnings(
       scheduledEndAt: proposals.scheduledEndAt,
     })
     .from(proposals)
-    .where(inArray(proposals.state, ["proposed", "resolved"]));
-
-  const activeInvitees = await db
-    .select({
-      proposalId: proposalInvitees.proposalId,
-      userId: proposalInvitees.userId,
-    })
-    .from(proposalInvitees);
+    .where(
+      and(
+        inArray(proposals.state, ["proposed", "resolved"]),
+        // Sleeping arrangements do not schedule-conflict with events (PC-59).
+        eq(proposals.proposalType, proposal.proposalType),
+        ne(proposals.id, proposalId),
+        isNotNull(proposals.scheduledStartAt),
+        scheduledWithinEnvelope(windowEnvelope(checkWindows)),
+        stakeholderReachFilter(stakeholderIds, sharedProposalIds),
+      ),
+    );
 
   const inviteesByProposal = new Map<string, string[]>();
-  for (const row of activeInvitees) {
-    const list = inviteesByProposal.get(row.proposalId) ?? [];
-    list.push(row.userId);
-    inviteesByProposal.set(row.proposalId, list);
+  for (const chunk of chunkIds(activeProposals.map((row) => row.id))) {
+    const rows = await db
+      .select({
+        proposalId: proposalInvitees.proposalId,
+        userId: proposalInvitees.userId,
+      })
+      .from(proposalInvitees)
+      .where(inArray(proposalInvitees.proposalId, chunk));
+    for (const row of rows) {
+      const list = inviteesByProposal.get(row.proposalId) ?? [];
+      list.push(row.userId);
+      inviteesByProposal.set(row.proposalId, list);
+    }
   }
 
-  const userNames = await db.select({ id: users.id, displayName: users.displayName }).from(users);
-  const nameById = new Map(userNames.map((u) => [u.id, u.displayName]));
+  // Warnings only ever name stakeholders of the proposal being checked.
+  const nameById = new Map<string, string>();
+  for (const chunk of chunkIds(stakeholderIds)) {
+    const rows = await db
+      .select({ id: users.id, displayName: users.displayName })
+      .from(users)
+      .where(inArray(users.id, chunk));
+    for (const row of rows) nameById.set(row.id, row.displayName);
+  }
 
   for (const other of activeProposals) {
-    if (other.id === proposalId) continue;
     if (!other.scheduledStartAt) continue;
-    // Sleeping arrangements do not schedule-conflict with events (PC-59).
-    if (proposal.proposalType !== other.proposalType) continue;
 
     const otherStakeholders = new Set([
       other.proposerId,
       ...(inviteesByProposal.get(other.id) ?? []),
     ]);
-    const affected = [...stakeholderIds].filter((id) => otherStakeholders.has(id));
+    const affected = stakeholderIds.filter((id) => otherStakeholders.has(id));
     if (affected.length === 0) continue;
 
     // Widen the other side too so same-night sleeping (null end) and same-day

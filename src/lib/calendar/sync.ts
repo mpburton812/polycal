@@ -7,6 +7,7 @@ import { randomUUID } from "node:crypto";
 import { and, eq, inArray, isNull } from "drizzle-orm";
 import { after } from "next/server";
 
+import { mapWithConcurrency } from "@/lib/async/concurrency";
 import { auth } from "@/lib/auth";
 import { decryptSecret, encryptSecret } from "@/lib/calendar/crypto";
 import {
@@ -39,6 +40,15 @@ import { isNonScheduleProposal } from "@/lib/proposals/special-proposals";
 import { logUserActivity } from "@/lib/audit";
 
 type Db = ReturnType<typeof getDb>;
+
+/**
+ * Bounded fan-out for calendar work (PC-355). A batch sleeping proposal shared
+ * by several participants used to issue every Google call strictly serially;
+ * these caps keep the sweep quick without hammering Google's rate limits.
+ */
+const CALENDAR_SYNC_USER_CONCURRENCY = 3;
+const CALENDAR_SYNC_NIGHT_CONCURRENCY = 4;
+
 type ProposalRow = typeof proposals.$inferSelect;
 type LinkRow = typeof calendarEventLinks.$inferSelect;
 type ConnectionRow = typeof calendarConnections.$inferSelect;
@@ -269,7 +279,8 @@ async function syncGoogleForUser(
   let created = 0;
   let updated = 0;
 
-  for (const payload of payloads) {
+  // Nights are independent Google calls — run a few at a time (PC-355).
+  await mapWithConcurrency(payloads, CALENDAR_SYNC_NIGHT_CONCURRENCY, async (payload) => {
     const link = existing.get(payload.nightKey);
     if (link?.googleEventId) {
       await patchGoogleEvent(
@@ -288,7 +299,7 @@ async function syncGoogleForUser(
         })
         .where(eq(calendarEventLinks.id, link.id));
       updated += 1;
-      continue;
+      return;
     }
 
     const eventId = await insertGoogleEvent(accessToken, calendarId, payload);
@@ -321,7 +332,7 @@ async function syncGoogleForUser(
       });
     }
     created += 1;
-  }
+  });
 
   // Reconcile: drop Google events for nights no longer in the payload set
   // (includes migrating legacy single-span night_key='' when batch expands).
@@ -687,10 +698,12 @@ export async function syncProposalToExternalCalendars(
       connections.map((c) => `${c.provider}:${c.userId}`).join(","),
     );
 
-    for (const connection of connections) {
+    // Participants are independent; a slow or failing provider for one user must
+    // not serialise the rest (PC-355). Errors stay contained per connection.
+    await mapWithConcurrency(connections, CALENDAR_SYNC_USER_CONCURRENCY, async (connection) => {
       try {
         if (connection.provider === "google") {
-          if (skipGoogle) continue;
+          if (skipGoogle) return;
           await syncGoogleForUser(db, connection, proposal, action, nameCtx);
         } else if (connection.provider === "ics") {
           await syncIcsForUser(db, connection, proposal, action, nameCtx);
@@ -722,7 +735,7 @@ export async function syncProposalToExternalCalendars(
           );
         }
       }
-    }
+    });
 
     console.info("[calendar-sync] done", proposalId, action);
   } catch (err) {

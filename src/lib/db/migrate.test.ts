@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
+
 import { describe, expect, it } from "vitest";
 
 import { SCHEMA_VERSION, shouldSkipMigrations } from "./migrate";
@@ -14,5 +17,13 @@ describe("shouldSkipMigrations (PC-143)", () => {
     expect(shouldSkipMigrations("")).toBe(false);
     expect(shouldSkipMigrations("20")).toBe(false);
     expect(shouldSkipMigrations("20", "21")).toBe(false);
+  });
+
+  it("keeps verify-turso-schema.mjs in sync with SCHEMA_VERSION (PC-355)", () => {
+    const verifyScript = readFileSync(
+      path.join(process.cwd(), "scripts", "verify-turso-schema.mjs"),
+      "utf8",
+    );
+    expect(verifyScript).toContain(`EXPECTED_SCHEMA_VERSION = "${SCHEMA_VERSION}"`);
   });
 });
