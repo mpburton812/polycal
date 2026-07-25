@@ -62,12 +62,18 @@ export const authConfig = {
         const refreshedAt = typeof token.dbRefreshedAt === "number" ? token.dbRefreshedAt : 0;
         // Never TTL-skip while the user still owes password change or onboarding —
         // those flags must stay in sync with Turso or the wizard never exits.
+        // A paused account or a missing sessionVersion is treated the same way:
+        // skipping the DB read there would let a revoked session keep working for
+        // up to the TTL, which is exactly the window revocation must close (PC-353).
         const onboardedAndSettled =
           token.onboardingComplete === true && token.mustChangePassword === false;
+        const revocationCheckPending =
+          token.accountStatus === "paused" || typeof token.sessionVersion !== "number";
         const withinTtl =
           trigger !== "update" &&
           !user &&
           onboardedAndSettled &&
+          !revocationCheckPending &&
           refreshedAt > 0 &&
           Date.now() - refreshedAt < JWT_DB_REFRESH_TTL_MS;
 

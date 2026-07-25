@@ -51,8 +51,10 @@ export const users = sqliteTable("users", {
   gender: text("gender"),
   notificationEmail: text("notification_email"),
   emailVerifiedAt: text("email_verified_at"),
+  /** SHA-256 digest of the emailed verification token — never the raw value (PC-353). */
   emailVerificationToken: text("email_verification_token"),
   emailVerificationTokenExpiresAt: text("email_verification_token_expires_at"),
+  /** SHA-256 digest of the emailed reset token — never the raw value (PC-353). */
   passwordResetToken: text("password_reset_token"),
   passwordResetTokenExpiresAt: text("password_reset_token_expires_at"),
   notificationPrefsJson: text("notification_prefs_json"),

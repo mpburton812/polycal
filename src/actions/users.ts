@@ -30,6 +30,7 @@ import {
   formatDraftReturnNotification,
 } from "@/lib/notifications-draft-return";
 import { enterPendingRecoveryIfNeeded } from "@/lib/proposals/pending-recovery";
+import { hashLinkToken } from "@/lib/crypto/token-hash";
 import {
   deliverLoginCredentials,
   newEmailVerificationToken,
@@ -486,7 +487,8 @@ export async function createActiveUserAction(
     onboardingComplete: false,
     notificationEmail,
     emailVerifiedAt: null,
-    emailVerificationToken: verifyToken,
+    // Digest at rest; `verifyToken` (raw) is handed to the email sender below.
+    emailVerificationToken: verifyToken ? hashLinkToken(verifyToken) : null,
     emailVerificationTokenExpiresAt: verifyExpires,
     createdAt: now,
     updatedAt: now,
@@ -1090,7 +1092,8 @@ export async function activatePassiveUserAction(
       activatedFromPassiveAt: now,
       notificationEmail,
       emailVerifiedAt: null,
-      emailVerificationToken: verifyToken,
+      // Digest at rest; `verifyToken` (raw) is handed to the email sender below.
+      emailVerificationToken: verifyToken ? hashLinkToken(verifyToken) : null,
       emailVerificationTokenExpiresAt: verifyExpires,
       updatedAt: now,
     })

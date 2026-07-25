@@ -19,6 +19,11 @@ export { issueAdminApiToken, verifyAdminApiToken };
 
 /**
  * Authenticates admin API callers via session cookie or Bearer token (PC-121).
+ *
+ * Bearer tokens are self-contained and live for 12h, so the role they carry can
+ * be stale — a demoted, paused, or deleted admin would keep full tracker access
+ * until expiry. The current row is re-read from the database on every Bearer
+ * request and the token's claims are ignored in favour of it (PC-353).
  */
 export async function requireAdminApiAccess(
   request: Request,
@@ -32,13 +37,30 @@ export async function requireAdminApiAccess(
         response: NextResponse.json({ error: "Unauthorized" }, { status: 401 }),
       };
     }
-    if (!(await userHasAdminAccess(tokenUser.role))) {
+
+    await ensureDbReady();
+    const db = getDb();
+    const [row] = await db
+      .select({
+        id: users.id,
+        role: users.role,
+        status: users.status,
+        displayName: users.displayName,
+      })
+      .from(users)
+      .where(eq(users.id, tokenUser.id))
+      .limit(1);
+
+    if (!row || row.status !== "active" || !(await userHasAdminAccess(row.role as UserRole))) {
       return {
         ok: false,
         response: NextResponse.json({ error: "Forbidden" }, { status: 403 }),
       };
     }
-    return { ok: true, user: tokenUser };
+    return {
+      ok: true,
+      user: { id: row.id, role: row.role as UserRole, displayName: row.displayName },
+    };
   }
 
   const session = await auth();
@@ -46,6 +68,12 @@ export async function requireAdminApiAccess(
     return {
       ok: false,
       response: NextResponse.json({ error: "Unauthorized" }, { status: 401 }),
+    };
+  }
+  if (session.user.accountStatus === "paused") {
+    return {
+      ok: false,
+      response: NextResponse.json({ error: "Forbidden" }, { status: 403 }),
     };
   }
   if (!(await userHasAdminAccess(session.user.role as UserRole))) {
