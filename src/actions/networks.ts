@@ -8,13 +8,10 @@ import { hashLinkToken } from "@/lib/crypto/token-hash";
 import { getDb } from "@/lib/db/client";
 import { ensureDbReady } from "@/lib/db/ensure-ready";
 import {
-  locations,
-  locationResidents,
   networkMembers,
   networkSetupTokens,
   networks,
   platformSettings,
-  sleepingPartnerships,
   users,
 } from "@/lib/db/schema";
 import { sendEmail } from "@/lib/email/send";
