@@ -1,4 +1,4 @@
-import { and, eq, like } from "drizzle-orm";
+import { and, eq, isNotNull, like } from "drizzle-orm";
 
 import { getDb } from "@/lib/db/client";
 import { ensureDbReady } from "@/lib/db/ensure-ready";
@@ -47,6 +47,9 @@ export async function dismissAllNotificationsForProposal(
   await ensureDbReady();
   const db = getDb();
 
+  // The payload JSON carries the proposal id, so let SQL discard unrelated rows
+  // instead of parsing every system notification ever written (PC-355). The
+  // metadata check below still confirms the match.
   const rows = await db
     .select()
     .from(userActivityLog)
@@ -54,6 +57,8 @@ export async function dismissAllNotificationsForProposal(
       and(
         eq(userActivityLog.eventType, "system"),
         like(userActivityLog.action, "notification.%"),
+        isNotNull(userActivityLog.userId),
+        like(userActivityLog.details, `%${proposalId}%`),
       ),
     );
 

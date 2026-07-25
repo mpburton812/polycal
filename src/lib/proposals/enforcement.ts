@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, isNotNull, isNull, lte, or } from "drizzle-orm";
 
 import { getDb } from "@/lib/db/client";
 import { notifyUser } from "@/lib/notifications";
@@ -9,6 +9,7 @@ import {
 import { expirePendingRecoveryProposals } from "@/lib/proposals/pending-recovery";
 import { logProposalTransition } from "@/lib/proposals/services/state-log";
 import { notifyProposalParticipants } from "@/lib/proposals/services/notify-participants";
+import { chunkIds, loadSlotsByProposalIds } from "@/lib/proposals/services/slot-loader";
 import { sleepingCalendarDayEnd } from "@/lib/proposals/sleeping-schedule";
 import { widenConflictWindow } from "@/lib/proposals/conflict-windows";
 import { intervalsOverlap } from "@/lib/schedule/dates";
@@ -19,6 +20,7 @@ import {
   proposals,
   sleepingPartnerships,
   users,
+  type ProposalType,
 } from "@/lib/db/schema";
 
 export interface EnforcementSettings {
@@ -42,6 +44,17 @@ const DEFAULT_ENFORCEMENT: EnforcementSettings = {
 type Db = ReturnType<typeof getDb>;
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
+/**
+ * Slack on SQL date prefilters for sweeps whose exact cutoff is computed in JS
+ * (sleeping rows expire at civil-day end, up to a day past their stored
+ * timestamp). The precise comparison still runs per row (PC-355).
+ */
+const SWEEP_PREFILTER_PAD_MS = 2 * MS_PER_DAY;
+
+function shiftIso(iso: string, deltaMs: number): string {
+  return new Date(Date.parse(iso) + deltaMs).toISOString();
+}
 
 /**
  * Loads admin-configurable enforcement thresholds from poly group settings (PC-46 / PC-273).
@@ -103,7 +116,15 @@ async function expireAtRiskProposals(db: Db): Promise<void> {
   const expired = await db
     .select()
     .from(proposals)
-    .where(and(eq(proposals.state, "draft"), eq(proposals.atRisk, true)));
+    .where(
+      and(
+        eq(proposals.state, "draft"),
+        eq(proposals.atRisk, true),
+        // TTL comparison pushed into SQL — drafts still counting down never load.
+        isNotNull(proposals.atRiskExpiresAt),
+        lte(proposals.atRiskExpiresAt, now),
+      ),
+    );
 
   for (const proposal of expired) {
     if (!proposal.atRiskExpiresAt || proposal.atRiskExpiresAt > now) continue;
@@ -229,9 +250,19 @@ async function expireProposedProposals(db: Db, settings: EnforcementSettings): P
   const now = new Date();
   const nowIso = now.toISOString();
   const proposedRows = await db.select().from(proposals).where(eq(proposals.state, "proposed"));
+  if (proposedRows.length === 0) return;
+
+  // One slot query for the whole sweep instead of one per proposed row (PC-355).
+  const slotsByProposal = await loadSlotsByProposalIds(
+    db,
+    proposedRows.map((row) => row.id),
+  );
 
   for (const proposal of proposedRows) {
-    const expirationInstant = await getProposedExpirationInstant(db, proposal);
+    const expirationInstant = computeScheduleExpirationInstant(
+      proposal,
+      (slotsByProposal.get(proposal.id) ?? []).map((slot) => slot.startAt),
+    );
     const startPassed = Boolean(expirationInstant && expirationInstant <= nowIso);
 
     const maxDaysExpired =
@@ -270,10 +301,28 @@ async function expireProposedProposals(db: Db, settings: EnforcementSettings): P
 async function archivePastResolvedProposals(db: Db, settings: EnforcementSettings): Promise<void> {
   const now = new Date();
   const graceMs = settings.archiveGraceHours * 60 * 60 * 1000;
+  // Archive can only fire once the scheduled end + grace has passed; bound the
+  // scan to that (padded) cutoff and keep the exact check per row (PC-355).
+  const paddedCutoff = new Date(
+    now.getTime() - graceMs + SWEEP_PREFILTER_PAD_MS,
+  ).toISOString();
   const resolvedRows = await db
     .select()
     .from(proposals)
-    .where(and(eq(proposals.state, "resolved"), eq(proposals.isRecurrenceParent, false)));
+    .where(
+      and(
+        eq(proposals.state, "resolved"),
+        eq(proposals.isRecurrenceParent, false),
+        isNotNull(proposals.scheduledStartAt),
+        or(
+          lte(proposals.scheduledEndAt, paddedCutoff),
+          and(
+            isNull(proposals.scheduledEndAt),
+            lte(proposals.scheduledStartAt, paddedCutoff),
+          ),
+        ),
+      ),
+    );
 
   for (const proposal of resolvedRows) {
     const archiveEndAt = resolveResolvedArchiveEndAt(proposal);
@@ -306,11 +355,20 @@ async function processRedraftDeadlines(db: Db, settings: EnforcementSettings): P
   const now = new Date();
   const nowIso = now.toISOString();
   const deadlineMs = now.getTime() + settings.redraftDeadlineHours * 60 * 60 * 1000;
+  const deadlineIso = new Date(deadlineMs).toISOString();
 
   const candidates = await db
     .select()
     .from(proposals)
-    .where(and(eq(proposals.state, "resolved"), eq(proposals.atRisk, true)));
+    .where(
+      and(
+        eq(proposals.state, "resolved"),
+        eq(proposals.atRisk, true),
+        // Only starts inside the redraft window can transition (PC-355).
+        isNotNull(proposals.scheduledStartAt),
+        lte(proposals.scheduledStartAt, deadlineIso),
+      ),
+    );
 
   for (const proposal of candidates) {
     if (!proposal.scheduledStartAt) continue;
@@ -351,18 +409,35 @@ async function archiveExpiredRecurrenceSeries(db: Db, settings: EnforcementSetti
     .select()
     .from(proposals)
     .where(and(eq(proposals.state, "resolved"), eq(proposals.isRecurrenceParent, true)));
+  if (parents.length === 0) return;
 
-  for (const parent of parents) {
-    const children = await db
+  // Children for every parent in one pass instead of a query per series (PC-355).
+  const childrenByParent = new Map<
+    string,
+    { id: string; state: string; scheduledEndAt: string | null; scheduledStartAt: string | null }[]
+  >();
+  for (const chunk of chunkIds(parents.map((parent) => parent.id))) {
+    const rows = await db
       .select({
         id: proposals.id,
+        parentProposalId: proposals.parentProposalId,
         state: proposals.state,
         scheduledEndAt: proposals.scheduledEndAt,
         scheduledStartAt: proposals.scheduledStartAt,
       })
       .from(proposals)
-      .where(eq(proposals.parentProposalId, parent.id))
+      .where(inArray(proposals.parentProposalId, chunk))
       .orderBy(desc(proposals.occurrenceIndex));
+    for (const row of rows) {
+      if (!row.parentProposalId) continue;
+      const list = childrenByParent.get(row.parentProposalId) ?? [];
+      list.push(row);
+      childrenByParent.set(row.parentProposalId, list);
+    }
+  }
+
+  for (const parent of parents) {
+    const children = childrenByParent.get(parent.id) ?? [];
 
     if (children.length === 0) continue;
 
@@ -401,7 +476,17 @@ async function autoCancelUnresolvedAtRiskResolved(db: Db): Promise<void> {
   const atRiskResolved = await db
     .select()
     .from(proposals)
-    .where(and(eq(proposals.state, "resolved"), eq(proposals.atRisk, true)));
+    .where(
+      and(
+        eq(proposals.state, "resolved"),
+        eq(proposals.atRisk, true),
+        // Either trigger (TTL elapsed or start passed) must already be true.
+        or(
+          lte(proposals.atRiskExpiresAt, nowIso),
+          lte(proposals.scheduledStartAt, nowIso),
+        ),
+      ),
+    );
 
   for (const proposal of atRiskResolved) {
     const expiredByTtl = Boolean(proposal.atRiskExpiresAt && proposal.atRiskExpiresAt <= nowIso);
@@ -452,7 +537,13 @@ async function expireSleepingPartnerProposals(
   const pending = await db
     .select()
     .from(sleepingPartnerships)
-    .where(eq(sleepingPartnerships.status, "proposed"));
+    .where(
+      and(
+        eq(sleepingPartnerships.status, "proposed"),
+        // updatedAt is NOT NULL and tracks the last response attempt (PC-355).
+        lte(sleepingPartnerships.updatedAt, cutoffIso),
+      ),
+    );
 
   for (const row of pending) {
     const proposedAt = row.updatedAt || row.createdAt;
@@ -534,6 +625,25 @@ export async function detectViewerOverlapWarning(
     isAllDay,
   );
 
+  // Only the viewer's own calendar can overlap, so scope the scan to proposals
+  // they propose or are invited to, within the padded window (PC-355).
+  const viewerInviteeRows = await db
+    .select({ proposalId: proposalInvitees.proposalId })
+    .from(proposalInvitees)
+    .where(eq(proposalInvitees.userId, viewerId));
+  const viewerProposalIds = [...new Set(viewerInviteeRows.map((row) => row.proposalId))];
+
+  const paddedStart = shiftIso(viewerWindow.start, -SWEEP_PREFILTER_PAD_MS);
+  const paddedEnd = shiftIso(
+    viewerWindow.end ?? viewerWindow.start,
+    SWEEP_PREFILTER_PAD_MS,
+  );
+
+  const reachClauses = [eq(proposals.proposerId, viewerId)];
+  for (const chunk of chunkIds(viewerProposalIds)) {
+    reachClauses.push(inArray(proposals.id, chunk));
+  }
+
   const activeProposals = await db
     .select({
       id: proposals.id,
@@ -544,25 +654,26 @@ export async function detectViewerOverlapWarning(
       isAllDay: proposals.isAllDay,
     })
     .from(proposals)
-    .where(inArray(proposals.state, ["proposed", "resolved"]));
-
-  const activeInvitees = await db
-    .select({ proposalId: proposalInvitees.proposalId, userId: proposalInvitees.userId })
-    .from(proposalInvitees);
-
-  const inviteesByProposal = new Map<string, string[]>();
-  for (const row of activeInvitees) {
-    const list = inviteesByProposal.get(row.proposalId) ?? [];
-    list.push(row.userId);
-    inviteesByProposal.set(row.proposalId, list);
-  }
+    .where(
+      and(
+        inArray(proposals.state, ["proposed", "resolved"]),
+        // Sleeping arrangements never conflict with events (PC-59).
+        eq(proposals.proposalType, proposalType as ProposalType),
+        isNotNull(proposals.scheduledStartAt),
+        lte(proposals.scheduledStartAt, paddedEnd),
+        or(
+          gte(proposals.scheduledEndAt, paddedStart),
+          and(
+            isNull(proposals.scheduledEndAt),
+            gte(proposals.scheduledStartAt, paddedStart),
+          ),
+        ),
+        or(...reachClauses),
+      ),
+    );
 
   for (const other of activeProposals) {
     if (other.id === proposalId || !other.scheduledStartAt) continue;
-    // Sleeping arrangements never conflict with events (PC-59).
-    if (other.proposalType !== proposalType) continue;
-    const stakeholders = new Set([other.proposerId, ...(inviteesByProposal.get(other.id) ?? [])]);
-    if (!stakeholders.has(viewerId)) continue;
 
     const otherWindow = widenConflictWindow(
       other.scheduledStartAt,

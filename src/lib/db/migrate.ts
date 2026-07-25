@@ -1,5 +1,5 @@
 import { BOOTSTRAP_SQL } from "./bootstrap-sql";
-import { getSqlClient } from "./client";
+import { getSqlClient, whenForeignKeysEnabled } from "./client";
 import { applyPeoplePlacesMigrations } from "./people-places-migrations";
 import { applyAdminMigrations } from "./admin-migrations";
 import { applyProposalsMigrations } from "./proposals-migrations";
@@ -8,9 +8,10 @@ import { applyFeedMigrations } from "./feed-migrations";
 import { applyPc280Migrations } from "./pc280-migrations";
 import { applyRateLimitMigrations } from "./rate-limit-migrations";
 import { applyCalendarMigrations } from "./calendar-migrations";
+import { applyPerformanceIndexMigrations } from "./performance-index-migrations";
 
 /** Bump whenever bootstrap DDL or *-migrations.ts modules change (PC-143). */
-export const SCHEMA_VERSION = "37";
+export const SCHEMA_VERSION = "38";
 
 /**
  * True when the stored schema version already matches the app target — skip
@@ -32,6 +33,7 @@ export function shouldSkipMigrations(
  */
 export async function runMigrations(): Promise<void> {
   const sql = getSqlClient();
+  await whenForeignKeysEnabled();
 
   try {
     const existing = await sql.execute({
@@ -61,6 +63,8 @@ export async function runMigrations(): Promise<void> {
   await applyPc280Migrations(sql);
   await applyRateLimitMigrations(sql);
   await applyCalendarMigrations(sql);
+  // Indexes last: every table they cover exists by this point (PC-355).
+  await applyPerformanceIndexMigrations(sql);
 
   await sql.execute({
     sql: `INSERT INTO schema_meta (key, value) VALUES ('version', ?)
