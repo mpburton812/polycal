@@ -51,6 +51,7 @@ async function AppLayoutReady({ children }: { children: React.ReactNode }) {
   const groupNamePromise = getPolyGroupDisplayNameAction();
 
   const hasAdminAccess = await hasAdminAccessPromise;
+  const isPlatformAdmin = session.user.isPlatformAdmin === true;
 
   return (
     <UserThemeProvider themeId={themeId}>
@@ -64,6 +65,7 @@ async function AppLayoutReady({ children }: { children: React.ReactNode }) {
             notificationCount={0}
             notificationItems={[]}
             notificationPrefs={DEFAULT_NOTIFICATION_PREFS}
+            isPlatformAdmin={isPlatformAdmin}
           >
             <BrandedLoading label="Loading…" />
           </AppShell>
@@ -73,6 +75,7 @@ async function AppLayoutReady({ children }: { children: React.ReactNode }) {
           displayName={session.user.displayName}
           avatarKey={session.user.avatarKey}
           isAdmin={hasAdminAccess}
+          isPlatformAdmin={isPlatformAdmin}
           showOnboarding={showOnboarding}
           mustChangePassword={session.user.mustChangePassword}
           themeId={themeId}
@@ -93,6 +96,7 @@ async function AppShellWithData({
   displayName,
   avatarKey,
   isAdmin,
+  isPlatformAdmin,
   showOnboarding,
   mustChangePassword,
   themeId,
@@ -105,6 +109,7 @@ async function AppShellWithData({
   displayName: string;
   avatarKey?: string;
   isAdmin: boolean;
+  isPlatformAdmin: boolean;
   showOnboarding: boolean;
   mustChangePassword: boolean;
   themeId: string;
@@ -136,6 +141,7 @@ async function AppShellWithData({
       notificationCount={notificationInbox.count}
       notificationItems={notificationInbox.items}
       notificationPrefs={notificationPrefs}
+      isPlatformAdmin={isPlatformAdmin}
     >
       {showOnboarding ? (
         <FirstLoginWizard

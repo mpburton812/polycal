@@ -71,10 +71,26 @@ function rowToSettings(row: typeof polyGroup.$inferSelect): PolyGroupSettings {
 
 /**
  * Loads the poly group display name for app chrome (all signed-in users).
+ * Prefers the active network name when multi-network memberships exist (PC-357).
  */
 export async function getPolyGroupDisplayNameAction(): Promise<string> {
   await ensureDbReady();
   const db = getDb();
+  try {
+    const { auth } = await import("@/lib/auth");
+    const { networks } = await import("@/lib/db/schema");
+    const session = await auth();
+    if (session?.user?.activeNetworkId) {
+      const [net] = await db
+        .select({ name: networks.name })
+        .from(networks)
+        .where(eq(networks.id, session.user.activeNetworkId))
+        .limit(1);
+      if (net?.name?.trim()) return net.name.trim();
+    }
+  } catch {
+    /* fall through to poly_group */
+  }
   const [row] = await db
     .select({ name: polyGroup.name })
     .from(polyGroup)

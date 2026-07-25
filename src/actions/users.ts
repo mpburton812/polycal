@@ -17,6 +17,7 @@ import {
   calendarConnections,
   locationResidents,
   locations,
+  networkMembers,
   polyGroup,
   proposalInvitees,
   proposalSlotVotes,
@@ -27,6 +28,11 @@ import {
   users,
   type UserRole,
 } from "@/lib/db/schema";
+import {
+  removeMembership,
+  upsertMembership,
+} from "@/lib/networks/membership";
+import { requireNetworkSession } from "@/lib/networks/context";
 import {
   ACCOUNT_DELETE_CONFIRMATION_PHRASE,
   anonymizedUserFields,
@@ -408,10 +414,27 @@ async function pauseUserProposalSideEffects(
 
 /**
  * Lists active and passive users for the People tab (PC-35/36).
+ * Scoped to the caller's active network membership (PC-357).
  */
 export async function listPeopleAction(): Promise<PersonSummary[]> {
   await ensureDbReady();
+  const networkSession = await requireNetworkSession();
+  if (!networkSession.ok) {
+    return [];
+  }
   const db = getDb();
+  const memberRows = await db
+    .select({ userId: networkMembers.userId })
+    .from(networkMembers)
+    .where(
+      and(
+        eq(networkMembers.networkId, networkSession.user.activeNetworkId),
+        eq(networkMembers.status, "active"),
+      ),
+    );
+  const memberIds = memberRows.map((r) => r.userId);
+  if (memberIds.length === 0) return [];
+
   const rows = await db
     .select({
       id: users.id,
@@ -423,7 +446,7 @@ export async function listPeopleAction(): Promise<PersonSummary[]> {
       profileBio: users.profileBio,
     })
     .from(users)
-    .where(eq(users.status, "active"))
+    .where(and(eq(users.status, "active"), inArray(users.id, memberIds)))
     .orderBy(asc(users.displayName));
 
   return rows.map((row) => ({
@@ -501,6 +524,15 @@ export async function createActiveUserAction(
     createdAt: now,
     updatedAt: now,
   });
+
+  const networkSession = await requireNetworkSession();
+  if (networkSession.ok) {
+    await upsertMembership({
+      networkId: networkSession.user.activeNetworkId,
+      userId,
+      role: role === "admin" ? "network_admin" : "user",
+    });
+  }
 
   await logUserActivity(
     session?.user?.id ?? null,
@@ -671,9 +703,19 @@ export async function createPassiveUserAction(
     avatarKey: parsed.data.avatarKey ?? "bird_green",
     theme: "mint",
     loginCount: 0,
+    ownedByUserId: sessionResult.user.id,
     createdAt: now,
     updatedAt: now,
   });
+
+  const networkSession = await requireNetworkSession();
+  if (networkSession.ok) {
+    await upsertMembership({
+      networkId: networkSession.user.activeNetworkId,
+      userId,
+      role: "passive",
+    });
+  }
 
   await logUserActivity(
     sessionResult.user.id,
@@ -862,6 +904,10 @@ function revalidateAfterAccountRemoval(): void {
 /**
  * Soft-deletes a user and removes their graph edges (admin only, PC-35 / PC-354).
  */
+/**
+ * Removes a user from the active network only (scoped delete).
+ * Platform-wide ban is `banUserFromAllNetworksAction` (PC-362).
+ */
 export async function deleteUserAction(userId: string): Promise<UserActionResult> {
   const adminResult = await requireAdminAccess();
   if (!adminResult.ok) {
@@ -879,6 +925,28 @@ export async function deleteUserAction(userId: string): Promise<UserActionResult
     return { ok: false, message: "User not found." };
   }
 
+  const networkSession = await requireNetworkSession();
+  if (networkSession.ok) {
+    const removed = await removeMembership(userId, networkSession.user.activeNetworkId);
+    if (removed) {
+      await logUserActivity(
+        adminResult.user.id,
+        "users.network_remove",
+        JSON.stringify({
+          userId,
+          username: user.username,
+          networkId: networkSession.user.activeNetworkId,
+        }),
+      );
+      revalidateAfterAccountRemoval();
+      return {
+        ok: true,
+        message: `Removed ${user.displayName} from this network.`,
+      };
+    }
+  }
+
+  // Fallback for pre-membership installs: full erase (legacy single-network).
   await eraseAccount(db, user, adminResult.user.id);
 
   await logUserActivity(

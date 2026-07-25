@@ -12,7 +12,34 @@ import { authConfig } from "../../auth.config";
 import { getDb } from "@/lib/db/client";
 import { ensureDbReady } from "@/lib/db/ensure-ready";
 import { users, type UserRole } from "@/lib/db/schema";
+import { listActiveMemberships } from "@/lib/networks/membership";
 import { checkRateLimitPersistent } from "@/lib/rate-limit";
+import type { NetworkMemberRole } from "@/types/network";
+
+async function networkClaimsForUser(userId: string): Promise<{
+  activeNetworkId?: string;
+  activeNetworkRole?: NetworkMemberRole;
+  networkIds: string[];
+  isPlatformAdmin: boolean;
+}> {
+  const db = getDb();
+  const [row] = await db
+    .select({ isPlatformAdmin: users.isPlatformAdmin })
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
+  const memberships = await listActiveMemberships(userId);
+  const usable = memberships.filter(
+    (m) => m.networkStatus === "active" || m.role === "network_admin",
+  );
+  const first = usable[0] ?? memberships[0];
+  return {
+    activeNetworkId: first?.networkId,
+    activeNetworkRole: first?.role,
+    networkIds: memberships.map((m) => m.networkId),
+    isPlatformAdmin: row?.isPlatformAdmin === true,
+  };
+}
 
 const credentialsSchema = z.object({
   username: z.string().min(1).max(64),
@@ -96,6 +123,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           if (!row || row.status !== "active" || row.role === "passive") {
             return null;
           }
+          const claims = await networkClaimsForUser(row.id);
           return {
             id: row.id,
             name: row.displayName,
@@ -110,6 +138,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             theme: row.theme,
             // Marks JWT so Google Calendar API calls stay disabled (PC-344).
             isImpersonating: true,
+            ...claims,
           };
         }
 
@@ -136,6 +165,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         if (!valid) return null;
 
         await recordSuccessfulLogin(row.id);
+        const claims = await networkClaimsForUser(row.id);
 
         return {
           id: row.id,
@@ -150,6 +180,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           avatarKey: row.avatarKey ?? undefined,
           theme: row.theme,
           isImpersonating: false,
+          ...claims,
         };
       },
     }),

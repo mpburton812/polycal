@@ -357,12 +357,20 @@ function mapResidentRows(
 
 /**
  * Lists places with accepted resident counts (PC-37).
+ * Scoped to the caller's active network (PC-357).
  */
 export async function listPlacesAction(): Promise<PlaceSummary[]> {
   await ensureDbReady();
   const session = await auth();
   const db = getDb();
-  const rows = await db.select().from(locations).orderBy(asc(locations.name));
+  const networkId = session?.user?.activeNetworkId;
+  const rows = networkId
+    ? await db
+        .select()
+        .from(locations)
+        .where(eq(locations.networkId, networkId))
+        .orderBy(asc(locations.name))
+    : await db.select().from(locations).orderBy(asc(locations.name));
   const residentRows = await db
     .select({
       id: locationResidents.id,
@@ -423,6 +431,7 @@ export async function createPlaceAction(
 
   await db.insert(locations).values({
     id: placeId,
+    networkId: session.user.activeNetworkId ?? null,
     name: parsed.data.name,
     description: parsed.data.description ?? null,
     address: parsed.data.address ?? null,

@@ -34,6 +34,10 @@ export const authConfig = {
         token.avatarKey = user.avatarKey;
         token.theme = user.theme;
         token.isImpersonating = user.isImpersonating === true;
+        token.activeNetworkId = user.activeNetworkId;
+        token.activeNetworkRole = user.activeNetworkRole;
+        token.isPlatformAdmin = user.isPlatformAdmin === true;
+        token.networkIds = user.networkIds ?? [];
         token.dbRefreshedAt = Date.now();
         delete token.error;
       }
@@ -53,6 +57,12 @@ export const authConfig = {
         if (session.user.theme) token.theme = session.user.theme;
         if (typeof session.user.sessionVersion === "number") {
           token.sessionVersion = session.user.sessionVersion;
+        }
+        if (typeof session.user.activeNetworkId === "string") {
+          token.activeNetworkId = session.user.activeNetworkId;
+        }
+        if (session.user.activeNetworkRole) {
+          token.activeNetworkRole = session.user.activeNetworkRole;
         }
         // Force a DB re-check after client session.update (password / onboarding).
         token.dbRefreshedAt = 0;
@@ -93,6 +103,7 @@ export const authConfig = {
             displayName: users.displayName,
             avatarKey: users.avatarKey,
             theme: users.theme,
+            isPlatformAdmin: users.isPlatformAdmin,
           })
           .from(users)
           .where(eq(users.id, token.id as string))
@@ -115,6 +126,7 @@ export const authConfig = {
         token.displayName = row.displayName;
         token.avatarKey = row.avatarKey ?? undefined;
         token.theme = row.theme;
+        token.isPlatformAdmin = row.isPlatformAdmin === true;
         token.dbRefreshedAt = Date.now();
         delete token.error;
       }
@@ -137,6 +149,10 @@ export const authConfig = {
         session.user.avatarKey = token.avatarKey as string | undefined;
         session.user.theme = token.theme as string | undefined;
         session.user.isImpersonating = token.isImpersonating === true;
+        session.user.activeNetworkId = token.activeNetworkId as string | undefined;
+        session.user.activeNetworkRole = token.activeNetworkRole;
+        session.user.isPlatformAdmin = token.isPlatformAdmin === true;
+        session.user.networkIds = token.networkIds ?? [];
       }
       return session;
     },

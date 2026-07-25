@@ -149,6 +149,14 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
         >
           Forgot password?
         </Button>
+        <Button
+          component={Link}
+          href="/create-network"
+          fullWidth
+          sx={{ mt: 1, color: GARDEN_TOKENS.ink }}
+        >
+          Create new network
+        </Button>
         {loginHint && (
           <Typography variant="caption" display="block" sx={{ mt: 2, color: GARDEN_TOKENS.inkMuted }}>
             {loginHint}

@@ -21,6 +21,8 @@ export default edgeAuth((request) => {
     "/forgot-password",
     "/reset-password",
     "/verify-email",
+    "/create-network",
+    "/setup-network",
     "/privacy",
     "/terms",
     "/paused",
