@@ -9,6 +9,7 @@ import { z } from "zod";
 import { auth } from "@/lib/auth";
 import { logUserActivity } from "@/lib/audit";
 import { requireSession, withDb } from "@/lib/actions/context";
+import { hashLinkToken } from "@/lib/crypto/token-hash";
 import {
   newEmailVerificationToken,
   sendVerificationEmail,
@@ -19,6 +20,10 @@ import { resolveTimezone } from "@/lib/schedule/timezone";
 import { profileBioSchema } from "@/lib/users/profile-bio";
 import { AVATAR_OPTIONS, isCustomAvatarKey, type AvatarKey } from "@/lib/constants/avatars";
 import { LONG_TEXT_MAX, maxCharsMessage } from "@/lib/validation/string-limits";
+import {
+  fileMatchesImageMagicBytes,
+  IMAGE_CONTENT_MISMATCH_MESSAGE,
+} from "@/lib/uploads/image-magic-bytes";
 import { isCroppedAvatarLargeEnough } from "@/lib/avatars/crop";
 import { getDb } from "@/lib/db/client";
 import { ensureDbReady } from "@/lib/db/ensure-ready";
@@ -92,9 +97,9 @@ async function readAvatarUpload(
     return { ok: false, error: "Use JPEG, PNG, WebP, or GIF." };
   }
 
-  const magicOk = await validateAvatarMagicBytes(file, mimeType);
+  const magicOk = await fileMatchesImageMagicBytes(file, mimeType);
   if (!magicOk) {
-    return { ok: false, error: "File content does not match a supported image format." };
+    return { ok: false, error: IMAGE_CONTENT_MISMATCH_MESSAGE };
   }
 
   return { ok: true, file: mimeType === file.type ? file : new File([file], file.name, { type: mimeType }) };
@@ -107,38 +112,6 @@ function guessImageMime(filename: string): string {
   if (lower.endsWith(".webp")) return "image/webp";
   if (lower.endsWith(".gif")) return "image/gif";
   return "image/jpeg";
-}
-
-/** Validates file magic bytes match the declared image MIME (PC-59). */
-async function validateAvatarMagicBytes(file: File, mimeType: string): Promise<boolean> {
-  const header = new Uint8Array(await file.slice(0, 12).arrayBuffer());
-  if (mimeType === "image/jpeg") {
-    return header[0] === 0xff && header[1] === 0xd8 && header[2] === 0xff;
-  }
-  if (mimeType === "image/png") {
-    return (
-      header[0] === 0x89 &&
-      header[1] === 0x50 &&
-      header[2] === 0x4e &&
-      header[3] === 0x47
-    );
-  }
-  if (mimeType === "image/gif") {
-    return header[0] === 0x47 && header[1] === 0x49 && header[2] === 0x46;
-  }
-  if (mimeType === "image/webp") {
-    return (
-      header[0] === 0x52 &&
-      header[1] === 0x49 &&
-      header[2] === 0x46 &&
-      header[3] === 0x46 &&
-      header[8] === 0x57 &&
-      header[9] === 0x45 &&
-      header[10] === 0x42 &&
-      header[11] === 0x50
-    );
-  }
-  return false;
 }
 
 function isValidAvatarKey(value: string): value is AvatarKey | `custom:${string}` {
@@ -457,7 +430,8 @@ export async function updateNotificationEmailAction(
     .set({
       notificationEmail: parsed.data,
       emailVerifiedAt: null,
-      emailVerificationToken: token,
+      // Digest at rest; the raw token only travels in the emailed link (PC-353).
+      emailVerificationToken: hashLinkToken(token),
       emailVerificationTokenExpiresAt: expiresAt,
       updatedAt: now,
     })

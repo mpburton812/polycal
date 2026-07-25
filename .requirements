@@ -308,3 +308,4 @@
 2026-07-24 | d3e58ef | PC-348 | bump postcss override to clear GHSA-r28c audit gate | package.json
 2026-07-24 | 8a18336 | PC-350 | suite-scoped serial/safe Playwright shards | src/lib/changelog/entries.ts
 2026-07-24 | e0b4073 | PC-351 | per-night batch Google/ICS events without Confirmed | src/lib/calendar/ics.test.ts
+2026-07-25 | 7c2174d | PC-353 | hash link tokens, pause gates, timing-safe secrets | src/actions/admin.ts

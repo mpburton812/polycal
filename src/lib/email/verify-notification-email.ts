@@ -5,6 +5,7 @@
 import { eq } from "drizzle-orm";
 
 import { logUserActivity } from "@/lib/audit";
+import { hashLinkToken } from "@/lib/crypto/token-hash";
 import { getDb } from "@/lib/db/client";
 import { ensureDbReady } from "@/lib/db/ensure-ready";
 import { users } from "@/lib/db/schema";
@@ -40,7 +41,8 @@ export async function verifyNotificationEmailToken(options: {
       emailVerificationTokenExpiresAt: users.emailVerificationTokenExpiresAt,
     })
     .from(users)
-    .where(eq(users.emailVerificationToken, token))
+    // Tokens are stored as SHA-256 digests, so look up by digest (PC-353).
+    .where(eq(users.emailVerificationToken, hashLinkToken(token)))
     .limit(1);
 
   if (!row) return "invalid_or_expired";

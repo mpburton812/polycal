@@ -73,15 +73,23 @@ describe("parseOsLabel / decodeScreenshotPayload / labels", () => {
   });
 
   it("decodes base64 screenshots within size limits", () => {
-    const payload = Buffer.from("fake-jpeg").toString("base64");
-    const decoded = decodeScreenshotPayload(payload, "image/jpeg");
+    const jpeg = Buffer.concat([
+      Buffer.from([0xff, 0xd8, 0xff]),
+      Buffer.from("fake-jpeg-body"),
+    ]);
+    const decoded = decodeScreenshotPayload(jpeg.toString("base64"), "image/jpeg");
     expect(decoded?.mimeType).toBe("image/jpeg");
-    expect(decoded?.data.toString()).toBe("fake-jpeg");
+    expect(decoded?.data.subarray(3).toString()).toBe("fake-jpeg-body");
   });
 
   it("returns null for oversized screenshots", () => {
     const huge = Buffer.alloc(1_600_000, 1).toString("base64");
     expect(decodeScreenshotPayload(huge, "image/jpeg")).toBeNull();
+  });
+
+  it("rejects payloads whose bytes do not match the declared MIME (PC-353)", () => {
+    const html = Buffer.from("<script>alert(1)</script>").toString("base64");
+    expect(decodeScreenshotPayload(html, "image/png")).toBeNull();
   });
 
   it("exposes human-readable status labels", () => {

@@ -13,14 +13,26 @@ export interface SessionUser {
 
 export type ActionContextError = { ok: false; message: string };
 
+/** Shown to paused accounts so they know the block is administrative, not a bug. */
+export const PAUSED_ACCOUNT_MESSAGE =
+  "Your account is paused. Contact an administrator to regain access.";
+
 /**
- * Requires a signed-in session or returns a standard error shape (PC-80).
+ * Requires a signed-in, non-paused session or returns a standard error shape (PC-80).
+ *
+ * Pausing bumps `sessionVersion`, which normally invalidates the JWT on its next
+ * refresh — but that leaves a window (and depends on the refresh path running),
+ * so paused accounts are rejected here as well (PC-353). Sign-out is unaffected:
+ * it goes through the Auth.js route handler, not this helper.
  */
 export async function requireSession():
   Promise<{ ok: true; user: SessionUser } | ActionContextError> {
   const session = await auth();
   if (!session?.user?.id) {
     return { ok: false, message: "Sign in required." };
+  }
+  if (session.user.accountStatus === "paused") {
+    return { ok: false, message: PAUSED_ACCOUNT_MESSAGE };
   }
   return {
     ok: true,

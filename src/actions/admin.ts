@@ -9,7 +9,10 @@ import {
   getNotificationActivityActor,
 } from "@/lib/audit/activity-log-display";
 import { requireAdminAccess, withDb } from "@/lib/actions/context";
-import { getImpersonationSecret } from "@/lib/auth/impersonation";
+import {
+  getImpersonationSecret,
+  isImpersonationAllowedForEnvironment,
+} from "@/lib/auth/impersonation";
 import { ensureDbReady } from "@/lib/db/ensure-ready";
 import { getAppEnvironment, isNonProductionEnvironment } from "@/lib/env";
 import { getDb } from "@/lib/db/client";
@@ -91,6 +94,10 @@ export async function adminImpersonateUserAction(userId: string): Promise<AdminA
 
   if (userId === adminResult.user.id) {
     return { ok: false, message: "You are already signed in as this user." };
+  }
+
+  if (!isImpersonationAllowedForEnvironment()) {
+    return { ok: false, message: "Impersonation is disabled on this environment." };
   }
 
   const secret = getImpersonationSecret();

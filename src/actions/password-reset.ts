@@ -2,13 +2,16 @@
 
 import { hash } from "bcryptjs";
 import { eq } from "drizzle-orm";
+import { headers } from "next/headers";
 import { z } from "zod";
 
 import { logUserActivity } from "@/lib/audit";
+import { hashLinkToken } from "@/lib/crypto/token-hash";
 import { newPasswordResetToken } from "@/lib/email/credentials";
 import { sendEmail } from "@/lib/email/send";
 import { buildPasswordResetEmailContent } from "@/lib/email/templates";
 import { getPublicAppUrl } from "@/lib/env";
+import { getClientIpFromHeaders } from "@/lib/http/client-ip";
 import { getDb } from "@/lib/db/client";
 import { ensureDbReady } from "@/lib/db/ensure-ready";
 import { users } from "@/lib/db/schema";
@@ -43,13 +46,15 @@ const resetPasswordSchema = z
  */
 export async function requestPasswordResetAction(
   usernameRaw: string,
-  clientIp = "unknown",
 ): Promise<{ ok: true; message: string } | { ok: false; error: string }> {
   const parsed = usernameSchema.safeParse(usernameRaw);
   if (!parsed.success) {
     return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid username." };
   }
 
+  // Derived from proxy headers only — a client-supplied IP would let a caller
+  // rotate the rate-limit key at will (PC-353).
+  const clientIp = getClientIpFromHeaders(await headers());
   const username = parsed.data.toLowerCase();
   if (
     !(await checkRateLimitPersistent(`password-reset-ip:${clientIp}`, 10, 60_000)) ||
@@ -86,7 +91,8 @@ export async function requestPasswordResetAction(
     await db
       .update(users)
       .set({
-        passwordResetToken: token,
+        // Only the digest is stored; the raw token lives in the emailed link.
+        passwordResetToken: hashLinkToken(token),
         passwordResetTokenExpiresAt: expiresAt,
         updatedAt: now,
       })
@@ -132,9 +138,11 @@ export async function resetPasswordWithTokenAction(
     return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid input." };
   }
 
+  const tokenHash = hashLinkToken(parsed.data.token);
   if (
     !(await checkRateLimitPersistent(
-      `password-reset-redeem:${parsed.data.token.slice(0, 16)}`,
+      // Keyed on the digest so the raw token never reaches the rate-limit store.
+      `password-reset-redeem:${tokenHash.slice(0, 16)}`,
       10,
       60_000,
     ))
@@ -147,7 +155,7 @@ export async function resetPasswordWithTokenAction(
   const [user] = await db
     .select()
     .from(users)
-    .where(eq(users.passwordResetToken, parsed.data.token))
+    .where(eq(users.passwordResetToken, tokenHash))
     .limit(1);
 
   if (!user || user.status !== "active" || user.role === "passive") {
