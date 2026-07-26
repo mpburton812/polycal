@@ -176,7 +176,16 @@ export async function requestNetworkSetupLinkAction(
 
 export async function validateNetworkSetupTokenAction(
   token: string,
-): Promise<{ ok: boolean; message: string; email?: string }> {
+): Promise<{
+  ok: boolean;
+  message: string;
+  email?: string;
+  signedInUser?: {
+    username: string;
+    displayName: string;
+    emailMatches: boolean;
+  };
+}> {
   await ensureDbReady();
   const digest = hashLinkToken(token);
   const db = getDb();
@@ -191,7 +200,37 @@ export async function validateNetworkSetupTokenAction(
   if (new Date(row.expiresAt).getTime() < Date.now()) {
     return { ok: false, message: "This setup link has expired." };
   }
-  return { ok: true, message: "OK", email: row.email };
+
+  const session = await auth();
+  let signedInUser:
+    | { username: string; displayName: string; emailMatches: boolean }
+    | undefined;
+  if (session?.user?.id) {
+    const [userRow] = await db
+      .select({
+        username: users.username,
+        displayName: users.displayName,
+        notificationEmail: users.notificationEmail,
+      })
+      .from(users)
+      .where(eq(users.id, session.user.id))
+      .limit(1);
+    if (userRow) {
+      const { notificationEmailMatchesToken } = await import(
+        "@/lib/networks/setup-creator"
+      );
+      signedInUser = {
+        username: userRow.username,
+        displayName: userRow.displayName,
+        emailMatches: notificationEmailMatchesToken(
+          userRow.notificationEmail,
+          row.email,
+        ),
+      };
+    }
+  }
+
+  return { ok: true, message: "OK", email: row.email, signedInUser };
 }
 
 const wizardSchema = z.object({

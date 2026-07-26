@@ -15,7 +15,7 @@ import {
 } from "@mui/material";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { signIn, useSession } from "next-auth/react";
+import { signIn, signOut, useSession } from "next-auth/react";
 import { Suspense, useEffect, useState } from "react";
 
 import { checkUsernameAvailableAction } from "@/actions/users";
@@ -41,6 +41,11 @@ function SetupNetworkWizard() {
   const signedIn = status === "authenticated" && Boolean(session?.user?.id);
 
   const [email, setEmail] = useState<string | null>(null);
+  const [signedInUser, setSignedInUser] = useState<{
+    username: string;
+    displayName: string;
+    emailMatches: boolean;
+  } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [accountMode, setAccountMode] = useState<AdminAccountMode>("existing");
   const [username, setUsername] = useState("");
@@ -66,6 +71,12 @@ function SetupNetworkWizard() {
         return;
       }
       setEmail(result.email ?? null);
+      setSignedInUser(result.signedInUser ?? null);
+      if (result.signedInUser && !result.signedInUser.emailMatches) {
+        setError(
+          "This setup link was sent to a different email than your signed-in account. Sign out and use the matching account, or request a new link.",
+        );
+      }
       const networks = await listMyNetworksAction();
       setSourceNetworks(networks);
       if (networks[0]) setImportFromNetworkId(networks[0].networkId);
@@ -169,15 +180,36 @@ function SetupNetworkWizard() {
         )}
 
         {signedIn ? (
-          <Typography variant="body2" sx={{ mb: 2 }}>
-            You&apos;ll be the first network admin as{" "}
-            <strong>{session?.user?.displayName ?? session?.user?.name}</strong>
-            {session?.user?.email ? ` (@${session.user.email})` : ""}.
-          </Typography>
+          signedInUser && !signedInUser.emailMatches ? (
+            <Box sx={{ mb: 2 }}>
+              <Typography color="error" variant="body2" sx={{ mb: 1 }}>
+                Signed in as <strong>{signedInUser.displayName}</strong> (@
+                {signedInUser.username}), but this link is for <strong>{email}</strong>.
+              </Typography>
+              <Button
+                variant="outlined"
+                fullWidth
+                onClick={() => void signOut({ callbackUrl: `/setup-network?token=${encodeURIComponent(token)}` })}
+              >
+                Sign out and continue setup
+              </Button>
+            </Box>
+          ) : (
+            <>
+              <Typography variant="subtitle2" sx={{ mt: 1 }}>
+                Step 1 — Network admin
+              </Typography>
+              <Typography variant="body2" sx={{ mb: 2 }}>
+                You&apos;ll be the first network admin as{" "}
+                <strong>{session?.user?.displayName ?? session?.user?.name}</strong>
+                {email ? ` (email must match ${email})` : ""}.
+              </Typography>
+            </>
+          )
         ) : (
           <>
             <Typography variant="subtitle2" sx={{ mt: 1 }}>
-              First network admin
+              Step 1 — First network admin
             </Typography>
             <Typography variant="body2" sx={{ color: GARDEN_TOKENS.inkMuted, mb: 1 }}>
               Use an account tied to {email}. That person becomes the network admin.
@@ -258,6 +290,11 @@ function SetupNetworkWizard() {
           </>
         )}
 
+        {(!signedIn || (signedInUser?.emailMatches ?? true)) && (
+          <>
+        <Typography variant="subtitle2" sx={{ mt: signedIn ? 0 : 2 }}>
+          Step 2 — Network details
+        </Typography>
         <TextField
           label="Network name"
           required
@@ -332,6 +369,7 @@ function SetupNetworkWizard() {
           disabled={
             busy ||
             !networkName.trim() ||
+            (signedIn && signedInUser && !signedInUser.emailMatches) ||
             (!signedIn && (!username.trim() || !password.trim()))
           }
           onClick={() => void onComplete()}
@@ -343,6 +381,8 @@ function SetupNetworkWizard() {
         >
           {busy ? "Creating…" : "Create network"}
         </Button>
+          </>
+        )}
       </Paper>
     </Box>
   );

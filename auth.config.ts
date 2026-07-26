@@ -59,7 +59,20 @@ export const authConfig = {
           token.sessionVersion = session.user.sessionVersion;
         }
         if (typeof session.user.activeNetworkId === "string") {
-          token.activeNetworkId = session.user.activeNetworkId;
+          try {
+            const { getMembership } = await import("@/lib/networks/membership");
+            const membership = await getMembership(
+              token.id as string,
+              session.user.activeNetworkId,
+            );
+            if (membership) {
+              token.activeNetworkId = membership.networkId;
+              token.activeNetworkRole =
+                session.user.activeNetworkRole ?? membership.role;
+            }
+          } catch {
+            /* networks table may be mid-migration — ignore client switch */
+          }
         }
         if (session.user.activeNetworkRole) {
           token.activeNetworkRole = session.user.activeNetworkRole;

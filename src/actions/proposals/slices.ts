@@ -523,6 +523,7 @@ export async function detachProposalSliceAction(
 
       await tx.insert(proposals).values({
         id: childId,
+        networkId: parent.networkId,
         title: parent.title,
         description: parent.description,
         proposalType: "sleeping",
@@ -634,6 +635,7 @@ export async function detachProposalSliceAction(
       const bounds = allDayBoundsForDateKey(sliceKey);
       await tx.insert(proposals).values({
         id: childId,
+        networkId: parent.networkId,
         title: parent.title,
         description: parent.description,
         proposalType: parent.proposalType,

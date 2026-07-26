@@ -5,13 +5,15 @@ import { and, eq, inArray, or } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
-import { auth } from "@/lib/auth";
 import { userHasAdminAccess } from "@/lib/admin-access";
 import { logUserActivity } from "@/lib/audit";
 import { dismissNotificationsForPartnership } from "@/actions/notifications";
 import { getDb } from "@/lib/db/client";
 import { ensureDbReady } from "@/lib/db/ensure-ready";
 import { sleepingPartnerships, users } from "@/lib/db/schema";
+import { requireNetworkSession } from "@/lib/networks/context";
+import { getMembership } from "@/lib/networks/membership";
+import { loadNetworkSettings } from "@/lib/networks/settings";
 import { canonicalUserPair } from "@/lib/users/pair";
 import { notifyUser } from "@/lib/notifications";
 import { notifySleepingNetworkOfPartnershipChange } from "@/lib/partnerships/network-notify";
@@ -33,22 +35,43 @@ const respondSchema = z.object({
   comment: limitedString("Comment", LONG_TEXT_MAX).optional(),
 });
 
+async function assertPartnershipInActiveNetwork(
+  partnershipId: string,
+  networkId: string,
+): Promise<
+  | { ok: true; row: typeof sleepingPartnerships.$inferSelect }
+  | { ok: false; message: string }
+> {
+  await ensureDbReady();
+  const db = getDb();
+  const [row] = await db
+    .select()
+    .from(sleepingPartnerships)
+    .where(eq(sleepingPartnerships.id, partnershipId))
+    .limit(1);
+  if (!row || row.networkId !== networkId) {
+    return { ok: false, message: "Partnership not found." };
+  }
+  return { ok: true, row };
+}
+
 /**
- * Lists sleeping partnerships for a user, including pending incoming proposals (PC-36).
+ * Lists sleeping partnerships for a user in the active network (PC-36 / PC-364).
  */
 export async function listPartnershipsForUserAction(
   userId: string,
 ): Promise<PartnershipView[]> {
-  const session = await auth();
-  if (!session?.user) {
+  const networkSession = await requireNetworkSession();
+  if (!networkSession.ok) {
     return [];
   }
 
-  const isAdmin = await userHasAdminAccess(session.user.role);
-  if (session.user.id !== userId && !isAdmin) {
+  const isAdmin = await userHasAdminAccess(networkSession.user.role);
+  if (networkSession.user.id !== userId && !isAdmin) {
     throw new Error("Forbidden");
   }
 
+  const networkId = networkSession.user.activeNetworkId;
   await ensureDbReady();
   const db = getDb();
 
@@ -62,9 +85,12 @@ export async function listPartnershipsForUserAction(
     })
     .from(sleepingPartnerships)
     .where(
-      or(
-        eq(sleepingPartnerships.userLowId, userId),
-        eq(sleepingPartnerships.userHighId, userId),
+      and(
+        eq(sleepingPartnerships.networkId, networkId),
+        or(
+          eq(sleepingPartnerships.userLowId, userId),
+          eq(sleepingPartnerships.userHighId, userId),
+        ),
       ),
     );
 
@@ -79,7 +105,8 @@ export async function listPartnershipsForUserAction(
       displayName: users.displayName,
       role: users.role,
     })
-    .from(users);
+    .from(users)
+    .where(inArray(users.id, partnerIds));
 
   const partnerMap = new Map(partnerRows.map((row) => [row.id, row]));
 
@@ -108,16 +135,24 @@ export async function proposePartnershipAction(
   targetUserId: string,
   subjectUserId?: string,
 ): Promise<{ ok: boolean; message: string }> {
-  const session = await auth();
-  if (!session?.user) {
-    return { ok: false, message: "Sign in required." };
+  const networkSession = await requireNetworkSession();
+  if (!networkSession.ok) {
+    return { ok: false, message: networkSession.message };
   }
 
   const proposerId =
-    subjectUserId && session.user.role === "admin" ? subjectUserId : session.user.id;
+    subjectUserId && networkSession.user.role === "admin"
+      ? subjectUserId
+      : networkSession.user.id;
 
   if (targetUserId === proposerId) {
     return { ok: false, message: "You cannot partner with yourself." };
+  }
+
+  const networkId = networkSession.user.activeNetworkId;
+  const targetMembership = await getMembership(targetUserId, networkId);
+  if (!targetMembership) {
+    return { ok: false, message: "User is not a member of this network." };
   }
 
   await ensureDbReady();
@@ -137,6 +172,7 @@ export async function proposePartnershipAction(
     .from(sleepingPartnerships)
     .where(
       and(
+        eq(sleepingPartnerships.networkId, networkId),
         eq(sleepingPartnerships.userLowId, userLowId),
         eq(sleepingPartnerships.userHighId, userHighId),
       ),
@@ -161,7 +197,9 @@ export async function proposePartnershipAction(
   const status = autoAccept ? "accepted" : "proposed";
   const partnershipId = existing?.id ?? `sp-${randomUUID()}`;
   const initiatedByUserId =
-    subjectUserId && session.user.id !== proposerId ? session.user.id : null;
+    subjectUserId && networkSession.user.id !== proposerId
+      ? networkSession.user.id
+      : null;
 
   if (existing) {
     await db
@@ -178,6 +216,7 @@ export async function proposePartnershipAction(
   } else {
     await db.insert(sleepingPartnerships).values({
       id: partnershipId,
+      networkId,
       userLowId,
       userHighId,
       status,
@@ -197,9 +236,9 @@ export async function proposePartnershipAction(
     .limit(1);
 
   await logUserActivity(
-    session.user.id,
+    networkSession.user.id,
     "partnership.propose",
-    JSON.stringify({ targetUserId, status }),
+    JSON.stringify({ targetUserId, status, networkId }),
   );
 
   if (!autoAccept) {
@@ -236,27 +275,27 @@ export async function proposePartnershipAction(
 export async function withdrawPartnershipProposalAction(
   partnershipId: string,
 ): Promise<{ ok: boolean; message: string }> {
-  const session = await auth();
-  if (!session?.user) {
-    return { ok: false, message: "Sign in required." };
+  const networkSession = await requireNetworkSession();
+  if (!networkSession.ok) {
+    return { ok: false, message: networkSession.message };
   }
 
-  await ensureDbReady();
-  const db = getDb();
-  const [row] = await db
-    .select()
-    .from(sleepingPartnerships)
-    .where(eq(sleepingPartnerships.id, partnershipId))
-    .limit(1);
+  const lookup = await assertPartnershipInActiveNetwork(
+    partnershipId,
+    networkSession.user.activeNetworkId,
+  );
+  if (!lookup.ok) return lookup;
+  const row = lookup.row;
 
-  if (!row || row.status !== "proposed") {
+  if (row.status !== "proposed") {
     return { ok: false, message: "Proposal not found." };
   }
 
-  if (row.proposedById !== session.user.id) {
+  if (row.proposedById !== networkSession.user.id) {
     return { ok: false, message: "Only the proposer can withdraw this proposal." };
   }
 
+  const db = getDb();
   const now = new Date().toISOString();
   await db
     .update(sleepingPartnerships)
@@ -264,11 +303,11 @@ export async function withdrawPartnershipProposalAction(
     .where(eq(sleepingPartnerships.id, row.id));
 
   const partnerId =
-    row.userLowId === session.user.id ? row.userHighId : row.userLowId;
+    row.userLowId === networkSession.user.id ? row.userHighId : row.userLowId;
   const [proposer] = await db
     .select({ displayName: users.displayName })
     .from(users)
-    .where(eq(users.id, session.user.id))
+    .where(eq(users.id, networkSession.user.id))
     .limit(1);
 
   await notifyUser(
@@ -278,7 +317,7 @@ export async function withdrawPartnershipProposalAction(
     { partnershipId: row.id },
   );
 
-  await logUserActivity(session.user.id, "partnership.withdraw", row.id);
+  await logUserActivity(networkSession.user.id, "partnership.withdraw", row.id);
   revalidatePath("/people-places");
   revalidatePath("/proposals");
 
@@ -291,9 +330,9 @@ export async function withdrawPartnershipProposalAction(
 export async function respondPartnershipAction(
   input: z.infer<typeof respondSchema>,
 ): Promise<{ ok: boolean; message: string }> {
-  const session = await auth();
-  if (!session?.user) {
-    return { ok: false, message: "Sign in required." };
+  const networkSession = await requireNetworkSession();
+  if (!networkSession.ok) {
+    return { ok: false, message: networkSession.message };
   }
 
   const parsed = respondSchema.safeParse(input);
@@ -301,24 +340,24 @@ export async function respondPartnershipAction(
     return { ok: false, message: "Invalid request." };
   }
 
-  await ensureDbReady();
-  const db = getDb();
-  const [row] = await db
-    .select()
-    .from(sleepingPartnerships)
-    .where(eq(sleepingPartnerships.id, parsed.data.partnershipId))
-    .limit(1);
+  const lookup = await assertPartnershipInActiveNetwork(
+    parsed.data.partnershipId,
+    networkSession.user.activeNetworkId,
+  );
+  if (!lookup.ok) return lookup;
+  const row = lookup.row;
 
-  if (!row || row.status !== "proposed") {
+  if (row.status !== "proposed") {
     return { ok: false, message: "Proposal not found." };
   }
 
   const isParticipant =
-    row.userLowId === session.user.id || row.userHighId === session.user.id;
-  if (!isParticipant || row.proposedById === session.user.id) {
+    row.userLowId === networkSession.user.id || row.userHighId === networkSession.user.id;
+  if (!isParticipant || row.proposedById === networkSession.user.id) {
     return { ok: false, message: "You cannot respond to this proposal." };
   }
 
+  const db = getDb();
   const now = new Date().toISOString();
   const status = parsed.data.accept ? "accepted" : "declined";
 
@@ -328,11 +367,11 @@ export async function respondPartnershipAction(
     .where(eq(sleepingPartnerships.id, row.id));
 
   const partnerId =
-    row.userLowId === session.user.id ? row.userHighId : row.userLowId;
+    row.userLowId === networkSession.user.id ? row.userHighId : row.userLowId;
   const [responder] = await db
     .select({ displayName: users.displayName })
     .from(users)
-    .where(eq(users.id, session.user.id))
+    .where(eq(users.id, networkSession.user.id))
     .limit(1);
   const [lowUser] = await db
     .select({ displayName: users.displayName })
@@ -365,7 +404,7 @@ export async function respondPartnershipAction(
   }
 
   await logUserActivity(
-    session.user.id,
+    networkSession.user.id,
     parsed.data.accept ? "partnership.accept" : "partnership.decline",
     JSON.stringify({
       partnershipId: row.id,
@@ -378,14 +417,14 @@ export async function respondPartnershipAction(
 
   if (parsed.data.comment?.trim()) {
     await logUserActivity(
-      session.user.id,
+      networkSession.user.id,
       "partnership.comment",
       JSON.stringify({ partnershipId: row.id, body: parsed.data.comment.trim() }),
     );
   }
 
   // Clear actionable inbox rows even when Accept/Decline happens outside the bell (PC-349).
-  await dismissNotificationsForPartnership(session.user.id, row.id);
+  await dismissNotificationsForPartnership(networkSession.user.id, row.id);
 
   revalidatePath("/people-places");
   revalidatePath("/proposals");
@@ -402,30 +441,26 @@ export async function respondPartnershipAction(
 export async function removePartnershipAction(
   partnershipId: string,
 ): Promise<{ ok: boolean; message: string }> {
-  const session = await auth();
-  if (!session?.user) {
-    return { ok: false, message: "Sign in required." };
+  const networkSession = await requireNetworkSession();
+  if (!networkSession.ok) {
+    return { ok: false, message: networkSession.message };
   }
 
-  await ensureDbReady();
-  const db = getDb();
-  const [row] = await db
-    .select()
-    .from(sleepingPartnerships)
-    .where(eq(sleepingPartnerships.id, partnershipId))
-    .limit(1);
-
-  if (!row) {
-    return { ok: false, message: "Partnership not found." };
-  }
+  const lookup = await assertPartnershipInActiveNetwork(
+    partnershipId,
+    networkSession.user.activeNetworkId,
+  );
+  if (!lookup.ok) return lookup;
+  const row = lookup.row;
 
   const isParticipant =
-    row.userLowId === session.user.id || row.userHighId === session.user.id;
-  const isAdmin = session.user.role === "admin";
+    row.userLowId === networkSession.user.id || row.userHighId === networkSession.user.id;
+  const isAdmin = networkSession.user.role === "admin";
   if (!isParticipant && !isAdmin) {
     return { ok: false, message: "Not allowed." };
   }
 
+  const db = getDb();
   const [lowUser] = await db
     .select({ displayName: users.displayName })
     .from(users)
@@ -439,7 +474,7 @@ export async function removePartnershipAction(
   const [actor] = await db
     .select({ displayName: users.displayName })
     .from(users)
-    .where(eq(users.id, session.user.id))
+    .where(eq(users.id, networkSession.user.id))
     .limit(1);
 
   await db.delete(sleepingPartnerships).where(eq(sleepingPartnerships.id, partnershipId));
@@ -454,7 +489,7 @@ export async function removePartnershipAction(
     );
   }
 
-  await logUserActivity(session.user.id, "partnership.remove", partnershipId);
+  await logUserActivity(networkSession.user.id, "partnership.remove", partnershipId);
   revalidatePath("/people-places");
 
   return { ok: true, message: "Sleeping partnership removed." };
@@ -473,20 +508,14 @@ export interface SleepingPartnershipMapEdge {
  * Accepted partnership edges for the People & Places Sleeping Partners tab (PC-73 / PC-180).
  */
 export async function listSleepingPartnershipMapEdgesAction(): Promise<SleepingPartnershipMapEdge[]> {
-  const session = await auth();
-  if (!session?.user) return [];
+  const networkSession = await requireNetworkSession();
+  if (!networkSession.ok) return [];
 
   await ensureDbReady();
   const db = getDb();
-  const { polyGroup } = await import("@/lib/db/schema");
-  const [group] = await db
-    .select({ placesMapVisibility: polyGroup.placesMapVisibility })
-    .from(polyGroup)
-    .where(eq(polyGroup.id, 1))
-    .limit(1);
-
-  const visibility = group?.placesMapVisibility ?? "all";
-  const isAdmin = await userHasAdminAccess(session.user.role);
+  const settings = await loadNetworkSettings(networkSession.user.activeNetworkId, db);
+  const visibility = settings?.placesMapVisibility ?? "all";
+  const isAdmin = await userHasAdminAccess(networkSession.user.role);
   if (visibility === "none") return [];
   if (visibility === "admins" && !isAdmin) return [];
 
@@ -496,7 +525,12 @@ export async function listSleepingPartnershipMapEdgesAction(): Promise<SleepingP
       userHighId: sleepingPartnerships.userHighId,
     })
     .from(sleepingPartnerships)
-    .where(eq(sleepingPartnerships.status, "accepted"));
+    .where(
+      and(
+        eq(sleepingPartnerships.networkId, networkSession.user.activeNetworkId),
+        eq(sleepingPartnerships.status, "accepted"),
+      ),
+    );
 
   if (rows.length === 0) return [];
 

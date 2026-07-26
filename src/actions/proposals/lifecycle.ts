@@ -654,6 +654,7 @@ export async function cancelProposalAction(
     const forkId = `prop-${randomUUID()}`;
     await db.insert(proposals).values({
       id: forkId,
+      networkId: proposal.networkId,
       title: `${proposal.title} (forked)`,
       description: proposal.description,
       proposalType: proposal.proposalType,

@@ -5,11 +5,11 @@ import { and, eq, inArray, isNull } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
-import { auth } from "@/lib/auth";
 import { userHasAdminAccess } from "@/lib/admin-access";
 import { logUserActivity } from "@/lib/audit";
 import { getDb } from "@/lib/db/client";
 import { ensureDbReady } from "@/lib/db/ensure-ready";
+import { requireNetworkSession } from "@/lib/networks/context";
 import {
   locationResidents,
   locations,
@@ -99,10 +99,12 @@ async function assertResidencyProposalAllowed(
 export async function createResidencyDraftProposalAction(
   input: z.infer<typeof residencyDraftSchema>,
 ): Promise<{ ok: boolean; message: string; proposalId?: string }> {
-  const session = await auth();
-  if (!session?.user) {
-    return { ok: false, message: "Sign in required." };
+  const networkSession = await requireNetworkSession();
+  if (!networkSession.ok) {
+    return { ok: false, message: networkSession.message };
   }
+  const session = { user: networkSession.user };
+  const networkId = networkSession.user.activeNetworkId;
 
   const parsed = residencyDraftSchema.safeParse(input);
   if (!parsed.success) {
@@ -144,6 +146,7 @@ export async function createResidencyDraftProposalAction(
 
   await db.insert(proposals).values({
     id: proposalId,
+    networkId,
     title,
     description,
     proposalType: "event",
@@ -448,6 +451,7 @@ export async function bridgeLegacyResidencyProposals(
       proposedById: locationResidents.proposedById,
       status: locationResidents.status,
       placeName: locations.name,
+      networkId: locations.networkId,
     })
     .from(locationResidents)
     .innerJoin(locations, eq(locationResidents.locationId, locations.id))
@@ -465,6 +469,7 @@ export async function bridgeLegacyResidencyProposals(
 
     await db.insert(proposals).values({
       id: proposalId,
+      networkId: row.networkId,
       title: `Residency at ${row.placeName}`,
       description: serializeResidencyProposalMeta({
         residencyProposal: true,

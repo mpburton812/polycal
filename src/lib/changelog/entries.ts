@@ -28,6 +28,24 @@ import { CHANGELOG_ARCHIVE } from "./entries.archive";
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "2026.07.26b",
+    date: "2026-07-26",
+    summary:
+      "Network data isolation across feed, schedule, proposals, partnerships, and admin settings.",
+    changes: [
+      {
+        type: "fixed",
+        description:
+          "Tenant-scoped reads and writes for proposals, feed milestones/chat, sleeping partnerships, schedule, and per-network admin settings so separate networks only share users who belong to both (PC-364).",
+      },
+      {
+        type: "fixed",
+        description:
+          "Network setup wizard shows signed-in email mismatch with sign-out path; JWT network switches validate membership (PC-364).",
+      },
+    ],
+  },
+  {
     version: "2026.07.26a",
     date: "2026-07-26",
     summary:
