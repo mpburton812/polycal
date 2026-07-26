@@ -3,15 +3,25 @@ import dynamic from "next/dynamic";
 import { redirect } from "next/navigation";
 
 import { listActivityLogAction } from "@/actions/admin";
+import {
+  getActiveNetworkDashboardAction,
+  getPlatformSettingsAction,
+  listAllNetworksAction,
+  setNetworkStatusAction,
+  updatePlatformSettingsAction,
+} from "@/actions/networks";
 import { getPolyGroupSettingsAction } from "@/actions/poly-group";
 import { listAdminUsersAction } from "@/actions/users";
 import { AdminCodeStatusPanel } from "@/components/admin/AdminCodeStatusPanel";
+import { AdminNetworkDashboardPanel } from "@/components/admin/AdminNetworkDashboardPanel";
+import { AdminPlatformPanel } from "@/components/admin/AdminPlatformPanel";
 import { auth } from "@/lib/auth";
-import { userHasAdminAccess } from "@/lib/admin-access";
+import { userCanSeeAdminTab, userHasAdminAccess } from "@/lib/admin-access";
 import { CHANGELOG, getLatestChangelogEntry } from "@/lib/changelog/entries";
 import { isImpersonationConfigured } from "@/lib/auth/impersonation";
 import { getBuildInfo, isNonProductionEnvironment } from "@/lib/env";
 import { brutalPageTitleSx } from "@/theme/brutalUi";
+import type { NetworkMemberRole } from "@/types/network";
 
 function AdminPanelFallback() {
   return (
@@ -60,17 +70,43 @@ const AdminTestDataPanel = dynamic(
 
 export default async function AdminPage() {
   const session = await auth();
-  if (!session?.user || !(await userHasAdminAccess(session.user.role))) {
+  const activeNetworkRole = session?.user?.activeNetworkRole as
+    | NetworkMemberRole
+    | undefined;
+  const canSeeAdmin =
+    session?.user &&
+    userCanSeeAdminTab({
+      role: session.user.role,
+      activeNetworkRole,
+      isPlatformAdmin: session.user.isPlatformAdmin === true,
+    });
+
+  if (!canSeeAdmin) {
     redirect("/feed");
   }
 
-  const [settings, adminUsers, logEntries] = await Promise.all([
-    getPolyGroupSettingsAction(),
-    listAdminUsersAction(),
-    listActivityLogAction(),
+  const isLegacyAdmin = await userHasAdminAccess(session.user.role);
+  const isPlatformAdmin = session.user.isPlatformAdmin === true;
+  const isNetworkAdmin =
+    activeNetworkRole === "network_admin" || isLegacyAdmin || isPlatformAdmin;
+
+  const [
+    settings,
+    adminUsers,
+    logEntries,
+    networkDashboard,
+    platformNetworks,
+    platformSettings,
+  ] = await Promise.all([
+    isLegacyAdmin ? getPolyGroupSettingsAction() : Promise.resolve(null),
+    isLegacyAdmin ? listAdminUsersAction() : Promise.resolve([]),
+    isLegacyAdmin ? listActivityLogAction() : Promise.resolve([]),
+    isNetworkAdmin ? getActiveNetworkDashboardAction() : Promise.resolve(null),
+    isPlatformAdmin ? listAllNetworksAction() : Promise.resolve([]),
+    isPlatformAdmin ? getPlatformSettingsAction() : Promise.resolve(null),
   ]);
 
-  if (!settings) {
+  if (isLegacyAdmin && !settings) {
     redirect("/feed");
   }
 
@@ -85,15 +121,30 @@ export default async function AdminPage() {
           changelog={CHANGELOG}
           latestEntry={getLatestChangelogEntry()}
         />
-        <AdminPolyGroupSettingsPanel initialSettings={settings} />
-        <AdminFastSleepingPlanPanel users={adminUsers} />
-        <AdminUserManagementPanel
-          users={adminUsers}
-          currentUserId={session.user.id}
-          impersonationEnabled={isImpersonationConfigured()}
-        />
-        <AdminActivityLogPanel entries={logEntries} />
-        {isNonProductionEnvironment() && <AdminTestDataPanel />}
+        {networkDashboard && (
+          <AdminNetworkDashboardPanel dashboard={networkDashboard} />
+        )}
+        {isPlatformAdmin && platformSettings && (
+          <AdminPlatformPanel
+            initialNetworks={platformNetworks}
+            initialSettings={platformSettings}
+            setNetworkStatusAction={setNetworkStatusAction}
+            updatePlatformSettingsAction={updatePlatformSettingsAction}
+          />
+        )}
+        {isLegacyAdmin && settings && (
+          <>
+            <AdminPolyGroupSettingsPanel initialSettings={settings} />
+            <AdminFastSleepingPlanPanel users={adminUsers} />
+            <AdminUserManagementPanel
+              users={adminUsers}
+              currentUserId={session.user.id}
+              impersonationEnabled={isImpersonationConfigured()}
+            />
+            <AdminActivityLogPanel entries={logEntries} />
+            {isNonProductionEnvironment() && <AdminTestDataPanel />}
+          </>
+        )}
       </Stack>
     </>
   );

@@ -28,6 +28,24 @@ import { CHANGELOG_ARCHIVE } from "./entries.archive";
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "2026.07.26a",
+    date: "2026-07-26",
+    summary:
+      "Network setup picks existing or new first admin; network dashboard in Admin; mpburton platform admin.",
+    changes: [
+      {
+        type: "added",
+        description:
+          "Self-serve setup wizard lets unsigned creators sign in with an existing username (email must match the magic link) or create a new account as the first network_admin; signed-in users skip the account step (PC-363).",
+      },
+      {
+        type: "added",
+        description:
+          "Admin tab shows an active-network dashboard for network admins and platform controls for platform operators; mpburton is granted is_platform_admin via migration (PC-363).",
+      },
+    ],
+  },
+  {
     version: "2026.07.25e",
     date: "2026-07-25",
     summary:
