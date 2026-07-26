@@ -157,6 +157,7 @@ export async function seedStarWarsFoundation(options?: {
       avatarKey: user.avatarKey,
       theme: "mint",
       loginCount: 0,
+      isPlatformAdmin: user.username === "luke",
       createdAt: now,
       updatedAt: now,
     });

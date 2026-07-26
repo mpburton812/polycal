@@ -1,4 +1,5 @@
 import type { DefaultSession } from "next-auth";
+import type { NetworkMemberRole } from "@/types/network";
 import type { UserRole, UserStatus } from "@/types/user";
 
 declare module "next-auth" {
@@ -15,6 +16,11 @@ declare module "next-auth" {
       sessionVersion?: number;
       /** True when an admin signed in as this user via impersonation (PC-344). */
       isImpersonating?: boolean;
+      /** Active tenant context (PC-357). */
+      activeNetworkId?: string;
+      activeNetworkRole?: NetworkMemberRole;
+      isPlatformAdmin?: boolean;
+      networkIds?: string[];
     } & DefaultSession["user"];
   }
 
@@ -28,6 +34,10 @@ declare module "next-auth" {
     avatarKey?: string;
     theme?: string;
     isImpersonating?: boolean;
+    activeNetworkId?: string;
+    activeNetworkRole?: NetworkMemberRole;
+    isPlatformAdmin?: boolean;
+    networkIds?: string[];
   }
 }
 
@@ -46,6 +56,10 @@ declare module "next-auth/jwt" {
     /** Epoch ms of last DB user-row refresh in the jwt callback (PC-144). */
     dbRefreshedAt?: number;
     isImpersonating?: boolean;
+    activeNetworkId?: string;
+    activeNetworkRole?: NetworkMemberRole;
+    isPlatformAdmin?: boolean;
+    networkIds?: string[];
   }
 }
 

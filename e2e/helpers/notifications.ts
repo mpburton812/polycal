@@ -76,18 +76,44 @@ export async function clearAllNotifications(page: Page): Promise<void> {
 }
 
 /**
+ * Closes the inbox popover without relying on the Close IconButton remaining stable
+ * across reconcile/RSC remounts (PC-357).
+ */
+export async function closeNotificationInbox(page: Page): Promise<void> {
+  const panel = notificationsPanel(page);
+  if (!(await panel.isVisible().catch(() => false))) {
+    return;
+  }
+  await page.keyboard.press("Escape");
+  await expect(panel)
+    .toBeHidden({ timeout: 5_000 })
+    .catch(async () => {
+      const close = page.getByRole("button", { name: "Close notifications" });
+      if (await close.isVisible().catch(() => false)) {
+        await close.click({ force: true, timeout: 3_000 });
+      }
+    });
+}
+
+/**
  * Reloads the shell (SSR notification props) and asserts a message appears in the inbox.
+ * Retries with reload — Suspense can briefly mount an empty notification shell (PC-357).
  */
 export async function expectInAppNotification(
   page: Page,
   message: string | RegExp,
 ): Promise<void> {
-  await page.reload();
-  await openNotificationInbox(page);
-  await expect(notificationsPanel(page).getByText(message).first()).toBeVisible({
-    timeout: 30_000,
-  });
-  await page.getByRole("button", { name: "Close notifications" }).click();
+  await expect(async () => {
+    await page.reload();
+    await expect(page.getByRole("button", { name: /notifications/i })).toBeVisible({
+      timeout: 15_000,
+    });
+    await openNotificationInbox(page);
+    await expect(notificationsPanel(page).getByText(message).first()).toBeVisible({
+      timeout: 8_000,
+    });
+  }).toPass({ timeout: 60_000 });
+  await closeNotificationInbox(page);
 }
 
 /**
@@ -107,7 +133,7 @@ export async function expectActionableNotificationClearedAfterReload(
   await expect(row.getByRole("button", { name: "Decline" })).toHaveCount(0);
   // Review invite copy must be gone for this title (resolved copy may remain).
   await expect(row.filter({ hasText: /needs your review/i })).toHaveCount(0);
-  await page.getByRole("button", { name: "Close notifications" }).click();
+  await closeNotificationInbox(page);
 }
 
 /** Asserts the notification badge shows an unread count. */
