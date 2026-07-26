@@ -28,6 +28,76 @@ import { CHANGELOG_ARCHIVE } from "./entries.archive";
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "2026.07.25e",
+    date: "2026-07-25",
+    summary:
+      "Multi-network tenancy: one login, many networks, switcher, self-serve create, platform admin.",
+    changes: [
+      {
+        type: "added",
+        description:
+          "Shared-DB row multi-tenancy with `networks`, `network_members`, `platform_settings`, and `networkId` backfill; JWT `activeNetworkId` with header switcher; magic-link `/create-network` and `/setup-network`; optional import of residences and sleeping partners on join; platform admin at `/platform-admin` (pause networks, edit caps, scoped remove vs ban). SCHEMA_VERSION 39→40 (PC-357).",
+      },
+      {
+        type: "fixed",
+        description:
+          "E2E DB reset wipes and rebackfills networks; sleeping partnership uniqueness scoped by `networkId`; places and admin delete after tenant reset; notification inbox refresh deferred so Close is not detached (PC-357).",
+      },
+    ],
+  },
+  {
+    version: "2026.07.25d",
+    date: "2026-07-25",
+    summary:
+      "ActionResult message normalization, shared actionFail helper, ESLint in CI, changelog archive.",
+    changes: [
+      {
+        type: "changed",
+        description:
+          "Normalize ActionResult to `{ message }` with shared `actionFail`; add `npm run lint` to dev/test/production CI workflows; share `proposalCard` e2e locator; archive older changelog entries (PC-356).",
+      },
+    ],
+  },
+  {
+    version: "2026.07.25c",
+    date: "2026-07-25",
+    summary:
+      "Phase 2 DB indexes, bounded scans, calendar sync concurrency, avatar cache headers.",
+    changes: [
+      {
+        type: "changed",
+        description:
+          "SCHEMA_VERSION 38 secondary indexes; PRAGMA foreign_keys=ON; bound conflict/enforcement/board/schedule/notification scans; calendar sync concurrency; avatar Cache-Control/ETag; MUI optimizePackageImports (PC-355).",
+      },
+    ],
+  },
+  {
+    version: "2026.07.25b",
+    date: "2026-07-25",
+    summary:
+      "Public Terms, self-service account delete/export, PWA maskable icon and offline fallback.",
+    changes: [
+      {
+        type: "added",
+        description:
+          "Public `/terms`, self-service account delete with full purge, download-my-data export; privacy §8 retention rewrite; PWA maskable icon and offline navigation fallback (PC-354).",
+      },
+    ],
+  },
+  {
+    version: "2026.07.25a",
+    date: "2026-07-25",
+    summary:
+      "Phase 0 security hardenings: hashed tokens, paused-account gate, fail-closed e2e, image validation.",
+    changes: [
+      {
+        type: "fixed",
+        description:
+          "Hash password-reset and email-verify tokens at rest (SHA-256); timing-safe secret compares for cron, e2e, and impersonation; block paused accounts in `requireSession`; fail-closed e2e gates (refuse `polycal-prod`); prod impersonation gated; magic-byte validation for feed/feedback images; push endpoint ownership; JWT never skips pause/sessionVersion refresh (PC-353).",
+      },
+    ],
+  },
+  {
     version: "2026.07.24e",
     date: "2026-07-24",
     summary:
