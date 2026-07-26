@@ -28,6 +28,19 @@ import { CHANGELOG_ARCHIVE } from "./entries.archive";
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "2026.07.26c",
+    date: "2026-07-26",
+    summary:
+      "Platform admin dashboard on Admin tab with network node stats and operator controls.",
+    changes: [
+      {
+        type: "added",
+        description:
+          "Platform operators see a Platform section on Admin with aggregate counts, per-network node table (ID, status, members, creator), creation caps, pause/activate, and control reference (PC-365).",
+      },
+    ],
+  },
+  {
     version: "2026.07.26b",
     date: "2026-07-26",
     summary:

@@ -5,8 +5,7 @@ import { redirect } from "next/navigation";
 import { listActivityLogAction } from "@/actions/admin";
 import {
   getActiveNetworkDashboardAction,
-  getPlatformSettingsAction,
-  listAllNetworksAction,
+  getPlatformDashboardAction,
   setNetworkStatusAction,
   updatePlatformSettingsAction,
 } from "@/actions/networks";
@@ -14,7 +13,7 @@ import { getPolyGroupSettingsAction } from "@/actions/poly-group";
 import { listAdminUsersAction } from "@/actions/users";
 import { AdminCodeStatusPanel } from "@/components/admin/AdminCodeStatusPanel";
 import { AdminNetworkDashboardPanel } from "@/components/admin/AdminNetworkDashboardPanel";
-import { AdminPlatformPanel } from "@/components/admin/AdminPlatformPanel";
+import { AdminPlatformDashboardPanel } from "@/components/admin/AdminPlatformDashboardPanel";
 import { auth } from "@/lib/auth";
 import { userCanSeeAdminTab, userHasAdminAccess } from "@/lib/admin-access";
 import { CHANGELOG, getLatestChangelogEntry } from "@/lib/changelog/entries";
@@ -95,15 +94,13 @@ export default async function AdminPage() {
     adminUsers,
     logEntries,
     networkDashboard,
-    platformNetworks,
-    platformSettings,
+    platformDashboard,
   ] = await Promise.all([
     isLegacyAdmin ? getPolyGroupSettingsAction() : Promise.resolve(null),
     isLegacyAdmin ? listAdminUsersAction() : Promise.resolve([]),
     isLegacyAdmin ? listActivityLogAction() : Promise.resolve([]),
     isNetworkAdmin ? getActiveNetworkDashboardAction() : Promise.resolve(null),
-    isPlatformAdmin ? listAllNetworksAction() : Promise.resolve([]),
-    isPlatformAdmin ? getPlatformSettingsAction() : Promise.resolve(null),
+    isPlatformAdmin ? getPlatformDashboardAction() : Promise.resolve(null),
   ]);
 
   if (isLegacyAdmin && !settings) {
@@ -124,10 +121,9 @@ export default async function AdminPage() {
         {networkDashboard && (
           <AdminNetworkDashboardPanel dashboard={networkDashboard} />
         )}
-        {isPlatformAdmin && platformSettings && (
-          <AdminPlatformPanel
-            initialNetworks={platformNetworks}
-            initialSettings={platformSettings}
+        {platformDashboard && (
+          <AdminPlatformDashboardPanel
+            initialDashboard={platformDashboard}
             setNetworkStatusAction={setNetworkStatusAction}
             updatePlatformSettingsAction={updatePlatformSettingsAction}
           />

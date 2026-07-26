@@ -1,16 +1,11 @@
 import { redirect } from "next/navigation";
 
-import {
-  getPlatformSettingsAction,
-  listAllNetworksAction,
-  setNetworkStatusAction,
-  updatePlatformSettingsAction,
-} from "@/actions/networks";
+import { getPlatformDashboardAction } from "@/actions/networks";
 import { auth } from "@/lib/auth";
 import { PlatformAdminClient } from "@/components/platform/PlatformAdminClient";
 
 /**
- * Platform operator console — caps, network pause, telemetry counts (PC-362).
+ * Platform operator console — caps, network pause, node telemetry (PC-362 / PC-365).
  */
 export default async function PlatformAdminPage() {
   const session = await auth();
@@ -18,17 +13,10 @@ export default async function PlatformAdminPage() {
     redirect("/feed");
   }
 
-  const [networks, settings] = await Promise.all([
-    listAllNetworksAction(),
-    getPlatformSettingsAction(),
-  ]);
+  const dashboard = await getPlatformDashboardAction();
+  if (!dashboard) {
+    redirect("/feed");
+  }
 
-  return (
-    <PlatformAdminClient
-      initialNetworks={networks}
-      initialSettings={settings}
-      setNetworkStatusAction={setNetworkStatusAction}
-      updatePlatformSettingsAction={updatePlatformSettingsAction}
-    />
-  );
+  return <PlatformAdminClient initialDashboard={dashboard} />;
 }

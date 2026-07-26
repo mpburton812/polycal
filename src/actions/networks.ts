@@ -1,6 +1,6 @@
 "use server";
 
-import { and, eq, gte, sql } from "drizzle-orm";
+import { and, asc, eq, gte, sql } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import { z } from "zod";
 
@@ -83,6 +83,93 @@ async function countNetworksForEmail(email: string): Promise<number> {
 export async function getPlatformSettingsAction(): Promise<PlatformSettings> {
   await ensureDbReady();
   return loadPlatformSettings();
+}
+
+export type PlatformNetworkNode = {
+  id: string;
+  name: string;
+  status: string;
+  createdAt: string;
+  createdByEmail: string | null;
+  allowUserProvisioning: boolean;
+  memberCount: number;
+};
+
+export type PlatformDashboardData = {
+  summary: {
+    totalNetworks: number;
+    activeNetworks: number;
+    pausedNetworks: number;
+    totalMemberSeats: number;
+    distinctMembers: number;
+    networksCreatedToday: number;
+  };
+  settings: PlatformSettings;
+  networks: PlatformNetworkNode[];
+};
+
+/**
+ * Platform operator dashboard: network nodes + aggregate counts (PC-365).
+ */
+export async function getPlatformDashboardAction(): Promise<PlatformDashboardData | null> {
+  const admin = await requirePlatformAdmin();
+  if (!admin.ok) return null;
+
+  await ensureDbReady();
+  const db = getDb();
+  const [settings, rows, createdToday, distinctRows] = await Promise.all([
+    loadPlatformSettings(),
+    db.select().from(networks).orderBy(asc(networks.createdAt)),
+    countNetworksCreatedToday(),
+    db
+      .select({ count: sql<number>`count(distinct ${networkMembers.userId})` })
+      .from(networkMembers)
+      .where(eq(networkMembers.status, "active")),
+  ]);
+  const distinctRow = distinctRows[0];
+
+  const networkNodes: PlatformNetworkNode[] = [];
+  let totalMemberSeats = 0;
+  let activeNetworks = 0;
+  let pausedNetworks = 0;
+
+  for (const n of rows) {
+    const [countRow] = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(networkMembers)
+      .where(
+        and(
+          eq(networkMembers.networkId, n.id),
+          eq(networkMembers.status, "active"),
+        ),
+      );
+    const memberCount = Number(countRow?.count ?? 0);
+    totalMemberSeats += memberCount;
+    if (n.status === "active") activeNetworks += 1;
+    if (n.status === "paused") pausedNetworks += 1;
+    networkNodes.push({
+      id: n.id,
+      name: n.name,
+      status: n.status,
+      createdAt: n.createdAt,
+      createdByEmail: n.createdByEmail,
+      allowUserProvisioning: n.allowUserProvisioning,
+      memberCount,
+    });
+  }
+
+  return {
+    summary: {
+      totalNetworks: rows.length,
+      activeNetworks,
+      pausedNetworks,
+      totalMemberSeats,
+      distinctMembers: Number(distinctRow?.count ?? 0),
+      networksCreatedToday: createdToday,
+    },
+    settings,
+    networks: networkNodes,
+  };
 }
 
 export async function updatePlatformSettingsAction(input: {
