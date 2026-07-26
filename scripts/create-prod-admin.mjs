@@ -55,13 +55,25 @@ if (existing.rows.length > 0) {
 const now = new Date().toISOString();
 const passwordHash = await hash(password, 12);
 const userId = `prod-${randomUUID()}`;
+const isPlatformAdmin =
+  username.toLowerCase() === "mpburton" || username.toLowerCase() === "mpburton@gmail.com";
 
 await client.execute({
   sql: `INSERT INTO users (
     id, username, display_name, password_hash, role, status,
-    must_change_password, avatar_key, theme, login_count, created_at, updated_at
-  ) VALUES (?, ?, ?, ?, 'admin', 'active', 0, 'bird_blue', 'mint', 0, ?, ?)`,
-  args: [userId, username, username, passwordHash, now, now],
+    must_change_password, avatar_key, theme, login_count, is_platform_admin,
+    notification_email, created_at, updated_at
+  ) VALUES (?, ?, ?, ?, 'admin', 'active', 0, 'bird_blue', 'mint', 0, ?, ?, ?, ?)`,
+  args: [
+    userId,
+    username,
+    username,
+    passwordHash,
+    isPlatformAdmin ? 1 : 0,
+    username.toLowerCase() === "mpburton" ? "mpburton@gmail.com" : null,
+    now,
+    now,
+  ],
 });
 
 const group = await client.execute("SELECT id FROM poly_group WHERE id = 1");

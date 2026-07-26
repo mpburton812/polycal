@@ -12,6 +12,7 @@ import {
   type UserRole,
 } from "@/lib/db/schema";
 import { canonicalUserPair } from "@/lib/users/pair";
+import { isPlatformAdminIdentity } from "@/lib/platform/platform-admins";
 
 export const TEST_FAMILY_DEFAULT_PASSWORD = "password";
 
@@ -131,6 +132,9 @@ export async function seedTestFamilyFoundation(options?: {
       avatarKey: user.avatarKey,
       theme: "mint",
       loginCount: 0,
+      isPlatformAdmin: isPlatformAdminIdentity({ username: user.username }),
+      notificationEmail:
+        user.username === "mpburton" ? "mpburton@gmail.com" : null,
       createdAt: now,
       updatedAt: now,
     });

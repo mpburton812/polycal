@@ -12,6 +12,7 @@ import {
   users,
 } from "@/lib/db/schema";
 import { upsertMembership } from "@/lib/networks/membership";
+import { isPlatformAdminIdentity } from "@/lib/platform/platform-admins";
 import { canonicalUserPair } from "@/lib/users/pair";
 
 /** E2E overlay credentials (Burton-Thompson fixture on top of Star Wars seed). */
@@ -76,6 +77,9 @@ export async function seedE2eBurtonThompsonOverlay(): Promise<void> {
         avatarKey: user.avatarKey,
         theme: "mint",
         loginCount: 0,
+        isPlatformAdmin: isPlatformAdminIdentity({ username: user.username }),
+        notificationEmail:
+          user.username === "mpburton" ? "mpburton@gmail.com" : null,
         createdAt: now,
         updatedAt: now,
       });

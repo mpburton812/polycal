@@ -101,6 +101,7 @@ export async function applyNetworksMigrations(sql: Client): Promise<void> {
 
   await rebuildSleepingPartnershipsUnique(sql);
   await backfillLegacyNetwork(sql);
+  await grantDefaultPlatformAdmins(sql);
 }
 
 /**
@@ -273,6 +274,33 @@ async function backfillLegacyNetwork(sql: Client): Promise<void> {
 
   await sql.execute({
     sql: `INSERT INTO schema_meta (key, value) VALUES ('networks_backfill_v1', '1')
+          ON CONFLICT(key) DO NOTHING`,
+    args: [],
+  });
+}
+
+/**
+ * Grants platform admin to the canonical operator account(s). Idempotent via schema_meta.
+ */
+async function grantDefaultPlatformAdmins(sql: Client): Promise<void> {
+  const flag = await sql.execute(
+    `SELECT value FROM schema_meta WHERE key = 'platform_admin_grant_v1' LIMIT 1`,
+  );
+  if (flag.rows.length > 0) {
+    return;
+  }
+
+  const now = new Date().toISOString();
+  await sql.execute({
+    sql: `UPDATE users
+          SET is_platform_admin = 1, updated_at = ?
+          WHERE LOWER(username) = 'mpburton'
+             OR LOWER(COALESCE(notification_email, '')) = 'mpburton@gmail.com'`,
+    args: [now],
+  });
+
+  await sql.execute({
+    sql: `INSERT INTO schema_meta (key, value) VALUES ('platform_admin_grant_v1', '1')
           ON CONFLICT(key) DO NOTHING`,
     args: [],
   });

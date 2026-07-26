@@ -21,6 +21,7 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Changed
+- PC-362: Grant platform admin (`is_platform_admin`) to username `mpburton` and notification email `mpburton@gmail.com`; one-time migration, test seeds, and prod bootstrap script; SCHEMA_VERSION 41. Change control: `2026.07.26a`.
 - PC-351: Batch sleeping syncs one all-day free Google/ICS event per night (LOCATION field + `, at Location` in title); non-batch multi-day sleeping stays one span; resolved sleeping titles omit Confirmed; SCHEMA_VERSION 37 (`calendar_event_links.night_key`). Change control: `2026.07.24e`.
 
 ### Added

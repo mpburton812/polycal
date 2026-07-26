@@ -28,6 +28,18 @@ import { CHANGELOG_ARCHIVE } from "./entries.archive";
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "2026.07.26a",
+    date: "2026-07-26",
+    summary: "Grant platform admin to mpburton / mpburton@gmail.com.",
+    changes: [
+      {
+        type: "changed",
+        description:
+          "Canonical platform operator identities set is_platform_admin for username mpburton and notification email mpburton@gmail.com; one-time migration, seeds, and prod bootstrap updated; SCHEMA_VERSION 41 (PC-362).",
+      },
+    ],
+  },
+  {
     version: "2026.07.24e",
     date: "2026-07-24",
     summary:
