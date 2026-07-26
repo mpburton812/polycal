@@ -1,3 +1,4 @@
+import type { NetworkMemberRole } from "@/types/network";
 import type { UserRole } from "@/types/user";
 
 /**
@@ -7,4 +8,19 @@ import type { UserRole } from "@/types/user";
  */
 export async function userHasAdminAccess(role: UserRole): Promise<boolean> {
   return role === "admin";
+}
+
+/**
+ * Whether the signed-in user should see the Admin tab — legacy admins, active
+ * network admins, or platform operators (PC-363).
+ */
+export function userCanSeeAdminTab(user: {
+  role: UserRole;
+  activeNetworkRole?: NetworkMemberRole | string;
+  isPlatformAdmin?: boolean;
+}): boolean {
+  if (user.isPlatformAdmin === true) return true;
+  if (user.role === "admin") return true;
+  if (user.activeNetworkRole === "network_admin") return true;
+  return false;
 }

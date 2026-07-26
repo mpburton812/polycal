@@ -29,6 +29,7 @@ import {
   requireNetworkAdmin,
   requirePlatformAdmin,
 } from "@/lib/networks/context";
+import { resolveSetupCreator } from "@/lib/networks/setup-creator";
 import { requireSession } from "@/lib/actions/context";
 import {
   DEFAULT_PLATFORM_SETTINGS,
@@ -198,6 +199,11 @@ const wizardSchema = z.object({
   networkName: z.string().min(1).max(80),
   allowUserProvisioning: z.boolean().optional(),
   adminCanSeeUninvolved: z.boolean().optional(),
+  adminMode: z.enum(["session", "existing", "new"]).optional(),
+  username: z.string().optional(),
+  password: z.string().optional(),
+  displayName: z.string().optional(),
+  confirmPassword: z.string().optional(),
   inviteEmails: z
     .array(
       z.object({
@@ -218,7 +224,13 @@ const wizardSchema = z.object({
  */
 export async function completeNetworkSetupAction(
   raw: z.infer<typeof wizardSchema>,
-): Promise<{ ok: boolean; message: string; networkId?: string }> {
+): Promise<{
+  ok: boolean;
+  message: string;
+  networkId?: string;
+  signInUsername?: string;
+  signInPassword?: string;
+}> {
   const parsed = wizardSchema.safeParse(raw);
   if (!parsed.success) {
     return { ok: false, message: parsed.error.issues[0]?.message ?? "Invalid input." };
@@ -249,31 +261,28 @@ export async function completeNetworkSetupAction(
   }
 
   const session = await auth();
-  let creatorId = session?.user?.id;
-  if (!creatorId) {
-    // Create a provisional platform user from email if not signed in.
-    const usernameBase = email.split("@")[0].replace(/[^a-zA-Z0-9]/g, "").slice(0, 20) || "user";
-    const username = `${usernameBase}${randomUUID().slice(0, 6)}`.toLowerCase();
-    creatorId = randomUUID();
-    const now = new Date().toISOString();
-    const { hash } = await import("bcryptjs");
-    const passwordHash = await hash(randomUUID() + "A1!", 10);
-    await db.insert(users).values({
-      id: creatorId,
-      username,
-      displayName: usernameBase,
-      passwordHash,
-      role: "admin",
-      status: "active",
-      mustChangePassword: true,
-      onboardingComplete: false,
-      theme: "mint",
-      timezone: "UTC",
-      createdAt: now,
-      updatedAt: now,
-      notificationEmail: email,
-    });
+  const adminMode =
+    input.adminMode ?? (session?.user?.id ? "session" : undefined);
+  if (!adminMode) {
+    return { ok: false, message: "Choose how to sign in as the first network admin." };
   }
+
+  const creatorResult = await resolveSetupCreator(db, {
+    tokenEmail: email,
+    mode: adminMode,
+    sessionUserId: session?.user?.id,
+    username: input.username,
+    password: input.password,
+    displayName: input.displayName,
+    confirmPassword: input.confirmPassword,
+  });
+  if (!creatorResult.ok) {
+    return { ok: false, message: creatorResult.message };
+  }
+  const creatorId = creatorResult.creatorId;
+  const signInUsername = creatorResult.signInUsername;
+  const signInPassword =
+    adminMode === "new" || adminMode === "existing" ? input.password : undefined;
 
   const now = new Date().toISOString();
   const networkId = randomUUID();
@@ -334,6 +343,52 @@ export async function completeNetworkSetupAction(
     ok: true,
     message: `Created network ${input.networkName}.`,
     networkId,
+    signInUsername: adminMode === "session" ? undefined : signInUsername,
+    signInPassword,
+  };
+}
+
+/**
+ * Network-scoped dashboard summary for Admin → Network (PC-363).
+ */
+export async function getActiveNetworkDashboardAction(): Promise<{
+  networkId: string;
+  name: string;
+  status: string;
+  memberCount: number;
+  createdAt: string;
+  createdByEmail: string | null;
+  allowUserProvisioning: boolean;
+  role: string;
+} | null> {
+  const admin = await requireNetworkAdmin();
+  if (!admin.ok) return null;
+  await ensureDbReady();
+  const db = getDb();
+  const [network] = await db
+    .select()
+    .from(networks)
+    .where(eq(networks.id, admin.user.activeNetworkId))
+    .limit(1);
+  if (!network) return null;
+  const [countRow] = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(networkMembers)
+    .where(
+      and(
+        eq(networkMembers.networkId, network.id),
+        eq(networkMembers.status, "active"),
+      ),
+    );
+  return {
+    networkId: network.id,
+    name: network.name,
+    status: network.status,
+    memberCount: Number(countRow?.count ?? 0),
+    createdAt: network.createdAt,
+    createdByEmail: network.createdByEmail,
+    allowUserProvisioning: network.allowUserProvisioning,
+    role: admin.user.activeNetworkRole,
   };
 }
 
