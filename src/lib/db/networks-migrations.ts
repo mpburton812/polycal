@@ -101,6 +101,7 @@ export async function applyNetworksMigrations(sql: Client): Promise<void> {
 
   await rebuildSleepingPartnershipsUnique(sql);
   await backfillLegacyNetwork(sql);
+  await ensureMpburtonPlatformAdmin(sql);
 }
 
 /**
@@ -274,6 +275,13 @@ async function backfillLegacyNetwork(sql: Client): Promise<void> {
   await sql.execute({
     sql: `INSERT INTO schema_meta (key, value) VALUES ('networks_backfill_v1', '1')
           ON CONFLICT(key) DO NOTHING`,
+    args: [],
+  });
+}
+
+async function ensureMpburtonPlatformAdmin(sql: Client): Promise<void> {
+  await sql.execute({
+    sql: `UPDATE users SET is_platform_admin = 1 WHERE username = 'mpburton' AND COALESCE(is_platform_admin, 0) = 0`,
     args: [],
   });
 }

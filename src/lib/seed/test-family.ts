@@ -131,6 +131,9 @@ export async function seedTestFamilyFoundation(options?: {
       avatarKey: user.avatarKey,
       theme: "mint",
       loginCount: 0,
+      isPlatformAdmin: user.username === "mpburton",
+      notificationEmail:
+        user.username === "mpburton" ? "mpburton@gmail.com" : null,
       createdAt: now,
       updatedAt: now,
     });

@@ -11,7 +11,7 @@ import { UserThemeProvider } from "@/components/providers/UserThemeProvider";
 import { BrandedLoading } from "@/components/ui/BrandedLoading";
 import { auth } from "@/lib/auth";
 import { getLiveUserStatus } from "@/lib/auth-session";
-import { userHasAdminAccess } from "@/lib/admin-access";
+import { userCanSeeAdminTab } from "@/lib/admin-access";
 import { normalizeUserThemeId } from "@/lib/constants/themes";
 import { DEFAULT_NOTIFICATION_PREFS } from "@/types/notification-prefs";
 
@@ -45,12 +45,16 @@ async function AppLayoutReady({ children }: { children: React.ReactNode }) {
   const showOnboarding = !session.user.onboardingComplete;
 
   // Shell chrome can paint as soon as admin flag resolves; inbox/prefs stream in parallel.
-  const hasAdminAccessPromise = userHasAdminAccess(session.user.role);
+  const canSeeAdminTab = userCanSeeAdminTab({
+    role: session.user.role,
+    activeNetworkRole: session.user.activeNetworkRole,
+    isPlatformAdmin: session.user.isPlatformAdmin === true,
+  });
   const notificationInboxPromise = getNotificationInboxAction();
   const notificationPrefsPromise = getNotificationPrefsAction();
   const groupNamePromise = getPolyGroupDisplayNameAction();
 
-  const hasAdminAccess = await hasAdminAccessPromise;
+  const showAdminTab = canSeeAdminTab;
   const isPlatformAdmin = session.user.isPlatformAdmin === true;
 
   return (
@@ -60,7 +64,7 @@ async function AppLayoutReady({ children }: { children: React.ReactNode }) {
           <AppShell
             displayName={session.user.displayName}
             groupName="…"
-            isAdmin={hasAdminAccess}
+            isAdmin={showAdminTab}
             avatarKey={session.user.avatarKey}
             notificationCount={0}
             notificationItems={[]}
@@ -74,7 +78,7 @@ async function AppLayoutReady({ children }: { children: React.ReactNode }) {
         <AppShellWithData
           displayName={session.user.displayName}
           avatarKey={session.user.avatarKey}
-          isAdmin={hasAdminAccess}
+          isAdmin={showAdminTab}
           isPlatformAdmin={isPlatformAdmin}
           showOnboarding={showOnboarding}
           mustChangePassword={session.user.mustChangePassword}
