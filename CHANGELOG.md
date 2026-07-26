@@ -25,6 +25,7 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - PC-354: Public `/terms`, self-service account delete with full purge, download-my-data export; PWA maskable icon and offline navigation fallback. Change control: `2026.07.25b`.
 
 ### Changed
+- PC-362: Canonical platform admin grant for username `mpburton` and notification email `mpburton@gmail.com`; one-time migration, seeds, and prod bootstrap aligned; SCHEMA_VERSION 41. Change control: `2026.07.26d`.
 - PC-356: Normalize ActionResult to `{ message }`; add `npm run lint` to dev/test/production CI; archive older changelog entries. Change control: `2026.07.25d`.
 - PC-355: SCHEMA_VERSION 38 secondary indexes; PRAGMA foreign_keys=ON; bound conflict/enforcement/board/schedule/notification scans; calendar sync concurrency; avatar Cache-Control/ETag. Change control: `2026.07.25c`.
 - PC-351: Batch sleeping syncs one all-day free Google/ICS event per night (LOCATION field + `, at Location` in title); non-batch multi-day sleeping stays one span; resolved sleeping titles omit Confirmed; SCHEMA_VERSION 37 (`calendar_event_links.night_key`). Change control: `2026.07.24e`.
