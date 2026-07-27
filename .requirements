@@ -329,3 +329,4 @@
 2026-07-27 | 99eeec3 | PC-368 | elevate platform admins and show access levels | src/actions/platform-admin.ts
 2026-07-27 | 78fc055 | PC-370 | target access-level select via test id | src/components/admin/AdminUserManagementPanel.tsx
 2026-07-27 | e4b3feb | PC-372 | sleeping as day events, optional partners, NYT default | src/actions/admin-fast-sleeping.test.ts
+2026-07-27 | 50253c4 | PC-374 | type inviteeRoles record for Next build | src/components/proposals/FastSleepingPlanGrid.tsx
