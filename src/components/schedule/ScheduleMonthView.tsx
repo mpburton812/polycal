@@ -53,8 +53,8 @@ export function ScheduleMonthView({
   const isSmall = useMediaQuery(theme.breakpoints.down("sm"));
   const maxSpanLanes = isSmall ? 2 : 3;
 
-  const grid = useMemo(() => buildMonthGrid(monthAnchor), [monthAnchor]);
-  const monthStart = startOfMonth(monthAnchor);
+  const grid = useMemo(() => buildMonthGrid(monthAnchor, timeZone), [monthAnchor, timeZone]);
+  const monthStart = startOfMonth(monthAnchor, timeZone);
   const monthKey = `${monthStart.getFullYear()}-${monthStart.getMonth()}`;
 
   const layout = useMemo(

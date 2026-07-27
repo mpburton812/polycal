@@ -79,8 +79,6 @@ export default defineConfig({
       workers: 1,
       use: {
         ...devices["Desktop Chrome"],
-        // Match GitHub Actions Linux hosts so week columns stay TZ-stable (PC-376).
-        timezoneId: "UTC",
         baseURL: `http://localhost:${E2E_PORT}`,
         storageState: lukeStorage(0),
       },

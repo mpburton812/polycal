@@ -1,31 +1,52 @@
-import { addDays, localDateKey, startOfWeekMonday } from "./dates";
+import {
+  addDays,
+  civilDateAtNoonUtc,
+  localDateKey,
+  startOfWeekMonday,
+} from "./dates";
+import { DEFAULT_VIEWER_TIMEZONE } from "./timezone";
 
-/** First calendar day of the month containing `date`. */
-export function startOfMonth(date: Date): Date {
-  const result = new Date(date);
-  result.setDate(1);
-  result.setHours(0, 0, 0, 0);
-  return result;
+/** First civil day (noon-UTC) of the month containing `date` in `timeZone` (PC-376). */
+export function startOfMonth(
+  date: Date,
+  timeZone: string = DEFAULT_VIEWER_TIMEZONE,
+): Date {
+  const key = localDateKey(date.toISOString(), timeZone);
+  return civilDateAtNoonUtc(`${key.slice(0, 8)}01`);
 }
 
-/** Last instant of the month containing `date`. */
-export function endOfMonth(date: Date): Date {
-  const result = new Date(date.getFullYear(), date.getMonth() + 1, 0, 23, 59, 59, 999);
-  return result;
+/** Last instant of the month containing `date` in `timeZone` (PC-376). */
+export function endOfMonth(
+  date: Date,
+  timeZone: string = DEFAULT_VIEWER_TIMEZONE,
+): Date {
+  const start = startOfMonth(date, timeZone);
+  const nextMonth = new Date(start);
+  nextMonth.setUTCMonth(nextMonth.getUTCMonth() + 1);
+  return new Date(nextMonth.getTime() - 1);
 }
 
 /** Monday-aligned 6-week grid covering the month (42 cells). */
-export function buildMonthGrid(monthAnchor: Date): Date[] {
-  const monthStart = startOfMonth(monthAnchor);
-  const gridStart = startOfWeekMonday(monthStart);
-  const monthEnd = endOfMonth(monthAnchor);
+export function buildMonthGrid(
+  monthAnchor: Date,
+  timeZone: string = DEFAULT_VIEWER_TIMEZONE,
+): Date[] {
+  const monthStart = startOfMonth(monthAnchor, timeZone);
+  const gridStart = startOfWeekMonday(monthStart, timeZone);
+  const monthEnd = endOfMonth(monthAnchor, timeZone);
 
   const days: Date[] = [];
   let cursor = gridStart;
   while (days.length < 42) {
     days.push(new Date(cursor));
     cursor = addDays(cursor, 1);
-    if (days.length >= 35 && cursor > monthEnd && cursor.getDay() === 1) break;
+    const cursorKey = localDateKey(cursor.toISOString(), timeZone);
+    const endKey = localDateKey(monthEnd.toISOString(), timeZone);
+    const cursorWeekday = new Intl.DateTimeFormat("en-US", {
+      timeZone,
+      weekday: "short",
+    }).format(cursor);
+    if (days.length >= 35 && cursorKey > endKey && cursorWeekday === "Mon") break;
   }
   while (days.length < 42) {
     days.push(addDays(days[days.length - 1]!, 1));
@@ -40,13 +61,15 @@ export function dayIndexInGrid(grid: Date[], iso: string, timeZone: string): num
 }
 
 /** Visible fetch range for the 42-cell month grid (includes leading/trailing padding days). */
-export function monthGridRange(monthAnchor: Date): { rangeStart: Date; rangeEnd: Date } {
-  const grid = buildMonthGrid(monthAnchor);
-  const rangeStart = new Date(grid[0]!);
-  rangeStart.setHours(0, 0, 0, 0);
-  const rangeEnd = new Date(grid[grid.length - 1]!);
-  rangeEnd.setHours(23, 59, 59, 999);
-  return { rangeStart, rangeEnd };
+export function monthGridRange(
+  monthAnchor: Date,
+  timeZone: string = DEFAULT_VIEWER_TIMEZONE,
+): { rangeStart: Date; rangeEnd: Date } {
+  const grid = buildMonthGrid(monthAnchor, timeZone);
+  return {
+    rangeStart: new Date(grid[0]!),
+    rangeEnd: new Date(grid[grid.length - 1]!),
+  };
 }
 
 /** Inclusive [startIndex, endIndex] span for a schedule block within the grid. */

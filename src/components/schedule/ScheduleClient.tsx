@@ -166,8 +166,8 @@ export function ScheduleClient({
     [viewState.weekStartIso, timeZone],
   );
   const monthAnchor = useMemo(
-    () => startOfMonth(new Date(viewState.monthAnchorIso)),
-    [viewState.monthAnchorIso],
+    () => startOfMonth(new Date(viewState.monthAnchorIso), timeZone),
+    [viewState.monthAnchorIso, timeZone],
   );
   const isMonthLayout = viewState.calendarLayout === "month";
   const isDayLayout = viewState.calendarLayout === "day";
@@ -290,7 +290,7 @@ export function ScheduleClient({
               nextLayout === "day"
                 ? startOfLocalDayNoon(anchorDate, timeZone).toISOString()
                 : startOfWeekMonday(anchorDate, timeZone).toISOString(),
-            monthAnchorIso: startOfMonth(anchorDate).toISOString(),
+            monthAnchorIso: startOfMonth(anchorDate, timeZone).toISOString(),
           };
         }
       }
@@ -395,7 +395,7 @@ export function ScheduleClient({
       setViewState((current) => ({
         ...current,
         weekStartIso: next.toISOString(),
-        monthAnchorIso: startOfMonth(next).toISOString(),
+        monthAnchorIso: startOfMonth(next, timeZone).toISOString(),
       }));
       refreshSchedule(next, { layout: "day" });
       return;

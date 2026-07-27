@@ -18,7 +18,7 @@ export function computeScheduleFetchRange(
   timeZone?: string,
 ): ScheduleFetchRange {
   if (layout === "month") {
-    const monthRange = monthGridRange(startOfMonth(anchorDate));
+    const monthRange = monthGridRange(startOfMonth(anchorDate, timeZone), timeZone);
     return { rangeStart: monthRange.rangeStart, rangeEnd: monthRange.rangeEnd };
   }
 
