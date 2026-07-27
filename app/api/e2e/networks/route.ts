@@ -51,6 +51,7 @@ export async function POST(request: Request): Promise<NextResponse> {
         adminCanSeeUninvolved: true,
         auditLogVisibility: "admin_only",
         hideSleepingArrangements: false,
+        seePartnersSleepingArrangements: false,
         placesMapVisibility: "all",
         logTailLength: 100,
         onboardingWelcomeMessage: "Welcome",

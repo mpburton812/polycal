@@ -55,6 +55,7 @@ export function ScheduleEventBlock({
     isContentMasked: event.isContentMasked,
     hasOverlap: event.hasOverlap,
     atRisk: event.atRisk,
+    isPartnerOnlySleeping: event.isPartnerOnlySleeping,
   });
   const colors = scheduleBlockSx(variant, rotationIndex);
   const stakeholders = formatStakeholders(event);

@@ -6,7 +6,7 @@
 export interface FeedFingerprintTable {
   count: number;
   maxCreatedAt: string | null;
-  /** Omit for tables without a soft-delete column (e.g. milestones). */
+  /** Soft-delete timestamp bump (chat, comments, milestones). */
   maxDeletedAt?: string | null;
 }
 

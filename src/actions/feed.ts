@@ -497,6 +497,7 @@ async function computeFeedFingerprint(
     .select({
       count: sql<number>`count(*)`,
       maxCreatedAt: sql<string | null>`max(${proposalStateLog.createdAt})`,
+      maxDeletedAt: sql<string | null>`max(${proposalStateLog.deletedAt})`,
     })
     .from(proposalStateLog)
     .innerJoin(proposals, eq(proposalStateLog.proposalId, proposals.id))
@@ -571,6 +572,7 @@ async function computeFeedFingerprint(
     milestones: {
       count: Number(milestones?.count ?? 0),
       maxCreatedAt: milestones?.maxCreatedAt ?? null,
+      maxDeletedAt: milestones?.maxDeletedAt ?? null,
     },
     proposals: { maxUpdatedAt: proposalsAgg?.maxUpdatedAt ?? null },
     chatMessages: {
@@ -640,6 +642,7 @@ async function loadMilestoneBatch(
     const conditions = [
       inArray(proposalStateLog.action, allowedActions),
       eq(proposals.networkId, networkId),
+      isNull(proposalStateLog.deletedAt),
     ];
     if (cursor) {
       conditions.push(lt(proposalStateLog.createdAt, cursor.createdAt));
@@ -686,6 +689,9 @@ async function loadMilestoneBatch(
       inviteesByProposal.set(invitee.proposalId, list);
     }
 
+    const seePartnersSleepingArrangements =
+      settings?.seePartnersSleepingArrangements ?? false;
+
     const milestones: FeedMilestone[] = [];
     for (const row of rows) {
       if (milestones.length >= fetchSize) break;
@@ -696,6 +702,8 @@ async function loadMilestoneBatch(
         proposalType: row.proposalType,
         state: row.state,
         adminCanSeeUninvolved,
+        seePartnersSleepingArrangements,
+        acceptedPartnerIds: partnerIds,
       };
       if (
         !viewerCanSeeProposalWithSleepingGate(viewerId, isAdmin, row.proposerId, inviteeUserIds, gateOptions)
@@ -756,6 +764,7 @@ async function loadMilestoneBatch(
         proposalState: row.state,
         masked: false,
         visibleViaAdminOnly,
+        canDelete: isAdmin,
         canComment: canCommentOnProposal({
           state: row.state,
           isContentMasked: false,
@@ -1302,6 +1311,45 @@ export async function deleteNetworkChatMessageAction(
 }
 
 /**
+ * Soft-deletes a feed milestone (admin only) — hides from feed, keeps audit row (PC-365).
+ */
+export async function deleteFeedMilestoneAction(
+  milestoneId: string,
+): Promise<{ ok: boolean; message: string }> {
+  const sessionResult = await requireSession();
+  if (!sessionResult.ok) return sessionResult;
+
+  const id = z.string().min(1).safeParse(milestoneId);
+  if (!id.success) return { ok: false, message: "Invalid milestone." };
+
+  const isAdmin = await userHasAdminAccess(sessionResult.user.role);
+  if (!isAdmin) {
+    return { ok: false, message: "Not allowed to delete this milestone." };
+  }
+
+  return withDb(async (db) => {
+    const [row] = await db
+      .select({
+        id: proposalStateLog.id,
+        deletedAt: proposalStateLog.deletedAt,
+      })
+      .from(proposalStateLog)
+      .where(eq(proposalStateLog.id, id.data))
+      .limit(1);
+
+    if (!row || row.deletedAt) return { ok: false, message: "Milestone not found." };
+
+    await db
+      .update(proposalStateLog)
+      .set({ deletedAt: new Date().toISOString() })
+      .where(eq(proposalStateLog.id, id.data));
+
+    revalidatePath("/feed");
+    return { ok: true, message: "Milestone deleted." };
+  });
+}
+
+/**
  * Soft-deletes a chat comment (author, message author, or admin) (PC-234).
  */
 export async function deleteNetworkChatCommentAction(
@@ -1367,11 +1415,11 @@ async function feedLikeTargetExists(
 ): Promise<boolean> {
   if (targetType === "milestone") {
     const [row] = await db
-      .select({ id: proposalStateLog.id })
+      .select({ id: proposalStateLog.id, deletedAt: proposalStateLog.deletedAt })
       .from(proposalStateLog)
       .where(eq(proposalStateLog.id, targetId))
       .limit(1);
-    return Boolean(row);
+    return Boolean(row && !row.deletedAt);
   }
   if (targetType === "chat") {
     const [row] = await db

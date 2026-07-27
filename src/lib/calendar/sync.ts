@@ -29,6 +29,7 @@ import {
   calendarConnections,
   calendarEventLinks,
   calendarIcsPending,
+  locations,
   proposalInvitees,
   proposals,
   users,
@@ -68,30 +69,52 @@ async function participantUserIds(db: Db, proposalId: string, proposerId: string
 }
 
 /**
- * Loads display names for sleeping calendar titles (proposal + batch night invitees).
+ * Loads display names for sleeping calendar titles (proposal + batch night invitees)
+ * and place names for LOCATION resolution (PC-367).
  */
 async function loadCalendarNameContext(
   db: Db,
   proposal: ProposalRow,
   inviteeIds: string[],
 ): Promise<CalendarPayloadNameContext> {
-  const batchIds = parseBatchEntriesJson(proposal.batchEntriesJson).flatMap((entry) =>
+  const batchEntries = parseBatchEntriesJson(proposal.batchEntriesJson);
+  const batchIds = batchEntries.flatMap((entry) =>
     entry.invitees.map((inv) => inv.userId),
   );
   const ids = [...new Set([proposal.proposerId, ...inviteeIds, ...batchIds])];
-  if (ids.length === 0) {
-    return { proposerName: "Someone", displayNameByUserId: {}, proposalInviteeNames: [] };
-  }
 
-  const rows = await db
-    .select({ id: users.id, displayName: users.displayName })
-    .from(users)
-    .where(inArray(users.id, ids));
+  const locationIds = [
+    ...new Set(
+      [
+        proposal.locationId,
+        ...batchEntries.map((entry) => entry.locationId),
+      ].filter((id): id is string => Boolean(id?.trim())),
+    ),
+  ];
 
   const displayNameByUserId: Record<string, string> = {};
-  for (const row of rows) {
-    if (row.displayName?.trim()) {
-      displayNameByUserId[row.id] = row.displayName.trim();
+  if (ids.length > 0) {
+    const rows = await db
+      .select({ id: users.id, displayName: users.displayName })
+      .from(users)
+      .where(inArray(users.id, ids));
+    for (const row of rows) {
+      if (row.displayName?.trim()) {
+        displayNameByUserId[row.id] = row.displayName.trim();
+      }
+    }
+  }
+
+  const placeNameByLocationId: Record<string, string> = {};
+  if (locationIds.length > 0) {
+    const placeRows = await db
+      .select({ id: locations.id, name: locations.name })
+      .from(locations)
+      .where(inArray(locations.id, locationIds));
+    for (const row of placeRows) {
+      if (row.name?.trim()) {
+        placeNameByLocationId[row.id] = row.name.trim();
+      }
     }
   }
 
@@ -100,7 +123,7 @@ async function loadCalendarNameContext(
     .map((id) => displayNameByUserId[id])
     .filter((name): name is string => Boolean(name?.trim()));
 
-  return { proposerName, displayNameByUserId, proposalInviteeNames };
+  return { proposerName, displayNameByUserId, proposalInviteeNames, placeNameByLocationId };
 }
 
 async function getValidGoogleAccessToken(

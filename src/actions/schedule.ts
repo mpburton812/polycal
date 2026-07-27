@@ -65,6 +65,11 @@ export interface ScheduleEvent {
   occurrenceProposalId: string | null;
   /** Category icon key; omitted when content is masked (PC-116). */
   eventIconKey: string | null;
+  /**
+   * True when this sleeping block is visible only because an accepted partner
+   * is involved and the viewer is not (PC-366).
+   */
+  isPartnerOnlySleeping: boolean;
 }
 
 export interface SchedulePayload {
@@ -77,12 +82,14 @@ async function getSchedulePrivacyFlags(
 ): Promise<{
   hideSleeping: boolean;
   adminCanSeeUninvolved: boolean;
+  seePartnersSleepingArrangements: boolean;
 }> {
   const adminCanSeeUninvolved = await getAdminCanSeeUninvolved(db, networkId);
   const settings = await loadNetworkSettings(networkId, db);
   return {
     hideSleeping: settings?.hideSleepingArrangements ?? false,
     adminCanSeeUninvolved,
+    seePartnersSleepingArrangements: settings?.seePartnersSleepingArrangements ?? false,
   };
 }
 
@@ -287,7 +294,8 @@ export async function listScheduleEventsAction(
       ...invitees.map((invitee) => invitee.displayName),
     ];
 
-    const { visible, contentMasked: isContentMasked } = canViewProposalContent({
+    const { visible, contentMasked: isContentMasked, isPartnerOnlySleeping } =
+      canViewProposalContent({
       viewerId,
       isAdmin,
       proposerId: row.proposerId,
@@ -297,6 +305,7 @@ export async function listScheduleEventsAction(
       adminCanSeeUninvolved: privacyFlags.adminCanSeeUninvolved,
       applyScheduleMask: true,
       hideSleeping: privacyFlags.hideSleeping,
+      seePartnersSleepingArrangements: privacyFlags.seePartnersSleepingArrangements,
       acceptedPartnerIds: partnerIds,
     });
 
@@ -441,6 +450,7 @@ export async function listScheduleEventsAction(
         occurrenceProposalId: window.occurrenceProposalId,
         eventIconKey:
           isContentMasked || row.proposalType !== "event" ? null : row.eventIconKey ?? null,
+        isPartnerOnlySleeping,
       });
     }
   }

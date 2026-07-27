@@ -28,6 +28,34 @@ import { CHANGELOG_ARCHIVE } from "./entries.archive";
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "2026.07.27d",
+    date: "2026-07-27",
+    summary:
+      "Sleeping day layout, admin milestone delete, partner sleeping toggle, calendar LOCATION/DESCRIPTION.",
+    changes: [
+      {
+        type: "changed",
+        description:
+          "Week/agenda/day-sheet list sleeping last; day hour grid places sleeping in the 0–8am band instead of the all-day strip (PC-364).",
+      },
+      {
+        type: "added",
+        description:
+          "Admins can soft-delete feed milestones (proposal_state_log.deleted_at); SCHEMA_VERSION 43 (PC-365).",
+      },
+      {
+        type: "added",
+        description:
+          "Network toggle See partners' sleeping arrangements (lighter purple partner-only nights) (PC-366).",
+      },
+      {
+        type: "fixed",
+        description:
+          "Calendar sync resolves locationId place names and includes description/notes (batch comment preferred) (PC-367).",
+      },
+    ],
+  },
+  {
     version: "2026.07.27c",
     date: "2026-07-27",
     summary: "Feed cleanup, calendar today highlight, platform admin readability.",

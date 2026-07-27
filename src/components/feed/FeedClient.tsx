@@ -20,6 +20,7 @@ import {
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 
 import {
+  deleteFeedMilestoneAction,
   deleteNetworkChatCommentAction,
   deleteNetworkChatMessageAction,
   getFeedUpdateTokenAction,
@@ -807,6 +808,14 @@ export function FeedClient({
     });
   }
 
+  function deleteMilestone(milestoneId: string) {
+    startTransition(async () => {
+      const result = await deleteFeedMilestoneAction(milestoneId);
+      if (!result.ok) setError(result.message);
+      else await loadFeed(null, { silent: true });
+    });
+  }
+
   function deleteChatComment(commentId: string) {
     startTransition(async () => {
       const result = await deleteNetworkChatCommentAction(commentId);
@@ -821,6 +830,7 @@ export function FeedClient({
       return (
         <Box
           key={`m-${item.id}`}
+          data-testid="feed-milestone-card"
           sx={{
             border: `2px solid ${GARDEN_TOKENS.ink}`,
             borderLeft: `6px solid ${MILESTONE_RAIL}`,
@@ -828,10 +838,22 @@ export function FeedClient({
             p: 2,
           }}
         >
-          <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }} flexWrap="wrap">
-            <Chip size="small" label="Milestone" sx={{ fontWeight: 700 }} />
-            <Chip size="small" label={item.proposalType === "sleeping" ? "Sleeping" : "Event"} />
-            <Chip size="small" variant="outlined" label={item.proposalState} />
+          <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
+            <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }} flexWrap="wrap">
+              <Chip size="small" label="Milestone" sx={{ fontWeight: 700 }} />
+              <Chip size="small" label={item.proposalType === "sleeping" ? "Sleeping" : "Event"} />
+              <Chip size="small" variant="outlined" label={item.proposalState} />
+            </Stack>
+            {item.canDelete || isAdmin ? (
+              <IconButton
+                aria-label="Delete milestone"
+                size="small"
+                onClick={() => deleteMilestone(item.id)}
+                disabled={pending}
+              >
+                <DeleteOutlineIcon fontSize="small" />
+              </IconButton>
+            ) : null}
           </Stack>
           <Typography variant="subtitle1" fontWeight={700}>
             {item.proposalTitle}
