@@ -135,6 +135,7 @@ export default async function AdminPage() {
             <AdminUserManagementPanel
               users={adminUsers}
               currentUserId={session.user.id}
+              canManagePlatformAdmin={isPlatformAdmin}
               impersonationEnabled={isImpersonationConfigured()}
             />
             <AdminActivityLogPanel entries={logEntries} />

@@ -38,6 +38,7 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition, type ReactNode } from "react";
 
 import { adminImpersonateUserAction } from "@/actions/admin";
+import { setUserAccessLevelAction } from "@/actions/platform-admin";
 import { AdminCollapsibleSection } from "@/components/admin/AdminCollapsibleSection";
 import { ModerationDialog } from "@/components/platform/ModerationDialog";
 import type { AdminUserRow } from "@/actions/users";
@@ -51,20 +52,29 @@ import {
   updateUserAction,
 } from "@/actions/users";
 import { AVATAR_OPTIONS } from "@/lib/constants/avatars";
-import { formatUserRole } from "@/lib/users/role-labels";
+import {
+  formatAccessLevel,
+  resolveAccessLevel,
+  type AccountAccessLevel,
+} from "@/lib/users/role-labels";
 import { LONG_TEXT_MAX } from "@/lib/validation/string-limits";
 import { GARDEN_TOKENS, ORGANIC_RADIUS, STROKE_DEFAULT } from "@/theme/tokens";
 
+type AssignableAccessLevel = Exclude<AccountAccessLevel, "passive">;
+
 /**
- * Admin user management with edit, impersonate, and delete (PC-31 / PC-178).
+ * Admin user management with edit, impersonate, and delete (PC-31 / PC-178 / PC-369).
  */
 export function AdminUserManagementPanel({
   users,
   currentUserId,
+  canManagePlatformAdmin = false,
   impersonationEnabled = false,
 }: {
   users: AdminUserRow[];
   currentUserId: string;
+  /** When true, platform admins can elevate access levels (PC-369). */
+  canManagePlatformAdmin?: boolean;
   /** When true, Impersonate is offered (AUTH_IMPERSONATION_SECRET configured) — PC-179. */
   impersonationEnabled?: boolean;
 }) {
@@ -82,6 +92,7 @@ export function AdminUserManagementPanel({
   const [editDisplayName, setEditDisplayName] = useState("");
   const [editUsername, setEditUsername] = useState("");
   const [editRole, setEditRole] = useState<"user" | "admin">("user");
+  const [editAccessLevel, setEditAccessLevel] = useState<AssignableAccessLevel>("user");
   const [editGender, setEditGender] = useState("");
   const [editAvatarKey, setEditAvatarKey] = useState<string>(AVATAR_OPTIONS[0].key);
   const [editUsernameStatus, setEditUsernameStatus] = useState({
@@ -112,13 +123,25 @@ export function AdminUserManagementPanel({
     setEditDisplayName(user.displayName);
     setEditUsername(user.username);
     setEditRole(user.role === "admin" ? "admin" : "user");
+    const level = resolveAccessLevel({
+      role: user.role,
+      isPlatformAdmin: user.isPlatformAdmin,
+    });
+    setEditAccessLevel(level === "passive" ? "user" : level);
     setEditGender(user.gender ?? "");
-    setEditAvatarKey(AVATAR_OPTIONS[0].key);
+    setEditAvatarKey(user.avatarKey ?? AVATAR_OPTIONS[0].key);
     setEditUsernameStatus(
       user.role === "passive"
         ? { checked: false, available: false, message: "" }
         : { checked: true, available: true, message: "Username unchanged." },
     );
+  }
+
+  function accessLabel(user: AdminUserRow): string {
+    return formatAccessLevel({
+      role: user.role,
+      isPlatformAdmin: user.isPlatformAdmin,
+    });
   }
 
   function checkEditUsername(userId: string) {
@@ -345,7 +368,7 @@ export function AdminUserManagementPanel({
                   >
                     {[
                       user.gender ?? "—",
-                      formatUserRole(user.role),
+                      accessLabel(user),
                       user.lastLoginAt
                         ? `Last login ${new Date(user.lastLoginAt).toLocaleString()}`
                         : "Never logged in",
@@ -363,12 +386,12 @@ export function AdminUserManagementPanel({
           <Table size="small" sx={{ tableLayout: "fixed", width: "100%" }}>
             <TableHead>
               <TableRow>
-                <TableCell sx={{ width: "22%" }}>Name</TableCell>
-                <TableCell sx={{ width: "12%" }}>Gender</TableCell>
-                <TableCell sx={{ width: "12%" }}>Role</TableCell>
-                <TableCell sx={{ width: "14%" }}>Status</TableCell>
+                <TableCell sx={{ width: "20%" }}>Name</TableCell>
+                <TableCell sx={{ width: "10%" }}>Gender</TableCell>
+                <TableCell sx={{ width: "16%" }}>Access level</TableCell>
+                <TableCell sx={{ width: "12%" }}>Status</TableCell>
                 <TableCell sx={{ width: "18%" }}>Last login</TableCell>
-                <TableCell sx={{ width: "22%" }}>Actions</TableCell>
+                <TableCell sx={{ width: "24%" }}>Actions</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -378,7 +401,7 @@ export function AdminUserManagementPanel({
                     {user.displayName}
                   </TableCell>
                   <TableCell sx={{ overflowWrap: "anywhere" }}>{user.gender ?? "—"}</TableCell>
-                  <TableCell sx={{ overflowWrap: "anywhere" }}>{formatUserRole(user.role)}</TableCell>
+                  <TableCell sx={{ overflowWrap: "anywhere" }}>{accessLabel(user)}</TableCell>
                   <TableCell>{statusChip(user)}</TableCell>
                   <TableCell sx={{ overflowWrap: "anywhere", wordBreak: "break-word" }}>
                     {user.lastLoginAt
@@ -461,17 +484,40 @@ export function AdminUserManagementPanel({
                       : "Availability is checked when you leave this field."
                   }
                 />
-                <FormControl fullWidth>
-                  <InputLabel>Role</InputLabel>
-                  <Select
-                    label="Role"
-                    value={editRole}
-                    onChange={(e) => setEditRole(e.target.value as "user" | "admin")}
-                  >
-                    <MenuItem value="user">User</MenuItem>
-                    <MenuItem value="admin">Admin</MenuItem>
-                  </Select>
-                </FormControl>
+                {canManagePlatformAdmin && editUser?.id !== currentUserId ? (
+                  <FormControl fullWidth>
+                    <InputLabel id="edit-user-access-level-label">Access level</InputLabel>
+                    <Select
+                      labelId="edit-user-access-level-label"
+                      label="Access level"
+                      value={editAccessLevel}
+                      data-testid="edit-user-access-level"
+                      onChange={(e) => {
+                        const next = e.target.value as AssignableAccessLevel;
+                        setEditAccessLevel(next);
+                        if (next === "admin" || next === "user") {
+                          setEditRole(next);
+                        }
+                      }}
+                    >
+                      <MenuItem value="platform_admin">Platform Admin</MenuItem>
+                      <MenuItem value="admin">Admin</MenuItem>
+                      <MenuItem value="user">User</MenuItem>
+                    </Select>
+                  </FormControl>
+                ) : (
+                  <FormControl fullWidth>
+                    <InputLabel>Role</InputLabel>
+                    <Select
+                      label="Role"
+                      value={editRole}
+                      onChange={(e) => setEditRole(e.target.value as "user" | "admin")}
+                    >
+                      <MenuItem value="user">User</MenuItem>
+                      <MenuItem value="admin">Admin</MenuItem>
+                    </Select>
+                  </FormControl>
+                )}
               </>
             )}
             <FormControl fullWidth>
@@ -510,14 +556,54 @@ export function AdminUserManagementPanel({
                   avatarKey: editAvatarKey,
                   gender: editGender.trim() || null,
                   ...(editUser.role !== "passive"
-                    ? { username: editUsername, role: editRole }
+                    ? {
+                        username: editUsername,
+                        role:
+                          canManagePlatformAdmin && editUser.id !== currentUserId
+                            ? editAccessLevel === "admin"
+                              ? "admin"
+                              : editAccessLevel === "user"
+                                ? "user"
+                                : editRole
+                            : editRole,
+                      }
                     : {}),
                 });
-                showStatus(result.message, result.ok ? "success" : "error");
-                if (result.ok) {
-                  setEditUser(null);
-                  router.refresh();
+                if (!result.ok) {
+                  showStatus(result.message, "error");
+                  return;
                 }
+
+                if (
+                  canManagePlatformAdmin &&
+                  editUser.role !== "passive" &&
+                  editUser.id !== currentUserId
+                ) {
+                  const currentLevel = resolveAccessLevel({
+                    role: editUser.role,
+                    isPlatformAdmin: editUser.isPlatformAdmin,
+                  });
+                  if (currentLevel !== editAccessLevel) {
+                    const accessResult = await setUserAccessLevelAction({
+                      userId: editUser.id,
+                      accessLevel: editAccessLevel,
+                    });
+                    showStatus(
+                      accessResult.ok
+                        ? `${result.message} ${accessResult.message}`
+                        : accessResult.message,
+                      accessResult.ok ? "success" : "error",
+                    );
+                    if (!accessResult.ok) return;
+                  } else {
+                    showStatus(result.message, "success");
+                  }
+                } else {
+                  showStatus(result.message, "success");
+                }
+
+                setEditUser(null);
+                router.refresh();
               })
             }
           >
