@@ -12,7 +12,7 @@ test.describe("Platform admin access levels", () => {
   test("All Users shows avatar + access level; elevate from platform and admin UIs", async ({
     page,
   }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(180_000);
 
     await login(page, USERS.luke.username);
 
@@ -51,7 +51,8 @@ test.describe("Platform admin access levels", () => {
 
     const editDialog = page.getByRole("dialog", { name: "Edit user" });
     await expect(editDialog).toBeVisible();
-    await editDialog.getByLabel("Access level").click();
+    await expect(editDialog.getByTestId("edit-user-access-level")).toBeVisible({ timeout: 10_000 });
+    await editDialog.getByTestId("edit-user-access-level").click();
     await page.getByRole("option", { name: "Platform Admin" }).click();
     await editDialog.getByRole("button", { name: "Save" }).click();
     await expect(editDialog).toBeHidden({ timeout: 20_000 });

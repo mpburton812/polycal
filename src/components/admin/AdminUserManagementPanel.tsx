@@ -486,10 +486,12 @@ export function AdminUserManagementPanel({
                 />
                 {canManagePlatformAdmin && editUser?.id !== currentUserId ? (
                   <FormControl fullWidth>
-                    <InputLabel>Access level</InputLabel>
+                    <InputLabel id="edit-user-access-level-label">Access level</InputLabel>
                     <Select
+                      labelId="edit-user-access-level-label"
                       label="Access level"
                       value={editAccessLevel}
+                      data-testid="edit-user-access-level"
                       onChange={(e) => {
                         const next = e.target.value as AssignableAccessLevel;
                         setEditAccessLevel(next);
