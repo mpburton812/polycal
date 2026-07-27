@@ -161,6 +161,27 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           return null;
         }
 
+        if (row.status === "banned") {
+          const valid = await compare(parsed.data.password, row.passwordHash);
+          if (!valid) return null;
+          const claims = await networkClaimsForUser(row.id);
+          return {
+            id: row.id,
+            name: row.displayName,
+            email: row.username,
+            role: row.role,
+            accountStatus: "banned",
+            mustChangePassword: row.mustChangePassword,
+            onboardingComplete: row.onboardingComplete,
+            sessionVersion: row.sessionVersion,
+            displayName: row.displayName,
+            avatarKey: row.avatarKey ?? undefined,
+            theme: row.theme,
+            isImpersonating: false,
+            ...claims,
+          };
+        }
+
         const valid = await compare(parsed.data.password, row.passwordHash);
         if (!valid) return null;
 

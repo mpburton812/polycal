@@ -90,6 +90,10 @@ export const users = sqliteTable("users", {
     .default(false),
   /** Owning active user for passive/proxy profiles that travel across networks (PC-357). */
   ownedByUserId: text("owned_by_user_id"),
+  /** Shown on the paused/banned screen when set by an administrator. */
+  moderationReason: text("moderation_reason"),
+  /** ISO timestamp — when set, shown on paused/banned screen and auto-clears on login after. */
+  moderationExpiresAt: text("moderation_expires_at"),
   createdAt: text("created_at").notNull(),
   updatedAt: text("updated_at").notNull(),
 });

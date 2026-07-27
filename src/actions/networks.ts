@@ -461,7 +461,7 @@ export async function banUserFromAllNetworksAction(
   await db
     .update(users)
     .set({
-      status: "deleted",
+      status: "banned",
       sessionVersion: (user.sessionVersion ?? 0) + 1,
       updatedAt: now,
     })

@@ -7,7 +7,7 @@ import { getPolyGroupSettingsAction } from "@/actions/poly-group";
 import { listAdminUsersAction } from "@/actions/users";
 import { AdminCodeStatusPanel } from "@/components/admin/AdminCodeStatusPanel";
 import { auth } from "@/lib/auth";
-import { userHasAdminAccess } from "@/lib/admin-access";
+import { userCanAccessAdminPanel } from "@/lib/admin-access";
 import { CHANGELOG, getLatestChangelogEntry } from "@/lib/changelog/entries";
 import { isImpersonationConfigured } from "@/lib/auth/impersonation";
 import { getBuildInfo, isNonProductionEnvironment } from "@/lib/env";
@@ -60,7 +60,14 @@ const AdminTestDataPanel = dynamic(
 
 export default async function AdminPage() {
   const session = await auth();
-  if (!session?.user || !(await userHasAdminAccess(session.user.role))) {
+  if (
+    !session?.user ||
+    !(await userCanAccessAdminPanel({
+      role: session.user.role,
+      activeNetworkRole: session.user.activeNetworkRole,
+      isPlatformAdmin: session.user.isPlatformAdmin === true,
+    }))
+  ) {
     redirect("/feed");
   }
 
