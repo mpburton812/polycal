@@ -35,6 +35,7 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - PC-351: Batch sleeping syncs one all-day free Google/ICS event per night (LOCATION field + `, at Location` in title); non-batch multi-day sleeping stays one span; resolved sleeping titles omit Confirmed; SCHEMA_VERSION 37 (`calendar_event_links.night_key`). Change control: `2026.07.24e`.
 
 ### Fixed
+- PC-362 (test): SCHEMA_VERSION 42 re-runs migrations so `moderation_reason` / `moderation_expires_at` apply on DBs that already recorded v41 before moderation columns shipped (restores login). Change control: `2026.07.27b`.
 - PC-362 (test): E2E navigation strict-mode flake on Rebel Alliance header. Change control: `2026.07.27a`.
 - PC-353: Phase 0 security hardenings — hashed password-reset/email-verify tokens, paused-account gate, fail-closed e2e gates, magic-byte image validation, push endpoint ownership. Change control: `2026.07.25a`.
 

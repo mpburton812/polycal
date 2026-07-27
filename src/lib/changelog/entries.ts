@@ -28,6 +28,18 @@ import { CHANGELOG_ARCHIVE } from "./entries.archive";
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "2026.07.27b",
+    date: "2026-07-27",
+    summary: "Fix test login after moderation columns missed migration.",
+    changes: [
+      {
+        type: "fixed",
+        description:
+          "SCHEMA_VERSION 42 re-applies admin migrations so moderation columns exist on Turso DBs that already stored v41 before the platform moderation UI shipped; restores sign-in (PC-362).",
+      },
+    ],
+  },
+  {
     version: "2026.07.27a",
     date: "2026-07-27",
     summary:
