@@ -8,7 +8,7 @@
  * Resolved/archived omit status (no "Confirmed"); keep Tentative / Proposed / At risk.
  */
 
-export type SleepingDisplayStatus = "Confirmed" | "Tentative" | "Proposed" | "At risk";
+export type SleepingDisplayStatus = "Tentative" | "Proposed" | "At risk";
 
 export interface SleepingDisplayInput {
   proposerName: string;
