@@ -9,7 +9,7 @@ function userRow(page: Page, displayName: string) {
   return page.getByRole("row").filter({ hasText: displayName });
 }
 
-/** Pauses a user from the admin user management table. */
+/** Pauses a user from the admin user management table (reason dialog required, PC-362). */
 export async function pauseUserInAdmin(page: Page, displayName: string): Promise<void> {
   await expandAdminSection(page, "User management");
   const pauseButton = userRow(page, displayName).getByRole("button", {
@@ -17,6 +17,14 @@ export async function pauseUserInAdmin(page: Page, displayName: string): Promise
   });
   await expect(pauseButton).toBeVisible({ timeout: 15_000 });
   await pauseButton.click();
+
+  // Pause opens ModerationDialog; confirm with a reason or the action is a no-op.
+  const dialog = page.getByRole("dialog", { name: `Pause ${displayName}` });
+  await expect(dialog).toBeVisible({ timeout: 10_000 });
+  await dialog.getByLabel("Reason").fill("E2E: pause for bad-user journey");
+  await dialog.getByRole("button", { name: "Pause user" }).click();
+  await expect(dialog).toBeHidden({ timeout: 15_000 });
+
   await expect(userRow(page, displayName).getByText("paused", { exact: true })).toBeVisible({
     timeout: 20_000,
   });
