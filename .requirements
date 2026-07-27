@@ -327,3 +327,4 @@
 2026-07-27 | 56336cd | PC-365 | milestone soft-delete and partner sleeping | src/actions/feed.ts
 2026-07-27 | e6dfccc | PC-367 | resolve LOCATION and DESCRIPTION for sync | src/lib/calendar/payloads.test.ts
 2026-07-27 | 99eeec3 | PC-368 | elevate platform admins and show access levels | src/actions/platform-admin.ts
+2026-07-27 | 78fc055 | PC-370 | target access-level select via test id | src/components/admin/AdminUserManagementPanel.tsx
