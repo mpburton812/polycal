@@ -333,3 +333,4 @@
 2026-07-27 | 4ce3696 | PC-374 | NYT profile default, mark batch partners required, restore browser-local draft times | src/components/proposals/proposalDraftDateUtils.test.ts
 2026-07-27 | bce3969 | PC-376 | match profile TZ label spacing; seed America/New_York | src/lib/seed/e2e-burton-thompson-overlay.ts
 2026-07-27 | 49583fc | PC-376 | align onboarding TZ label with underscore-to-space display | e2e/helpers/onboarding.ts
+2026-07-27 | 1d88f48 | PC-376 | accept New_York or New York in timezone assertions | e2e/helpers/onboarding.ts
