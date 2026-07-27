@@ -1,11 +1,24 @@
 import { redirect } from "next/navigation";
 
-import { getPlatformDashboardAction } from "@/actions/networks";
+import {
+  getPlatformSettingsAction,
+  listAllNetworksAction,
+  setNetworkStatusAction,
+  updatePlatformSettingsAction,
+} from "@/actions/networks";
+import {
+  banUserPlatformAction,
+  deleteUserPlatformAction,
+  inhabitNetworkAdminAction,
+  listPlatformUsersAction,
+  pauseUserPlatformAction,
+  resumeUserPlatformAction,
+} from "@/actions/platform-admin";
 import { auth } from "@/lib/auth";
 import { PlatformAdminClient } from "@/components/platform/PlatformAdminClient";
 
 /**
- * Platform operator console — caps, network pause, node telemetry (PC-362 / PC-365).
+ * Platform operator console — caps, network pause, telemetry, user moderation (PC-362).
  */
 export default async function PlatformAdminPage() {
   const session = await auth();
@@ -13,10 +26,24 @@ export default async function PlatformAdminPage() {
     redirect("/feed");
   }
 
-  const dashboard = await getPlatformDashboardAction();
-  if (!dashboard) {
-    redirect("/feed");
-  }
+  const [networks, settings, users] = await Promise.all([
+    listAllNetworksAction(),
+    getPlatformSettingsAction(),
+    listPlatformUsersAction(),
+  ]);
 
-  return <PlatformAdminClient initialDashboard={dashboard} />;
+  return (
+    <PlatformAdminClient
+      initialNetworks={networks}
+      initialSettings={settings}
+      initialUsers={users}
+      setNetworkStatusAction={setNetworkStatusAction}
+      updatePlatformSettingsAction={updatePlatformSettingsAction}
+      pauseUserPlatformAction={pauseUserPlatformAction}
+      banUserPlatformAction={banUserPlatformAction}
+      resumeUserPlatformAction={resumeUserPlatformAction}
+      deleteUserPlatformAction={deleteUserPlatformAction}
+      inhabitNetworkAdminAction={inhabitNetworkAdminAction}
+    />
+  );
 }

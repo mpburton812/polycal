@@ -34,6 +34,9 @@ export async function requireSession():
   if (session.user.accountStatus === "paused") {
     return { ok: false, message: PAUSED_ACCOUNT_MESSAGE };
   }
+  if (session.user.accountStatus === "banned") {
+    return { ok: false, message: "Your account has been banned." };
+  }
   return {
     ok: true,
     user: {

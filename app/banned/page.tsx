@@ -1,6 +1,5 @@
-import { Box, Button, Paper, Stack, Typography } from "@mui/material";
+import { Box, Button, Paper, Typography } from "@mui/material";
 import Image from "next/image";
-import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { getModerationDisplayForUser } from "@/lib/users/moderation-db";
@@ -12,9 +11,9 @@ import { brutalPaperSx } from "@/theme/brutalUi";
 import { GARDEN_TOKENS } from "@/theme/tokens";
 
 /**
- * Minimal shell for paused accounts — reason, optional end date, leave/feedback/logout (PC-362).
+ * Minimal shell for banned accounts — reason shown, logout only (PC-362).
  */
-export default async function PausedPage() {
+export default async function BannedPage() {
   const session = await auth();
   if (!session?.user?.id) {
     redirect("/login");
@@ -24,10 +23,10 @@ export default async function PausedPage() {
   if (liveStatus === "deleted") {
     redirect("/login");
   }
-  if (liveStatus === "banned") {
-    redirect("/banned");
+  if (liveStatus === "paused") {
+    redirect("/paused");
   }
-  if (liveStatus !== "paused") {
+  if (liveStatus !== "banned") {
     redirect("/feed");
   }
 
@@ -36,22 +35,6 @@ export default async function PausedPage() {
 
   async function signOutAction() {
     "use server";
-    await signOut({ redirectTo: "/login" });
-  }
-
-  async function leaveAction() {
-    "use server";
-    const { logUserActivity } = await import("@/lib/audit");
-    const { auth } = await import("@/lib/auth");
-    const current = await auth();
-    if (current?.user?.id) {
-      await logUserActivity(
-        current.user.id,
-        "user.paused_leave_request",
-        "User requested to leave while paused.",
-      );
-    }
-    const { signOut } = await import("@/lib/auth");
     await signOut({ redirectTo: "/login" });
   }
 
@@ -82,10 +65,10 @@ export default async function PausedPage() {
           gutterBottom
           sx={{ fontFamily: fontFamilies.display, fontWeight: 700, color: GARDEN_TOKENS.ink }}
         >
-          Account paused
+          Account banned
         </Typography>
         <Typography variant="body1" sx={{ mb: 2, color: GARDEN_TOKENS.inkMuted }}>
-          An administrator has temporarily paused your access.
+          You no longer have access to PolyCal networks.
         </Typography>
         {moderation?.reason && (
           <Typography variant="body2" sx={{ mb: 1, fontWeight: 600 }}>
@@ -94,33 +77,23 @@ export default async function PausedPage() {
         )}
         {expiryLabel && (
           <Typography variant="body2" sx={{ mb: 3, color: GARDEN_TOKENS.inkMuted }}>
-            Access may resume after {expiryLabel}.
+            This ban is scheduled to end on {expiryLabel}.
           </Typography>
         )}
-        <Stack spacing={1}>
-          <Box component="form" action={leaveAction}>
-            <Button type="submit" variant="outlined" fullWidth>
-              Leave
-            </Button>
-          </Box>
-          <Button component={Link} href="/feedback" variant="outlined" fullWidth>
-            Feedback
+        <Box component="form" action={signOutAction}>
+          <Button
+            type="submit"
+            variant="contained"
+            fullWidth
+            sx={{
+              bgcolor: GARDEN_TOKENS.sage,
+              color: GARDEN_TOKENS.surface,
+              "&:hover": { bgcolor: "#557A5C" },
+            }}
+          >
+            Log out
           </Button>
-          <Box component="form" action={signOutAction}>
-            <Button
-              type="submit"
-              variant="contained"
-              fullWidth
-              sx={{
-                bgcolor: GARDEN_TOKENS.sage,
-                color: GARDEN_TOKENS.surface,
-                "&:hover": { bgcolor: "#557A5C" },
-              }}
-            >
-              Log out
-            </Button>
-          </Box>
-        </Stack>
+        </Box>
       </Paper>
     </Box>
   );

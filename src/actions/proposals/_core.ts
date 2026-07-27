@@ -1135,7 +1135,7 @@ export async function submitProposalAction(
 
   let requiredCount = invitees.filter((row) => row.role === "required").length;
   let intentionalSolo = proposal.intentionalSolo;
-  const optionalCount = invitees.filter((row) => row.role === "optional").length;
+  let optionalCount = invitees.filter((row) => row.role === "optional").length;
 
   if (proposal.isBatchSleeping) {
     const batchEntries = parseBatchEntriesJson(proposal.batchEntriesJson);
@@ -1144,27 +1144,15 @@ export async function submitProposalAction(
     }
     const union = unionBatchInvitees(batchEntries);
     requiredCount = union.filter((row) => row.role === "required").length;
+    optionalCount = union.filter((row) => row.role === "optional").length;
     intentionalSolo = batchEntries.every((entry) => entry.intentionalSolo);
-    for (const entry of batchEntries) {
-      if (entry.intentionalSolo) continue;
-      if (!entry.invitees.some((invitee) => invitee.role === "required")) {
-        return {
-          ok: false,
-          message: "Each batch night with invitees needs at least one required invitee.",
-        };
-      }
-    }
   }
 
-  if (requiredCount === 0 && !intentionalSolo) {
-    const optionalOnlyEvent =
-      proposal.proposalType === "event" && optionalCount > 0 && !proposal.isBatchSleeping;
-    if (!optionalOnlyEvent) {
-      return {
-        ok: false,
-        message: "Add at least one required invitee or enable solo before submitting.",
-      };
-    }
+  if (requiredCount === 0 && !intentionalSolo && optionalCount === 0) {
+    return {
+      ok: false,
+      message: "Add at least one invitee or enable solo before submitting.",
+    };
   }
 
   let autoResolve = shouldAutoResolveOnSubmit(

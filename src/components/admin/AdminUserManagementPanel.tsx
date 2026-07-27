@@ -39,6 +39,7 @@ import { useState, useTransition, type ReactNode } from "react";
 
 import { adminImpersonateUserAction } from "@/actions/admin";
 import { AdminCollapsibleSection } from "@/components/admin/AdminCollapsibleSection";
+import { ModerationDialog } from "@/components/platform/ModerationDialog";
 import type { AdminUserRow } from "@/actions/users";
 import {
   activatePassiveUserAction,
@@ -77,6 +78,7 @@ export function AdminUserManagementPanel({
   const [pending, startTransition] = useTransition();
 
   const [editUser, setEditUser] = useState<AdminUserRow | null>(null);
+  const [pauseTarget, setPauseTarget] = useState<AdminUserRow | null>(null);
   const [editDisplayName, setEditDisplayName] = useState("");
   const [editUsername, setEditUsername] = useState("");
   const [editRole, setEditRole] = useState<"user" | "admin">("user");
@@ -252,13 +254,7 @@ export function AdminUserManagementPanel({
                 aria-label={`Pause ${user.displayName}`}
                 color="warning"
                 disabled={pending}
-                onClick={() =>
-                  startTransition(async () => {
-                    const result = await pauseUserAction(user.id);
-                    showStatus(result.message, result.ok ? "success" : "error");
-                    if (result.ok) router.refresh();
-                  })
-                }
+                onClick={() => setPauseTarget(user)}
               >
                 <PauseCircleOutlineIcon fontSize="small" />
               </IconButton>
@@ -606,6 +602,22 @@ export function AdminUserManagementPanel({
           </Button>
         </DialogActions>
       </Dialog>
+
+      <ModerationDialog
+        open={Boolean(pauseTarget)}
+        title={pauseTarget ? `Pause ${pauseTarget.displayName}` : ""}
+        confirmLabel="Pause user"
+        onClose={() => setPauseTarget(null)}
+        onConfirm={async ({ reason, durationDays }) => {
+          if (!pauseTarget) return;
+          const result = await pauseUserAction(pauseTarget.id, { reason, durationDays });
+          showStatus(result.message, result.ok ? "success" : "error");
+          if (result.ok) {
+            setPauseTarget(null);
+            router.refresh();
+          }
+        }}
+      />
     </AdminCollapsibleSection>
   );
 }

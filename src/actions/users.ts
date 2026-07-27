@@ -335,7 +335,7 @@ async function demoteOrRemoveInviteeFromActiveProposals(
 /**
  * Pauses active proposals involving a user by demoting them to optional (PC-45).
  */
-async function pauseUserProposalSideEffects(
+export async function pauseUserProposalSideEffects(
   db: ReturnType<typeof getDb>,
   userId: string,
   actorUserId: string | null,
@@ -1081,11 +1081,19 @@ export async function listAdminUsersAction(): Promise<AdminUserRow[]> {
 /**
  * Pauses a user account and invalidates active sessions (PC-31).
  */
-export async function pauseUserAction(userId: string): Promise<UserActionResult> {
+export async function pauseUserAction(
+  userId: string,
+  options?: { reason?: string; durationDays?: number },
+): Promise<UserActionResult> {
   const adminResult = await requireAdminAccess();
   if (!adminResult.ok) return { ok: false, message: adminResult.message };
   if (userId === adminResult.user.id) {
     return { ok: false, message: "You cannot pause your own account." };
+  }
+
+  const reason = options?.reason?.trim();
+  if (!reason) {
+    return { ok: false, message: "A reason is required to pause a user." };
   }
 
   await ensureDbReady();
@@ -1098,16 +1106,23 @@ export async function pauseUserAction(userId: string): Promise<UserActionResult>
   await pauseUserProposalSideEffects(db, userId, adminResult.user.id);
 
   const now = new Date().toISOString();
+  const { moderationExpiresFromDays } = await import("@/lib/users/moderation");
   await db
     .update(users)
     .set({
       status: "paused",
+      moderationReason: reason,
+      moderationExpiresAt: moderationExpiresFromDays(options?.durationDays),
       sessionVersion: user.sessionVersion + 1,
       updatedAt: now,
     })
     .where(eq(users.id, userId));
 
-  await logUserActivity(adminResult.user.id, "users.admin_pause", JSON.stringify({ userId }));
+  await logUserActivity(
+    adminResult.user.id,
+    "users.admin_pause",
+    JSON.stringify({ userId, reason }),
+  );
   revalidatePath("/admin");
   revalidatePath("/people-places");
   revalidatePath("/proposals");
@@ -1132,7 +1147,7 @@ export async function resumeUserAction(userId: string): Promise<UserActionResult
   const now = new Date().toISOString();
   await db
     .update(users)
-    .set({ status: "active", updatedAt: now })
+    .set({ status: "active", moderationReason: null, moderationExpiresAt: null, updatedAt: now })
     .where(eq(users.id, userId));
 
   await logUserActivity(adminResult.user.id, "users.admin_resume", JSON.stringify({ userId }));

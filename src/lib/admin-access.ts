@@ -10,17 +10,26 @@ export async function userHasAdminAccess(role: UserRole): Promise<boolean> {
   return role === "admin";
 }
 
+export interface AdminAccessSession {
+  role: UserRole;
+  activeNetworkRole?: NetworkMemberRole;
+  isPlatformAdmin?: boolean;
+}
+
 /**
  * Whether the signed-in user should see the Admin tab — legacy admins, active
- * network admins, or platform operators (PC-363).
+ * network admins, or platform operators (PC-363 / PC-362).
  */
-export function userCanSeeAdminTab(user: {
-  role: UserRole;
-  activeNetworkRole?: NetworkMemberRole | string;
-  isPlatformAdmin?: boolean;
-}): boolean {
+export function userCanSeeAdminTab(user: AdminAccessSession): boolean {
   if (user.isPlatformAdmin === true) return true;
   if (user.role === "admin") return true;
   if (user.activeNetworkRole === "network_admin") return true;
   return false;
+}
+
+/** Async alias for server actions that already await admin checks. */
+export async function userCanAccessAdminPanel(
+  session: AdminAccessSession,
+): Promise<boolean> {
+  return userCanSeeAdminTab(session);
 }

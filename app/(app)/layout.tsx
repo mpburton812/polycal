@@ -40,21 +40,19 @@ async function AppLayoutReady({ children }: { children: React.ReactNode }) {
   if (liveStatus === "paused") {
     redirect("/paused");
   }
+  if (liveStatus === "banned") {
+    redirect("/banned");
+  }
 
   const themeId = normalizeUserThemeId(session.user.theme ?? "sage");
   const showOnboarding = !session.user.onboardingComplete;
 
   // Shell chrome can paint as soon as admin flag resolves; inbox/prefs stream in parallel.
-  const canSeeAdminTab = userCanSeeAdminTab({
+  const showAdminTab = userCanSeeAdminTab({
     role: session.user.role,
     activeNetworkRole: session.user.activeNetworkRole,
     isPlatformAdmin: session.user.isPlatformAdmin === true,
   });
-  const notificationInboxPromise = getNotificationInboxAction();
-  const notificationPrefsPromise = getNotificationPrefsAction();
-  const groupNamePromise = getPolyGroupDisplayNameAction();
-
-  const showAdminTab = canSeeAdminTab;
   const isPlatformAdmin = session.user.isPlatformAdmin === true;
 
   return (

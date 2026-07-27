@@ -91,7 +91,9 @@ export const authConfig = {
         const onboardedAndSettled =
           token.onboardingComplete === true && token.mustChangePassword === false;
         const revocationCheckPending =
-          token.accountStatus === "paused" || typeof token.sessionVersion !== "number";
+          token.accountStatus === "paused" ||
+          token.accountStatus === "banned" ||
+          typeof token.sessionVersion !== "number";
         const withinTtl =
           trigger !== "update" &&
           !user &&
@@ -125,6 +127,14 @@ export const authConfig = {
         if (!row || row.status === "deleted") {
           token.error = "SessionInvalid";
           return token;
+        }
+
+        const { clearExpiredModeration } = await import("@/lib/users/moderation-db");
+        const effectiveStatus = await clearExpiredModeration(token.id as string);
+        if (effectiveStatus === "active") {
+          row.status = "active";
+        } else if (effectiveStatus) {
+          row.status = effectiveStatus as typeof row.status;
         }
 
         if (row.sessionVersion !== token.sessionVersion) {
@@ -182,7 +192,8 @@ export const authConfig = {
       if (session.user && token.id) {
         session.user.id = token.id as string;
         session.user.role = token.role as "admin" | "user" | "passive";
-        session.user.accountStatus = (token.accountStatus as "active" | "paused") ?? "active";
+        session.user.accountStatus =
+          (token.accountStatus as "active" | "paused" | "banned") ?? "active";
         session.user.mustChangePassword = token.mustChangePassword as boolean;
         session.user.onboardingComplete = token.onboardingComplete as boolean;
         session.user.displayName = token.displayName as string;
