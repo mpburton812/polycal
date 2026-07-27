@@ -339,3 +339,4 @@
 2026-07-27 | e4e8a2f | PC-376 | pass timezone into heatmap date keys | src/components/schedule/ScheduleHeatmap.tsx
 2026-07-27 | 260890c | PC-376 | timezone-aware month grid and civil date navigation | src/components/schedule/ScheduleClient.tsx
 2026-07-27 | b5325dd | PC-376 | fetch full civil week and stabilize month layout tests | src/lib/schedule/dates.test.ts
+2026-07-27 | 6f2be44 | PC-376 | drop unused endOfWeekSunday import in fetch-range | src/lib/schedule/fetch-range.ts
