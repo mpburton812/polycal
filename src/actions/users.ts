@@ -113,6 +113,8 @@ export interface AdminUserRow {
   status: string;
   lastLoginAt: string | null;
   loginCount: number;
+  isPlatformAdmin: boolean;
+  avatarKey: string | null;
 }
 
 export interface CreateUserResult {
@@ -1070,12 +1072,17 @@ export async function listAdminUsersAction(): Promise<AdminUserRow[]> {
       status: users.status,
       lastLoginAt: users.lastLoginAt,
       loginCount: users.loginCount,
+      isPlatformAdmin: users.isPlatformAdmin,
+      avatarKey: users.avatarKey,
     })
     .from(users)
     .where(ne(users.status, "deleted"))
     .orderBy(asc(users.displayName));
 
-  return rows;
+  return rows.map((row) => ({
+    ...row,
+    isPlatformAdmin: row.isPlatformAdmin === true,
+  }));
 }
 
 /**

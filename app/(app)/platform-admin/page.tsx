@@ -13,6 +13,7 @@ import {
   listPlatformUsersAction,
   pauseUserPlatformAction,
   resumeUserPlatformAction,
+  setUserAccessLevelAction,
 } from "@/actions/platform-admin";
 import { auth } from "@/lib/auth";
 import { PlatformAdminClient } from "@/components/platform/PlatformAdminClient";
@@ -37,6 +38,7 @@ export default async function PlatformAdminPage() {
       initialNetworks={networks}
       initialSettings={settings}
       initialUsers={users}
+      currentUserId={session.user.id}
       setNetworkStatusAction={setNetworkStatusAction}
       updatePlatformSettingsAction={updatePlatformSettingsAction}
       pauseUserPlatformAction={pauseUserPlatformAction}
@@ -44,6 +46,7 @@ export default async function PlatformAdminPage() {
       resumeUserPlatformAction={resumeUserPlatformAction}
       deleteUserPlatformAction={deleteUserPlatformAction}
       inhabitNetworkAdminAction={inhabitNetworkAdminAction}
+      setUserAccessLevelAction={setUserAccessLevelAction}
     />
   );
 }
