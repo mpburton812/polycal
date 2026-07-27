@@ -31,9 +31,6 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
     if (liveStatus === "banned") {
       redirect("/banned");
     }
-    if (liveStatus === "banned") {
-      redirect("/banned");
-    }
     redirect("/feed");
   }
 

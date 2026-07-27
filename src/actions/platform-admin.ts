@@ -417,5 +417,3 @@ export async function deleteUserPlatformAction(
   revalidatePath("/platform-admin");
   return { ok: true, message: `Deleted ${user.displayName}.` };
 }
-
-export { getModerationDisplayForUser, clearExpiredModeration } from "@/lib/users/moderation-db";

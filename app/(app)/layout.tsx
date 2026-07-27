@@ -53,6 +53,9 @@ async function AppLayoutReady({ children }: { children: React.ReactNode }) {
     activeNetworkRole: session.user.activeNetworkRole,
     isPlatformAdmin: session.user.isPlatformAdmin === true,
   });
+  const notificationInboxPromise = getNotificationInboxAction();
+  const notificationPrefsPromise = getNotificationPrefsAction();
+  const groupNamePromise = getPolyGroupDisplayNameAction();
   const isPlatformAdmin = session.user.isPlatformAdmin === true;
 
   return (
