@@ -4,6 +4,8 @@ import {
   buildCalendarEventPayload,
   buildCalendarEventPayloads,
   nextAllDayDate,
+  resolveCalendarDescription,
+  resolveCalendarLocation,
   type ProposalRow,
 } from "@/lib/calendar/payloads";
 
@@ -42,6 +44,7 @@ function proposal(overrides: Partial<ProposalRow> = {}): ProposalRow {
 const names = {
   proposerName: "Luke",
   displayNameByUserId: { u1: "Luke", u2: "Leia", u3: "Han" },
+  placeNameByLocationId: { loc1: "Tatooine Pad", loc2: "Falcon Berth" },
 };
 
 describe("buildCalendarEventPayload sleeping (PC-351)", () => {
@@ -116,5 +119,93 @@ describe("buildCalendarEventPayload sleeping (PC-351)", () => {
 
   it("returns empty without scheduledStartAt for non-batch", () => {
     expect(buildCalendarEventPayloads(proposal({ scheduledStartAt: null }))).toEqual([]);
+  });
+});
+
+describe("calendar LOCATION + DESCRIPTION (PC-367)", () => {
+  it("resolveCalendarLocation prefers locationText over place name", () => {
+    expect(resolveCalendarLocation("Custom", "loc1", names.placeNameByLocationId)).toBe(
+      "Custom",
+    );
+    expect(resolveCalendarLocation(null, "loc1", names.placeNameByLocationId)).toBe(
+      "Tatooine Pad",
+    );
+    expect(resolveCalendarLocation("  ", "loc1", names.placeNameByLocationId)).toBe(
+      "Tatooine Pad",
+    );
+    expect(resolveCalendarLocation(null, "missing", names.placeNameByLocationId)).toBeNull();
+  });
+
+  it("resolveCalendarDescription prefers comment then description+notes", () => {
+    expect(
+      resolveCalendarDescription({
+        comment: "Night note",
+        description: "Desc",
+        notes: "Notes",
+      }),
+    ).toBe("Night note");
+    expect(
+      resolveCalendarDescription({
+        description: "Desc",
+        notes: "Notes",
+      }),
+    ).toBe("Desc\n\nNotes");
+    expect(resolveCalendarDescription({ description: "Only desc" })).toBe("Only desc");
+    expect(resolveCalendarDescription({ notes: "Only notes" })).toBe("Only notes");
+    expect(resolveCalendarDescription({})).toBeUndefined();
+  });
+
+  it("resolves locationId place name when locationText is empty", () => {
+    const payload = buildCalendarEventPayload(
+      proposal({ locationText: null, locationId: "loc1" }),
+      names,
+    );
+    expect(payload!.location).toBe("Tatooine Pad");
+    expect(payload!.title).toContain("at Tatooine Pad");
+  });
+
+  it("lets locationText override locationId on non-batch", () => {
+    const payload = buildCalendarEventPayload(
+      proposal({ locationText: "Override Pad", locationId: "loc1" }),
+      names,
+    );
+    expect(payload!.location).toBe("Override Pad");
+  });
+
+  it("joins description and notes into DESCRIPTION", () => {
+    const payload = buildCalendarEventPayload(
+      proposal({ description: "Bring snacks", notes: "Quiet night" }),
+      names,
+    );
+    expect(payload!.description).toBe("Bring snacks\n\nQuiet night");
+  });
+
+  it("batch night prefers comment, else description+notes; resolves locationId", () => {
+    const batch = proposal({
+      isBatchSleeping: true,
+      locationText: null,
+      description: "Proposal desc",
+      notes: "Proposal notes",
+      batchEntriesJson: JSON.stringify([
+        {
+          id: "n1",
+          nightDate: "2026-08-01",
+          locationId: "loc2",
+          comment: "Per-night comment",
+          invitees: [{ userId: "u2", role: "required" }],
+        },
+        {
+          id: "n2",
+          nightDate: "2026-08-02",
+          locationId: "loc1",
+          invitees: [{ userId: "u3", role: "required" }],
+        },
+      ]),
+    });
+    const payloads = buildCalendarEventPayloads(batch, names, "u1");
+    expect(payloads[0]!.location).toBe("Falcon Berth");
+    expect(payloads[0]!.description).toBe("Per-night comment");
+    expect(payloads[1]!.location).toBe("Tatooine Pad");
+    expect(payloads[1]!.description).toBe("Proposal desc\n\nProposal notes");
   });
 });
