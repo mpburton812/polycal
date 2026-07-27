@@ -17,7 +17,7 @@ const profile: AccountExportProfileRow = {
   profileBio: "Moisture farmer.",
   avatarKey: "bird_blue",
   theme: "mint",
-  timezone: "UTC",
+  timezone: "America/New_York",
   notificationEmail: "luke@example.com",
   emailVerifiedAt: "2026-07-01T00:00:00.000Z",
   notificationPrefsJson: '{"globalEnabled":true}',

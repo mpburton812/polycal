@@ -98,7 +98,7 @@ export async function POST(request: Request): Promise<NextResponse> {
         mustChangePassword: false,
         onboardingComplete: true,
         theme: "mint",
-        timezone: "UTC",
+        timezone: "America/New_York",
         ownedByUserId,
         createdAt: now,
         updatedAt: now,

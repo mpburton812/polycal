@@ -58,7 +58,7 @@ export async function getOnboardingStatusAction(): Promise<OnboardingStatus | nu
 export async function saveOnboardingPreferencesAction(input: {
   avatarKey: string;
   theme: string;
-  /** Browser-detected IANA timezone; falls back to UTC when invalid (PC-48). */
+  /** Account IANA timezone; falls back to America/New_York when invalid (PC-376). */
   timezone?: string;
   profileBio?: string;
 }): Promise<{ ok: boolean; error?: string }> {

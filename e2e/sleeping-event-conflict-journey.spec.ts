@@ -8,8 +8,10 @@ import {
   openEventProposalDraft,
   openSleepingProposalDraft,
   setInviteeRequired,
+  sleepingProposalCardsFor,
   submitProposalDraft,
 } from "./helpers/proposals";
+import { expectToast } from "./helpers/toast";
 
 test.describe("Sleeping vs events — no false conflicts", () => {
   test("solo sleeping night does not block overlapping event submit", async ({ page }) => {
@@ -35,6 +37,53 @@ test.describe("Sleeping vs events — no false conflicts", () => {
 
     await selectProposalTab(page, "Proposed");
     await expect(page.getByRole("heading", { name: eventTitle, level: 2 })).toBeVisible({
+      timeout: 20_000,
+    });
+  });
+
+  test("cancel solo sleeping then resubmit same night without false conflict (PC-373)", async ({
+    page,
+  }) => {
+    test.setTimeout(180_000);
+
+    const nightDate = "2099-09-22";
+
+    await login(page, USERS.luke.username);
+    await goToProposals(page);
+
+    const first = await openSleepingProposalDraft(page);
+    await fillProposalDateRange(first, nightDate);
+    await first.getByRole("button", { name: "Solo", exact: true }).first().click();
+    await submitProposalDraft(page, first);
+
+    await selectProposalTab(page, "Resolved");
+    const card = sleepingProposalCardsFor(page, USERS.luke.displayName).first();
+    await expect(card).toBeVisible({ timeout: 20_000 });
+    const cancelledTitle = await card.getByRole("heading", { level: 2 }).innerText();
+
+    page.once("dialog", (dialog) => dialog.accept());
+    await card.getByRole("heading", { level: 2 }).click();
+    const detail = page.getByRole("dialog");
+    await detail.getByRole("button", { name: "Cancel", exact: true }).click();
+    await expect(detail).toBeHidden({ timeout: 15_000 });
+
+    await selectProposalTab(page, "Archived");
+    await expect(page.getByRole("heading", { name: cancelledTitle, level: 2 })).toBeVisible({
+      timeout: 15_000,
+    });
+
+    const second = await openSleepingProposalDraft(page);
+    await fillProposalDateRange(second, nightDate);
+    await second.getByRole("button", { name: "Solo", exact: true }).first().click();
+    await second.getByRole("button", { name: "Submit" }).click();
+
+    const conflictDialog = page.getByRole("dialog", { name: "Schedule conflicts detected" });
+    await expect(conflictDialog).toHaveCount(0);
+
+    await expectToast(page, /submitted|scheduled|resolved|created/i);
+
+    await selectProposalTab(page, "Resolved");
+    await expect(sleepingProposalCardsFor(page, USERS.luke.displayName).first()).toBeVisible({
       timeout: 20_000,
     });
   });

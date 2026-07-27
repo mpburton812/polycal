@@ -4,18 +4,25 @@ import { Box, Tooltip, Typography } from "@mui/material";
 import { useMemo } from "react";
 
 import type { ScheduleEvent } from "@/actions/schedule";
-import { addDays, isPastDate, isTodayDate, startOfWeekMonday } from "@/lib/schedule/dates";
+import {
+  addDays,
+  civilDateAtNoonUtc,
+  isPastDate,
+  isTodayDate,
+  localDateKey,
+  startOfWeekMonday,
+} from "@/lib/schedule/dates";
+import { DEFAULT_VIEWER_TIMEZONE } from "@/lib/schedule/timezone";
 import { GARDEN_TOKENS, HEATMAP_LEVEL_COLORS } from "@/theme/tokens";
 
 const LEVEL_COLORS = [...HEATMAP_LEVEL_COLORS];
 
 export type HeatmapLayout = "day" | "week" | "twoWeek" | "month";
 
-/** Formats a day label as MM/DD for heatmap cells. */
-function formatHeatmapDate(day: Date): string {
-  const mm = String(day.getMonth() + 1).padStart(2, "0");
-  const dd = String(day.getDate()).padStart(2, "0");
-  return `${mm}/${dd}`;
+/** Formats a day label as MM/DD for heatmap cells in the viewer timezone. */
+function formatHeatmapDate(day: Date, timeZone: string = DEFAULT_VIEWER_TIMEZONE): string {
+  const key = localDateKey(day.toISOString(), timeZone);
+  return `${key.slice(5, 7)}/${key.slice(8, 10)}`;
 }
 
 function computeBusynessLevels(
@@ -56,14 +63,14 @@ interface HeatmapCellProps {
 }
 
 /** Single busyness cell with DD/MM label (PC-56, PC-59 past/today styling). */
-function HeatmapCell({ level, day, compact = false, timeZone = "UTC" }: HeatmapCellProps) {
-  const label = formatHeatmapDate(day);
+function HeatmapCell({ level, day, compact = false, timeZone = DEFAULT_VIEWER_TIMEZONE }: HeatmapCellProps) {
+  const label = formatHeatmapDate(day, timeZone);
   const busyLabel = level === 0 ? "open" : level === 3 ? "very busy" : "busy";
   const isToday = isTodayDate(day, timeZone);
   const isPast = isPastDate(day, timeZone);
   return (
     <Tooltip
-      title={`${day.toLocaleDateString(undefined, { weekday: "short" })} ${label}: ${busyLabel}${isToday ? " (today)" : ""}`}
+      title={`${day.toLocaleDateString(undefined, { weekday: "short", timeZone })} ${label}: ${busyLabel}${isToday ? " (today)" : ""}`}
     >
       <Box
         sx={{
@@ -86,7 +93,7 @@ function HeatmapCell({ level, day, compact = false, timeZone = "UTC" }: HeatmapC
         }}
         tabIndex={0}
         role="img"
-        aria-label={`${day.toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" })}: ${busyLabel}${isToday ? ", today" : ""}`}
+        aria-label={`${day.toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric", timeZone })}: ${busyLabel}${isToday ? ", today" : ""}`}
       >
         {label}
       </Box>
@@ -102,7 +109,7 @@ export function ScheduleHeatmap({
   weekStartIso,
   dayCount,
   layout = "week",
-  timeZone = "UTC",
+  timeZone = DEFAULT_VIEWER_TIMEZONE,
 }: {
   events: ScheduleEvent[];
   weekStartIso: string;
@@ -113,11 +120,10 @@ export function ScheduleHeatmap({
   const weekStart = useMemo(() => {
     const anchor = new Date(weekStartIso);
     if (layout === "day") {
-      anchor.setHours(0, 0, 0, 0);
-      return anchor;
+      return civilDateAtNoonUtc(localDateKey(anchor.toISOString(), timeZone ?? DEFAULT_VIEWER_TIMEZONE));
     }
-    return startOfWeekMonday(anchor);
-  }, [layout, weekStartIso]);
+    return startOfWeekMonday(anchor, timeZone);
+  }, [layout, weekStartIso, timeZone]);
 
   const levels = useMemo(
     () => computeBusynessLevels(events, weekStart, dayCount),
@@ -157,7 +163,7 @@ export function ScheduleHeatmap({
                 const day = addDays(weekStart, dayIndex);
                 return (
                   <HeatmapCell
-                    key={`${dayIndex}-${formatHeatmapDate(day)}`}
+                    key={`${dayIndex}-${formatHeatmapDate(day, timeZone ?? DEFAULT_VIEWER_TIMEZONE)}`}
                     level={level}
                     day={day}
                     compact={layout === "twoWeek"}

@@ -1,17 +1,48 @@
-/** Monday-based week boundaries for the schedule tab (PC-42). */
+/** Monday-based week boundaries for the schedule tab (PC-42 / PC-376). */
 
 import { GARDEN_TOKENS } from "@/theme/tokens";
+import { DEFAULT_VIEWER_TIMEZONE } from "@/lib/schedule/timezone";
+
+/** Civil yyyy-MM-dd → noon-UTC Date (stable across host timezones). */
+export function civilDateAtNoonUtc(dateKey: string): Date {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateKey.trim());
+  if (!match) return new Date(NaN);
+  return new Date(`${match[1]}-${match[2]}-${match[3]}T12:00:00.000Z`);
+}
+
+/** Weekday 0=Sun…6=Sat for an instant in `timeZone`. */
+function weekdayInTimeZone(date: Date, timeZone: string): number {
+  const label = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    weekday: "short",
+  }).format(date);
+  const map: Record<string, number> = {
+    Sun: 0,
+    Mon: 1,
+    Tue: 2,
+    Wed: 3,
+    Thu: 4,
+    Fri: 5,
+    Sat: 6,
+  };
+  return map[label] ?? date.getUTCDay();
+}
 
 /**
- * Returns midnight local time for the Monday starting the week containing `date`.
+ * Returns noon-UTC on the Monday (viewer TZ) that starts the week containing `date`.
+ * Host-local midnight Mondays shift back a day when formatted in US zones (PC-376).
  */
-export function startOfWeekMonday(date: Date): Date {
-  const result = new Date(date);
-  result.setHours(0, 0, 0, 0);
-  const day = result.getDay();
+export function startOfWeekMonday(
+  date: Date,
+  timeZone: string = DEFAULT_VIEWER_TIMEZONE,
+): Date {
+  const dayKey = localDateKey(date.toISOString(), timeZone);
+  const noon = civilDateAtNoonUtc(dayKey);
+  const day = weekdayInTimeZone(noon, timeZone);
   const diff = day === 0 ? -6 : 1 - day;
-  result.setDate(result.getDate() + diff);
-  return result;
+  const monday = new Date(noon);
+  monday.setUTCDate(monday.getUTCDate() + diff);
+  return monday;
 }
 
 /** True when two dates fall on the same local calendar day (PC-141). */
@@ -23,19 +54,68 @@ export function isSameLocalCalendarDay(a: Date, b: Date): boolean {
   );
 }
 
-/** Inclusive range end at Sunday 23:59:59.999 for a week starting `weekStart`. */
-export function endOfWeekSunday(weekStart: Date): Date {
-  const end = new Date(weekStart);
-  end.setDate(end.getDate() + 6);
-  end.setHours(23, 59, 59, 999);
-  return end;
+/**
+ * Inclusive range end at Sunday end-of-day in `timeZone` for a noon-UTC Monday anchor (PC-376).
+ */
+export function endOfWeekSunday(
+  weekStart: Date,
+  timeZone: string = DEFAULT_VIEWER_TIMEZONE,
+): Date {
+  const sundayNoon = addDays(weekStart, 6);
+  const sundayKey = localDateKey(sundayNoon.toISOString(), timeZone);
+  return endOfCivilDayInZone(sundayKey, timeZone);
 }
 
-/** Adds `days` to a date copy. */
+/** Adds `days` on the UTC calendar (matches noon-UTC civil anchors). */
 export function addDays(date: Date, days: number): Date {
   const next = new Date(date);
-  next.setDate(next.getDate() + days);
+  next.setUTCDate(next.getUTCDate() + days);
   return next;
+}
+
+/**
+ * Instant for wall-clock `hour:minute:second.ms` on civil `dateKey` in `timeZone` (PC-376).
+ */
+export function zonedWallTimeToUtc(
+  dateKey: string,
+  hour: number,
+  minute: number,
+  second: number,
+  ms: number,
+  timeZone: string,
+): Date {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateKey.trim());
+  if (!match) return new Date(NaN);
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const dayNum = Number(match[3]);
+  const probe = new Date(Date.UTC(year, month - 1, dayNum, 12, 0, 0));
+  const offsetParts = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    timeZoneName: "shortOffset",
+    hour: "numeric",
+  }).formatToParts(probe);
+  const tzName = offsetParts.find((p) => p.type === "timeZoneName")?.value ?? "GMT";
+  const offsetMatch = /GMT([+-])(\d+)(?::(\d+))?/.exec(tzName);
+  let offsetMinutes = 0;
+  if (offsetMatch) {
+    const sign = offsetMatch[1] === "-" ? -1 : 1;
+    offsetMinutes =
+      sign * (Number(offsetMatch[2]) * 60 + Number(offsetMatch[3] ?? 0));
+  }
+  return new Date(
+    Date.UTC(year, month - 1, dayNum, hour, minute, second, ms) - offsetMinutes * 60_000,
+  );
+}
+
+/** Start of civil day (00:00:00.000) in `timeZone`. */
+export function startOfCivilDayInZone(dateKey: string, timeZone: string): Date {
+  return zonedWallTimeToUtc(dateKey, 0, 0, 0, 0, timeZone);
+}
+
+/** End of civil day (23:59:59.999) in `timeZone`. */
+export function endOfCivilDayInZone(dateKey: string, timeZone: string): Date {
+  return zonedWallTimeToUtc(dateKey, 23, 59, 59, 999, timeZone);
 }
 
 /** True when [aStart,aEnd] overlaps [bStart,bEnd] (open end uses start instant). */
@@ -64,7 +144,7 @@ export function eventInRange(
 }
 
 /** Formats a day column header (e.g. "Mon 6/24") in the viewer timezone. */
-export function formatDayHeader(date: Date, timeZone = "UTC"): string {
+export function formatDayHeader(date: Date, timeZone = DEFAULT_VIEWER_TIMEZONE): string {
   return date.toLocaleDateString(undefined, {
     weekday: "short",
     month: "numeric",
@@ -78,7 +158,7 @@ export function formatEventTime(
   startAt: string,
   endAt: string | null,
   proposalType: "event" | "sleeping" = "event",
-  timeZone = "UTC",
+  timeZone = DEFAULT_VIEWER_TIMEZONE,
   isAllDay = false,
 ): string {
   const dateOnly = proposalType === "sleeping" || isAllDay;
@@ -122,7 +202,7 @@ export function formatEventTime(
 }
 
 /** ISO date key yyyy-mm-dd in the viewer timezone for grouping. */
-export function localDateKey(iso: string, timeZone = "UTC"): string {
+export function localDateKey(iso: string, timeZone = DEFAULT_VIEWER_TIMEZONE): string {
   const parts = new Intl.DateTimeFormat("en-CA", {
     timeZone,
     year: "numeric",
@@ -136,19 +216,19 @@ export function localDateKey(iso: string, timeZone = "UTC"): string {
 }
 
 /** True when `day` falls on today in the viewer timezone (PC-59). */
-export function isTodayDate(day: Date, timeZone = "UTC"): boolean {
+export function isTodayDate(day: Date, timeZone = DEFAULT_VIEWER_TIMEZONE): boolean {
   return localDateKey(day.toISOString(), timeZone) === localDateKey(new Date().toISOString(), timeZone);
 }
 
 /** True when `day` is strictly before today in the viewer timezone (PC-59). */
-export function isPastDate(day: Date, timeZone = "UTC"): boolean {
+export function isPastDate(day: Date, timeZone = DEFAULT_VIEWER_TIMEZONE): boolean {
   return localDateKey(day.toISOString(), timeZone) < localDateKey(new Date().toISOString(), timeZone);
 }
 
 /** Shared calendar cell styles for past/today emphasis (PC-59). */
 export function scheduleDayCellSx(
   day: Date,
-  timeZone = "UTC",
+  timeZone = DEFAULT_VIEWER_TIMEZONE,
 ): { borderColor: string; bgcolor: string; opacity: number } {
   const isToday = isTodayDate(day, timeZone);
   const isPast = isPastDate(day, timeZone);

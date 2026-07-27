@@ -33,9 +33,10 @@ function parseIsoDate(isoDate: string): Date {
 }
 
 function dateInRange(isoDate: string, rangeStart: string, rangeEnd: string): boolean {
-  const target = parseIsoDate(isoDate).getTime();
-  const start = new Date(rangeStart).getTime();
-  const end = new Date(rangeEnd).getTime();
+  // Target noon-UTC vs fetch bounds (viewer-TZ midnight→EOD) — stable on UTC CI (PC-376).
+  const target = Date.parse(`${isoDate.slice(0, 10)}T12:00:00.000Z`);
+  const start = Date.parse(rangeStart);
+  const end = Date.parse(rangeEnd);
   return target >= start && target <= end;
 }
 

@@ -201,7 +201,7 @@ export async function updateProfilePreferencesAction(
   const parsed = preferencesSchema.safeParse({
     avatarKey: formData.get("avatarKey"),
     theme: formData.get("theme"),
-    timezone: formData.get("timezone") ?? "UTC",
+    timezone: formData.get("timezone") ?? "America/New_York",
   });
   if (!parsed.success) {
     return { ok: false, message: "Invalid avatar, theme, or timezone selection." };
