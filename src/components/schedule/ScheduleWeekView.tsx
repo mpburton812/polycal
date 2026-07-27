@@ -14,6 +14,7 @@ import {
   scheduleDayCellSx,
   startOfWeekMonday,
 } from "@/lib/schedule/dates";
+import { sortDayEvents } from "@/lib/schedule/sort-day-events";
 import { fontFamilies } from "@/theme/fonts";
 import { GARDEN_TOKENS, ORGANIC_RADIUS } from "@/theme/tokens";
 
@@ -67,8 +68,8 @@ export function ScheduleWeekView({
       }
     }
 
-    for (const list of map.values()) {
-      list.sort((a, b) => a.startAt.localeCompare(b.startAt));
+    for (const [key, list] of map.entries()) {
+      map.set(key, sortDayEvents(list));
     }
     return map;
   }, [days, events, timeZone]);

@@ -105,7 +105,7 @@ describe("proposal access helpers", () => {
         proposalType: "sleeping",
         state: "resolved",
       }),
-    ).toEqual({ visible: false, contentMasked: false });
+    ).toEqual({ visible: false, contentMasked: false, isPartnerOnlySleeping: false });
   });
 
   it("canViewProposalContent masks sleeping for uninvolved admins when schedule mask is on", () => {
@@ -122,7 +122,7 @@ describe("proposal access helpers", () => {
         hideSleeping: true,
         acceptedPartnerIds: new Set(),
       }),
-    ).toEqual({ visible: true, contentMasked: true });
+    ).toEqual({ visible: true, contentMasked: true, isPartnerOnlySleeping: false });
   });
 
   it("canViewProposalContent does not mask when schedule mask is off (feed/board)", () => {
@@ -138,7 +138,7 @@ describe("proposal access helpers", () => {
         hideSleeping: true,
         acceptedPartnerIds: new Set(),
       }),
-    ).toEqual({ visible: true, contentMasked: false });
+    ).toEqual({ visible: true, contentMasked: false, isPartnerOnlySleeping: false });
   });
 
   it("canViewProposalContent does not mask partners of participants", () => {
@@ -153,6 +153,63 @@ describe("proposal access helpers", () => {
         hideSleeping: true,
         acceptedPartnerIds: new Set(["u1"]),
       }),
-    ).toEqual({ visible: true, contentMasked: false });
+    ).toEqual({ visible: true, contentMasked: false, isPartnerOnlySleeping: false });
+  });
+
+  it("partner sleeping toggle shows partner-only nights when ON (PC-366)", () => {
+    expect(
+      viewerCanSeeSleepingProposal("partner", false, "u1", ["u2"], {
+        seePartnersSleepingArrangements: true,
+        acceptedPartnerIds: new Set(["u1"]),
+      }),
+    ).toBe(true);
+    expect(
+      canViewProposalContent({
+        viewerId: "partner",
+        isAdmin: false,
+        proposerId: "u1",
+        inviteeUserIds: ["u2"],
+        proposalType: "sleeping",
+        state: "resolved",
+        seePartnersSleepingArrangements: true,
+        acceptedPartnerIds: new Set(["u1"]),
+      }),
+    ).toEqual({ visible: true, contentMasked: false, isPartnerOnlySleeping: true });
+  });
+
+  it("partner sleeping toggle stays involved-only when OFF (PC-366)", () => {
+    expect(
+      viewerCanSeeSleepingProposal("partner", false, "u1", ["u2"], {
+        seePartnersSleepingArrangements: false,
+        acceptedPartnerIds: new Set(["u1"]),
+      }),
+    ).toBe(false);
+    expect(
+      canViewProposalContent({
+        viewerId: "partner",
+        isAdmin: false,
+        proposerId: "u1",
+        inviteeUserIds: ["u2"],
+        proposalType: "sleeping",
+        state: "resolved",
+        seePartnersSleepingArrangements: false,
+        acceptedPartnerIds: new Set(["u1"]),
+      }),
+    ).toEqual({ visible: false, contentMasked: false, isPartnerOnlySleeping: false });
+  });
+
+  it("involved viewers are not partner-only even when toggle is ON (PC-366)", () => {
+    expect(
+      canViewProposalContent({
+        viewerId: "u2",
+        isAdmin: false,
+        proposerId: "u1",
+        inviteeUserIds: ["u2"],
+        proposalType: "sleeping",
+        state: "resolved",
+        seePartnersSleepingArrangements: true,
+        acceptedPartnerIds: new Set(["u1"]),
+      }),
+    ).toEqual({ visible: true, contentMasked: false, isPartnerOnlySleeping: false });
   });
 });

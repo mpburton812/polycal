@@ -30,6 +30,7 @@ export type ScheduleSemanticVariant =
   | "proposed"
   | "resolved_event"
   | "resolved_sleeping"
+  | "resolved_sleeping_partner"
   | "at_risk"
   | "conflict"
   | "masked"
@@ -43,6 +44,8 @@ export const SCHEDULE_SEMANTIC_COLORS: Record<
   proposed: { fill: "#F5D76E", text: "#3D3500", borderStyle: "dashed" },
   resolved_event: { fill: "#A8C5A0", text: "#1E3A24", borderStyle: "solid" },
   resolved_sleeping: { fill: "#C4B5E8", text: "#2E2450", borderStyle: "solid" },
+  /** Partner-only sleeping nights — lighter purple than involved sleeping (PC-366). */
+  resolved_sleeping_partner: { fill: "#E4DCF5", text: "#4A3F6B", borderStyle: "solid" },
   at_risk: { fill: "#F0C878", text: "#4A3800", borderStyle: "dashed" },
   conflict: { fill: "#E8A598", text: "#4A1F18", borderStyle: "solid" },
   masked: { fill: "#E8E2D8", text: "#6B6560", borderStyle: "dashed" },

@@ -1,5 +1,5 @@
 /**
- * Builds Google Calendar / ICS event payloads from PolyCal proposals (PC-338 / PC-351).
+ * Builds Google Calendar / ICS event payloads from PolyCal proposals (PC-338 / PC-351 / PC-367).
  */
 import type { proposals } from "@/lib/db/schema";
 import {
@@ -37,6 +37,41 @@ export interface CalendarPayloadNameContext {
   displayNameByUserId: Record<string, string>;
   /** Proposal-level invitee display names (non-batch sleeping titles). */
   proposalInviteeNames?: string[];
+  /** Place name by locationId — used when locationText is empty (PC-367). */
+  placeNameByLocationId?: Record<string, string>;
+}
+
+/**
+ * Resolves calendar LOCATION: free-text override, else registered place name (PC-367).
+ */
+export function resolveCalendarLocation(
+  locationText: string | null | undefined,
+  locationId: string | null | undefined,
+  placeNameByLocationId?: Record<string, string>,
+): string | null {
+  const text = locationText?.trim();
+  if (text) return text;
+  if (locationId && placeNameByLocationId?.[locationId]?.trim()) {
+    return placeNameByLocationId[locationId]!.trim();
+  }
+  return null;
+}
+
+/**
+ * Builds DESCRIPTION: batch prefers night comment; else description then notes (PC-367).
+ */
+export function resolveCalendarDescription(input: {
+  comment?: string | null;
+  description?: string | null;
+  notes?: string | null;
+}): string | undefined {
+  const comment = input.comment?.trim();
+  if (comment) return comment;
+  const parts = [input.description?.trim(), input.notes?.trim()].filter(
+    (part): part is string => Boolean(part),
+  );
+  if (parts.length === 0) return undefined;
+  return parts.join("\n\n");
 }
 
 /**
@@ -86,14 +121,21 @@ function buildSingleCalendarEventPayload(
     }
   }
 
-  const location = proposal.locationText?.trim() || null;
+  const location = resolveCalendarLocation(
+    proposal.locationText,
+    proposal.locationId,
+    nameCtx?.placeNameByLocationId,
+  );
   const title = isSleeping
     ? sleepingCalendarTitle(proposal, location, nameCtx)
     : proposal.title;
 
   return {
     title,
-    description: proposal.description ?? undefined,
+    description: resolveCalendarDescription({
+      description: proposal.description,
+      notes: proposal.notes,
+    }),
     location,
     startAt,
     endAt,
@@ -125,12 +167,20 @@ function buildBatchSleepingPayloads(
     }
     const nightKey = entry.nightDate.slice(0, 10);
     const startAt = `${nightKey}T00:00:00.000Z`;
-    const location = entry.locationText?.trim() || null;
+    const location = resolveCalendarLocation(
+      entry.locationText,
+      entry.locationId,
+      nameCtx?.placeNameByLocationId,
+    );
     const title = batchNightTitle(proposal, entry, location, nameCtx);
 
     payloads.push({
       title,
-      description: entry.comment?.trim() || proposal.description || undefined,
+      description: resolveCalendarDescription({
+        comment: entry.comment,
+        description: proposal.description,
+        notes: proposal.notes,
+      }),
       location,
       startAt,
       endAt: startAt,

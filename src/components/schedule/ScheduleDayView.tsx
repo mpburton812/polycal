@@ -16,6 +16,9 @@ import { GARDEN_TOKENS, ORGANIC_RADIUS } from "@/theme/tokens";
 
 const HOUR_HEIGHT_PX = 48;
 const DAY_MINUTES = 24 * 60;
+/** Sleeping arrangements occupy the overnight 12a–8a band on the hour grid (PC-364). */
+const SLEEPING_BAND_HOURS = 8;
+const SLEEPING_BAND_PX = SLEEPING_BAND_HOURS * HOUR_HEIGHT_PX;
 
 interface ScheduleDayViewProps {
   day: Date;
@@ -24,9 +27,9 @@ interface ScheduleDayViewProps {
   onEventClick: (event: ScheduleEvent) => void;
 }
 
-/** True when the event is date-only (all-day strip), matching formatEventTime (PC-204). */
+/** True all-day events only — sleeping uses the timed 0–8am band (PC-364). */
 function isAllDayLaneEvent(event: ScheduleEvent): boolean {
-  return event.isAllDay || event.proposalType === "sleeping";
+  return event.isAllDay && event.proposalType !== "sleeping";
 }
 
 /** Minutes from local midnight for an instant in the viewer timezone. */
@@ -58,14 +61,17 @@ export function ScheduleDayView({
   const dayKey = localDateKey(day.toISOString(), timeZone);
   const cellSx = scheduleDayCellSx(day, timeZone);
 
-  const { allDayEvents, timedEvents } = useMemo(() => {
+  const { allDayEvents, timedEvents, sleepingEvents } = useMemo(() => {
     const allDay: ScheduleEvent[] = [];
     const timed: ScheduleEvent[] = [];
+    const sleeping: ScheduleEvent[] = [];
     for (const event of events) {
       const startKey = localDateKey(event.startAt, timeZone);
       const endKey = localDateKey(event.endAt ?? event.startAt, timeZone);
       if (startKey > dayKey || endKey < dayKey) continue;
-      if (isAllDayLaneEvent(event)) {
+      if (event.proposalType === "sleeping") {
+        sleeping.push(event);
+      } else if (isAllDayLaneEvent(event)) {
         allDay.push(event);
       } else {
         timed.push(event);
@@ -73,7 +79,8 @@ export function ScheduleDayView({
     }
     allDay.sort((a, b) => a.startAt.localeCompare(b.startAt));
     timed.sort((a, b) => a.startAt.localeCompare(b.startAt));
-    return { allDayEvents: allDay, timedEvents: timed };
+    sleeping.sort((a, b) => a.startAt.localeCompare(b.startAt));
+    return { allDayEvents: allDay, timedEvents: timed, sleepingEvents: sleeping };
   }, [dayKey, events, timeZone]);
 
   const hourLabels = useMemo(
@@ -210,11 +217,40 @@ export function ScheduleDayView({
             />
           ))}
 
-          {timedEvents.length === 0 && allDayEvents.length === 0 ? (
+          {timedEvents.length === 0 &&
+          allDayEvents.length === 0 &&
+          sleepingEvents.length === 0 ? (
             <Box sx={{ position: "absolute", inset: 0, p: 2 }}>
               <EmptyState title="Nothing scheduled" description="Tap + to add an event or sleeping night." />
             </Box>
           ) : null}
+
+          {sleepingEvents.map((event, index) => {
+            const stackCount = sleepingEvents.length;
+            const height = Math.max(SLEEPING_BAND_PX / stackCount, 28);
+            const top = Math.min(index * height, SLEEPING_BAND_PX - height);
+            return (
+              <Box
+                key={`${event.proposalId}-${event.startAt}-sleeping`}
+                sx={{
+                  position: "absolute",
+                  left: 4,
+                  right: 4,
+                  top,
+                  height: Math.min(height, SLEEPING_BAND_PX - top),
+                  zIndex: 1,
+                }}
+              >
+                <ScheduleEventBlock
+                  event={event}
+                  compact
+                  timeZone={timeZone}
+                  rotationIndex={index}
+                  onClick={() => onEventClick(event)}
+                />
+              </Box>
+            );
+          })}
 
           {timedEvents.map((event, index) => {
             const startKey = localDateKey(event.startAt, timeZone);
@@ -248,7 +284,7 @@ export function ScheduleDayView({
                   event={event}
                   compact
                   timeZone={timeZone}
-                  rotationIndex={index}
+                  rotationIndex={index + sleepingEvents.length}
                   onClick={() => onEventClick(event)}
                 />
               </Box>

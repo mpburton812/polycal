@@ -36,6 +36,7 @@ const settingsSchema = z.object({
   auditLogVisibility: z.enum(auditLogVisibilityLevels),
   allowUserProvisioning: z.boolean(),
   hideSleepingArrangements: z.boolean(),
+  seePartnersSleepingArrangements: z.boolean(),
   placesMapVisibility: z.enum(placesMapVisibilityLevels),
   logTailLength: z.number().int().min(0).max(1000),
   onboardingWelcomeMessage: z
@@ -56,6 +57,7 @@ function rowToSettings(row: {
   auditLogVisibility: string;
   allowUserProvisioning: boolean;
   hideSleepingArrangements: boolean;
+  seePartnersSleepingArrangements: boolean | null;
   placesMapVisibility: string | null;
   logTailLength: number;
   onboardingWelcomeMessage: string | null;
@@ -71,6 +73,7 @@ function rowToSettings(row: {
     auditLogVisibility: row.auditLogVisibility as PolyGroupSettings["auditLogVisibility"],
     allowUserProvisioning: row.allowUserProvisioning,
     hideSleepingArrangements: row.hideSleepingArrangements,
+    seePartnersSleepingArrangements: row.seePartnersSleepingArrangements ?? false,
     placesMapVisibility:
       (row.placesMapVisibility as PolyGroupSettings["placesMapVisibility"]) ?? "all",
     logTailLength: row.logTailLength,
@@ -130,6 +133,7 @@ export async function getPolyGroupSettingsAction(): Promise<PolyGroupSettings | 
     auditLogVisibility: settings.auditLogVisibility,
     allowUserProvisioning: settings.allowUserProvisioning,
     hideSleepingArrangements: settings.hideSleepingArrangements,
+    seePartnersSleepingArrangements: settings.seePartnersSleepingArrangements,
     placesMapVisibility: settings.placesMapVisibility,
     logTailLength: settings.logTailLength,
     onboardingWelcomeMessage: settings.onboardingWelcomeMessage,
@@ -179,6 +183,7 @@ export async function updatePolyGroupSettingsAction(
       auditLogVisibility: parsed.data.auditLogVisibility,
       allowUserProvisioning: parsed.data.allowUserProvisioning,
       hideSleepingArrangements: parsed.data.hideSleepingArrangements,
+      seePartnersSleepingArrangements: parsed.data.seePartnersSleepingArrangements,
       placesMapVisibility: parsed.data.placesMapVisibility,
       logTailLength: parsed.data.logTailLength,
       onboardingWelcomeMessage: parsed.data.onboardingWelcomeMessage,
@@ -190,6 +195,28 @@ export async function updatePolyGroupSettingsAction(
       updatedAt: now,
     })
     .where(eq(networks.id, networkId));
+
+  // Legacy dual-write so poly_group-backed readers stay in sync (PC-366).
+  await db
+    .update(polyGroup)
+    .set({
+      name: parsed.data.name,
+      adminCanSeeUninvolved: parsed.data.adminCanSeeUninvolved,
+      auditLogVisibility: parsed.data.auditLogVisibility,
+      allowUserProvisioning: parsed.data.allowUserProvisioning,
+      hideSleepingArrangements: parsed.data.hideSleepingArrangements,
+      seePartnersSleepingArrangements: parsed.data.seePartnersSleepingArrangements,
+      placesMapVisibility: parsed.data.placesMapVisibility,
+      logTailLength: parsed.data.logTailLength,
+      onboardingWelcomeMessage: parsed.data.onboardingWelcomeMessage,
+      proposedMaxDays: parsed.data.proposedMaxDays,
+      atRiskTtlDays: parsed.data.atRiskTtlDays,
+      archiveGraceHours: parsed.data.archiveGraceHours,
+      redraftDeadlineHours: parsed.data.redraftDeadlineHours,
+      sleepingPartnerProposalMaxDays: parsed.data.sleepingPartnerProposalMaxDays,
+      updatedAt: now,
+    })
+    .where(eq(polyGroup.id, 1));
 
   await logUserActivity(
     adminResult.user.id,
