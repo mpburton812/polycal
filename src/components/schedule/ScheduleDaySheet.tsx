@@ -19,6 +19,7 @@ import type { ScheduleEvent } from "@/actions/schedule";
 import { ScheduleEventBlock } from "@/components/schedule/ScheduleEventBlock";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { localDateKey } from "@/lib/schedule/dates";
+import { sortDayEvents } from "@/lib/schedule/sort-day-events";
 import { GARDEN_TOKENS } from "@/theme/tokens";
 import { fontFamilies } from "@/theme/fonts";
 
@@ -59,14 +60,14 @@ export function ScheduleDaySheet({
     : "Day";
 
   const dayEvents = day
-    ? events
-        .filter((event) => {
+    ? sortDayEvents(
+        events.filter((event) => {
           const startKey = localDateKey(event.startAt, timeZone);
           const endKey = localDateKey(event.endAt ?? event.startAt, timeZone);
           const key = localDateKey(day.toISOString(), timeZone);
           return key >= startKey && key <= endKey;
-        })
-        .sort((a, b) => a.startAt.localeCompare(b.startAt))
+        }),
+      )
     : [];
 
   return (
