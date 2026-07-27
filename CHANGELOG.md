@@ -21,6 +21,10 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- PC-362 (test): Expanded platform admin — network detail reports, inhabit admin, global user moderation with reason/duration, paused/banned screens. Change control: `2026.07.27a`.
+
+### Changed
+- PC-362 (test): Sleeping proposals allow optional-only invitees; schedule blocks omit Confirmed on approved events. Change control: `2026.07.27a`.
 - PC-357: Multi-network tenancy — one login / many networks with header switcher; self-serve create via `/create-network` and `/setup-network`; optional import of residences and sleeping partners on join; platform admin (`/platform-admin`) for pause/caps/remove/ban. SCHEMA_VERSION 39→40. Change control: `2026.07.25e`.
 - PC-354: Public `/terms`, self-service account delete with full purge, download-my-data export; PWA maskable icon and offline navigation fallback. Change control: `2026.07.25b`.
 
@@ -31,6 +35,7 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - PC-351: Batch sleeping syncs one all-day free Google/ICS event per night (LOCATION field + `, at Location` in title); non-batch multi-day sleeping stays one span; resolved sleeping titles omit Confirmed; SCHEMA_VERSION 37 (`calendar_event_links.night_key`). Change control: `2026.07.24e`.
 
 ### Fixed
+- PC-362 (test): E2E navigation strict-mode flake on Rebel Alliance header. Change control: `2026.07.27a`.
 - PC-353: Phase 0 security hardenings — hashed password-reset/email-verify tokens, paused-account gate, fail-closed e2e gates, magic-byte image validation, push endpoint ownership. Change control: `2026.07.25a`.
 
 ### Added

@@ -28,6 +28,28 @@ import { CHANGELOG_ARCHIVE } from "./entries.archive";
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "2026.07.27a",
+    date: "2026-07-27",
+    summary:
+      "Platform admin console, user moderation, sleeping optional invitees, schedule title cleanup.",
+    changes: [
+      {
+        type: "added",
+        description:
+          "Expanded /platform-admin: network detail reports, inhabit admin, global user pause/ban/delete with reason and optional duration; paused/banned login screens; SCHEMA_VERSION 41 moderation columns (PC-362).",
+      },
+      {
+        type: "changed",
+        description:
+          "Sleeping proposals may submit with optional-only invitees; resolved schedule blocks omit Confirmed (PC-351 follow-up).",
+      },
+      {
+        type: "fixed",
+        description: "E2E navigation strict-mode flake on Rebel Alliance header (PC-362).",
+      },
+    ],
+  },
+  {
     version: "2026.07.26d",
     date: "2026-07-26",
     summary:
