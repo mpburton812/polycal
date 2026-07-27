@@ -24,6 +24,7 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - PC-362 (test): Expanded platform admin — network detail reports, inhabit admin, global user moderation with reason/duration, paused/banned screens. Change control: `2026.07.27a`.
 
 ### Changed
+- PC-362 (test): Removed Code Status from Feed; platform admin uses stacked card layout; today's calendar cells use light blue highlight; DevBar no longer shows impersonation dropdown (use Admin → Test data). Change control: `2026.07.27c`.
 - PC-362 (test): Sleeping proposals allow optional-only invitees; schedule blocks omit Confirmed on approved events. Change control: `2026.07.27a`.
 - PC-357: Multi-network tenancy — one login / many networks with header switcher; self-serve create via `/create-network` and `/setup-network`; optional import of residences and sleeping partners on join; platform admin (`/platform-admin`) for pause/caps/remove/ban. SCHEMA_VERSION 39→40. Change control: `2026.07.25e`.
 - PC-354: Public `/terms`, self-service account delete with full purge, download-my-data export; PWA maskable icon and offline navigation fallback. Change control: `2026.07.25b`.
