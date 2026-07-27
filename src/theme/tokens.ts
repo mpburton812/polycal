@@ -13,6 +13,8 @@ export const GARDEN_TOKENS = {
   sage: "#6B8F71",
   mustard: "#D4A017",
   lavender: "#8B7AB8",
+  /** Light blue highlight for today's calendar cells. */
+  todayHighlight: "#E3F2FD",
 } as const;
 
 /** Organic default radius — uneven corners for cards and day cells. */

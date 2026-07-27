@@ -35,7 +35,6 @@ import {
 } from "@/actions/proposals";
 import type { PersonSummary } from "@/actions/users";
 import { FeedLikeRow } from "@/components/feed/FeedLikeControl";
-import { FeedCodeStatusPanel } from "@/components/feed/FeedCodeStatusPanel";
 import {
   FeedControlsButton,
   FeedControlsDrawer,
@@ -51,8 +50,7 @@ import type {
   FeedLinkPreview,
 } from "@/lib/feed/types";
 import { extractFirstUrl } from "@/lib/feed/link-preview-core";
-import type { ChangelogEntry } from "@/lib/changelog/entries";
-import type { BuildInfo } from "@/lib/env";
+import { getAppEnvironment } from "@/lib/env";
 import { LONG_TEXT_MAX } from "@/lib/validation/string-limits";
 import { brutalPageTitleSx } from "@/theme/brutalUi";
 import { GARDEN_TOKENS } from "@/theme/tokens";
@@ -343,16 +341,10 @@ export function FeedClient({
   currentUserId,
   isAdmin,
   people,
-  buildInfo,
-  changelog,
-  latestChangelogEntry,
 }: {
   currentUserId: string;
   isAdmin: boolean;
   people: PersonSummary[];
-  buildInfo: BuildInfo;
-  changelog: ChangelogEntry[];
-  latestChangelogEntry: ChangelogEntry | null;
 }) {
   const [items, setItems] = useState<FeedItem[]>([]);
   const [activeEvents, setActiveEvents] = useState<FeedActiveEvent[]>([]);
@@ -1094,12 +1086,6 @@ export function FeedClient({
         onPrefsApplied={() => void loadFeed(null, { silent: false })}
       />
 
-      <FeedCodeStatusPanel
-        buildInfo={buildInfo}
-        changelog={changelog}
-        latestEntry={latestChangelogEntry}
-      />
-
       {activeEvents.length > 0 ? (
         <Box
           component="section"
@@ -1108,9 +1094,9 @@ export function FeedClient({
           sx={{
             position: "sticky",
             top:
-              buildInfo.environment === "production"
+              getAppEnvironment() === "production"
                 ? { xs: 56, sm: 64 }
-                : { xs: 132, sm: 116 },
+                : { xs: 88, sm: 72 },
             zIndex: 1100,
             bgcolor: GARDEN_TOKENS.background,
             border: `3px solid ${GARDEN_TOKENS.ink}`,

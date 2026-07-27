@@ -38,6 +38,9 @@ export async function requireNetworkSession(): Promise<
   if (session.user.accountStatus === "paused") {
     return { ok: false, message: PAUSED_ACCOUNT_MESSAGE };
   }
+  if (session.user.accountStatus === "banned") {
+    return { ok: false, message: "Your account has been banned." };
+  }
 
   const memberships = await listActiveMemberships(session.user.id);
   if (memberships.length === 0) {

@@ -1,6 +1,6 @@
 "use server";
 
-import { and, eq, gte, sql } from "drizzle-orm";
+import { and, asc, eq, gte, sql } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import { z } from "zod";
 
@@ -29,6 +29,7 @@ import {
   requireNetworkAdmin,
   requirePlatformAdmin,
 } from "@/lib/networks/context";
+import { resolveSetupCreator } from "@/lib/networks/setup-creator";
 import { requireSession } from "@/lib/actions/context";
 import {
   DEFAULT_PLATFORM_SETTINGS,
@@ -82,6 +83,93 @@ async function countNetworksForEmail(email: string): Promise<number> {
 export async function getPlatformSettingsAction(): Promise<PlatformSettings> {
   await ensureDbReady();
   return loadPlatformSettings();
+}
+
+export type PlatformNetworkNode = {
+  id: string;
+  name: string;
+  status: string;
+  createdAt: string;
+  createdByEmail: string | null;
+  allowUserProvisioning: boolean;
+  memberCount: number;
+};
+
+export type PlatformDashboardData = {
+  summary: {
+    totalNetworks: number;
+    activeNetworks: number;
+    pausedNetworks: number;
+    totalMemberSeats: number;
+    distinctMembers: number;
+    networksCreatedToday: number;
+  };
+  settings: PlatformSettings;
+  networks: PlatformNetworkNode[];
+};
+
+/**
+ * Platform operator dashboard: network nodes + aggregate counts (PC-365).
+ */
+export async function getPlatformDashboardAction(): Promise<PlatformDashboardData | null> {
+  const admin = await requirePlatformAdmin();
+  if (!admin.ok) return null;
+
+  await ensureDbReady();
+  const db = getDb();
+  const [settings, rows, createdToday, distinctRows] = await Promise.all([
+    loadPlatformSettings(),
+    db.select().from(networks).orderBy(asc(networks.createdAt)),
+    countNetworksCreatedToday(),
+    db
+      .select({ count: sql<number>`count(distinct ${networkMembers.userId})` })
+      .from(networkMembers)
+      .where(eq(networkMembers.status, "active")),
+  ]);
+  const distinctRow = distinctRows[0];
+
+  const networkNodes: PlatformNetworkNode[] = [];
+  let totalMemberSeats = 0;
+  let activeNetworks = 0;
+  let pausedNetworks = 0;
+
+  for (const n of rows) {
+    const [countRow] = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(networkMembers)
+      .where(
+        and(
+          eq(networkMembers.networkId, n.id),
+          eq(networkMembers.status, "active"),
+        ),
+      );
+    const memberCount = Number(countRow?.count ?? 0);
+    totalMemberSeats += memberCount;
+    if (n.status === "active") activeNetworks += 1;
+    if (n.status === "paused") pausedNetworks += 1;
+    networkNodes.push({
+      id: n.id,
+      name: n.name,
+      status: n.status,
+      createdAt: n.createdAt,
+      createdByEmail: n.createdByEmail,
+      allowUserProvisioning: n.allowUserProvisioning,
+      memberCount,
+    });
+  }
+
+  return {
+    summary: {
+      totalNetworks: rows.length,
+      activeNetworks,
+      pausedNetworks,
+      totalMemberSeats,
+      distinctMembers: Number(distinctRow?.count ?? 0),
+      networksCreatedToday: createdToday,
+    },
+    settings,
+    networks: networkNodes,
+  };
 }
 
 export async function updatePlatformSettingsAction(input: {
@@ -175,7 +263,16 @@ export async function requestNetworkSetupLinkAction(
 
 export async function validateNetworkSetupTokenAction(
   token: string,
-): Promise<{ ok: boolean; message: string; email?: string }> {
+): Promise<{
+  ok: boolean;
+  message: string;
+  email?: string;
+  signedInUser?: {
+    username: string;
+    displayName: string;
+    emailMatches: boolean;
+  };
+}> {
   await ensureDbReady();
   const digest = hashLinkToken(token);
   const db = getDb();
@@ -190,7 +287,37 @@ export async function validateNetworkSetupTokenAction(
   if (new Date(row.expiresAt).getTime() < Date.now()) {
     return { ok: false, message: "This setup link has expired." };
   }
-  return { ok: true, message: "OK", email: row.email };
+
+  const session = await auth();
+  let signedInUser:
+    | { username: string; displayName: string; emailMatches: boolean }
+    | undefined;
+  if (session?.user?.id) {
+    const [userRow] = await db
+      .select({
+        username: users.username,
+        displayName: users.displayName,
+        notificationEmail: users.notificationEmail,
+      })
+      .from(users)
+      .where(eq(users.id, session.user.id))
+      .limit(1);
+    if (userRow) {
+      const { notificationEmailMatchesToken } = await import(
+        "@/lib/networks/setup-creator"
+      );
+      signedInUser = {
+        username: userRow.username,
+        displayName: userRow.displayName,
+        emailMatches: notificationEmailMatchesToken(
+          userRow.notificationEmail,
+          row.email,
+        ),
+      };
+    }
+  }
+
+  return { ok: true, message: "OK", email: row.email, signedInUser };
 }
 
 const wizardSchema = z.object({
@@ -198,6 +325,11 @@ const wizardSchema = z.object({
   networkName: z.string().min(1).max(80),
   allowUserProvisioning: z.boolean().optional(),
   adminCanSeeUninvolved: z.boolean().optional(),
+  adminMode: z.enum(["session", "existing", "new"]).optional(),
+  username: z.string().optional(),
+  password: z.string().optional(),
+  displayName: z.string().optional(),
+  confirmPassword: z.string().optional(),
   inviteEmails: z
     .array(
       z.object({
@@ -218,7 +350,13 @@ const wizardSchema = z.object({
  */
 export async function completeNetworkSetupAction(
   raw: z.infer<typeof wizardSchema>,
-): Promise<{ ok: boolean; message: string; networkId?: string }> {
+): Promise<{
+  ok: boolean;
+  message: string;
+  networkId?: string;
+  signInUsername?: string;
+  signInPassword?: string;
+}> {
   const parsed = wizardSchema.safeParse(raw);
   if (!parsed.success) {
     return { ok: false, message: parsed.error.issues[0]?.message ?? "Invalid input." };
@@ -249,31 +387,28 @@ export async function completeNetworkSetupAction(
   }
 
   const session = await auth();
-  let creatorId = session?.user?.id;
-  if (!creatorId) {
-    // Create a provisional platform user from email if not signed in.
-    const usernameBase = email.split("@")[0].replace(/[^a-zA-Z0-9]/g, "").slice(0, 20) || "user";
-    const username = `${usernameBase}${randomUUID().slice(0, 6)}`.toLowerCase();
-    creatorId = randomUUID();
-    const now = new Date().toISOString();
-    const { hash } = await import("bcryptjs");
-    const passwordHash = await hash(randomUUID() + "A1!", 10);
-    await db.insert(users).values({
-      id: creatorId,
-      username,
-      displayName: usernameBase,
-      passwordHash,
-      role: "admin",
-      status: "active",
-      mustChangePassword: true,
-      onboardingComplete: false,
-      theme: "mint",
-      timezone: "UTC",
-      createdAt: now,
-      updatedAt: now,
-      notificationEmail: email,
-    });
+  const adminMode =
+    input.adminMode ?? (session?.user?.id ? "session" : undefined);
+  if (!adminMode) {
+    return { ok: false, message: "Choose how to sign in as the first network admin." };
   }
+
+  const creatorResult = await resolveSetupCreator(db, {
+    tokenEmail: email,
+    mode: adminMode,
+    sessionUserId: session?.user?.id,
+    username: input.username,
+    password: input.password,
+    displayName: input.displayName,
+    confirmPassword: input.confirmPassword,
+  });
+  if (!creatorResult.ok) {
+    return { ok: false, message: creatorResult.message };
+  }
+  const creatorId = creatorResult.creatorId;
+  const signInUsername = creatorResult.signInUsername;
+  const signInPassword =
+    adminMode === "new" || adminMode === "existing" ? input.password : undefined;
 
   const now = new Date().toISOString();
   const networkId = randomUUID();
@@ -334,6 +469,52 @@ export async function completeNetworkSetupAction(
     ok: true,
     message: `Created network ${input.networkName}.`,
     networkId,
+    signInUsername: adminMode === "session" ? undefined : signInUsername,
+    signInPassword,
+  };
+}
+
+/**
+ * Network-scoped dashboard summary for Admin → Network (PC-363).
+ */
+export async function getActiveNetworkDashboardAction(): Promise<{
+  networkId: string;
+  name: string;
+  status: string;
+  memberCount: number;
+  createdAt: string;
+  createdByEmail: string | null;
+  allowUserProvisioning: boolean;
+  role: string;
+} | null> {
+  const admin = await requireNetworkAdmin();
+  if (!admin.ok) return null;
+  await ensureDbReady();
+  const db = getDb();
+  const [network] = await db
+    .select()
+    .from(networks)
+    .where(eq(networks.id, admin.user.activeNetworkId))
+    .limit(1);
+  if (!network) return null;
+  const [countRow] = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(networkMembers)
+    .where(
+      and(
+        eq(networkMembers.networkId, network.id),
+        eq(networkMembers.status, "active"),
+      ),
+    );
+  return {
+    networkId: network.id,
+    name: network.name,
+    status: network.status,
+    memberCount: Number(countRow?.count ?? 0),
+    createdAt: network.createdAt,
+    createdByEmail: network.createdByEmail,
+    allowUserProvisioning: network.allowUserProvisioning,
+    role: admin.user.activeNetworkRole,
   };
 }
 
@@ -461,7 +642,7 @@ export async function banUserFromAllNetworksAction(
   await db
     .update(users)
     .set({
-      status: "deleted",
+      status: "banned",
       sessionVersion: (user.sessionVersion ?? 0) + 1,
       updatedAt: now,
     })

@@ -309,7 +309,7 @@ export async function resolveProposal(
       .from(proposalInvitees)
       .where(eq(proposalInvitees.proposalId, proposal.id));
     const batchEntries = parseBatchEntriesJson(proposal.batchEntriesJson);
-    const confirmedTitle = await buildSleepingProposalTitle(db, {
+    const resolvedTitle = await buildSleepingProposalTitle(db, {
       proposerName: proposerRow?.displayName ?? "User",
       intentionalSolo: proposal.intentionalSolo,
       locationId: proposal.locationId,
@@ -323,7 +323,7 @@ export async function resolveProposal(
       .update(proposals)
       .set({
         state: "resolved",
-        title: confirmedTitle,
+        title: resolvedTitle,
         scheduledStartAt: scheduleStart,
         scheduledEndAt: scheduleEnd,
         winningSlotId,
@@ -332,7 +332,7 @@ export async function resolveProposal(
         updatedAt: now,
       })
       .where(eq(proposals.id, proposal.id));
-    proposal.title = confirmedTitle;
+    proposal.title = resolvedTitle;
   } else {
     await db
       .update(proposals)

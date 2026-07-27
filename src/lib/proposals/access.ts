@@ -2,6 +2,7 @@ import { eq } from "drizzle-orm";
 
 import { getDb } from "@/lib/db/client";
 import { polyGroup, type ProposalState, type ProposalType } from "@/lib/db/schema";
+import { loadNetworkSettings } from "@/lib/networks/settings";
 import { shouldMaskSleepingForViewer } from "@/lib/schedule/slice-auth";
 import type { AuditLogVisibility } from "@/types/poly-group";
 
@@ -44,7 +45,12 @@ export function applyProposalMask<
  */
 export async function getAdminCanSeeUninvolved(
   db: ReturnType<typeof getDb> = getDb(),
+  networkId?: string,
 ): Promise<boolean> {
+  if (networkId) {
+    const settings = await loadNetworkSettings(networkId, db);
+    return settings?.adminCanSeeUninvolved ?? true;
+  }
   const [group] = await db
     .select({ adminCanSeeUninvolved: polyGroup.adminCanSeeUninvolved })
     .from(polyGroup)

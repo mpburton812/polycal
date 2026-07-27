@@ -28,6 +28,184 @@ import { CHANGELOG_ARCHIVE } from "./entries.archive";
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "2026.07.27c",
+    date: "2026-07-27",
+    summary: "Feed cleanup, calendar today highlight, platform admin readability.",
+    changes: [
+      {
+        type: "changed",
+        description:
+          "Removed Code Status from Feed; platform admin and network detail use stacked card rows instead of cramped tables; week/two-week/month today cells use light blue background; DevBar impersonation dropdown removed (Admin → Test data remains).",
+      },
+    ],
+  },
+  {
+    version: "2026.07.27b",
+    date: "2026-07-27",
+    summary: "Fix test login after moderation columns missed migration.",
+    changes: [
+      {
+        type: "fixed",
+        description:
+          "SCHEMA_VERSION 42 re-applies admin migrations so moderation columns exist on Turso DBs that already stored v41 before the platform moderation UI shipped; restores sign-in (PC-362).",
+      },
+    ],
+  },
+  {
+    version: "2026.07.27a",
+    date: "2026-07-27",
+    summary:
+      "Platform admin console, user moderation, sleeping optional invitees, schedule title cleanup.",
+    changes: [
+      {
+        type: "added",
+        description:
+          "Expanded /platform-admin: network detail reports, inhabit admin, global user pause/ban/delete with reason and optional duration; paused/banned login screens; SCHEMA_VERSION 41 moderation columns (PC-362).",
+      },
+      {
+        type: "changed",
+        description:
+          "Sleeping proposals may submit with optional-only invitees; resolved schedule blocks omit Confirmed (PC-351 follow-up).",
+      },
+      {
+        type: "fixed",
+        description: "E2E navigation strict-mode flake on Rebel Alliance header (PC-362).",
+      },
+    ],
+  },
+  {
+    version: "2026.07.26d",
+    date: "2026-07-26",
+    summary:
+      "Canonical platform admin grant for mpburton / mpburton@gmail.com.",
+    changes: [
+      {
+        type: "changed",
+        description:
+          "Platform operator identities helper; one-time migration matches username or notification email; seeds and prod bootstrap aligned; SCHEMA_VERSION 41 (PC-362).",
+      },
+    ],
+  },
+  {
+    version: "2026.07.26c",
+    date: "2026-07-26",
+    summary:
+      "Platform admin dashboard on Admin tab with network node stats and operator controls.",
+    changes: [
+      {
+        type: "added",
+        description:
+          "Platform operators see a Platform section on Admin with aggregate counts, per-network node table (ID, status, members, creator), creation caps, pause/activate, and control reference (PC-365).",
+      },
+    ],
+  },
+  {
+    version: "2026.07.26b",
+    date: "2026-07-26",
+    summary:
+      "Network data isolation across feed, schedule, proposals, partnerships, and admin settings.",
+    changes: [
+      {
+        type: "fixed",
+        description:
+          "Tenant-scoped reads and writes for proposals, feed milestones/chat, sleeping partnerships, schedule, and per-network admin settings so separate networks only share users who belong to both (PC-364).",
+      },
+      {
+        type: "fixed",
+        description:
+          "Network setup wizard shows signed-in email mismatch with sign-out path; JWT network switches validate membership (PC-364).",
+      },
+    ],
+  },
+  {
+    version: "2026.07.26a",
+    date: "2026-07-26",
+    summary:
+      "Network setup picks existing or new first admin; network dashboard in Admin; mpburton platform admin.",
+    changes: [
+      {
+        type: "added",
+        description:
+          "Self-serve setup wizard lets unsigned creators sign in with an existing username (email must match the magic link) or create a new account as the first network_admin; signed-in users skip the account step (PC-363).",
+      },
+      {
+        type: "added",
+        description:
+          "Admin tab shows an active-network dashboard for network admins and platform controls for platform operators; mpburton is granted is_platform_admin via migration (PC-363).",
+      },
+    ],
+  },
+  {
+    version: "2026.07.25e",
+    date: "2026-07-25",
+    summary:
+      "Multi-network tenancy: one login, many networks, switcher, self-serve create, platform admin.",
+    changes: [
+      {
+        type: "added",
+        description:
+          "Shared-DB row multi-tenancy with `networks`, `network_members`, `platform_settings`, and `networkId` backfill; JWT `activeNetworkId` with header switcher; magic-link `/create-network` and `/setup-network`; optional import of residences and sleeping partners on join; platform admin at `/platform-admin` (pause networks, edit caps, scoped remove vs ban). SCHEMA_VERSION 39→40 (PC-357).",
+      },
+      {
+        type: "fixed",
+        description:
+          "E2E DB reset wipes and rebackfills networks; sleeping partnership uniqueness scoped by `networkId`; places and admin delete after tenant reset; notification inbox refresh deferred so Close is not detached (PC-357).",
+      },
+    ],
+  },
+  {
+    version: "2026.07.25d",
+    date: "2026-07-25",
+    summary:
+      "ActionResult message normalization, shared actionFail helper, ESLint in CI, changelog archive.",
+    changes: [
+      {
+        type: "changed",
+        description:
+          "Normalize ActionResult to `{ message }` with shared `actionFail`; add `npm run lint` to dev/test/production CI workflows; share `proposalCard` e2e locator; archive older changelog entries (PC-356).",
+      },
+    ],
+  },
+  {
+    version: "2026.07.25c",
+    date: "2026-07-25",
+    summary:
+      "Phase 2 DB indexes, bounded scans, calendar sync concurrency, avatar cache headers.",
+    changes: [
+      {
+        type: "changed",
+        description:
+          "SCHEMA_VERSION 38 secondary indexes; PRAGMA foreign_keys=ON; bound conflict/enforcement/board/schedule/notification scans; calendar sync concurrency; avatar Cache-Control/ETag; MUI optimizePackageImports (PC-355).",
+      },
+    ],
+  },
+  {
+    version: "2026.07.25b",
+    date: "2026-07-25",
+    summary:
+      "Public Terms, self-service account delete/export, PWA maskable icon and offline fallback.",
+    changes: [
+      {
+        type: "added",
+        description:
+          "Public `/terms`, self-service account delete with full purge, download-my-data export; privacy §8 retention rewrite; PWA maskable icon and offline navigation fallback (PC-354).",
+      },
+    ],
+  },
+  {
+    version: "2026.07.25a",
+    date: "2026-07-25",
+    summary:
+      "Phase 0 security hardenings: hashed tokens, paused-account gate, fail-closed e2e, image validation.",
+    changes: [
+      {
+        type: "fixed",
+        description:
+          "Hash password-reset and email-verify tokens at rest (SHA-256); timing-safe secret compares for cron, e2e, and impersonation; block paused accounts in `requireSession`; fail-closed e2e gates (refuse `polycal-prod`); prod impersonation gated; magic-byte validation for feed/feedback images; push endpoint ownership; JWT never skips pause/sessionVersion refresh (PC-353).",
+      },
+    ],
+  },
+  {
     version: "2026.07.24e",
     date: "2026-07-24",
     summary:

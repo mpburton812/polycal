@@ -13,6 +13,7 @@ import { chunkIds, loadSlotsByProposalIds } from "@/lib/proposals/services/slot-
 import { sleepingCalendarDayEnd } from "@/lib/proposals/sleeping-schedule";
 import { widenConflictWindow } from "@/lib/proposals/conflict-windows";
 import { intervalsOverlap } from "@/lib/schedule/dates";
+import { loadNetworkSettings } from "@/lib/networks/settings";
 import {
   polyGroup,
   proposalInvitees,
@@ -59,7 +60,21 @@ function shiftIso(iso: string, deltaMs: number): string {
 /**
  * Loads admin-configurable enforcement thresholds from poly group settings (PC-46 / PC-273).
  */
-export async function loadEnforcementSettings(db: Db): Promise<EnforcementSettings> {
+export async function loadEnforcementSettings(
+  db: Db,
+  networkId?: string,
+): Promise<EnforcementSettings> {
+  if (networkId) {
+    const settings = await loadNetworkSettings(networkId, db);
+    if (!settings) return DEFAULT_ENFORCEMENT;
+    return {
+      proposedMaxDays: settings.proposedMaxDays,
+      atRiskTtlDays: settings.atRiskTtlDays,
+      archiveGraceHours: settings.archiveGraceHours,
+      redraftDeadlineHours: settings.redraftDeadlineHours,
+      sleepingPartnerProposalMaxDays: settings.sleepingPartnerProposalMaxDays,
+    };
+  }
   const [row] = await db.select().from(polyGroup).where(eq(polyGroup.id, 1)).limit(1);
   if (!row) return DEFAULT_ENFORCEMENT;
 

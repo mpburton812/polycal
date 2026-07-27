@@ -10,6 +10,7 @@ import { userHasAdminAccess } from "@/lib/admin-access";
 import { latestIcsPendingIdsByProposal } from "@/lib/calendar/pending-ics";
 import { getDb } from "@/lib/db/client";
 import { ensureDbReady } from "@/lib/db/ensure-ready";
+import { requireNetworkSession } from "@/lib/networks/context";
 import {
   locations,
   polyGroup,
@@ -437,13 +438,22 @@ async function assertLocationAllowed(
   role: string,
   locationId: string | undefined,
   locationText?: string,
+  networkId?: string,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   if (locationId && locationText?.trim()) {
     return { ok: false, error: "Choose either a registered place or custom location text, not both." };
   }
   if (!locationId) return { ok: true };
 
-  const [place] = await db.select().from(locations).where(eq(locations.id, locationId)).limit(1);
+  const locationFilters = [eq(locations.id, locationId)];
+  if (networkId) {
+    locationFilters.push(eq(locations.networkId, networkId));
+  }
+  const [place] = await db
+    .select()
+    .from(locations)
+    .where(and(...locationFilters))
+    .limit(1);
   if (!place) {
     return { ok: false, error: "Selected place was not found." };
   }
@@ -452,7 +462,7 @@ async function assertLocationAllowed(
     return { ok: true };
   }
 
-  const eligibleIds = await loadEligibleLocationIdsForUser(db, userId);
+  const eligibleIds = await loadEligibleLocationIdsForUser(db, userId, networkId);
   if (!eligibleIds.includes(locationId)) {
     return {
       ok: false,
@@ -543,6 +553,7 @@ async function createRecurringChildProposals(
 
     await db.insert(proposals).values({
       id: childId,
+      networkId: parent.networkId,
       title: `${parent.title} — ${label}`,
       description: parent.description,
       proposalType: parent.proposalType,
@@ -687,10 +698,11 @@ export async function adminForceResolveProposalAction(
 export async function createDraftProposalAction(
   input: z.infer<typeof draftProposalSchema>,
 ): Promise<{ ok: boolean; message: string; proposalId?: string }> {
-  const session = await auth();
-  if (!session?.user) {
-    return { ok: false, message: "Sign in required." };
+  const networkSession = await requireNetworkSession();
+  if (!networkSession.ok) {
+    return { ok: false, message: networkSession.message };
   }
+  const session = { user: networkSession.user };
 
   const parsed = draftProposalSchema.safeParse(input);
   if (!parsed.success) {
@@ -699,6 +711,7 @@ export async function createDraftProposalAction(
 
   await ensureDbReady();
   const db = getDb();
+  const networkId = networkSession.user.activeNetworkId;
 
   const isBatchSleeping =
     parsed.data.proposalType === "sleeping" && Boolean(parsed.data.isBatchSleeping);
@@ -723,12 +736,13 @@ export async function createDraftProposalAction(
 
     const created = await createBatchSleepingDraft(db, {
       proposerId: session.user.id,
-      proposerName: proposerRow?.displayName ?? session.user.name ?? "User",
+      proposerName: proposerRow?.displayName ?? "User",
       actorUserId: session.user.id,
       entries: batchEntries,
       titleState: "draft",
       description: parsed.data.description,
       notes: parsed.data.notes ?? null,
+      networkId,
     });
 
     revalidatePath("/proposals");
@@ -741,6 +755,7 @@ export async function createDraftProposalAction(
     session.user.role,
     parsed.data.locationId,
     parsed.data.locationText,
+    networkId,
   );
   if (!locationCheck.ok) {
     return { ok: false, message: locationCheck.error };
@@ -782,7 +797,7 @@ export async function createDraftProposalAction(
   let proposalTitle = parsed.data.title;
   if (parsed.data.proposalType === "sleeping") {
     proposalTitle = await buildSleepingProposalTitle(db, {
-      proposerName: proposerRow?.displayName ?? session.user.name ?? "User",
+      proposerName: proposerRow?.displayName ?? "User",
       intentionalSolo,
       locationId: parsed.data.locationId,
       locationText: parsed.data.locationText,
@@ -793,6 +808,7 @@ export async function createDraftProposalAction(
 
   await db.insert(proposals).values({
     id: proposalId,
+    networkId,
     title: proposalTitle,
     description: parsed.data.description,
     proposalType: parsed.data.proposalType,
@@ -840,10 +856,12 @@ export async function createDraftProposalAction(
 export async function updateDraftProposalAction(
   input: z.infer<typeof draftProposalSchema> & { proposalId: string },
 ): Promise<{ ok: boolean; message: string }> {
-  const session = await auth();
-  if (!session?.user) {
-    return { ok: false, message: "Sign in required." };
+  const networkSession = await requireNetworkSession();
+  if (!networkSession.ok) {
+    return { ok: false, message: networkSession.message };
   }
+  const session = { user: networkSession.user };
+  const networkId = networkSession.user.activeNetworkId;
 
   const parsed = draftProposalSchema
     .extend({ proposalId: z.string().min(1) })
@@ -860,7 +878,12 @@ export async function updateDraftProposalAction(
     .where(eq(proposals.id, parsed.data.proposalId))
     .limit(1);
 
-  if (!proposal || proposal.proposerId !== session.user.id || proposal.state !== "draft") {
+  if (
+    !proposal ||
+    proposal.networkId !== networkId ||
+    proposal.proposerId !== session.user.id ||
+    proposal.state !== "draft"
+  ) {
     return { ok: false, message: "Draft not found." };
   }
 
@@ -893,7 +916,7 @@ export async function updateDraftProposalAction(
     await updateBatchSleepingDraft(db, {
       proposalId: proposal.id,
       proposerId: session.user.id,
-      proposerName: proposerRow?.displayName ?? session.user.name ?? "User",
+      proposerName: proposerRow?.displayName ?? "User",
       entries: batchEntries,
     });
 
@@ -921,6 +944,7 @@ export async function updateDraftProposalAction(
     session.user.role,
     parsed.data.locationId,
     parsed.data.locationText,
+    networkId,
   );
   if (!locationCheck.ok) {
     return { ok: false, message: locationCheck.error };
@@ -984,7 +1008,7 @@ export async function updateDraftProposalAction(
   let proposalTitle = parsed.data.title;
   if (parsed.data.proposalType === "sleeping") {
     proposalTitle = await buildSleepingProposalTitle(db, {
-      proposerName: proposerRow?.displayName ?? session.user.name ?? "User",
+      proposerName: proposerRow?.displayName ?? "User",
       intentionalSolo,
       locationId: afterLocationId,
       locationText: afterLocationText,
@@ -1111,7 +1135,7 @@ export async function submitProposalAction(
 
   let requiredCount = invitees.filter((row) => row.role === "required").length;
   let intentionalSolo = proposal.intentionalSolo;
-  const optionalCount = invitees.filter((row) => row.role === "optional").length;
+  let optionalCount = invitees.filter((row) => row.role === "optional").length;
 
   if (proposal.isBatchSleeping) {
     const batchEntries = parseBatchEntriesJson(proposal.batchEntriesJson);
@@ -1120,27 +1144,15 @@ export async function submitProposalAction(
     }
     const union = unionBatchInvitees(batchEntries);
     requiredCount = union.filter((row) => row.role === "required").length;
+    optionalCount = union.filter((row) => row.role === "optional").length;
     intentionalSolo = batchEntries.every((entry) => entry.intentionalSolo);
-    for (const entry of batchEntries) {
-      if (entry.intentionalSolo) continue;
-      if (!entry.invitees.some((invitee) => invitee.role === "required")) {
-        return {
-          ok: false,
-          message: "Each batch night with invitees needs at least one required invitee.",
-        };
-      }
-    }
   }
 
-  if (requiredCount === 0 && !intentionalSolo) {
-    const optionalOnlyEvent =
-      proposal.proposalType === "event" && optionalCount > 0 && !proposal.isBatchSleeping;
-    if (!optionalOnlyEvent) {
-      return {
-        ok: false,
-        message: "Add at least one required invitee or enable solo before submitting.",
-      };
-    }
+  if (requiredCount === 0 && !intentionalSolo && optionalCount === 0) {
+    return {
+      ok: false,
+      message: "Add at least one invitee or enable solo before submitting.",
+    };
   }
 
   let autoResolve = shouldAutoResolveOnSubmit(

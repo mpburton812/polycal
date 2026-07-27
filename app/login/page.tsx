@@ -28,6 +28,9 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
     if (liveStatus === "paused") {
       redirect("/paused");
     }
+    if (liveStatus === "banned") {
+      redirect("/banned");
+    }
     redirect("/feed");
   }
 
@@ -49,6 +52,8 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
       .limit(1);
     if (row?.status === "paused") {
       redirectTo = "/paused";
+    } else if (row?.status === "banned") {
+      redirectTo = "/banned";
     }
 
     try {

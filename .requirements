@@ -321,3 +321,5 @@
 2026-07-25 | 23e9567 | PC-357 | scope sleeping partnership unique by networkId | src/lib/db/migrate.ts
 2026-07-25 | c294f44 | PC-357 | restore places and admin delete after tenant reset | src/actions/places.ts
 2026-07-25 | 753ac8a | PC-357 | defer inbox refresh so Close is not detached | src/components/layout/NotificationInbox.tsx
+2026-07-26 | pending | PC-363 | network setup admin account choice + Admin network dashboard | app/setup-network/page.tsx
+2026-07-27 | e307fba | PC-362 | fill pause ModerationDialog reason in admin helper | e2e/helpers/admin.ts
