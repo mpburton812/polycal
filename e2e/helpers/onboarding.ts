@@ -18,7 +18,7 @@ export async function completeFirstLoginOnboarding(
   await expect(page.getByText("Accent theme")).toBeVisible({ timeout: 15_000 });
   await page.getByRole("button", { name: "Blue bird" }).click();
   // Timezone defaults to US Eastern (PC-194).
-  await expect(page.getByLabel("Time zone")).toContainText("America/New York");
+  await expect(page.getByLabel("Time zone")).toContainText(/America\/New[_ ]York/);
   await page.getByRole("button", { name: "Continue" }).click();
 
   await expect(
