@@ -337,3 +337,4 @@
 2026-07-27 | dadec83 | PC-376 | normalize recurring all-day windows for viewer TZ | src/actions/proposals/_core.ts
 2026-07-27 | 39f2e14 | PC-376 | align week columns with viewer timezone | src/components/schedule/ScheduleAgendaView.tsx
 2026-07-27 | e4e8a2f | PC-376 | pass timezone into heatmap date keys | src/components/schedule/ScheduleHeatmap.tsx
+2026-07-27 | 260890c | PC-376 | timezone-aware month grid and civil date navigation | src/components/schedule/ScheduleClient.tsx
