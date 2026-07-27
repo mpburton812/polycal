@@ -332,3 +332,4 @@
 2026-07-27 | 50253c4 | PC-374 | type inviteeRoles record for Next build | src/components/proposals/FastSleepingPlanGrid.tsx
 2026-07-27 | 4ce3696 | PC-374 | NYT profile default, mark batch partners required, restore browser-local draft times | src/components/proposals/proposalDraftDateUtils.test.ts
 2026-07-27 | bce3969 | PC-376 | match profile TZ label spacing; seed America/New_York | src/lib/seed/e2e-burton-thompson-overlay.ts
+2026-07-27 | 49583fc | PC-376 | align onboarding TZ label with underscore-to-space display | e2e/helpers/onboarding.ts
