@@ -422,6 +422,7 @@ export async function completeNetworkSetupAction(
     adminCanSeeUninvolved: input.adminCanSeeUninvolved ?? true,
     auditLogVisibility: "admin_only",
     hideSleepingArrangements: false,
+    seePartnersSleepingArrangements: false,
     placesMapVisibility: "all",
     logTailLength: 100,
     onboardingWelcomeMessage: DEFAULT_ONBOARDING_WELCOME_MESSAGE,

@@ -37,6 +37,7 @@ function makeEvent(overrides: Partial<ScheduleEvent> = {}): ScheduleEvent {
     slotId: null,
     occurrenceProposalId: null,
     eventIconKey: null,
+    isPartnerOnlySleeping: false,
     ...overrides,
   };
 }

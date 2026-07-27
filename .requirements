@@ -323,3 +323,4 @@
 2026-07-25 | 753ac8a | PC-357 | defer inbox refresh so Close is not detached | src/components/layout/NotificationInbox.tsx
 2026-07-26 | pending | PC-363 | network setup admin account choice + Admin network dashboard | app/setup-network/page.tsx
 2026-07-27 | e307fba | PC-362 | fill pause ModerationDialog reason in admin helper | e2e/helpers/admin.ts
+2026-07-27 | 57b1b92 | PC-364 | put sleeping last and in 0-8am day band | src/components/schedule/ScheduleAgendaView.tsx

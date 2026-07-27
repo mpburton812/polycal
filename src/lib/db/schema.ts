@@ -123,6 +123,15 @@ export const polyGroup = sqliteTable("poly_group", {
   hideSleepingArrangements: integer("hide_sleeping_arrangements", { mode: "boolean" })
     .notNull()
     .default(false),
+  /**
+   * When true, members see sleeping nights where an accepted partner is involved
+   * and they themselves are not (lighter purple on schedule) (PC-366).
+   */
+  seePartnersSleepingArrangements: integer("see_partners_sleeping_arrangements", {
+    mode: "boolean",
+  })
+    .notNull()
+    .default(false),
   placesMapVisibility: text("places_map_visibility").notNull().default("all"),
   logTailLength: integer("log_tail_length").notNull().default(100),
   onboardingWelcomeMessage: text("onboarding_welcome_message"),
@@ -160,6 +169,15 @@ export const networks = sqliteTable("networks", {
     .default(true),
   auditLogVisibility: text("audit_log_visibility").notNull().default("admin_only"),
   hideSleepingArrangements: integer("hide_sleeping_arrangements", { mode: "boolean" })
+    .notNull()
+    .default(false),
+  /**
+   * When true, members see sleeping nights where an accepted partner is involved
+   * and they themselves are not (lighter purple on schedule) (PC-366).
+   */
+  seePartnersSleepingArrangements: integer("see_partners_sleeping_arrangements", {
+    mode: "boolean",
+  })
     .notNull()
     .default(false),
   placesMapVisibility: text("places_map_visibility").notNull().default("all"),
@@ -483,7 +501,7 @@ export const proposalSlotVotes = sqliteTable(
   (table) => [unique().on(table.timeSlotId, table.userId)],
 );
 
-/** Immutable proposal state transition audit trail (PC-40). */
+/** Proposal state transition audit trail (PC-40). Soft-delete hides from Feed (PC-365). */
 export const proposalStateLog = sqliteTable("proposal_state_log", {
   id: text("id").primaryKey(),
   proposalId: text("proposal_id")
@@ -493,6 +511,7 @@ export const proposalStateLog = sqliteTable("proposal_state_log", {
   action: text("action").notNull(),
   details: text("details"),
   createdAt: text("created_at").notNull(),
+  deletedAt: text("deleted_at"),
 });
 
 /** Threaded discussion on a proposal (PC-40). */

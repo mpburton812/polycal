@@ -48,6 +48,8 @@ export interface FeedMilestone {
    * visibility (PC-250).
    */
   visibleViaAdminOnly: boolean;
+  /** Admins may soft-delete milestones from the feed (PC-365). */
+  canDelete: boolean;
   canComment: boolean;
   comments: FeedComment[];
   likeCount: number;
