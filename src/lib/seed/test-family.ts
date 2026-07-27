@@ -131,6 +131,7 @@ export async function seedTestFamilyFoundation(options?: {
       mustChangePassword: false,
       avatarKey: user.avatarKey,
       theme: "mint",
+      timezone: "America/New_York",
       loginCount: 0,
       isPlatformAdmin: isPlatformAdminIdentity({ username: user.username }),
       notificationEmail:

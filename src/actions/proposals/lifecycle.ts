@@ -618,10 +618,17 @@ export async function cancelProposalAction(
         state: "archived",
         scheduledStartAt: null,
         scheduledEndAt: null,
+        // Drop batch night payload so cancelled batch cannot reappear via slots (PC-373).
+        batchEntriesJson: null,
         atRisk: false,
         updatedAt: now,
       })
       .where(eq(proposals.id, id));
+    // Detach leftover slots so any leftover schedule rebuild path ignores them.
+    await db
+      .update(proposalTimeSlots)
+      .set({ isDetached: true })
+      .where(eq(proposalTimeSlots.proposalId, id));
     await logProposalTransition(db, id, actorId, "proposal.cancelled");
     archivedIds.push(id);
   }

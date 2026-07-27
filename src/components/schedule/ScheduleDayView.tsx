@@ -11,14 +11,12 @@ import {
   localDateKey,
   scheduleDayCellSx,
 } from "@/lib/schedule/dates";
+import { DEFAULT_VIEWER_TIMEZONE } from "@/lib/schedule/timezone";
 import { fontFamilies } from "@/theme/fonts";
 import { GARDEN_TOKENS, ORGANIC_RADIUS } from "@/theme/tokens";
 
 const HOUR_HEIGHT_PX = 48;
 const DAY_MINUTES = 24 * 60;
-/** Sleeping arrangements occupy the overnight 12a–8a band on the hour grid (PC-364). */
-const SLEEPING_BAND_HOURS = 8;
-const SLEEPING_BAND_PX = SLEEPING_BAND_HOURS * HOUR_HEIGHT_PX;
 
 interface ScheduleDayViewProps {
   day: Date;
@@ -27,9 +25,12 @@ interface ScheduleDayViewProps {
   onEventClick: (event: ScheduleEvent) => void;
 }
 
-/** True all-day events only — sleeping uses the timed 0–8am band (PC-364). */
+/**
+ * All-day strip includes true all-day events and sleeping arrangements
+ * (non-time day events — PC-372). Timed events stay on the hour grid.
+ */
 function isAllDayLaneEvent(event: ScheduleEvent): boolean {
-  return event.isAllDay && event.proposalType !== "sleeping";
+  return event.isAllDay || event.proposalType === "sleeping";
 }
 
 /** Minutes from local midnight for an instant in the viewer timezone. */
@@ -45,49 +46,75 @@ function minutesInTimeZone(iso: string, timeZone: string): number {
   return hour * 60 + minute;
 }
 
+/**
+ * Builds a Date at `hour`:00 in `timeZone` on the same civil day as `dayIso`,
+ * so hour-grid labels stay aligned with event placement (PC-376).
+ */
+function zonedHourOnDay(dayIso: string, hour: number, timeZone: string): Date {
+  const dayKey = localDateKey(dayIso, timeZone);
+  const [year, month, dayNum] = dayKey.split("-").map(Number);
+  // Noon UTC probe avoids DST edge ambiguity when reading the zone offset.
+  const probe = new Date(Date.UTC(year!, month! - 1, dayNum!, 12, 0, 0));
+  const offsetParts = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    timeZoneName: "shortOffset",
+    hour: "numeric",
+  }).formatToParts(probe);
+  const tzName = offsetParts.find((p) => p.type === "timeZoneName")?.value ?? "GMT";
+  const match = /GMT([+-])(\d+)(?::(\d+))?/.exec(tzName);
+  let offsetMinutes = 0;
+  if (match) {
+    const sign = match[1] === "-" ? -1 : 1;
+    offsetMinutes = sign * (Number(match[2]) * 60 + Number(match[3] ?? 0));
+  }
+  // Local wall time = UTC + offset → UTC = wall - offset.
+  return new Date(Date.UTC(year!, month! - 1, dayNum!, hour, 0, 0) - offsetMinutes * 60_000);
+}
+
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
 
 /**
- * Single-day 12a–12a hour grid with an all-day strip (PC-204).
+ * Single-day 12a–12a hour grid with an all-day strip (PC-204 / PC-372).
  */
 export function ScheduleDayView({
   day,
   events,
-  timeZone = "UTC",
+  timeZone = DEFAULT_VIEWER_TIMEZONE,
   onEventClick,
 }: ScheduleDayViewProps) {
   const dayKey = localDateKey(day.toISOString(), timeZone);
   const cellSx = scheduleDayCellSx(day, timeZone);
 
-  const { allDayEvents, timedEvents, sleepingEvents } = useMemo(() => {
+  const { allDayEvents, timedEvents } = useMemo(() => {
     const allDay: ScheduleEvent[] = [];
     const timed: ScheduleEvent[] = [];
-    const sleeping: ScheduleEvent[] = [];
     for (const event of events) {
       const startKey = localDateKey(event.startAt, timeZone);
       const endKey = localDateKey(event.endAt ?? event.startAt, timeZone);
       if (startKey > dayKey || endKey < dayKey) continue;
-      if (event.proposalType === "sleeping") {
-        sleeping.push(event);
-      } else if (isAllDayLaneEvent(event)) {
+      if (isAllDayLaneEvent(event)) {
         allDay.push(event);
       } else {
         timed.push(event);
       }
     }
-    allDay.sort((a, b) => a.startAt.localeCompare(b.startAt));
+    // Sleeping last within the all-day strip (PC-364 ordering preserved).
+    allDay.sort((a, b) => {
+      const aSleep = a.proposalType === "sleeping";
+      const bSleep = b.proposalType === "sleeping";
+      if (aSleep !== bSleep) return aSleep ? 1 : -1;
+      return a.startAt.localeCompare(b.startAt);
+    });
     timed.sort((a, b) => a.startAt.localeCompare(b.startAt));
-    sleeping.sort((a, b) => a.startAt.localeCompare(b.startAt));
-    return { allDayEvents: allDay, timedEvents: timed, sleepingEvents: sleeping };
+    return { allDayEvents: allDay, timedEvents: timed };
   }, [dayKey, events, timeZone]);
 
   const hourLabels = useMemo(
     () =>
       Array.from({ length: 24 }, (_, hour) => {
-        const labelDate = new Date(day);
-        labelDate.setHours(hour, 0, 0, 0);
+        const labelDate = zonedHourOnDay(day.toISOString(), hour, timeZone);
         return labelDate.toLocaleTimeString(undefined, {
           hour: "numeric",
           timeZone,
@@ -134,6 +161,7 @@ export function ScheduleDayView({
           borderBottom: `1px solid ${GARDEN_TOKENS.outlineSoft}`,
           minHeight: 48,
         }}
+        data-testid="schedule-day-all-day-strip"
       >
         <Typography
           variant="caption"
@@ -217,40 +245,11 @@ export function ScheduleDayView({
             />
           ))}
 
-          {timedEvents.length === 0 &&
-          allDayEvents.length === 0 &&
-          sleepingEvents.length === 0 ? (
+          {timedEvents.length === 0 && allDayEvents.length === 0 ? (
             <Box sx={{ position: "absolute", inset: 0, p: 2 }}>
               <EmptyState title="Nothing scheduled" description="Tap + to add an event or sleeping night." />
             </Box>
           ) : null}
-
-          {sleepingEvents.map((event, index) => {
-            const stackCount = sleepingEvents.length;
-            const height = Math.max(SLEEPING_BAND_PX / stackCount, 28);
-            const top = Math.min(index * height, SLEEPING_BAND_PX - height);
-            return (
-              <Box
-                key={`${event.proposalId}-${event.startAt}-sleeping`}
-                sx={{
-                  position: "absolute",
-                  left: 4,
-                  right: 4,
-                  top,
-                  height: Math.min(height, SLEEPING_BAND_PX - top),
-                  zIndex: 1,
-                }}
-              >
-                <ScheduleEventBlock
-                  event={event}
-                  compact
-                  timeZone={timeZone}
-                  rotationIndex={index}
-                  onClick={() => onEventClick(event)}
-                />
-              </Box>
-            );
-          })}
 
           {timedEvents.map((event, index) => {
             const startKey = localDateKey(event.startAt, timeZone);
@@ -284,7 +283,7 @@ export function ScheduleDayView({
                   event={event}
                   compact
                   timeZone={timeZone}
-                  rotationIndex={index + sleepingEvents.length}
+                  rotationIndex={index}
                   onClick={() => onEventClick(event)}
                 />
               </Box>

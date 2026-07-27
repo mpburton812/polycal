@@ -565,6 +565,7 @@ async function createRecurringChildProposals(
       intentionalSolo: parent.intentionalSolo,
       eventPrivacy: parent.eventPrivacy,
       isPoll: false,
+      isAllDay: parent.isAllDay ?? false,
       parentProposalId: parent.id,
       occurrenceIndex: index,
       isRecurrenceParent: false,
@@ -878,14 +879,21 @@ export async function updateDraftProposalAction(
     .where(eq(proposals.id, parsed.data.proposalId))
     .limit(1);
 
-  if (
-    !proposal ||
-    proposal.networkId !== networkId ||
-    proposal.proposerId !== session.user.id ||
-    proposal.state !== "draft"
-  ) {
+  if (!proposal || proposal.state !== "draft" || proposal.networkId !== networkId) {
     return { ok: false, message: "Draft not found." };
   }
+
+  const isAdmin = await userHasAdminAccess(session.user.role);
+  const isOwner = proposal.proposerId === session.user.id;
+  // Match canEdit: proposer or admin may update drafts (PC-375).
+  if (!isOwner && !isAdmin) {
+    return { ok: false, message: "Draft not found." };
+  }
+
+  // Admin edits keep the original proposer's identity for invitee checks;
+  // location checks still use the actor role so admins can pick any place (PC-375).
+  const subjectUserId = proposal.proposerId;
+  const locationActorRole = session.user.role as UserRole;
 
   if (isNonScheduleProposal(proposal.description)) {
     return { ok: false, message: "This draft cannot be edited here." };
@@ -898,8 +906,8 @@ export async function updateDraftProposalAction(
 
   if (isBatchSleeping) {
     const validation = await validateBatchSleepingEntries(db, {
-      subjectUserId: session.user.id,
-      subjectRole: session.user.role,
+      subjectUserId,
+      subjectRole: locationActorRole,
       entries: batchEntries,
       locationPolicy: "network",
     });
@@ -910,12 +918,12 @@ export async function updateDraftProposalAction(
     const [proposerRow] = await db
       .select({ displayName: users.displayName })
       .from(users)
-      .where(eq(users.id, session.user.id))
+      .where(eq(users.id, subjectUserId))
       .limit(1);
 
     await updateBatchSleepingDraft(db, {
       proposalId: proposal.id,
-      proposerId: session.user.id,
+      proposerId: subjectUserId,
       proposerName: proposerRow?.displayName ?? "User",
       entries: batchEntries,
     });
@@ -940,8 +948,8 @@ export async function updateDraftProposalAction(
 
   const locationCheck = await assertLocationAllowed(
     db,
-    session.user.id,
-    session.user.role,
+    subjectUserId,
+    locationActorRole,
     parsed.data.locationId,
     parsed.data.locationText,
     networkId,
@@ -952,7 +960,7 @@ export async function updateDraftProposalAction(
 
   const inviteeCheck = await assertSleepingInviteesAllowed(
     db,
-    session.user.id,
+    subjectUserId,
     parsed.data.proposalType,
     Boolean(parsed.data.intentionalSolo),
     parsed.data.invitees ?? [],

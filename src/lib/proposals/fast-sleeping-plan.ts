@@ -11,6 +11,10 @@ export const FAST_SLEEPING_GRID_DAYS = 14;
 export const fastSleepingRowSchema = z.object({
   nightDate: z.string().min(1, "Night date is required."),
   inviteeUserIds: z.array(z.string().min(1)).default([]),
+  /** Per-partner role; missing ids default to optional on batch build (PC-374). */
+  inviteeRoles: z
+    .record(z.string(), z.enum(["required", "optional"]))
+    .optional(),
   locationId: z.string().optional(),
   locationText: limitedString("Location", SHORT_TEXT_MAX).optional(),
   intentionalSolo: z.boolean().optional(),
@@ -47,6 +51,7 @@ export function buildEmptyGridRows(
     return {
       nightDate: formatGridDate(day),
       inviteeUserIds: [],
+      inviteeRoles: {},
       intentionalSolo: false,
     };
   });
@@ -74,7 +79,7 @@ export function fastSleepingRowHasContent(row: FastSleepingRow): boolean {
 
 /**
  * Builds batch sleeping entries from fast-plan grid rows (skips empty nights).
- * Selected partners are always required invitees.
+ * Partners default to optional unless explicitly marked required (PC-374).
  */
 export function buildBatchEntriesFromRows(rows: FastSleepingRow[]): BatchSleepingEntry[] {
   return rows.filter(fastSleepingRowHasContent).map((row) => ({
@@ -85,7 +90,10 @@ export function buildBatchEntriesFromRows(rows: FastSleepingRow[]): BatchSleepin
     intentionalSolo: Boolean(row.intentionalSolo),
     invitees: row.intentionalSolo
       ? []
-      : row.inviteeUserIds.map((userId) => ({ userId, role: "required" as const })),
+      : row.inviteeUserIds.map((userId) => ({
+          userId,
+          role: (row.inviteeRoles?.[userId] ?? "optional") as "required" | "optional",
+        })),
   }));
 }
 
@@ -108,6 +116,11 @@ export function rowsFromBatchEntries(
         inviteeUserIds: entry.intentionalSolo
           ? []
           : entry.invitees.map((invitee) => invitee.userId),
+        inviteeRoles: entry.intentionalSolo
+          ? {}
+          : Object.fromEntries(
+              entry.invitees.map((invitee) => [invitee.userId, invitee.role]),
+            ),
         locationId: entry.locationId,
         locationText: entry.locationText,
         intentionalSolo: Boolean(entry.intentionalSolo),

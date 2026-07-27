@@ -1,8 +1,9 @@
 "use client";
 
 import type { ScheduleFilterMode } from "@/actions/schedule";
-import { startOfWeekMonday } from "@/lib/schedule/dates";
+import { civilDateAtNoonUtc, localDateKey, startOfWeekMonday } from "@/lib/schedule/dates";
 import { startOfMonth } from "@/lib/schedule/month-grid";
+import { DEFAULT_VIEWER_TIMEZONE } from "@/lib/schedule/timezone";
 
 const STORAGE_KEY = "polycal.schedule.view";
 
@@ -159,10 +160,12 @@ export function todayAnchors(
 }
 
 /**
- * Normalizes an anchor to local noon on that calendar day for day layout (PC-204).
+ * Normalizes an anchor to noon-UTC on that civil day in `timeZone` (PC-204 / PC-376).
  */
-export function startOfLocalDayNoon(date: Date): Date {
-  const next = new Date(date);
-  next.setHours(12, 0, 0, 0);
-  return next;
+export function startOfLocalDayNoon(
+  date: Date,
+  timeZone: string = DEFAULT_VIEWER_TIMEZONE,
+): Date {
+  const key = localDateKey(date.toISOString(), timeZone);
+  return civilDateAtNoonUtc(key);
 }

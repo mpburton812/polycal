@@ -58,7 +58,21 @@ export async function applyAdminMigrations(sql: Client): Promise<void> {
   await ensureColumn(sql, "users", "onboarding_complete", "INTEGER NOT NULL DEFAULT 1");
   await ensureColumn(sql, "users", "session_version", "INTEGER NOT NULL DEFAULT 0");
   await ensureColumn(sql, "users", "activated_from_passive_at", "TEXT");
-  await ensureColumn(sql, "users", "timezone", "TEXT NOT NULL DEFAULT 'UTC'");
+  await ensureColumn(sql, "users", "timezone", "TEXT NOT NULL DEFAULT 'America/New_York'");
+
+  // One-shot: migrate legacy UTC defaults to America/New_York (PC-376).
+  const tzBackfill = await sql.execute({
+    sql: `SELECT value FROM schema_meta WHERE key = 'timezone_nyt_backfill_v1' LIMIT 1`,
+  });
+  if (!tzBackfill.rows[0]) {
+    await sql.execute({
+      sql: `UPDATE users SET timezone = 'America/New_York' WHERE timezone = 'UTC' OR timezone IS NULL OR TRIM(timezone) = ''`,
+    });
+    await sql.execute({
+      sql: `INSERT INTO schema_meta (key, value) VALUES ('timezone_nyt_backfill_v1', '1')
+            ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
+    });
+  }
   await ensureColumn(sql, "users", "moderation_reason", "TEXT");
   await ensureColumn(sql, "users", "moderation_expires_at", "TEXT");
 

@@ -1,7 +1,21 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { sleepingDateToStartIso } from "@/lib/proposals/sleeping-schedule";
-import { isAdminOversightView, isPastSchedule } from "./proposalCardTheme";
+import { formatTimeRange, isAdminOversightView, isPastSchedule } from "./proposalCardTheme";
+
+describe("formatTimeRange", () => {
+  it("formats timed events in the account timezone (PC-376)", () => {
+    // 22:00 UTC = 6:00 PM Eastern (EDT)
+    const label = formatTimeRange(
+      "2026-07-16T22:00:00.000Z",
+      "2026-07-17T00:40:00.000Z",
+      "event",
+      false,
+      "America/New_York",
+    );
+    expect(label).toMatch(/6:00/);
+  });
+});
 
 describe("isAdminOversightView", () => {
   it("is true when admin views another user's proposal and is not an invitee", () => {

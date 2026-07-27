@@ -88,7 +88,7 @@ describe("fastSleepingRowHasContent", () => {
 });
 
 describe("buildBatchEntriesFromRows", () => {
-  it("skips empty nights and maps invitees to required", () => {
+  it("skips empty nights and maps invitees to optional by default (PC-374)", () => {
     const entries = buildBatchEntriesFromRows([
       { nightDate: "2099-07-01", inviteeUserIds: [] },
       { nightDate: "2099-07-02", inviteeUserIds: ["p1", "p2"] },
@@ -98,11 +98,25 @@ describe("buildBatchEntriesFromRows", () => {
     expect(entries).toHaveLength(2);
     expect(entries[0]?.nightDate).toBe("2099-07-02");
     expect(entries[0]?.invitees).toEqual([
-      { userId: "p1", role: "required" },
-      { userId: "p2", role: "required" },
+      { userId: "p1", role: "optional" },
+      { userId: "p2", role: "optional" },
     ]);
     expect(entries[1]?.intentionalSolo).toBe(true);
     expect(entries[1]?.invitees).toEqual([]);
+  });
+
+  it("honors explicit required roles on partners", () => {
+    const entries = buildBatchEntriesFromRows([
+      {
+        nightDate: "2099-07-02",
+        inviteeUserIds: ["p1", "p2"],
+        inviteeRoles: { p1: "required", p2: "optional" },
+      },
+    ]);
+    expect(entries[0]?.invitees).toEqual([
+      { userId: "p1", role: "required" },
+      { userId: "p2", role: "optional" },
+    ]);
   });
 });
 

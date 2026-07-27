@@ -9,6 +9,7 @@ import { isEventIconKey } from "@/lib/event-icons/registry";
 import { MASKED_TITLE } from "@/lib/proposals/access";
 import { scheduleBlockSx, scheduleBlockVariant } from "@/lib/schedule/colors";
 import { formatEventTime } from "@/lib/schedule/dates";
+import { DEFAULT_VIEWER_TIMEZONE } from "@/lib/schedule/timezone";
 import { fontFamilies } from "@/theme/fonts";
 import { GARDEN_TOKENS } from "@/theme/tokens";
 
@@ -45,7 +46,7 @@ function formatStatusLabel(event: ScheduleEvent): string {
 export function ScheduleEventBlock({
   event,
   compact = false,
-  timeZone = "UTC",
+  timeZone = DEFAULT_VIEWER_TIMEZONE,
   rotationIndex = 0,
   onClick,
 }: ScheduleEventBlockProps) {

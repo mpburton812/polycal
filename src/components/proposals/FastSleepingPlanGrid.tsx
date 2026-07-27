@@ -56,7 +56,29 @@ export function FastSleepingPlanGrid({
     const inviteeUserIds = hasPartner
       ? row.inviteeUserIds.filter((id) => id !== partnerId)
       : [...row.inviteeUserIds, partnerId];
-    updateRow(index, { inviteeUserIds });
+    const inviteeRoles: Record<string, "required" | "optional"> = {
+      ...(row.inviteeRoles ?? {}),
+    };
+    if (hasPartner) {
+      delete inviteeRoles[partnerId];
+    } else {
+      // Default new partners to optional so nights can submit without blocking (PC-374).
+      inviteeRoles[partnerId] = "optional";
+    }
+    updateRow(index, { inviteeUserIds, inviteeRoles });
+  }
+
+  function setPartnerRole(
+    index: number,
+    partnerId: string,
+    role: "required" | "optional",
+  ) {
+    const row = rows[index];
+    if (!row || row.intentionalSolo || disabled) return;
+    if (!row.inviteeUserIds.includes(partnerId)) return;
+    updateRow(index, {
+      inviteeRoles: { ...(row.inviteeRoles ?? {}), [partnerId]: role },
+    });
   }
 
   return (
@@ -103,7 +125,7 @@ export function FastSleepingPlanGrid({
                 <ToggleButton value="network">Partners</ToggleButton>
               </ToggleButtonGroup>
               {!row.intentionalSolo && (
-                <Stack direction="row" flexWrap="wrap" gap={0.5}>
+                <Stack direction="column" gap={0.75}>
                   {partnerPeople.length === 0 ? (
                     <Typography variant="caption" color="text.secondary">
                       No sleeping partners
@@ -111,17 +133,52 @@ export function FastSleepingPlanGrid({
                   ) : (
                     partnerPeople.map((partner) => {
                       const selected = row.inviteeUserIds.includes(partner.id);
+                      const role = row.inviteeRoles?.[partner.id] ?? "optional";
                       return (
-                        <Chip
+                        <Stack
                           key={partner.id}
-                          label={partner.displayName}
-                          size="small"
-                          color={selected ? "primary" : "default"}
-                          variant={selected ? "filled" : "outlined"}
-                          onClick={() => togglePartner(index, partner.id)}
-                          disabled={disabled}
-                          sx={{ cursor: disabled ? "default" : "pointer" }}
-                        />
+                          direction="row"
+                          flexWrap="wrap"
+                          gap={0.5}
+                          alignItems="center"
+                        >
+                          <Chip
+                            label={partner.displayName}
+                            size="small"
+                            color={selected ? "primary" : "default"}
+                            variant={selected ? "filled" : "outlined"}
+                            onClick={() => togglePartner(index, partner.id)}
+                            disabled={disabled}
+                            sx={{ cursor: disabled ? "default" : "pointer" }}
+                          />
+                          {selected ? (
+                            <ToggleButtonGroup
+                              exclusive
+                              size="small"
+                              value={role}
+                              disabled={disabled}
+                              onChange={(_, value) => {
+                                if (value === "required" || value === "optional") {
+                                  setPartnerRole(index, partner.id, value);
+                                }
+                              }}
+                              aria-label={`${partner.displayName} invite role`}
+                            >
+                              <ToggleButton
+                                value="optional"
+                                aria-label={`${partner.displayName} optional`}
+                              >
+                                Optional
+                              </ToggleButton>
+                              <ToggleButton
+                                value="required"
+                                aria-label={`${partner.displayName} required`}
+                              >
+                                Required
+                              </ToggleButton>
+                            </ToggleButtonGroup>
+                          ) : null}
+                        </Stack>
                       );
                     })
                   )}

@@ -158,16 +158,16 @@ export function ScheduleClient({
   } = useScheduleTapRouter();
 
   const weekStart = useMemo(
-    () => startOfWeekMonday(new Date(viewState.weekStartIso)),
-    [viewState.weekStartIso],
+    () => startOfWeekMonday(new Date(viewState.weekStartIso), timeZone),
+    [viewState.weekStartIso, timeZone],
   );
   const dayAnchor = useMemo(
-    () => startOfLocalDayNoon(new Date(viewState.weekStartIso)),
-    [viewState.weekStartIso],
+    () => startOfLocalDayNoon(new Date(viewState.weekStartIso), timeZone),
+    [viewState.weekStartIso, timeZone],
   );
   const monthAnchor = useMemo(
-    () => startOfMonth(new Date(viewState.monthAnchorIso)),
-    [viewState.monthAnchorIso],
+    () => startOfMonth(new Date(viewState.monthAnchorIso), timeZone),
+    [viewState.monthAnchorIso, timeZone],
   );
   const isMonthLayout = viewState.calendarLayout === "month";
   const isDayLayout = viewState.calendarLayout === "day";
@@ -179,20 +179,26 @@ export function ScheduleClient({
       fetchAnchor,
       viewState.calendarLayout,
       viewState.compact,
+      timeZone,
     ).rangeEnd;
-  }, [fetchAnchor, viewState.calendarLayout, viewState.compact]);
+  }, [fetchAnchor, viewState.calendarLayout, viewState.compact, timeZone]);
 
   const rangeStart = useMemo(() => {
     return computeScheduleFetchRange(
       fetchAnchor,
       viewState.calendarLayout,
       viewState.compact,
+      timeZone,
     ).rangeStart;
-  }, [fetchAnchor, viewState.calendarLayout, viewState.compact]);
+  }, [fetchAnchor, viewState.calendarLayout, viewState.compact, timeZone]);
 
   const rangeLabel = useMemo(() => {
     if (isMonthLayout) {
-      return monthAnchor.toLocaleDateString(undefined, { month: "long", year: "numeric" });
+      return monthAnchor.toLocaleDateString(undefined, {
+        month: "long",
+        year: "numeric",
+        timeZone,
+      });
     }
     if (isDayLayout) {
       return dayAnchor.toLocaleDateString(undefined, {
@@ -200,12 +206,13 @@ export function ScheduleClient({
         month: "short",
         day: "numeric",
         year: "numeric",
+        timeZone,
       });
     }
     const end = addDays(weekStart, dayCount - 1);
-    const fmt: Intl.DateTimeFormatOptions = { month: "short", day: "numeric" };
+    const fmt: Intl.DateTimeFormatOptions = { month: "short", day: "numeric", timeZone };
     return `${weekStart.toLocaleDateString(undefined, fmt)} – ${end.toLocaleDateString(undefined, fmt)}`;
-  }, [dayAnchor, dayCount, isDayLayout, isMonthLayout, monthAnchor, weekStart]);
+  }, [dayAnchor, dayCount, isDayLayout, isMonthLayout, monthAnchor, timeZone, weekStart]);
 
   const refreshSchedule = useCallback(
     (
@@ -218,6 +225,7 @@ export function ScheduleClient({
         anchorDate,
         layout,
         compact,
+        timeZone,
       );
 
       const seq = ++refreshSeqRef.current;
@@ -235,7 +243,7 @@ export function ScheduleClient({
         }
       })();
     },
-    [viewState.calendarLayout, viewState.compact],
+    [timeZone, viewState.calendarLayout, viewState.compact],
   );
 
   const refreshCurrentView = useCallback(() => {
@@ -280,9 +288,9 @@ export function ScheduleClient({
             ...next,
             weekStartIso:
               nextLayout === "day"
-                ? startOfLocalDayNoon(anchorDate).toISOString()
-                : startOfWeekMonday(anchorDate).toISOString(),
-            monthAnchorIso: startOfMonth(anchorDate).toISOString(),
+                ? startOfLocalDayNoon(anchorDate, timeZone).toISOString()
+                : startOfWeekMonday(anchorDate, timeZone).toISOString(),
+            monthAnchorIso: startOfMonth(anchorDate, timeZone).toISOString(),
           };
         }
       }
@@ -335,10 +343,10 @@ export function ScheduleClient({
       viewState.calendarLayout === "month"
         ? new Date(viewState.monthAnchorIso)
         : viewState.calendarLayout === "day"
-          ? startOfLocalDayNoon(new Date(viewState.weekStartIso))
+          ? startOfLocalDayNoon(new Date(viewState.weekStartIso), timeZone)
           : new Date(viewState.weekStartIso);
-    const initialMonday = startOfWeekMonday(new Date(initialWeekStartIso));
-    const viewMonday = startOfWeekMonday(anchor);
+    const initialMonday = startOfWeekMonday(new Date(initialWeekStartIso), timeZone);
+    const viewMonday = startOfWeekMonday(anchor, timeZone);
     const sameWeek = isSameLocalCalendarDay(viewMonday, initialMonday);
     if (
       !sameWeek ||
@@ -383,11 +391,11 @@ export function ScheduleClient({
     }
 
     if (isDayLayout) {
-      const next = startOfLocalDayNoon(addDays(dayAnchor, delta));
+      const next = startOfLocalDayNoon(addDays(dayAnchor, delta), timeZone);
       setViewState((current) => ({
         ...current,
         weekStartIso: next.toISOString(),
-        monthAnchorIso: startOfMonth(next).toISOString(),
+        monthAnchorIso: startOfMonth(next, timeZone).toISOString(),
       }));
       refreshSchedule(next, { layout: "day" });
       return;
@@ -403,7 +411,7 @@ export function ScheduleClient({
     const anchors = todayAnchors();
     const now = new Date();
     if (viewState.calendarLayout === "day") {
-      const day = startOfLocalDayNoon(now);
+      const day = startOfLocalDayNoon(now, timeZone);
       setViewState((current) => ({
         ...current,
         weekStartIso: day.toISOString(),
@@ -428,6 +436,7 @@ export function ScheduleClient({
     if (mode === "day") {
       const day = startOfLocalDayNoon(
         viewState.calendarLayout === "month" ? monthAnchor : new Date(viewState.weekStartIso),
+        timeZone,
       );
       const withDay = { ...next, weekStartIso: day.toISOString() };
       setViewState(withDay);
@@ -438,7 +447,7 @@ export function ScheduleClient({
     const anchor =
       next.calendarLayout === "month"
         ? new Date(next.monthAnchorIso)
-        : startOfWeekMonday(new Date(next.weekStartIso));
+        : startOfWeekMonday(new Date(next.weekStartIso), timeZone);
     refreshSchedule(anchor, { layout: next.calendarLayout, compact: next.compact });
   }
 
@@ -447,7 +456,7 @@ export function ScheduleClient({
   }
 
   function openWeekForDay(day: Date) {
-    const monday = startOfWeekMonday(day);
+    const monday = startOfWeekMonday(day, timeZone);
     setDaySheetDay(null);
     setViewState((current) => ({
       ...current,

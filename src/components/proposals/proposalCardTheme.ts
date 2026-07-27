@@ -1,5 +1,6 @@
 /** Shared PolyCal proposal card palette and helpers — Garden Brutalism (PC-40). */
 import { sleepingCalendarDayEnd } from "@/lib/proposals/sleeping-schedule";
+import { DEFAULT_VIEWER_TIMEZONE } from "@/lib/schedule/timezone";
 import {
   EVENT_BLOCK_ROTATIONS,
   GARDEN_TOKENS,
@@ -23,15 +24,20 @@ export const ADMIN_OVERSIGHT_BG = "#FFE8D6";
  */
 export const ADMIN_ONLY_FEED_COMMENT_BG = "#FFF59D";
 
+/**
+ * Formats a proposal time/date span in the account timezone (PC-376).
+ * Defaults to America/New_York when no zone is passed — same as schedule.
+ */
 export function formatTimeRange(
   start: string | null,
   end: string | null,
   proposalType: "event" | "sleeping" = "event",
   isAllDay = false,
+  timeZone: string = DEFAULT_VIEWER_TIMEZONE,
 ): string | null {
   if (!start) return null;
   if (proposalType === "sleeping" || isAllDay) {
-    const range = formatDateRange(start, end);
+    const range = formatDateRange(start, end, timeZone);
     return isAllDay && range ? `All day · ${range}` : range;
   }
   const startLabel = new Date(start).toLocaleString(undefined, {
@@ -40,33 +46,36 @@ export function formatTimeRange(
     day: "numeric",
     hour: "numeric",
     minute: "2-digit",
+    timeZone,
   });
   if (!end) return startLabel;
   const endLabel = new Date(end).toLocaleString(undefined, {
     hour: "numeric",
     minute: "2-digit",
+    timeZone,
   });
   return `${startLabel} – ${endLabel}`;
 }
 
 /** Date-only span for sleeping proposals (no clock times). */
-export function formatDateRange(start: string | null, end: string | null): string | null {
+export function formatDateRange(
+  start: string | null,
+  end: string | null,
+  timeZone: string = DEFAULT_VIEWER_TIMEZONE,
+): string | null {
   if (!start) return null;
   const dateOpts: Intl.DateTimeFormatOptions = {
     weekday: "short",
     month: "short",
     day: "numeric",
+    timeZone,
   };
   const startLabel = new Date(start).toLocaleDateString(undefined, dateOpts);
   if (!end) return startLabel;
-  const endDate = new Date(end);
-  const startDate = new Date(start);
-  const sameDay =
-    startDate.getFullYear() === endDate.getFullYear() &&
-    startDate.getMonth() === endDate.getMonth() &&
-    startDate.getDate() === endDate.getDate();
-  if (sameDay) return startLabel;
-  return `${startLabel} – ${endDate.toLocaleDateString(undefined, dateOpts)}`;
+  const endKey = new Date(end).toLocaleDateString("en-CA", { timeZone });
+  const startKey = new Date(start).toLocaleDateString("en-CA", { timeZone });
+  if (startKey === endKey) return startLabel;
+  return `${startLabel} – ${new Date(end).toLocaleDateString(undefined, dateOpts)}`;
 }
 
 export function typeBadgeLabel(
