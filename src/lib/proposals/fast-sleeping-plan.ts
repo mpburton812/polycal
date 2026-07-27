@@ -12,7 +12,9 @@ export const fastSleepingRowSchema = z.object({
   nightDate: z.string().min(1, "Night date is required."),
   inviteeUserIds: z.array(z.string().min(1)).default([]),
   /** Per-partner role; missing ids default to optional on batch build (PC-374). */
-  inviteeRoles: z.record(z.enum(["required", "optional"])).optional(),
+  inviteeRoles: z
+    .record(z.string(), z.enum(["required", "optional"]))
+    .optional(),
   locationId: z.string().optional(),
   locationText: limitedString("Location", SHORT_TEXT_MAX).optional(),
   intentionalSolo: z.boolean().optional(),

@@ -56,7 +56,9 @@ export function FastSleepingPlanGrid({
     const inviteeUserIds = hasPartner
       ? row.inviteeUserIds.filter((id) => id !== partnerId)
       : [...row.inviteeUserIds, partnerId];
-    const inviteeRoles = { ...(row.inviteeRoles ?? {}) };
+    const inviteeRoles: Record<string, "required" | "optional"> = {
+      ...(row.inviteeRoles ?? {}),
+    };
     if (hasPartner) {
       delete inviteeRoles[partnerId];
     } else {
