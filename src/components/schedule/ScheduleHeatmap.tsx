@@ -20,7 +20,7 @@ const LEVEL_COLORS = [...HEATMAP_LEVEL_COLORS];
 export type HeatmapLayout = "day" | "week" | "twoWeek" | "month";
 
 /** Formats a day label as MM/DD for heatmap cells in the viewer timezone. */
-function formatHeatmapDate(day: Date, timeZone: string): string {
+function formatHeatmapDate(day: Date, timeZone: string = DEFAULT_VIEWER_TIMEZONE): string {
   const key = localDateKey(day.toISOString(), timeZone);
   return `${key.slice(5, 7)}/${key.slice(8, 10)}`;
 }
@@ -163,7 +163,7 @@ export function ScheduleHeatmap({
                 const day = addDays(weekStart, dayIndex);
                 return (
                   <HeatmapCell
-                    key={`${dayIndex}-${formatHeatmapDate(day)}`}
+                    key={`${dayIndex}-${formatHeatmapDate(day, timeZone ?? DEFAULT_VIEWER_TIMEZONE)}`}
                     level={level}
                     day={day}
                     compact={layout === "twoWeek"}
