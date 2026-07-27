@@ -3,20 +3,15 @@
 import {
   Box,
   Button,
-  Chip,
+  Divider,
   Paper,
   Stack,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableRow,
   TextField,
   Typography,
 } from "@mui/material";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 
 import type { PlatformUserRow } from "@/actions/platform-admin";
 import type { PlatformSettings } from "@/types/network";
@@ -34,6 +29,21 @@ type NetworkRow = {
 };
 
 type ModerationTarget = { userId: string; displayName: string; kind: "pause" | "ban" };
+
+function DetailRow({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <Box sx={{ py: 1 }}>
+      <Typography
+        variant="caption"
+        color="text.secondary"
+        sx={{ display: "block", fontWeight: 600, mb: 0.25 }}
+      >
+        {label}
+      </Typography>
+      <Box sx={{ typography: "body2" }}>{children}</Box>
+    </Box>
+  );
+}
 
 /**
  * Client UI for platform settings, networks, and global user moderation (PC-362).
@@ -147,224 +157,203 @@ export function PlatformAdminClient({
   }
 
   return (
-    <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+    <Box sx={{ display: "flex", flexDirection: "column", gap: 3, maxWidth: 960 }}>
       <Typography variant="h5" sx={{ fontFamily: fontFamilies.display }}>
         Platform administration
       </Typography>
       {message && <Typography variant="body2">{message}</Typography>}
 
       <Paper sx={{ ...brutalPaperSx, p: 2 }}>
-        <Typography variant="h6" sx={{ mb: 1 }}>
+        <Typography variant="h6" sx={{ mb: 2 }}>
           Creation caps
         </Typography>
-        <TextField
-          label="Max networks per email"
-          type="number"
-          value={maxPerEmail}
-          onChange={(e) => setMaxPerEmail(Number(e.target.value))}
-          sx={{ mr: 2, mb: 1 }}
-        />
-        <TextField
-          label="Max network creates per day"
-          type="number"
-          value={maxPerDay}
-          onChange={(e) => setMaxPerDay(Number(e.target.value))}
-          sx={{ mb: 1 }}
-        />
-        <Box>
-          <Button variant="contained" onClick={() => void saveSettings()}>
-            Save caps
-          </Button>
-        </Box>
+        <Stack spacing={2} sx={{ maxWidth: 420 }}>
+          <TextField
+            label="Max networks per email"
+            type="number"
+            value={maxPerEmail}
+            onChange={(e) => setMaxPerEmail(Number(e.target.value))}
+            fullWidth
+          />
+          <TextField
+            label="Max network creates per day"
+            type="number"
+            value={maxPerDay}
+            onChange={(e) => setMaxPerDay(Number(e.target.value))}
+            fullWidth
+          />
+          <Box>
+            <Button variant="contained" onClick={() => void saveSettings()}>
+              Save caps
+            </Button>
+          </Box>
+        </Stack>
       </Paper>
 
-      <Paper sx={{ ...brutalPaperSx, p: 2, overflow: "hidden" }}>
-        <Typography variant="h6" sx={{ mb: 1 }}>
-          Networks
+      <Box>
+        <Typography variant="h6" sx={{ mb: 1.5 }}>
+          Networks ({networks.length})
         </Typography>
-        <Box sx={{ overflowX: "auto" }}>
-          <Table
-            size="small"
-            sx={{
-              tableLayout: "fixed",
-              width: "100%",
-              "& th, & td": {
-                wordBreak: "break-word",
-                whiteSpace: "normal",
-                verticalAlign: "top",
-              },
-            }}
-          >
-            <TableHead>
-              <TableRow>
-                <TableCell sx={{ width: "22%" }}>Name</TableCell>
-                <TableCell sx={{ width: "12%" }}>Status</TableCell>
-                <TableCell sx={{ width: "10%" }}>Members</TableCell>
-                <TableCell sx={{ width: "14%" }}>Created</TableCell>
-                <TableCell sx={{ width: "42%" }}>Actions</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {networks.map((n) => (
-                <TableRow key={n.id}>
-                  <TableCell>{n.name}</TableCell>
-                  <TableCell>{n.status}</TableCell>
-                  <TableCell>{n.memberCount}</TableCell>
-                  <TableCell>{n.createdAt.slice(0, 10)}</TableCell>
-                  <TableCell>
-                    <Stack direction="row" flexWrap="wrap" gap={0.5}>
-                      <Button size="small" onClick={() => void toggleStatus(n.id, n.status)}>
-                        {n.status === "active" ? "Pause" : "Activate"}
-                      </Button>
-                      <Button
-                        size="small"
-                        variant="outlined"
-                        onClick={() => setDetailNetwork({ id: n.id, name: n.name })}
-                      >
-                        Detail view
-                      </Button>
-                      <Button
-                        size="small"
-                        variant="outlined"
-                        onClick={() => void inhabitNetwork(n.id)}
-                      >
-                        Inhabit admin
-                      </Button>
-                    </Stack>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </Box>
-      </Paper>
+        <Stack spacing={1.5}>
+          {networks.map((network) => (
+            <Paper key={network.id} sx={{ ...brutalPaperSx, p: 2 }}>
+              <DetailRow label="Network name">{network.name}</DetailRow>
+              <Divider />
+              <DetailRow label="Status">{network.status}</DetailRow>
+              <Divider />
+              <DetailRow label="Members">{network.memberCount}</DetailRow>
+              <Divider />
+              <DetailRow label="Created">{network.createdAt.slice(0, 10)}</DetailRow>
+              <Divider />
+              <DetailRow label="Actions">
+                <Stack direction="row" flexWrap="wrap" gap={1} sx={{ pt: 0.5 }}>
+                  <Button size="small" onClick={() => void toggleStatus(network.id, network.status)}>
+                    {network.status === "active" ? "Pause network" : "Activate network"}
+                  </Button>
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    onClick={() => setDetailNetwork({ id: network.id, name: network.name })}
+                  >
+                    Detail view
+                  </Button>
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    onClick={() => void inhabitNetwork(network.id)}
+                  >
+                    Inhabit admin
+                  </Button>
+                </Stack>
+              </DetailRow>
+            </Paper>
+          ))}
+        </Stack>
+      </Box>
 
-      <Paper sx={{ ...brutalPaperSx, p: 2, overflow: "hidden" }}>
-        <Typography variant="h6" sx={{ mb: 1 }}>
-          All users
+      <Box>
+        <Typography variant="h6" sx={{ mb: 1.5 }}>
+          All users ({users.length})
         </Typography>
-        <Table
-          size="small"
-          sx={{
-            tableLayout: "fixed",
-            width: "100%",
-            "& th, & td": {
-              wordBreak: "break-word",
-              whiteSpace: "normal",
-              verticalAlign: "top",
-            },
-          }}
-        >
-          <TableHead>
-            <TableRow>
-              <TableCell sx={{ width: "14%" }}>Username</TableCell>
-              <TableCell sx={{ width: "16%" }}>Profile name</TableCell>
-              <TableCell sx={{ width: "10%" }}>Status</TableCell>
-              <TableCell sx={{ width: "30%" }}>Networks</TableCell>
-              <TableCell sx={{ width: "30%" }}>Actions</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {users.map((user) => (
-              <TableRow key={user.id}>
-                <TableCell>{user.username}</TableCell>
-                <TableCell>{user.displayName}</TableCell>
-                <TableCell>{user.status}</TableCell>
-                <TableCell>
-                  {user.networks.length === 0 ? (
-                    <Typography variant="caption" color="text.secondary">
-                      None
-                    </Typography>
-                  ) : (
-                    <Stack direction="row" flexWrap="wrap" gap={0.5}>
-                      {user.networks.map((network) => (
-                        <Chip
-                          key={network.networkId}
-                          size="small"
-                          label={`${network.name} (${network.role})`}
-                        />
-                      ))}
-                    </Stack>
-                  )}
-                </TableCell>
-                <TableCell>
-                  <Stack direction="row" flexWrap="wrap" gap={0.5}>
-                    {user.status === "active" && (
-                      <>
-                        <Button
-                          size="small"
-                          onClick={() =>
-                            setModerationTarget({
-                              userId: user.id,
-                              displayName: user.displayName,
-                              kind: "pause",
-                            })
-                          }
-                        >
-                          Pause
-                        </Button>
-                        <Button
-                          size="small"
-                          color="error"
-                          onClick={() =>
-                            setModerationTarget({
-                              userId: user.id,
-                              displayName: user.displayName,
-                              kind: "ban",
-                            })
-                          }
-                        >
-                          Ban
-                        </Button>
-                        <Button
-                          size="small"
-                          color="error"
-                          onClick={() => {
-                            if (
-                              !window.confirm(
-                                `Permanently delete ${user.displayName}? This cannot be undone.`,
-                              )
-                            ) {
-                              return;
-                            }
-                            void deleteUserPlatformAction(user.id).then((result) => {
-                              setMessage(result.message);
-                              if (result.ok) {
-                                setUsers((prev) => prev.filter((row) => row.id !== user.id));
-                              }
-                            });
-                          }}
-                        >
-                          Delete
-                        </Button>
-                      </>
+        <Stack spacing={1.5}>
+          {users.map((user) => (
+            <Paper key={user.id} sx={{ ...brutalPaperSx, p: 2 }}>
+              <DetailRow label="Username">{user.username}</DetailRow>
+              <Divider />
+              <DetailRow label="Profile name">{user.displayName}</DetailRow>
+              <Divider />
+              <DetailRow label="Account status">{user.status}</DetailRow>
+              <Divider />
+              <DetailRow label="Network memberships">
+                {user.networks.length === 0 ? (
+                  <Typography variant="body2" color="text.secondary">
+                    None
+                  </Typography>
+                ) : (
+                  <Stack spacing={0.75} sx={{ pt: 0.25 }}>
+                    {user.networks.map((network) => (
+                      <Typography key={network.networkId} variant="body2">
+                        {network.name} — {network.role}
+                      </Typography>
+                    ))}
+                  </Stack>
+                )}
+              </DetailRow>
+              {(user.moderationReason || user.moderationExpiresAt) && (
+                <>
+                  <Divider />
+                  <DetailRow label="Moderation">
+                    {user.moderationReason && (
+                      <Typography variant="body2" sx={{ mb: 0.5 }}>
+                        Reason: {user.moderationReason}
+                      </Typography>
                     )}
-                    {(user.status === "paused" || user.status === "banned") && (
+                    {user.moderationExpiresAt && (
+                      <Typography variant="body2" color="text.secondary">
+                        Expires: {user.moderationExpiresAt.slice(0, 10)}
+                      </Typography>
+                    )}
+                  </DetailRow>
+                </>
+              )}
+              <Divider />
+              <DetailRow label="Actions">
+                <Stack direction="row" flexWrap="wrap" gap={1} sx={{ pt: 0.5 }}>
+                  {user.status === "active" && (
+                    <>
                       <Button
                         size="small"
                         onClick={() =>
-                          void resumeUserPlatformAction(user.id).then((result) => {
-                            setMessage(result.message);
-                            if (result.ok) {
-                              setUsers((prev) =>
-                                prev.map((row) =>
-                                  row.id === user.id ? { ...row, status: "active" } : row,
-                                ),
-                              );
-                            }
+                          setModerationTarget({
+                            userId: user.id,
+                            displayName: user.displayName,
+                            kind: "pause",
                           })
                         }
                       >
-                        Resume
+                        Pause user
                       </Button>
-                    )}
-                  </Stack>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </Paper>
+                      <Button
+                        size="small"
+                        color="error"
+                        onClick={() =>
+                          setModerationTarget({
+                            userId: user.id,
+                            displayName: user.displayName,
+                            kind: "ban",
+                          })
+                        }
+                      >
+                        Ban user
+                      </Button>
+                      <Button
+                        size="small"
+                        color="error"
+                        onClick={() => {
+                          if (
+                            !window.confirm(
+                              `Permanently delete ${user.displayName}? This cannot be undone.`,
+                            )
+                          ) {
+                            return;
+                          }
+                          void deleteUserPlatformAction(user.id).then((result) => {
+                            setMessage(result.message);
+                            if (result.ok) {
+                              setUsers((prev) => prev.filter((row) => row.id !== user.id));
+                            }
+                          });
+                        }}
+                      >
+                        Delete user
+                      </Button>
+                    </>
+                  )}
+                  {(user.status === "paused" || user.status === "banned") && (
+                    <Button
+                      size="small"
+                      onClick={() =>
+                        void resumeUserPlatformAction(user.id).then((result) => {
+                          setMessage(result.message);
+                          if (result.ok) {
+                            setUsers((prev) =>
+                              prev.map((row) =>
+                                row.id === user.id ? { ...row, status: "active" } : row,
+                              ),
+                            );
+                          }
+                        })
+                      }
+                    >
+                      Resume user
+                    </Button>
+                  )}
+                </Stack>
+              </DetailRow>
+            </Paper>
+          ))}
+        </Stack>
+      </Box>
 
       <NetworkDetailDialog
         networkId={detailNetwork?.id ?? null}

@@ -28,6 +28,18 @@ import { CHANGELOG_ARCHIVE } from "./entries.archive";
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "2026.07.27c",
+    date: "2026-07-27",
+    summary: "Feed cleanup, calendar today highlight, platform admin readability.",
+    changes: [
+      {
+        type: "changed",
+        description:
+          "Removed Code Status from Feed; platform admin and network detail use stacked card rows instead of cramped tables; week/two-week/month today cells use light blue background; DevBar impersonation dropdown removed (Admin → Test data remains).",
+      },
+    ],
+  },
+  {
     version: "2026.07.27b",
     date: "2026-07-27",
     summary: "Fix test login after moderation columns missed migration.",

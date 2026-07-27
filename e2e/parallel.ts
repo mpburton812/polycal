@@ -7,7 +7,6 @@
 export const SAFE_PARALLEL_SPECS = [
   "admin-code-status-journey.spec.ts",
   "admin-schedule.spec.ts",
-  "feed-code-status-journey.spec.ts",
   "feed-likes-journey.spec.ts",
   "feed.spec.ts",
   "alert-prefs-journey.spec.ts",

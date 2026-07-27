@@ -1,5 +1,7 @@
 /** Monday-based week boundaries for the schedule tab (PC-42). */
 
+import { GARDEN_TOKENS } from "@/theme/tokens";
+
 /**
  * Returns midnight local time for the Monday starting the week containing `date`.
  */
@@ -152,7 +154,11 @@ export function scheduleDayCellSx(
   const isPast = isPastDate(day, timeZone);
   return {
     borderColor: isToday ? "primary.main" : "divider",
-    bgcolor: isToday ? "action.hover" : isPast ? "action.disabledBackground" : "background.paper",
+    bgcolor: isToday
+      ? GARDEN_TOKENS.todayHighlight
+      : isPast
+        ? "action.disabledBackground"
+        : "background.paper",
     opacity: isPast ? 0.55 : 1,
   };
 }
