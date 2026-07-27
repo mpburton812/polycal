@@ -1,84 +1,28 @@
 /**
  * Local date/datetime helpers for proposal draft form inputs (PC-132 / PC-376).
  * Kept pure so draft dialog sections can share without pulling React state.
- * Timed inputs use the account IANA timezone (default America/New_York).
+ *
+ * Timed `datetime-local` values follow the browser wall clock (native input
+ * contract). Account-timezone formatting for display lives in formatTimeRange /
+ * formatEventTime. Civil sleeping/all-day dates stay date-only / noon-UTC.
  */
 
 import { DEFAULT_VIEWER_TIMEZONE, resolveTimezone } from "@/lib/schedule/timezone";
+import { localDateKey } from "@/lib/schedule/dates";
 
-function zonedParts(
-  date: Date,
-  timeZone: string,
-): { year: number; month: number; day: number; hour: number; minute: number } {
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    hourCycle: "h23",
-  }).formatToParts(date);
-  const num = (type: Intl.DateTimeFormatPartTypes) =>
-    Number(parts.find((p) => p.type === type)?.value ?? "0");
-  return {
-    year: num("year"),
-    month: num("month"),
-    day: num("day"),
-    hour: num("hour"),
-    minute: num("minute"),
-  };
-}
-
-/**
- * Converts a wall-clock datetime in `timeZone` to a UTC ISO string.
- * Uses iterative offset correction so DST edges stay correct (PC-376).
- */
-export function wallDateTimeToIso(
-  year: number,
-  month: number,
-  day: number,
-  hour: number,
-  minute: number,
-  timeZone: string = DEFAULT_VIEWER_TIMEZONE,
-): string {
-  const tz = resolveTimezone(timeZone);
-  // Initial guess: treat the wall clock as UTC, then nudge by the zone offset.
-  let utcMs = Date.UTC(year, month - 1, day, hour, minute, 0, 0);
-  for (let i = 0; i < 3; i += 1) {
-    const asUtc = new Date(utcMs);
-    const parts = zonedParts(asUtc, tz);
-    const asWallMs = Date.UTC(
-      parts.year,
-      parts.month - 1,
-      parts.day,
-      parts.hour,
-      parts.minute,
-      0,
-      0,
-    );
-    const desiredWallMs = Date.UTC(year, month - 1, day, hour, minute, 0, 0);
-    const delta = desiredWallMs - asWallMs;
-    if (delta === 0) break;
-    utcMs += delta;
-  }
-  return new Date(utcMs).toISOString();
-}
-
-/** Datetime-local string from ISO in the account timezone (YYYY-MM-DDTHH:mm). */
-export function toLocalInput(
-  iso: string | null | undefined,
-  timeZone: string = DEFAULT_VIEWER_TIMEZONE,
-): string {
+/** Datetime-local string from ISO (YYYY-MM-DDTHH:mm) in browser local time. */
+export function toLocalInput(iso: string | null | undefined): string {
   if (!iso) return "";
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return "";
-  const parts = zonedParts(date, resolveTimezone(timeZone));
   const pad = (n: number) => String(n).padStart(2, "0");
-  return `${parts.year}-${pad(parts.month)}-${pad(parts.day)}T${pad(parts.hour)}:${pad(parts.minute)}`;
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
-/** Date-only input for sleeping / all-day proposals (no clock times). */
+/**
+ * Date-only input for sleeping / all-day proposals (no clock times).
+ * Uses account timezone when provided so civil days match schedule (PC-376).
+ */
 export function toLocalDateInput(
   iso: string | null | undefined,
   timeZone: string = DEFAULT_VIEWER_TIMEZONE,
@@ -86,31 +30,15 @@ export function toLocalDateInput(
   if (!iso) return "";
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return "";
-  const parts = zonedParts(date, resolveTimezone(timeZone));
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${parts.year}-${pad(parts.month)}-${pad(parts.day)}`;
+  return localDateKey(iso, resolveTimezone(timeZone));
 }
 
-/** Parses datetime-local value as wall clock in account timezone → UTC ISO. */
-export function localInputToIso(
-  value: string,
-  timeZone: string = DEFAULT_VIEWER_TIMEZONE,
-): string | undefined {
+/** Parses datetime-local value as browser-local wall clock → UTC ISO. */
+export function localInputToIso(value: string): string | undefined {
   if (!value) return undefined;
-  const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(value.trim());
-  if (!match) {
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) return undefined;
-    return date.toISOString();
-  }
-  return wallDateTimeToIso(
-    Number(match[1]),
-    Number(match[2]),
-    Number(match[3]),
-    Number(match[4]),
-    Number(match[5]),
-    timeZone,
-  );
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return undefined;
+  return date.toISOString();
 }
 
 export function localDateToStartIso(value: string): string | undefined {
@@ -135,7 +63,7 @@ export function slotStartInput(
 ): string {
   return proposalType === "sleeping" || isAllDay
     ? toLocalDateInput(iso, timeZone)
-    : toLocalInput(iso, timeZone);
+    : toLocalInput(iso);
 }
 
 export type InviteeSelection = "none" | "required" | "optional";
