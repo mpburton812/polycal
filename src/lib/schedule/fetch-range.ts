@@ -1,6 +1,6 @@
 import type { ScheduleCalendarLayout } from "@/components/schedule/scheduleViewState";
 
-import { addDays, endOfCivilDayInZone, endOfWeekSunday, localDateKey, startOfCivilDayInZone, startOfWeekMonday } from "@/lib/schedule/dates";
+import { addDays, endOfCivilDayInZone, localDateKey, startOfCivilDayInZone, startOfWeekMonday } from "@/lib/schedule/dates";
 import { monthGridRange, startOfMonth } from "@/lib/schedule/month-grid";
 import { DEFAULT_VIEWER_TIMEZONE } from "@/lib/schedule/timezone";
 
