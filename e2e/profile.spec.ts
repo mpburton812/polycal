@@ -36,7 +36,8 @@ test.describe("Profile settings", () => {
 
   test("shows timezone selector in preferences", async ({ page }) => {
     await expect(page.getByLabel("Time zone")).toBeVisible();
-    await expect(page.getByLabel("Time zone")).toContainText("America/New_York");
+    // Profile Select labels replace underscores with spaces (PC-376).
+    await expect(page.getByLabel("Time zone")).toContainText("America/New York");
   });
 
   test("shows custom avatar upload control", async ({ page }) => {

@@ -156,6 +156,7 @@ export async function seedStarWarsFoundation(options?: {
       mustChangePassword: user.mustChangePassword,
       avatarKey: user.avatarKey,
       theme: "mint",
+      timezone: "America/New_York",
       loginCount: 0,
       isPlatformAdmin: user.username === "luke",
       createdAt: now,
