@@ -55,14 +55,15 @@ export function isSameLocalCalendarDay(a: Date, b: Date): boolean {
 }
 
 /**
- * Inclusive range end at Sunday 23:59:59.999 UTC for a week whose Monday
- * anchor is typically noon-UTC (PC-376).
+ * Inclusive range end at Sunday end-of-day in `timeZone` for a noon-UTC Monday anchor (PC-376).
  */
-export function endOfWeekSunday(weekStart: Date): Date {
-  const end = new Date(weekStart);
-  end.setUTCDate(end.getUTCDate() + 6);
-  end.setUTCHours(23, 59, 59, 999);
-  return end;
+export function endOfWeekSunday(
+  weekStart: Date,
+  timeZone: string = DEFAULT_VIEWER_TIMEZONE,
+): Date {
+  const sundayNoon = addDays(weekStart, 6);
+  const sundayKey = localDateKey(sundayNoon.toISOString(), timeZone);
+  return endOfCivilDayInZone(sundayKey, timeZone);
 }
 
 /** Adds `days` on the UTC calendar (matches noon-UTC civil anchors). */
@@ -70,6 +71,51 @@ export function addDays(date: Date, days: number): Date {
   const next = new Date(date);
   next.setUTCDate(next.getUTCDate() + days);
   return next;
+}
+
+/**
+ * Instant for wall-clock `hour:minute:second.ms` on civil `dateKey` in `timeZone` (PC-376).
+ */
+export function zonedWallTimeToUtc(
+  dateKey: string,
+  hour: number,
+  minute: number,
+  second: number,
+  ms: number,
+  timeZone: string,
+): Date {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateKey.trim());
+  if (!match) return new Date(NaN);
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const dayNum = Number(match[3]);
+  const probe = new Date(Date.UTC(year, month - 1, dayNum, 12, 0, 0));
+  const offsetParts = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    timeZoneName: "shortOffset",
+    hour: "numeric",
+  }).formatToParts(probe);
+  const tzName = offsetParts.find((p) => p.type === "timeZoneName")?.value ?? "GMT";
+  const offsetMatch = /GMT([+-])(\d+)(?::(\d+))?/.exec(tzName);
+  let offsetMinutes = 0;
+  if (offsetMatch) {
+    const sign = offsetMatch[1] === "-" ? -1 : 1;
+    offsetMinutes =
+      sign * (Number(offsetMatch[2]) * 60 + Number(offsetMatch[3] ?? 0));
+  }
+  return new Date(
+    Date.UTC(year, month - 1, dayNum, hour, minute, second, ms) - offsetMinutes * 60_000,
+  );
+}
+
+/** Start of civil day (00:00:00.000) in `timeZone`. */
+export function startOfCivilDayInZone(dateKey: string, timeZone: string): Date {
+  return zonedWallTimeToUtc(dateKey, 0, 0, 0, 0, timeZone);
+}
+
+/** End of civil day (23:59:59.999) in `timeZone`. */
+export function endOfCivilDayInZone(dateKey: string, timeZone: string): Date {
+  return zonedWallTimeToUtc(dateKey, 23, 59, 59, 999, timeZone);
 }
 
 /** True when [aStart,aEnd] overlaps [bStart,bEnd] (open end uses start instant). */

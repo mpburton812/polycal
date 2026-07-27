@@ -33,10 +33,10 @@ function parseIsoDate(isoDate: string): Date {
 }
 
 function dateInRange(isoDate: string, rangeStart: string, rangeEnd: string): boolean {
-  // Compare civil yyyy-MM-dd — avoids host-TZ skew between noon anchors and local parse (PC-376).
-  const target = isoDate.slice(0, 10);
-  const start = rangeStart.slice(0, 10);
-  const end = rangeEnd.slice(0, 10);
+  // Target noon-UTC vs fetch bounds (viewer-TZ midnight→EOD) — stable on UTC CI (PC-376).
+  const target = Date.parse(`${isoDate.slice(0, 10)}T12:00:00.000Z`);
+  const start = Date.parse(rangeStart);
+  const end = Date.parse(rangeEnd);
   return target >= start && target <= end;
 }
 

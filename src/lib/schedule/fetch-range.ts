@@ -1,7 +1,8 @@
 import type { ScheduleCalendarLayout } from "@/components/schedule/scheduleViewState";
 
-import { addDays, endOfWeekSunday, startOfWeekMonday } from "@/lib/schedule/dates";
+import { addDays, endOfCivilDayInZone, endOfWeekSunday, localDateKey, startOfCivilDayInZone, startOfWeekMonday } from "@/lib/schedule/dates";
 import { monthGridRange, startOfMonth } from "@/lib/schedule/month-grid";
+import { DEFAULT_VIEWER_TIMEZONE } from "@/lib/schedule/timezone";
 
 export interface ScheduleFetchRange {
   rangeStart: Date;
@@ -9,13 +10,14 @@ export interface ScheduleFetchRange {
 }
 
 /**
- * Computes the inclusive API fetch window for day, week, or month layouts (PC-77 / PC-204).
+ * Computes the inclusive API fetch window for day, week, or month layouts (PC-77 / PC-204 / PC-376).
+ * Week bounds use viewer-TZ midnight→EOD so Monday morning events are not clipped by noon anchors.
  */
 export function computeScheduleFetchRange(
   anchorDate: Date,
   layout: ScheduleCalendarLayout,
   compact: boolean,
-  timeZone?: string,
+  timeZone: string = DEFAULT_VIEWER_TIMEZONE,
 ): ScheduleFetchRange {
   if (layout === "month") {
     const monthRange = monthGridRange(startOfMonth(anchorDate, timeZone), timeZone);
@@ -31,12 +33,15 @@ export function computeScheduleFetchRange(
     return { rangeStart, rangeEnd };
   }
 
-  const rangeStart = startOfWeekMonday(anchorDate, timeZone);
-  const rangeEnd = compact ? addDays(rangeStart, 13) : endOfWeekSunday(rangeStart);
-  if (compact) {
-    rangeEnd.setUTCHours(23, 59, 59, 999);
-  }
-  return { rangeStart, rangeEnd };
+  const mondayNoon = startOfWeekMonday(anchorDate, timeZone);
+  const mondayKey = localDateKey(mondayNoon.toISOString(), timeZone);
+  const rangeStart = startOfCivilDayInZone(mondayKey, timeZone);
+  const endNoon = addDays(mondayNoon, compact ? 13 : 6);
+  const endKey = localDateKey(endNoon.toISOString(), timeZone);
+  return {
+    rangeStart,
+    rangeEnd: endOfCivilDayInZone(endKey, timeZone),
+  };
 }
 
 /** Day count between two dates (inclusive of partial span). */

@@ -59,10 +59,11 @@ describe("startOfWeekMonday", () => {
 });
 
 describe("endOfWeekSunday", () => {
-  it("ends on Sunday 23:59:59.999 UTC", () => {
+  it("ends on Sunday end-of-day in America/New_York", () => {
     const monday = new Date("2026-06-22T12:00:00.000Z");
-    const end = endOfWeekSunday(monday);
-    expect(end.toISOString()).toBe("2026-06-28T23:59:59.999Z");
+    const end = endOfWeekSunday(monday, "America/New_York");
+    // Sunday Jun 28 23:59:59.999 EDT = Jun 29 03:59:59.999Z
+    expect(end.toISOString()).toBe("2026-06-29T03:59:59.999Z");
   });
 });
 
