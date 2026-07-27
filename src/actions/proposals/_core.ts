@@ -565,6 +565,7 @@ async function createRecurringChildProposals(
       intentionalSolo: parent.intentionalSolo,
       eventPrivacy: parent.eventPrivacy,
       isPoll: false,
+      isAllDay: parent.isAllDay ?? false,
       parentProposalId: parent.id,
       occurrenceIndex: index,
       isRecurrenceParent: false,

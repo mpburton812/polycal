@@ -228,10 +228,22 @@ export function buildScheduleWindows(
     slotId: string | null,
     keyPrefix: string,
   ) => {
+    // Single-day all-day: collapse to noon-UTC civil bounds in the viewer TZ so
+    // week/month placement matches standalone all-day events (PC-301 / PC-376).
+    const singleDayAllDayBounds =
+      row.isAllDay &&
+      !row.isBatchSleeping &&
+      !isMultiDayAllDaySpan(startAt, endAt, row.isAllDay, timeZone)
+        ? allDayBoundsForDateKey(
+            expandAllDayDateKeys(startAt, endAt, timeZone)[0] ??
+              localDateKey(startAt, timeZone),
+          )
+        : null;
+
     if (row.isRecurrenceParent) {
       pushRecurrenceParentOccurrence(windows, row, {
-        startAt,
-        endAt,
+        startAt: singleDayAllDayBounds?.startAt ?? startAt,
+        endAt: singleDayAllDayBounds?.endAt ?? endAt,
         slotLabel,
         key: slotId ? `${keyPrefix}:${slotId}` : `${keyPrefix}:occurrence-0`,
         slotId,
@@ -244,15 +256,10 @@ export function buildScheduleWindows(
       row.parentProposalId ||
       !isMultiDayAllDaySpan(startAt, endAt, row.isAllDay, timeZone)
     ) {
-      // Normalize single-day all-day to noon-UTC bounds so week/agenda inclusive
-      // startKey..endKey placement cannot spill into a second civil day (PC-301).
-      if (row.isAllDay && !row.isBatchSleeping && !row.parentProposalId) {
-        const dayKey =
-          expandAllDayDateKeys(startAt, endAt, timeZone)[0] ?? localDateKey(startAt, timeZone);
-        const bounds = allDayBoundsForDateKey(dayKey);
+      if (singleDayAllDayBounds) {
         pushWindow(windows, row, {
-          startAt: bounds.startAt,
-          endAt: bounds.endAt,
+          startAt: singleDayAllDayBounds.startAt,
+          endAt: singleDayAllDayBounds.endAt,
           slotLabel,
           key: slotId ? `${keyPrefix}:${slotId}` : keyPrefix,
           slotId,
