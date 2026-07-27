@@ -15,6 +15,7 @@ export function computeScheduleFetchRange(
   anchorDate: Date,
   layout: ScheduleCalendarLayout,
   compact: boolean,
+  timeZone?: string,
 ): ScheduleFetchRange {
   if (layout === "month") {
     const monthRange = monthGridRange(startOfMonth(anchorDate));
@@ -22,6 +23,7 @@ export function computeScheduleFetchRange(
   }
 
   if (layout === "day") {
+    // Local midnight→EOD around the anchor; day chrome uses noon-UTC civil anchors (PC-204).
     const rangeStart = new Date(anchorDate);
     rangeStart.setHours(0, 0, 0, 0);
     const rangeEnd = new Date(rangeStart);
@@ -29,10 +31,10 @@ export function computeScheduleFetchRange(
     return { rangeStart, rangeEnd };
   }
 
-  const rangeStart = startOfWeekMonday(anchorDate);
+  const rangeStart = startOfWeekMonday(anchorDate, timeZone);
   const rangeEnd = compact ? addDays(rangeStart, 13) : endOfWeekSunday(rangeStart);
   if (compact) {
-    rangeEnd.setHours(23, 59, 59, 999);
+    rangeEnd.setUTCHours(23, 59, 59, 999);
   }
   return { rangeStart, rangeEnd };
 }

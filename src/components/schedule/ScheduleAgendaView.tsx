@@ -44,9 +44,9 @@ export function ScheduleAgendaView({
   onDayOverflowClick,
 }: ScheduleAgendaViewProps) {
   const days = useMemo(() => {
-    const monday = startOfWeekMonday(weekStart);
+    const monday = startOfWeekMonday(weekStart, timeZone);
     return Array.from({ length: dayCount }, (_, index) => addDays(monday, index));
-  }, [weekStart, dayCount]);
+  }, [weekStart, dayCount, timeZone]);
 
   const eventsByDay = useMemo(() => {
     const map = new Map<string, ScheduleEvent[]>();

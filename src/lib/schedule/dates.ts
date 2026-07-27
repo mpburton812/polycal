@@ -1,18 +1,48 @@
-/** Monday-based week boundaries for the schedule tab (PC-42). */
+/** Monday-based week boundaries for the schedule tab (PC-42 / PC-376). */
 
 import { GARDEN_TOKENS } from "@/theme/tokens";
 import { DEFAULT_VIEWER_TIMEZONE } from "@/lib/schedule/timezone";
 
+/** Civil yyyy-MM-dd → noon-UTC Date (stable across host timezones). */
+export function civilDateAtNoonUtc(dateKey: string): Date {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateKey.trim());
+  if (!match) return new Date(NaN);
+  return new Date(`${match[1]}-${match[2]}-${match[3]}T12:00:00.000Z`);
+}
+
+/** Weekday 0=Sun…6=Sat for an instant in `timeZone`. */
+function weekdayInTimeZone(date: Date, timeZone: string): number {
+  const label = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    weekday: "short",
+  }).format(date);
+  const map: Record<string, number> = {
+    Sun: 0,
+    Mon: 1,
+    Tue: 2,
+    Wed: 3,
+    Thu: 4,
+    Fri: 5,
+    Sat: 6,
+  };
+  return map[label] ?? date.getUTCDay();
+}
+
 /**
- * Returns midnight local time for the Monday starting the week containing `date`.
+ * Returns noon-UTC on the Monday (viewer TZ) that starts the week containing `date`.
+ * Host-local midnight Mondays shift back a day when formatted in US zones (PC-376).
  */
-export function startOfWeekMonday(date: Date): Date {
-  const result = new Date(date);
-  result.setHours(0, 0, 0, 0);
-  const day = result.getDay();
+export function startOfWeekMonday(
+  date: Date,
+  timeZone: string = DEFAULT_VIEWER_TIMEZONE,
+): Date {
+  const dayKey = localDateKey(date.toISOString(), timeZone);
+  const noon = civilDateAtNoonUtc(dayKey);
+  const day = weekdayInTimeZone(noon, timeZone);
   const diff = day === 0 ? -6 : 1 - day;
-  result.setDate(result.getDate() + diff);
-  return result;
+  const monday = new Date(noon);
+  monday.setUTCDate(monday.getUTCDate() + diff);
+  return monday;
 }
 
 /** True when two dates fall on the same local calendar day (PC-141). */
@@ -24,18 +54,21 @@ export function isSameLocalCalendarDay(a: Date, b: Date): boolean {
   );
 }
 
-/** Inclusive range end at Sunday 23:59:59.999 for a week starting `weekStart`. */
+/**
+ * Inclusive range end at Sunday 23:59:59.999 UTC for a week whose Monday
+ * anchor is typically noon-UTC (PC-376).
+ */
 export function endOfWeekSunday(weekStart: Date): Date {
   const end = new Date(weekStart);
-  end.setDate(end.getDate() + 6);
-  end.setHours(23, 59, 59, 999);
+  end.setUTCDate(end.getUTCDate() + 6);
+  end.setUTCHours(23, 59, 59, 999);
   return end;
 }
 
-/** Adds `days` to a date copy. */
+/** Adds `days` on the UTC calendar (matches noon-UTC civil anchors). */
 export function addDays(date: Date, days: number): Date {
   const next = new Date(date);
-  next.setDate(next.getDate() + days);
+  next.setUTCDate(next.getUTCDate() + days);
   return next;
 }
 
