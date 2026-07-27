@@ -29,11 +29,11 @@ test.describe("App navigation (admin)", () => {
     await expect(nav.getByRole("link", { name: "Proposals" })).toBeVisible();
     await expect(nav.getByRole("link", { name: "People & Places" })).toBeVisible();
     await expect(nav.getByRole("link", { name: "Admin" })).toBeVisible();
-    await expect(page.getByText("Rebel Alliance")).toBeVisible();
+    const banner = page.getByRole("banner");
+    // Network label is poly_group name or switcher value; MUI may render it twice in the banner (PC-357).
+    await expect(banner.getByText("Rebel Alliance", { exact: true }).first()).toBeVisible();
     // Scope to the app banner — document <title> also reads "PolyCal" and fails strict mode.
-    await expect(
-      page.getByRole("banner").getByText("PolyCal", { exact: true }),
-    ).toBeVisible();
+    await expect(banner.getByText("PolyCal", { exact: true })).toBeVisible();
   });
 
   test("login lands on Feed as default home tab", async ({ page }) => {

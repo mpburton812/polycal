@@ -4,11 +4,11 @@ import { and, asc, eq, gte, inArray, isNotNull, isNull, lte, or } from "drizzle-
 import { z } from "zod";
 
 import { userHasAdminAccess } from "@/lib/admin-access";
-import { requireSession, withDb } from "@/lib/actions/context";
+import { requireNetworkSession } from "@/lib/networks/context";
+import { withDb } from "@/lib/actions/context";
 import { getDb } from "@/lib/db/client";
 import {
   locations,
-  polyGroup,
   proposalInvitees,
   proposalTimeSlots,
   proposals,
@@ -18,8 +18,9 @@ import {
 import { eventInRange } from "@/lib/schedule/dates";
 import { markOverlaps } from "@/lib/schedule/overlaps";
 import { buildScheduleWindows } from "@/lib/schedule/schedule-slices";
-import type { ScheduleSliceKind } from "@/lib/schedule/slice-types";
 import { resolveTimezone } from "@/lib/schedule/timezone";
+import type { ScheduleSliceKind } from "@/lib/schedule/slice-types";
+import { loadNetworkSettings } from "@/lib/networks/settings";
 import { parseBatchSlotMeta } from "@/lib/proposals/batch-sleeping";
 import { formatSleepingDisplayTitle } from "@/lib/proposals/sleeping-display";
 import {
@@ -64,6 +65,11 @@ export interface ScheduleEvent {
   occurrenceProposalId: string | null;
   /** Category icon key; omitted when content is masked (PC-116). */
   eventIconKey: string | null;
+  /**
+   * True when this sleeping block is visible only because an accepted partner
+   * is involved and the viewer is not (PC-366).
+   */
+  isPartnerOnlySleeping: boolean;
 }
 
 export interface SchedulePayload {
@@ -72,21 +78,18 @@ export interface SchedulePayload {
 
 async function getSchedulePrivacyFlags(
   db: ReturnType<typeof getDb>,
+  networkId: string,
 ): Promise<{
   hideSleeping: boolean;
   adminCanSeeUninvolved: boolean;
+  seePartnersSleepingArrangements: boolean;
 }> {
-  const adminCanSeeUninvolved = await getAdminCanSeeUninvolved(db);
-  const [group] = await db
-    .select({
-      hideSleepingArrangements: polyGroup.hideSleepingArrangements,
-    })
-    .from(polyGroup)
-    .where(eq(polyGroup.id, 1))
-    .limit(1);
+  const adminCanSeeUninvolved = await getAdminCanSeeUninvolved(db, networkId);
+  const settings = await loadNetworkSettings(networkId, db);
   return {
-    hideSleeping: group?.hideSleepingArrangements ?? false,
+    hideSleeping: settings?.hideSleepingArrangements ?? false,
     adminCanSeeUninvolved,
+    seePartnersSleepingArrangements: settings?.seePartnersSleepingArrangements ?? false,
   };
 }
 
@@ -136,7 +139,7 @@ function slotOverlapsRange(rangeStart: string, rangeEnd: string) {
 export async function listScheduleEventsAction(
   input: z.infer<typeof rangeSchema>,
 ): Promise<{ ok: boolean; message: string; payload: SchedulePayload }> {
-  const sessionResult = await requireSession();
+  const sessionResult = await requireNetworkSession();
   if (!sessionResult.ok) {
     return {
       ok: false,
@@ -156,15 +159,19 @@ export async function listScheduleEventsAction(
 
   return withDb(async (db) => {
   const viewerId = sessionResult.user.id;
-  const isAdmin = await userHasAdminAccess(sessionResult.user.role);
+  const networkId = sessionResult.user.activeNetworkId;
+  const isAdmin =
+    sessionResult.user.activeNetworkRole === "network_admin" ||
+    sessionResult.user.isPlatformAdmin ||
+    (await userHasAdminAccess(sessionResult.user.role));
   const [viewerRow] = await db
     .select({ timezone: users.timezone })
     .from(users)
     .where(eq(users.id, viewerId))
     .limit(1);
   const viewerTimeZone = resolveTimezone(viewerRow?.timezone);
-  const privacyFlags = await getSchedulePrivacyFlags(db);
-  const partnerIds = await getAcceptedSleepingPartnerIds(db, viewerId);
+  const privacyFlags = await getSchedulePrivacyFlags(db, networkId);
+  const partnerIds = await getAcceptedSleepingPartnerIds(db, viewerId, networkId);
   const { rangeStart, rangeEnd } = parsed.data;
 
   // Every rendered window derives from a time slot or the proposal's own
@@ -220,6 +227,7 @@ export async function listScheduleEventsAction(
     .leftJoin(locations, eq(proposals.locationId, locations.id))
     .where(
       and(
+        eq(proposals.networkId, networkId),
         inArray(proposals.state, ["proposed", "resolved", "archived"]),
         or(...rangeFilters),
       ),
@@ -269,7 +277,10 @@ export async function listScheduleEventsAction(
     slotsByProposal.set(slot.proposalId, list);
   }
 
-  const locationRows = await db.select({ id: locations.id, name: locations.name }).from(locations);
+  const locationRows = await db
+    .select({ id: locations.id, name: locations.name })
+    .from(locations)
+    .where(eq(locations.networkId, networkId));
   const locationNameById = new Map(locationRows.map((row) => [row.id, row.name]));
 
   const events: ScheduleEvent[] = [];
@@ -283,7 +294,8 @@ export async function listScheduleEventsAction(
       ...invitees.map((invitee) => invitee.displayName),
     ];
 
-    const { visible, contentMasked: isContentMasked } = canViewProposalContent({
+    const { visible, contentMasked: isContentMasked, isPartnerOnlySleeping } =
+      canViewProposalContent({
       viewerId,
       isAdmin,
       proposerId: row.proposerId,
@@ -293,6 +305,7 @@ export async function listScheduleEventsAction(
       adminCanSeeUninvolved: privacyFlags.adminCanSeeUninvolved,
       applyScheduleMask: true,
       hideSleeping: privacyFlags.hideSleeping,
+      seePartnersSleepingArrangements: privacyFlags.seePartnersSleepingArrangements,
       acceptedPartnerIds: partnerIds,
     });
 
@@ -437,6 +450,7 @@ export async function listScheduleEventsAction(
         occurrenceProposalId: window.occurrenceProposalId,
         eventIconKey:
           isContentMasked || row.proposalType !== "event" ? null : row.eventIconKey ?? null,
+        isPartnerOnlySleeping,
       });
     }
   }

@@ -26,13 +26,17 @@ export function scheduleBlockVariant(event: {
   isContentMasked: boolean;
   hasOverlap: boolean;
   atRisk: boolean;
+  /** Partner-only sleeping (viewer not involved) — lighter purple (PC-366). */
+  isPartnerOnlySleeping?: boolean;
 }): ScheduleBlockVariant {
   if (event.isContentMasked) return "masked";
   if (event.state === "archived") return "archived";
   if (event.hasOverlap) return "conflict";
   if (event.atRisk) return "at_risk";
   if (event.state === "proposed") return "proposed";
-  if (event.proposalType === "sleeping") return "resolved_sleeping";
+  if (event.proposalType === "sleeping") {
+    return event.isPartnerOnlySleeping ? "resolved_sleeping_partner" : "resolved_sleeping";
+  }
   return "resolved_event";
 }
 

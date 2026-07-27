@@ -28,6 +28,9 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
     if (liveStatus === "paused") {
       redirect("/paused");
     }
+    if (liveStatus === "banned") {
+      redirect("/banned");
+    }
     redirect("/feed");
   }
 
@@ -49,6 +52,8 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
       .limit(1);
     if (row?.status === "paused") {
       redirectTo = "/paused";
+    } else if (row?.status === "banned") {
+      redirectTo = "/banned";
     }
 
     try {
@@ -148,6 +153,14 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
           sx={{ mt: 1.5, color: GARDEN_TOKENS.inkMuted }}
         >
           Forgot password?
+        </Button>
+        <Button
+          component={Link}
+          href="/create-network"
+          fullWidth
+          sx={{ mt: 1, color: GARDEN_TOKENS.ink }}
+        >
+          Create new network
         </Button>
         {loginHint && (
           <Typography variant="caption" display="block" sx={{ mt: 2, color: GARDEN_TOKENS.inkMuted }}>

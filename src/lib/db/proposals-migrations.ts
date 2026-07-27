@@ -147,6 +147,7 @@ export async function applyProposalsMigrations(sql: Client): Promise<void> {
       created_at TEXT NOT NULL
     );
   `);
+  await ensureColumn(sql, "proposal_state_log", "deleted_at", "TEXT");
 
   await sql.execute(`
     CREATE TABLE IF NOT EXISTS proposal_comments (

@@ -19,6 +19,7 @@ import {
   userActivityLog,
   users,
 } from "@/lib/db/schema";
+import { requireNetworkSession } from "@/lib/networks/context";
 import { actorNotifyFields, notifyUser } from "@/lib/notifications";
 import { userIsPlaceOwner } from "@/lib/places/membership";
 import type { PlaceRole } from "@/types/relationship";
@@ -357,12 +358,24 @@ function mapResidentRows(
 
 /**
  * Lists places with accepted resident counts (PC-37).
+ * Scoped to the caller's resolved active network (PC-357).
+ *
+ * Uses requireNetworkSession (not raw JWT activeNetworkId) so a stale JWT after
+ * DB reset / network recreate still falls back to a live membership.
  */
 export async function listPlacesAction(): Promise<PlaceSummary[]> {
   await ensureDbReady();
-  const session = await auth();
+  const networkSession = await requireNetworkSession();
+  if (!networkSession.ok) {
+    return [];
+  }
   const db = getDb();
-  const rows = await db.select().from(locations).orderBy(asc(locations.name));
+  const networkId = networkSession.user.activeNetworkId;
+  const rows = await db
+    .select()
+    .from(locations)
+    .where(eq(locations.networkId, networkId))
+    .orderBy(asc(locations.name));
   const residentRows = await db
     .select({
       id: locationResidents.id,
@@ -376,7 +389,7 @@ export async function listPlacesAction(): Promise<PlaceSummary[]> {
     .from(locationResidents)
     .innerJoin(users, eq(locationResidents.userId, users.id));
 
-  const viewerId = session?.user?.id;
+  const viewerId = networkSession.user.id;
 
   return rows.map((row) => {
     const placeResidents = residentRows.filter((resident) => resident.locationId === row.id);
@@ -411,6 +424,10 @@ export async function createPlaceAction(
   }
 
   await ensureDbReady();
+  const networkSession = await requireNetworkSession();
+  if (!networkSession.ok) {
+    return { ok: false, message: networkSession.message };
+  }
   const db = getDb();
   if (await isPlaceNameTaken(db, parsed.data.name)) {
     return { ok: false, message: "A place with this name is already in use." };
@@ -423,6 +440,7 @@ export async function createPlaceAction(
 
   await db.insert(locations).values({
     id: placeId,
+    networkId: networkSession.user.activeNetworkId,
     name: parsed.data.name,
     description: parsed.data.description ?? null,
     address: parsed.data.address ?? null,

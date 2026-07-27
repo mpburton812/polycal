@@ -34,6 +34,10 @@ export const authConfig = {
         token.avatarKey = user.avatarKey;
         token.theme = user.theme;
         token.isImpersonating = user.isImpersonating === true;
+        token.activeNetworkId = user.activeNetworkId;
+        token.activeNetworkRole = user.activeNetworkRole;
+        token.isPlatformAdmin = user.isPlatformAdmin === true;
+        token.networkIds = user.networkIds ?? [];
         token.dbRefreshedAt = Date.now();
         delete token.error;
       }
@@ -54,6 +58,25 @@ export const authConfig = {
         if (typeof session.user.sessionVersion === "number") {
           token.sessionVersion = session.user.sessionVersion;
         }
+        if (typeof session.user.activeNetworkId === "string") {
+          try {
+            const { getMembership } = await import("@/lib/networks/membership");
+            const membership = await getMembership(
+              token.id as string,
+              session.user.activeNetworkId,
+            );
+            if (membership) {
+              token.activeNetworkId = membership.networkId;
+              token.activeNetworkRole =
+                session.user.activeNetworkRole ?? membership.role;
+            }
+          } catch {
+            /* networks table may be mid-migration — ignore client switch */
+          }
+        }
+        if (session.user.activeNetworkRole) {
+          token.activeNetworkRole = session.user.activeNetworkRole;
+        }
         // Force a DB re-check after client session.update (password / onboarding).
         token.dbRefreshedAt = 0;
       }
@@ -68,7 +91,9 @@ export const authConfig = {
         const onboardedAndSettled =
           token.onboardingComplete === true && token.mustChangePassword === false;
         const revocationCheckPending =
-          token.accountStatus === "paused" || typeof token.sessionVersion !== "number";
+          token.accountStatus === "paused" ||
+          token.accountStatus === "banned" ||
+          typeof token.sessionVersion !== "number";
         const withinTtl =
           trigger !== "update" &&
           !user &&
@@ -93,6 +118,7 @@ export const authConfig = {
             displayName: users.displayName,
             avatarKey: users.avatarKey,
             theme: users.theme,
+            isPlatformAdmin: users.isPlatformAdmin,
           })
           .from(users)
           .where(eq(users.id, token.id as string))
@@ -101,6 +127,14 @@ export const authConfig = {
         if (!row || row.status === "deleted") {
           token.error = "SessionInvalid";
           return token;
+        }
+
+        const { clearExpiredModeration } = await import("@/lib/users/moderation-db");
+        const effectiveStatus = await clearExpiredModeration(token.id as string);
+        if (effectiveStatus === "active") {
+          row.status = "active";
+        } else if (effectiveStatus) {
+          row.status = effectiveStatus as typeof row.status;
         }
 
         if (row.sessionVersion !== token.sessionVersion) {
@@ -115,6 +149,35 @@ export const authConfig = {
         token.displayName = row.displayName;
         token.avatarKey = row.avatarKey ?? undefined;
         token.theme = row.theme;
+        token.isPlatformAdmin = row.isPlatformAdmin === true;
+
+        // Reconcile active network when JWT points at a wiped/recreated tenant
+        // (E2E per-test reset) or membership was removed (PC-357).
+        try {
+          const { listActiveMemberships } = await import("@/lib/networks/membership");
+          const memberships = await listActiveMemberships(token.id as string);
+          const usable = memberships.filter(
+            (m) => m.networkStatus === "active" || m.role === "network_admin",
+          );
+          const preferred =
+            typeof token.activeNetworkId === "string"
+              ? usable.find((m) => m.networkId === token.activeNetworkId) ??
+                memberships.find((m) => m.networkId === token.activeNetworkId)
+              : undefined;
+          const next = preferred ?? usable[0] ?? memberships[0];
+          if (next) {
+            token.activeNetworkId = next.networkId;
+            token.activeNetworkRole = next.role;
+            token.networkIds = memberships.map((m) => m.networkId);
+          } else {
+            delete token.activeNetworkId;
+            delete token.activeNetworkRole;
+            token.networkIds = [];
+          }
+        } catch {
+          /* networks table may be mid-migration — keep prior claims */
+        }
+
         token.dbRefreshedAt = Date.now();
         delete token.error;
       }
@@ -129,7 +192,8 @@ export const authConfig = {
       if (session.user && token.id) {
         session.user.id = token.id as string;
         session.user.role = token.role as "admin" | "user" | "passive";
-        session.user.accountStatus = (token.accountStatus as "active" | "paused") ?? "active";
+        session.user.accountStatus =
+          (token.accountStatus as "active" | "paused" | "banned") ?? "active";
         session.user.mustChangePassword = token.mustChangePassword as boolean;
         session.user.onboardingComplete = token.onboardingComplete as boolean;
         session.user.displayName = token.displayName as string;
@@ -137,6 +201,10 @@ export const authConfig = {
         session.user.avatarKey = token.avatarKey as string | undefined;
         session.user.theme = token.theme as string | undefined;
         session.user.isImpersonating = token.isImpersonating === true;
+        session.user.activeNetworkId = token.activeNetworkId as string | undefined;
+        session.user.activeNetworkRole = token.activeNetworkRole;
+        session.user.isPlatformAdmin = token.isPlatformAdmin === true;
+        session.user.networkIds = token.networkIds ?? [];
       }
       return session;
     },

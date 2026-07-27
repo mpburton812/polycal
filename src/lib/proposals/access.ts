@@ -2,6 +2,7 @@ import { eq } from "drizzle-orm";
 
 import { getDb } from "@/lib/db/client";
 import { polyGroup, type ProposalState, type ProposalType } from "@/lib/db/schema";
+import { loadNetworkSettings } from "@/lib/networks/settings";
 import { shouldMaskSleepingForViewer } from "@/lib/schedule/slice-auth";
 import type { AuditLogVisibility } from "@/types/poly-group";
 
@@ -44,7 +45,12 @@ export function applyProposalMask<
  */
 export async function getAdminCanSeeUninvolved(
   db: ReturnType<typeof getDb> = getDb(),
+  networkId?: string,
 ): Promise<boolean> {
+  if (networkId) {
+    const settings = await loadNetworkSettings(networkId, db);
+    return settings?.adminCanSeeUninvolved ?? true;
+  }
   const [group] = await db
     .select({ adminCanSeeUninvolved: polyGroup.adminCanSeeUninvolved })
     .from(polyGroup)
@@ -74,9 +80,35 @@ export function viewerCanSeeProposal(
   return false;
 }
 
+/** True when the viewer is proposer or invitee on the proposal. */
+export function viewerIsInvolvedInProposal(
+  viewerId: string,
+  proposerId: string,
+  inviteeUserIds: string[],
+): boolean {
+  return proposerId === viewerId || inviteeUserIds.includes(viewerId);
+}
+
+/**
+ * True when an accepted sleeping partner of the viewer is the proposer or an
+ * invitee, and the viewer themselves is not involved (PC-366 partner nights).
+ */
+export function isPartnerOnlySleepingViewer(
+  viewerId: string,
+  proposerId: string,
+  inviteeUserIds: string[],
+  acceptedPartnerIds: ReadonlySet<string>,
+): boolean {
+  if (viewerIsInvolvedInProposal(viewerId, proposerId, inviteeUserIds)) return false;
+  if (acceptedPartnerIds.has(proposerId)) return true;
+  return inviteeUserIds.some((id) => acceptedPartnerIds.has(id));
+}
+
 /**
  * Sleeping visibility is hard-defaulted to "involved": only proposer, invitees,
  * and (when allowed) admins can see sleeping proposals — even open resolved/archived (PC-229/PC-280).
+ * When seePartnersSleepingArrangements is on, accepted partners of participants also see
+ * nights they are not on (PC-366).
  */
 export function viewerCanSeeSleepingProposal(
   viewerId: string,
@@ -85,12 +117,25 @@ export function viewerCanSeeSleepingProposal(
   inviteeUserIds: string[],
   options: {
     adminCanSeeUninvolved?: boolean;
+    seePartnersSleepingArrangements?: boolean;
+    acceptedPartnerIds?: ReadonlySet<string>;
   } = {},
 ): boolean {
   const adminSeesAll = isAdmin && options.adminCanSeeUninvolved !== false;
   if (adminSeesAll) return true;
   if (proposerId === viewerId) return true;
   if (inviteeUserIds.includes(viewerId)) return true;
+  if (
+    options.seePartnersSleepingArrangements &&
+    isPartnerOnlySleepingViewer(
+      viewerId,
+      proposerId,
+      inviteeUserIds,
+      options.acceptedPartnerIds ?? new Set(),
+    )
+  ) {
+    return true;
+  }
   return false;
 }
 
@@ -106,11 +151,15 @@ export function viewerCanSeeProposalWithSleepingGate(
     proposalType: ProposalType;
     state?: ProposalState;
     adminCanSeeUninvolved?: boolean;
+    seePartnersSleepingArrangements?: boolean;
+    acceptedPartnerIds?: ReadonlySet<string>;
   },
 ): boolean {
   if (options.proposalType === "sleeping") {
     return viewerCanSeeSleepingProposal(viewerId, isAdmin, proposerId, inviteeUserIds, {
       adminCanSeeUninvolved: options.adminCanSeeUninvolved,
+      seePartnersSleepingArrangements: options.seePartnersSleepingArrangements,
+      acceptedPartnerIds: options.acceptedPartnerIds,
     });
   }
   return viewerCanSeeProposal(viewerId, isAdmin, proposerId, inviteeUserIds, {
@@ -133,8 +182,9 @@ export function canViewProposalContent(input: {
   adminCanSeeUninvolved?: boolean;
   applyScheduleMask?: boolean;
   hideSleeping?: boolean;
+  seePartnersSleepingArrangements?: boolean;
   acceptedPartnerIds?: ReadonlySet<string>;
-}): { visible: boolean; contentMasked: boolean } {
+}): { visible: boolean; contentMasked: boolean; isPartnerOnlySleeping: boolean } {
   const visible = viewerCanSeeProposalWithSleepingGate(
     input.viewerId,
     input.isAdmin,
@@ -144,11 +194,23 @@ export function canViewProposalContent(input: {
       proposalType: input.proposalType,
       state: input.state,
       adminCanSeeUninvolved: input.adminCanSeeUninvolved,
+      seePartnersSleepingArrangements: input.seePartnersSleepingArrangements,
+      acceptedPartnerIds: input.acceptedPartnerIds,
     },
   );
   if (!visible) {
-    return { visible: false, contentMasked: false };
+    return { visible: false, contentMasked: false, isPartnerOnlySleeping: false };
   }
+
+  const isPartnerOnlySleeping =
+    input.proposalType === "sleeping" &&
+    Boolean(input.seePartnersSleepingArrangements) &&
+    isPartnerOnlySleepingViewer(
+      input.viewerId,
+      input.proposerId,
+      input.inviteeUserIds,
+      input.acceptedPartnerIds ?? new Set(),
+    );
 
   const contentMasked =
     Boolean(input.applyScheduleMask) &&
@@ -161,7 +223,7 @@ export function canViewProposalContent(input: {
       input.acceptedPartnerIds ?? new Set(),
     );
 
-  return { visible: true, contentMasked };
+  return { visible: true, contentMasked, isPartnerOnlySleeping };
 }
 
 /** Whether the viewer may see proposal audit / feed milestone lines (PC-45 / PC-226). */

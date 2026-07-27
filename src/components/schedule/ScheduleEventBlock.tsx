@@ -30,10 +30,10 @@ function formatStakeholders(event: ScheduleEvent): string | null {
   return event.participantNames.join(", ");
 }
 
-/** Status fragment for line-one event card format (PC-56). */
+/** Status fragment for line-one event card format (PC-56). Approved events omit Confirmed. */
 function formatStatusLabel(event: ScheduleEvent): string {
   const parts: string[] = [];
-  parts.push(event.isTentative ? "Tentative" : "Confirmed");
+  if (event.isTentative) parts.push("Tentative");
   if (event.atRisk) parts.push("At risk");
   if (event.hasOverlap) parts.push("Conflict");
   return parts.join(", ");
@@ -55,6 +55,7 @@ export function ScheduleEventBlock({
     isContentMasked: event.isContentMasked,
     hasOverlap: event.hasOverlap,
     atRisk: event.atRisk,
+    isPartnerOnlySleeping: event.isPartnerOnlySleeping,
   });
   const colors = scheduleBlockSx(variant, rotationIndex);
   const stakeholders = formatStakeholders(event);
@@ -84,7 +85,7 @@ export function ScheduleEventBlock({
     if (!event.isContentMasked && event.locationName) {
       lineOneParts.push(event.locationName);
     }
-    lineOneParts.push(statusLabel);
+    if (statusLabel) lineOneParts.push(statusLabel);
     lineOne = lineOneParts.join(", ");
 
     const lineTwoParts: string[] = [];

@@ -21,6 +21,14 @@ import {
   type PlaceRole,
   type ResidencyStatus,
 } from "@/types/relationship";
+import {
+  networkMemberRoles,
+  networkMemberStatuses,
+  networkStatuses,
+  type NetworkMemberRole,
+  type NetworkMemberStatus,
+  type NetworkStatus,
+} from "@/types/network";
 
 export { userRoles, userStatuses, type UserRole, type UserStatus };
 export {
@@ -30,6 +38,14 @@ export {
   type PartnershipStatus,
   type PlaceRole,
   type ResidencyStatus,
+};
+export {
+  networkMemberRoles,
+  networkMemberStatuses,
+  networkStatuses,
+  type NetworkMemberRole,
+  type NetworkMemberStatus,
+  type NetworkStatus,
 };
 
 /**
@@ -68,6 +84,16 @@ export const users = sqliteTable("users", {
   onboardingComplete: integer("onboarding_complete", { mode: "boolean" }).notNull().default(true),
   sessionVersion: integer("session_version").notNull().default(0),
   activatedFromPassiveAt: text("activated_from_passive_at"),
+  /** Platform-wide operator — not a network membership role (PC-357). */
+  isPlatformAdmin: integer("is_platform_admin", { mode: "boolean" })
+    .notNull()
+    .default(false),
+  /** Owning active user for passive/proxy profiles that travel across networks (PC-357). */
+  ownedByUserId: text("owned_by_user_id"),
+  /** Shown on the paused/banned screen when set by an administrator. */
+  moderationReason: text("moderation_reason"),
+  /** ISO timestamp — when set, shown on paused/banned screen and auto-clears on login after. */
+  moderationExpiresAt: text("moderation_expires_at"),
   createdAt: text("created_at").notNull(),
   updatedAt: text("updated_at").notNull(),
 });
@@ -97,6 +123,15 @@ export const polyGroup = sqliteTable("poly_group", {
   hideSleepingArrangements: integer("hide_sleeping_arrangements", { mode: "boolean" })
     .notNull()
     .default(false),
+  /**
+   * When true, members see sleeping nights where an accepted partner is involved
+   * and they themselves are not (lighter purple on schedule) (PC-366).
+   */
+  seePartnersSleepingArrangements: integer("see_partners_sleeping_arrangements", {
+    mode: "boolean",
+  })
+    .notNull()
+    .default(false),
   placesMapVisibility: text("places_map_visibility").notNull().default("all"),
   logTailLength: integer("log_tail_length").notNull().default(100),
   onboardingWelcomeMessage: text("onboarding_welcome_message"),
@@ -116,9 +151,95 @@ export const polyGroup = sqliteTable("poly_group", {
   updatedAt: text("updated_at").notNull(),
 });
 
+/**
+ * Product tenant (PC-357) — replaces singleton poly_group as the settings +
+ * isolation boundary. poly_group remains for legacy dual-write during transition.
+ */
+export const networks = sqliteTable("networks", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  status: text("status", { enum: networkStatuses }).notNull().default("active"),
+  createdByUserId: text("created_by_user_id").references(() => users.id),
+  createdByEmail: text("created_by_email"),
+  allowUserProvisioning: integer("allow_user_provisioning", { mode: "boolean" })
+    .notNull()
+    .default(false),
+  adminCanSeeUninvolved: integer("admin_can_see_uninvolved", { mode: "boolean" })
+    .notNull()
+    .default(true),
+  auditLogVisibility: text("audit_log_visibility").notNull().default("admin_only"),
+  hideSleepingArrangements: integer("hide_sleeping_arrangements", { mode: "boolean" })
+    .notNull()
+    .default(false),
+  /**
+   * When true, members see sleeping nights where an accepted partner is involved
+   * and they themselves are not (lighter purple on schedule) (PC-366).
+   */
+  seePartnersSleepingArrangements: integer("see_partners_sleeping_arrangements", {
+    mode: "boolean",
+  })
+    .notNull()
+    .default(false),
+  placesMapVisibility: text("places_map_visibility").notNull().default("all"),
+  logTailLength: integer("log_tail_length").notNull().default(100),
+  onboardingWelcomeMessage: text("onboarding_welcome_message"),
+  proposedMaxDays: integer("proposed_max_days").notNull().default(0),
+  atRiskTtlDays: integer("at_risk_ttl_days").notNull().default(7),
+  archiveGraceHours: integer("archive_grace_hours").notNull().default(24),
+  redraftDeadlineHours: integer("redraft_deadline_hours").notNull().default(24),
+  sleepingPartnerProposalMaxDays: integer("sleeping_partner_proposal_max_days")
+    .notNull()
+    .default(5),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+});
+
+/** Membership of a platform user in a network (PC-357). */
+export const networkMembers = sqliteTable(
+  "network_members",
+  {
+    id: text("id").primaryKey(),
+    networkId: text("network_id")
+      .notNull()
+      .references(() => networks.id),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id),
+    role: text("role", { enum: networkMemberRoles }).notNull().default("user"),
+    status: text("status", { enum: networkMemberStatuses }).notNull().default("active"),
+    createdAt: text("created_at").notNull(),
+    updatedAt: text("updated_at").notNull(),
+  },
+  (table) => [
+    unique().on(table.networkId, table.userId),
+    index("idx_network_members_user").on(table.userId, table.status),
+    index("idx_network_members_network").on(table.networkId, table.status),
+  ],
+);
+
+/** Single-use hashed tokens for self-serve network setup (PC-357 / PC-360). */
+export const networkSetupTokens = sqliteTable("network_setup_tokens", {
+  id: text("id").primaryKey(),
+  email: text("email").notNull(),
+  tokenDigest: text("token_digest").notNull().unique(),
+  expiresAt: text("expires_at").notNull(),
+  consumedAt: text("consumed_at"),
+  createdNetworkId: text("created_network_id").references(() => networks.id),
+  createdAt: text("created_at").notNull(),
+});
+
+/** Global platform knobs for network creation abuse controls (PC-357). */
+export const platformSettings = sqliteTable("platform_settings", {
+  id: integer("id").primaryKey(),
+  maxNetworksPerEmail: integer("max_networks_per_email").notNull().default(3),
+  maxNetworkCreatesPerDay: integer("max_network_creates_per_day").notNull().default(10),
+  updatedAt: text("updated_at").notNull(),
+});
+
 /** Physical or virtual places — foundation for People & Places tab. */
 export const locations = sqliteTable("locations", {
   id: text("id").primaryKey(),
+  networkId: text("network_id").references(() => networks.id),
   name: text("name").notNull(),
   description: text("description"),
   address: text("address"),
@@ -136,6 +257,7 @@ export const locations = sqliteTable("locations", {
 export const userActivityLog = sqliteTable("user_activity_log", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   userId: text("user_id").references(() => users.id),
+  networkId: text("network_id").references(() => networks.id),
   action: text("action").notNull(),
   details: text("details"),
   eventType: text("event_type").notNull().default("user"),
@@ -244,6 +366,7 @@ export type EventPrivacyLevel = (typeof eventPrivacyLevels)[number];
  */
 export const proposals = sqliteTable("proposals", {
   id: text("id").primaryKey(),
+  networkId: text("network_id").references(() => networks.id),
   title: text("title").notNull(),
   description: text("description"),
   proposalType: text("proposal_type", { enum: proposalTypes }).notNull(),
@@ -378,7 +501,7 @@ export const proposalSlotVotes = sqliteTable(
   (table) => [unique().on(table.timeSlotId, table.userId)],
 );
 
-/** Immutable proposal state transition audit trail (PC-40). */
+/** Proposal state transition audit trail (PC-40). Soft-delete hides from Feed (PC-365). */
 export const proposalStateLog = sqliteTable("proposal_state_log", {
   id: text("id").primaryKey(),
   proposalId: text("proposal_id")
@@ -388,6 +511,7 @@ export const proposalStateLog = sqliteTable("proposal_state_log", {
   action: text("action").notNull(),
   details: text("details"),
   createdAt: text("created_at").notNull(),
+  deletedAt: text("deleted_at"),
 });
 
 /** Threaded discussion on a proposal (PC-40). */
@@ -442,6 +566,7 @@ export const pushSubscriptions = sqliteTable(
 /** Undirected sleeping partnership edge with proposal workflow (PC-36). */
 export const sleepingPartnerships = sqliteTable("sleeping_partnerships", {
   id: text("id").primaryKey(),
+  networkId: text("network_id").references(() => networks.id),
   userLowId: text("user_low_id")
     .notNull()
     .references(() => users.id),
@@ -496,6 +621,7 @@ export const locationResidents = sqliteTable("location_residents", {
 /** Network-wide chat messages on the Feed tab (PC-228). */
 export const networkChatMessages = sqliteTable("network_chat_messages", {
   id: text("id").primaryKey(),
+  networkId: text("network_id").references(() => networks.id),
   authorId: text("author_id")
     .notNull()
     .references(() => users.id),
@@ -679,6 +805,10 @@ export const calendarIcsPending = sqliteTable("calendar_ics_pending", {
 export const schema = {
   users,
   polyGroup,
+  networks,
+  networkMembers,
+  networkSetupTokens,
+  platformSettings,
   locations,
   userActivityLog,
   storedImages,

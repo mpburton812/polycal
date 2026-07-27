@@ -5,6 +5,8 @@ import { and, asc, desc, eq, gte, inArray, isNull, lt, lte, or, sql } from "driz
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
+import { requireNetworkSession } from "@/lib/networks/context";
+import { loadNetworkSettings } from "@/lib/networks/settings";
 import { requireSession, withDb } from "@/lib/actions/context";
 import { userHasAdminAccess } from "@/lib/admin-access";
 import {
@@ -14,7 +16,6 @@ import {
   networkChatMessages,
   feedImageUploads,
   feedLikes,
-  polyGroup,
   proposalCommentImages,
   proposalComments,
   proposalInvitees,
@@ -224,8 +225,9 @@ async function loadLikeSummaries(
 async function loadAcceptedPartnerIds(
   db: Parameters<Parameters<typeof withDb>[0]>[0],
   viewerId: string,
+  networkId: string,
 ): Promise<Set<string>> {
-  return getAcceptedSleepingPartnerIds(db, viewerId);
+  return getAcceptedSleepingPartnerIds(db, viewerId, networkId);
 }
 
 /**
@@ -240,6 +242,7 @@ async function loadActiveEvents(
   prefs: FeedPrefs,
   partnerIds: ReadonlySet<string>,
   now: Date,
+  networkId: string,
 ): Promise<FeedActiveEvent[]> {
   if (!prefs.content.resolved) return [];
 
@@ -257,6 +260,7 @@ async function loadActiveEvents(
     .from(proposals)
     .where(
       and(
+        eq(proposals.networkId, networkId),
         eq(proposals.proposalType, "event"),
         eq(proposals.state, "resolved"),
         lte(proposals.scheduledStartAt, nowIso),
@@ -284,13 +288,9 @@ async function loadActiveEvents(
     inviteesByProposal.set(invitee.proposalId, list);
   }
 
-  const adminCanSeeUninvolved = await getAdminCanSeeUninvolved(db);
-  const [group] = await db
-    .select({ auditLogVisibility: polyGroup.auditLogVisibility })
-    .from(polyGroup)
-    .where(eq(polyGroup.id, 1))
-    .limit(1);
-  const auditVisibility = (group?.auditLogVisibility ?? "admin_only") as AuditLogVisibility;
+  const adminCanSeeUninvolved = await getAdminCanSeeUninvolved(db, networkId);
+  const settings = await loadNetworkSettings(networkId, db);
+  const auditVisibility = (settings?.auditLogVisibility ?? "admin_only") as AuditLogVisibility;
 
   const activeEvents: FeedActiveEvent[] = [];
   for (const row of rows) {
@@ -398,7 +398,7 @@ export async function listFeedItemsAction(
   /** Cheap first-page fingerprint so the client can baseline silent polls (PC-336). */
   updateToken?: string;
 }> {
-  const sessionResult = await requireSession();
+  const sessionResult = await requireNetworkSession();
   if (!sessionResult.ok) return sessionResult;
 
   const parsed = listFeedSchema.safeParse(input);
@@ -409,6 +409,7 @@ export async function listFeedItemsAction(
   const limit = parsed.data.limit ?? 20;
   const cursor = parseFeedCursor(parsed.data.cursor ?? null);
   const viewerId = sessionResult.user.id;
+  const networkId = sessionResult.user.activeNetworkId;
   const isAdmin = await userHasAdminAccess(sessionResult.user.role);
 
   // Single DB handle — parallel withDb on sqlite can stall local e2e (PC-232).
@@ -419,10 +420,18 @@ export async function listFeedItemsAction(
       .where(eq(users.id, viewerId))
       .limit(1);
     const prefs = parseFeedPrefs(prefsRow?.feedPrefsJson);
-    const partnerIds = await loadAcceptedPartnerIds(db, viewerId);
+    const partnerIds = await loadAcceptedPartnerIds(db, viewerId, networkId);
     const activeEvents =
       parsed.data.cursor == null
-        ? await loadActiveEvents(db, viewerId, isAdmin, prefs, partnerIds, new Date())
+        ? await loadActiveEvents(
+            db,
+            viewerId,
+            isAdmin,
+            prefs,
+            partnerIds,
+            new Date(),
+            networkId,
+          )
         : [];
 
     const milestones = await loadMilestoneBatch(
@@ -433,9 +442,19 @@ export async function listFeedItemsAction(
       cursor,
       prefs,
       partnerIds,
+      networkId,
     );
     const chatMessages = networkChatAllowed(prefs)
-      ? await loadChatBatch(db, viewerId, isAdmin, limit * 4, cursor, prefs, partnerIds)
+      ? await loadChatBatch(
+          db,
+          viewerId,
+          isAdmin,
+          limit * 4,
+          cursor,
+          prefs,
+          partnerIds,
+          networkId,
+        )
       : [];
 
     let merged: FeedItem[] = [...milestones, ...chatMessages];
@@ -455,7 +474,7 @@ export async function listFeedItemsAction(
         ? encodeFeedCursor(items[items.length - 1]!)
         : null;
 
-    const updateToken = await computeFeedFingerprint(db, viewerId);
+    const updateToken = await computeFeedFingerprint(db, viewerId, networkId);
 
     return { ok: true, message: "OK", items, activeEvents, nextCursor, updateToken };
   });
@@ -471,18 +490,23 @@ export async function listFeedItemsAction(
 async function computeFeedFingerprint(
   db: Parameters<Parameters<typeof withDb>[0]>[0],
   viewerId: string,
+  networkId: string,
   now: Date = new Date(),
 ): Promise<string> {
   const [milestones] = await db
     .select({
       count: sql<number>`count(*)`,
       maxCreatedAt: sql<string | null>`max(${proposalStateLog.createdAt})`,
+      maxDeletedAt: sql<string | null>`max(${proposalStateLog.deletedAt})`,
     })
-    .from(proposalStateLog);
+    .from(proposalStateLog)
+    .innerJoin(proposals, eq(proposalStateLog.proposalId, proposals.id))
+    .where(eq(proposals.networkId, networkId));
 
   const [proposalsAgg] = await db
     .select({ maxUpdatedAt: sql<string | null>`max(${proposals.updatedAt})` })
-    .from(proposals);
+    .from(proposals)
+    .where(eq(proposals.networkId, networkId));
 
   const [chatMessagesAgg] = await db
     .select({
@@ -490,7 +514,8 @@ async function computeFeedFingerprint(
       maxCreatedAt: sql<string | null>`max(${networkChatMessages.createdAt})`,
       maxDeletedAt: sql<string | null>`max(${networkChatMessages.deletedAt})`,
     })
-    .from(networkChatMessages);
+    .from(networkChatMessages)
+    .where(eq(networkChatMessages.networkId, networkId));
 
   const [chatCommentsAgg] = await db
     .select({
@@ -531,6 +556,7 @@ async function computeFeedFingerprint(
     .from(proposals)
     .where(
       and(
+        eq(proposals.networkId, networkId),
         eq(proposals.proposalType, "event"),
         eq(proposals.state, "resolved"),
         lte(proposals.scheduledStartAt, nowIso),
@@ -546,6 +572,7 @@ async function computeFeedFingerprint(
     milestones: {
       count: Number(milestones?.count ?? 0),
       maxCreatedAt: milestones?.maxCreatedAt ?? null,
+      maxDeletedAt: milestones?.maxDeletedAt ?? null,
     },
     proposals: { maxUpdatedAt: proposalsAgg?.maxUpdatedAt ?? null },
     chatMessages: {
@@ -582,10 +609,13 @@ export async function getFeedUpdateTokenAction(): Promise<{
   message: string;
   token?: string;
 }> {
-  const sessionResult = await requireSession();
+  const sessionResult = await requireNetworkSession();
   if (!sessionResult.ok) return { ok: false, message: sessionResult.message };
 
-  const token = await withDb((db) => computeFeedFingerprint(db, sessionResult.user.id));
+  const networkId = sessionResult.user.activeNetworkId;
+  const token = await withDb((db) =>
+    computeFeedFingerprint(db, sessionResult.user.id, networkId),
+  );
   return { ok: true, message: "OK", token };
 }
 
@@ -597,22 +627,23 @@ async function loadMilestoneBatch(
   cursor: { createdAt: string; kind: string; id: string } | null,
   prefs: FeedPrefs,
   partnerIds: ReadonlySet<string>,
+  networkId: string,
 ): Promise<FeedItem[]> {
   {
-    const adminCanSeeUninvolved = await getAdminCanSeeUninvolved(db);
-    const [group] = await db
-      .select({ auditLogVisibility: polyGroup.auditLogVisibility })
-      .from(polyGroup)
-      .where(eq(polyGroup.id, 1))
-      .limit(1);
-    const auditVisibility = (group?.auditLogVisibility ?? "admin_only") as AuditLogVisibility;
+    const adminCanSeeUninvolved = await getAdminCanSeeUninvolved(db, networkId);
+    const settings = await loadNetworkSettings(networkId, db);
+    const auditVisibility = (settings?.auditLogVisibility ?? "admin_only") as AuditLogVisibility;
 
     const allowedActions = milestoneActionsForPrefs(prefs);
     if (allowedActions.length === 0) {
       return [];
     }
 
-    const conditions = [inArray(proposalStateLog.action, allowedActions)];
+    const conditions = [
+      inArray(proposalStateLog.action, allowedActions),
+      eq(proposals.networkId, networkId),
+      isNull(proposalStateLog.deletedAt),
+    ];
     if (cursor) {
       conditions.push(lt(proposalStateLog.createdAt, cursor.createdAt));
     }
@@ -658,6 +689,9 @@ async function loadMilestoneBatch(
       inviteesByProposal.set(invitee.proposalId, list);
     }
 
+    const seePartnersSleepingArrangements =
+      settings?.seePartnersSleepingArrangements ?? false;
+
     const milestones: FeedMilestone[] = [];
     for (const row of rows) {
       if (milestones.length >= fetchSize) break;
@@ -668,6 +702,8 @@ async function loadMilestoneBatch(
         proposalType: row.proposalType,
         state: row.state,
         adminCanSeeUninvolved,
+        seePartnersSleepingArrangements,
+        acceptedPartnerIds: partnerIds,
       };
       if (
         !viewerCanSeeProposalWithSleepingGate(viewerId, isAdmin, row.proposerId, inviteeUserIds, gateOptions)
@@ -728,6 +764,7 @@ async function loadMilestoneBatch(
         proposalState: row.state,
         masked: false,
         visibleViaAdminOnly,
+        canDelete: isAdmin,
         canComment: canCommentOnProposal({
           state: row.state,
           isContentMasked: false,
@@ -826,9 +863,13 @@ async function loadChatBatch(
   cursor: { createdAt: string; kind: string; id: string } | null,
   prefs: FeedPrefs,
   partnerIds: ReadonlySet<string>,
+  networkId: string,
 ): Promise<FeedItem[]> {
   {
-    const conditions = [isNull(networkChatMessages.deletedAt)];
+    const conditions = [
+      eq(networkChatMessages.networkId, networkId),
+      isNull(networkChatMessages.deletedAt),
+    ];
     if (cursor) {
       conditions.push(lt(networkChatMessages.createdAt, cursor.createdAt));
     }
@@ -1021,7 +1062,7 @@ async function assertOwnedImageIds(
 export async function postNetworkChatMessageAction(
   input: z.infer<typeof chatPostSchema>,
 ): Promise<{ ok: boolean; message: string; item?: NetworkChatMessage }> {
-  const sessionResult = await requireSession();
+  const sessionResult = await requireNetworkSession();
   if (!sessionResult.ok) return sessionResult;
 
   const parsed = chatPostSchema.safeParse(input);
@@ -1044,6 +1085,7 @@ export async function postNetworkChatMessageAction(
     const { linkPreviewId, linkPreview } = await resolvePreviewForBody(db, parsed.data.body);
     await db.insert(networkChatMessages).values({
       id,
+      networkId: sessionResult.user.activeNetworkId,
       authorId: sessionResult.user.id,
       body: parsed.data.body,
       createdAt: now,
@@ -1095,7 +1137,7 @@ export async function postNetworkChatMessageAction(
 export async function postNetworkChatCommentAction(
   input: z.infer<typeof chatCommentSchema>,
 ): Promise<{ ok: boolean; message: string; comment?: FeedComment }> {
-  const sessionResult = await requireSession();
+  const sessionResult = await requireNetworkSession();
   if (!sessionResult.ok) return sessionResult;
 
   const parsed = chatCommentSchema.safeParse(input);
@@ -1111,17 +1153,26 @@ export async function postNetworkChatCommentAction(
       .select({
         id: networkChatMessages.id,
         authorId: networkChatMessages.authorId,
+        networkId: networkChatMessages.networkId,
         deletedAt: networkChatMessages.deletedAt,
       })
       .from(networkChatMessages)
       .where(eq(networkChatMessages.id, parsed.data.messageId))
       .limit(1);
 
-    if (!message || message.deletedAt) {
+    if (
+      !message ||
+      message.deletedAt ||
+      message.networkId !== sessionResult.user.activeNetworkId
+    ) {
       return { ok: false, message: "Message not found." };
     }
 
-    const owned = await assertOwnedImageIds(db, parsed.data.imageIds, sessionResult.user.id);
+    const owned = await assertOwnedImageIds(
+      db,
+      parsed.data.imageIds,
+      sessionResult.user.id,
+    );
     if (!owned) {
       return { ok: false, message: FEED_IMAGE_INVALID_MESSAGE };
     }
@@ -1260,6 +1311,45 @@ export async function deleteNetworkChatMessageAction(
 }
 
 /**
+ * Soft-deletes a feed milestone (admin only) — hides from feed, keeps audit row (PC-365).
+ */
+export async function deleteFeedMilestoneAction(
+  milestoneId: string,
+): Promise<{ ok: boolean; message: string }> {
+  const sessionResult = await requireSession();
+  if (!sessionResult.ok) return sessionResult;
+
+  const id = z.string().min(1).safeParse(milestoneId);
+  if (!id.success) return { ok: false, message: "Invalid milestone." };
+
+  const isAdmin = await userHasAdminAccess(sessionResult.user.role);
+  if (!isAdmin) {
+    return { ok: false, message: "Not allowed to delete this milestone." };
+  }
+
+  return withDb(async (db) => {
+    const [row] = await db
+      .select({
+        id: proposalStateLog.id,
+        deletedAt: proposalStateLog.deletedAt,
+      })
+      .from(proposalStateLog)
+      .where(eq(proposalStateLog.id, id.data))
+      .limit(1);
+
+    if (!row || row.deletedAt) return { ok: false, message: "Milestone not found." };
+
+    await db
+      .update(proposalStateLog)
+      .set({ deletedAt: new Date().toISOString() })
+      .where(eq(proposalStateLog.id, id.data));
+
+    revalidatePath("/feed");
+    return { ok: true, message: "Milestone deleted." };
+  });
+}
+
+/**
  * Soft-deletes a chat comment (author, message author, or admin) (PC-234).
  */
 export async function deleteNetworkChatCommentAction(
@@ -1325,11 +1415,11 @@ async function feedLikeTargetExists(
 ): Promise<boolean> {
   if (targetType === "milestone") {
     const [row] = await db
-      .select({ id: proposalStateLog.id })
+      .select({ id: proposalStateLog.id, deletedAt: proposalStateLog.deletedAt })
       .from(proposalStateLog)
       .where(eq(proposalStateLog.id, targetId))
       .limit(1);
-    return Boolean(row);
+    return Boolean(row && !row.deletedAt);
   }
   if (targetType === "chat") {
     const [row] = await db

@@ -64,12 +64,16 @@ const detachSliceSchema = sliceDetailSchema;
 
 async function getSlicePrivacyFlags(db: ReturnType<typeof getDb>) {
   const [group] = await db
-    .select({ hideSleepingArrangements: polyGroup.hideSleepingArrangements })
+    .select({
+      hideSleepingArrangements: polyGroup.hideSleepingArrangements,
+      seePartnersSleepingArrangements: polyGroup.seePartnersSleepingArrangements,
+    })
     .from(polyGroup)
     .where(eq(polyGroup.id, 1))
     .limit(1);
   return {
     hideSleeping: group?.hideSleepingArrangements ?? false,
+    seePartnersSleepingArrangements: group?.seePartnersSleepingArrangements ?? false,
   };
 }
 
@@ -219,6 +223,7 @@ export async function getProposalSliceDetailAction(
     adminCanSeeUninvolved,
     applyScheduleMask: true,
     hideSleeping: privacyFlags.hideSleeping,
+    seePartnersSleepingArrangements: privacyFlags.seePartnersSleepingArrangements,
     acceptedPartnerIds: partnerIds,
   });
   if (!visible) {
@@ -523,6 +528,7 @@ export async function detachProposalSliceAction(
 
       await tx.insert(proposals).values({
         id: childId,
+        networkId: parent.networkId,
         title: parent.title,
         description: parent.description,
         proposalType: "sleeping",
@@ -634,6 +640,7 @@ export async function detachProposalSliceAction(
       const bounds = allDayBoundsForDateKey(sliceKey);
       await tx.insert(proposals).values({
         id: childId,
+        networkId: parent.networkId,
         title: parent.title,
         description: parent.description,
         proposalType: parent.proposalType,

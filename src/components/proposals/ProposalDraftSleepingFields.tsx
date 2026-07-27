@@ -106,7 +106,7 @@ export function ProposalDraftSleepingFields({
           <ProposalDraftSectionHeader
             icon={<AccessTimeIcon fontSize="small" />}
             title="Batch nights"
-            subtitle="Empty nights are skipped. Selected partners are required invitees."
+            subtitle="Empty nights are skipped. Mark partners required or optional."
           />
           <FastSleepingPlanGrid
             rows={fastPlanRows}

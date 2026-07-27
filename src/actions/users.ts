@@ -17,6 +17,7 @@ import {
   calendarConnections,
   locationResidents,
   locations,
+  networkMembers,
   polyGroup,
   proposalInvitees,
   proposalSlotVotes,
@@ -27,6 +28,12 @@ import {
   users,
   type UserRole,
 } from "@/lib/db/schema";
+import {
+  listActiveMemberships,
+  removeMembership,
+  upsertMembership,
+} from "@/lib/networks/membership";
+import { requireNetworkSession } from "@/lib/networks/context";
 import {
   ACCOUNT_DELETE_CONFIRMATION_PHRASE,
   anonymizedUserFields,
@@ -328,7 +335,7 @@ async function demoteOrRemoveInviteeFromActiveProposals(
 /**
  * Pauses active proposals involving a user by demoting them to optional (PC-45).
  */
-async function pauseUserProposalSideEffects(
+export async function pauseUserProposalSideEffects(
   db: ReturnType<typeof getDb>,
   userId: string,
   actorUserId: string | null,
@@ -408,10 +415,27 @@ async function pauseUserProposalSideEffects(
 
 /**
  * Lists active and passive users for the People tab (PC-35/36).
+ * Scoped to the caller's active network membership (PC-357).
  */
 export async function listPeopleAction(): Promise<PersonSummary[]> {
   await ensureDbReady();
+  const networkSession = await requireNetworkSession();
+  if (!networkSession.ok) {
+    return [];
+  }
   const db = getDb();
+  const memberRows = await db
+    .select({ userId: networkMembers.userId })
+    .from(networkMembers)
+    .where(
+      and(
+        eq(networkMembers.networkId, networkSession.user.activeNetworkId),
+        eq(networkMembers.status, "active"),
+      ),
+    );
+  const memberIds = memberRows.map((r) => r.userId);
+  if (memberIds.length === 0) return [];
+
   const rows = await db
     .select({
       id: users.id,
@@ -423,7 +447,7 @@ export async function listPeopleAction(): Promise<PersonSummary[]> {
       profileBio: users.profileBio,
     })
     .from(users)
-    .where(eq(users.status, "active"))
+    .where(and(eq(users.status, "active"), inArray(users.id, memberIds)))
     .orderBy(asc(users.displayName));
 
   return rows.map((row) => ({
@@ -501,6 +525,15 @@ export async function createActiveUserAction(
     createdAt: now,
     updatedAt: now,
   });
+
+  const networkSession = await requireNetworkSession();
+  if (networkSession.ok) {
+    await upsertMembership({
+      networkId: networkSession.user.activeNetworkId,
+      userId,
+      role: role === "admin" ? "network_admin" : "user",
+    });
+  }
 
   await logUserActivity(
     session?.user?.id ?? null,
@@ -671,9 +704,19 @@ export async function createPassiveUserAction(
     avatarKey: parsed.data.avatarKey ?? "bird_green",
     theme: "mint",
     loginCount: 0,
+    ownedByUserId: sessionResult.user.id,
     createdAt: now,
     updatedAt: now,
   });
+
+  const networkSession = await requireNetworkSession();
+  if (networkSession.ok) {
+    await upsertMembership({
+      networkId: networkSession.user.activeNetworkId,
+      userId,
+      role: "passive",
+    });
+  }
 
   await logUserActivity(
     sessionResult.user.id,
@@ -860,7 +903,12 @@ function revalidateAfterAccountRemoval(): void {
 }
 
 /**
- * Soft-deletes a user and removes their graph edges (admin only, PC-35 / PC-354).
+ * Soft-deletes a user from the active network (admin only, PC-35 / PC-354 / PC-357).
+ *
+ * Removes membership first. When the user has no remaining active memberships,
+ * erases personal graph edges and anonymizes the account (same as legacy delete).
+ * Users who remain in other networks are only removed from this one — use
+ * `banUserFromAllNetworksAction` for a platform-wide ban (PC-362).
  */
 export async function deleteUserAction(userId: string): Promise<UserActionResult> {
   const adminResult = await requireAdminAccess();
@@ -877,6 +925,29 @@ export async function deleteUserAction(userId: string): Promise<UserActionResult
   const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
   if (!user || (user.status !== "active" && user.status !== "paused")) {
     return { ok: false, message: "User not found." };
+  }
+
+  const networkSession = await requireNetworkSession();
+  if (networkSession.ok) {
+    await removeMembership(userId, networkSession.user.activeNetworkId);
+  }
+
+  const remaining = await listActiveMemberships(userId);
+  if (remaining.length > 0) {
+    await logUserActivity(
+      adminResult.user.id,
+      "users.network_remove",
+      JSON.stringify({
+        userId,
+        username: user.username,
+        networkId: networkSession.ok ? networkSession.user.activeNetworkId : null,
+      }),
+    );
+    revalidateAfterAccountRemoval();
+    return {
+      ok: true,
+      message: `Removed ${user.displayName} from this network.`,
+    };
   }
 
   await eraseAccount(db, user, adminResult.user.id);
@@ -1010,11 +1081,19 @@ export async function listAdminUsersAction(): Promise<AdminUserRow[]> {
 /**
  * Pauses a user account and invalidates active sessions (PC-31).
  */
-export async function pauseUserAction(userId: string): Promise<UserActionResult> {
+export async function pauseUserAction(
+  userId: string,
+  options?: { reason?: string; durationDays?: number },
+): Promise<UserActionResult> {
   const adminResult = await requireAdminAccess();
   if (!adminResult.ok) return { ok: false, message: adminResult.message };
   if (userId === adminResult.user.id) {
     return { ok: false, message: "You cannot pause your own account." };
+  }
+
+  const reason = options?.reason?.trim();
+  if (!reason) {
+    return { ok: false, message: "A reason is required to pause a user." };
   }
 
   await ensureDbReady();
@@ -1027,16 +1106,23 @@ export async function pauseUserAction(userId: string): Promise<UserActionResult>
   await pauseUserProposalSideEffects(db, userId, adminResult.user.id);
 
   const now = new Date().toISOString();
+  const { moderationExpiresFromDays } = await import("@/lib/users/moderation");
   await db
     .update(users)
     .set({
       status: "paused",
+      moderationReason: reason,
+      moderationExpiresAt: moderationExpiresFromDays(options?.durationDays),
       sessionVersion: user.sessionVersion + 1,
       updatedAt: now,
     })
     .where(eq(users.id, userId));
 
-  await logUserActivity(adminResult.user.id, "users.admin_pause", JSON.stringify({ userId }));
+  await logUserActivity(
+    adminResult.user.id,
+    "users.admin_pause",
+    JSON.stringify({ userId, reason }),
+  );
   revalidatePath("/admin");
   revalidatePath("/people-places");
   revalidatePath("/proposals");
@@ -1061,7 +1147,7 @@ export async function resumeUserAction(userId: string): Promise<UserActionResult
   const now = new Date().toISOString();
   await db
     .update(users)
-    .set({ status: "active", updatedAt: now })
+    .set({ status: "active", moderationReason: null, moderationExpiresAt: null, updatedAt: now })
     .where(eq(users.id, userId));
 
   await logUserActivity(adminResult.user.id, "users.admin_resume", JSON.stringify({ userId }));

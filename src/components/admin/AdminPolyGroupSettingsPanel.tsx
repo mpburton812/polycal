@@ -127,6 +127,25 @@ export function AdminPolyGroupSettingsPanel({
           }
           label="Mask sleeping details for uninvolved admins on calendar"
         />
+        <FormControlLabel
+          control={
+            <Switch
+              checked={settings.seePartnersSleepingArrangements}
+              onChange={(e) =>
+                setSettings({
+                  ...settings,
+                  seePartnersSleepingArrangements: e.target.checked,
+                })
+              }
+            />
+          }
+          label="See partners' sleeping arrangements"
+        />
+        <Typography variant="caption" color="text.secondary" sx={{ mt: -1, display: "block" }}>
+          When on, members see nights where an accepted sleeping partner is involved and they
+          are not (shown in a lighter purple). Distinct from masking Busy details for uninvolved
+          admins above.
+        </Typography>
         <FormControl fullWidth>
           <InputLabel>Sleeping Partners tab visibility</InputLabel>
           <Select

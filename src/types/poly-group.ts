@@ -16,6 +16,11 @@ export interface PolyGroupSettings {
   auditLogVisibility: AuditLogVisibility;
   allowUserProvisioning: boolean;
   hideSleepingArrangements: boolean;
+  /**
+   * When true, members see sleeping nights where an accepted partner is involved
+   * and they are not (PC-366). Orthogonal to hideSleepingArrangements (Busy mask).
+   */
+  seePartnersSleepingArrangements: boolean;
   placesMapVisibility: PlacesMapVisibility;
   logTailLength: number;
   onboardingWelcomeMessage: string;

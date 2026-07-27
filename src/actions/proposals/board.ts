@@ -4,6 +4,7 @@ import { and, asc, desc, eq, inArray, ne, or } from "drizzle-orm";
 
 import { auth } from "@/lib/auth";
 import { userHasAdminAccess } from "@/lib/admin-access";
+import { requireNetworkSession } from "@/lib/networks/context";
 import { getDb } from "@/lib/db/client";
 import { ensureDbReady } from "@/lib/db/ensure-ready";
 import {
@@ -74,20 +75,26 @@ function bedroomLabelFromPlace(
  */
 export async function listProposalBoardAction(): Promise<ProposalBoard> {
   await ensureDbReady();
-  const session = await auth();
-  if (!session?.user) {
+  const networkSession = await requireNetworkSession();
+  if (!networkSession.ok) {
     return { draft: [], proposed: [], resolved: [], archived: [] };
   }
 
   const db = getDb();
   const { bridgeLegacyResidencyProposals } = await import("@/actions/residency-proposals");
   await bridgeLegacyResidencyProposals(db);
-  const viewerId = session.user.id;
-  const isAdmin = await userHasAdminAccess(session.user.role);
-  const adminCanSeeUninvolved = await getAdminCanSeeUninvolved(db);
+  const viewerId = networkSession.user.id;
+  const networkId = networkSession.user.activeNetworkId;
+  const isAdmin =
+    networkSession.user.activeNetworkRole === "network_admin" ||
+    networkSession.user.isPlatformAdmin ||
+    (await userHasAdminAccess(networkSession.user.role));
+  const adminCanSeeUninvolved = await getAdminCanSeeUninvolved(db, networkId);
   const adminSeesAll = isAdmin && adminCanSeeUninvolved;
   const nowIso = new Date().toISOString();
-  const enforcement = await loadEnforcementSettings(db);
+  const enforcement = await loadEnforcementSettings(db, networkId);
+
+  const networkFilter = eq(proposals.networkId, networkId);
 
   const viewerInviteeProposalRows = adminSeesAll
     ? []
@@ -98,17 +105,20 @@ export async function listProposalBoardAction(): Promise<ProposalBoard> {
   const viewerInviteeProposalIds = viewerInviteeProposalRows.map((row) => row.proposalId);
 
   const boardVisibilityFilter = adminSeesAll
-    ? undefined
-    : or(
-        and(eq(proposals.state, "draft"), eq(proposals.proposerId, viewerId)),
-        and(
-          ne(proposals.state, "draft"),
-          or(
-            eq(proposals.proposerId, viewerId),
-            viewerInviteeProposalIds.length > 0
-              ? inArray(proposals.id, viewerInviteeProposalIds)
-              : eq(proposals.id, "__none__"),
-            inArray(proposals.state, ["resolved", "archived"]),
+    ? networkFilter
+    : and(
+        networkFilter,
+        or(
+          and(eq(proposals.state, "draft"), eq(proposals.proposerId, viewerId)),
+          and(
+            ne(proposals.state, "draft"),
+            or(
+              eq(proposals.proposerId, viewerId),
+              viewerInviteeProposalIds.length > 0
+                ? inArray(proposals.id, viewerInviteeProposalIds)
+                : eq(proposals.id, "__none__"),
+              inArray(proposals.state, ["resolved", "archived"]),
+            ),
           ),
         ),
       );
@@ -373,7 +383,12 @@ export async function listProposalBoardAction(): Promise<ProposalBoard> {
     })
     .from(sleepingPartnerships)
     .innerJoin(users, eq(sleepingPartnerships.proposedById, users.id))
-    .where(eq(sleepingPartnerships.status, "proposed"));
+    .where(
+      and(
+        eq(sleepingPartnerships.status, "proposed"),
+        eq(sleepingPartnerships.networkId, networkId),
+      ),
+    );
 
   if (partnershipRows.length > 0) {
     const partnerIds = new Set<string>();

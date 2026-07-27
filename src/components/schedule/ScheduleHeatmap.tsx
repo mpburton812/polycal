@@ -68,7 +68,7 @@ function HeatmapCell({ level, day, compact = false, timeZone = "UTC" }: HeatmapC
       <Box
         sx={{
           borderRadius: 0.5,
-          bgcolor: LEVEL_COLORS[level],
+          bgcolor: isToday ? GARDEN_TOKENS.todayHighlight : LEVEL_COLORS[level],
           border: "1px solid",
           borderColor: isToday ? GARDEN_TOKENS.sage : GARDEN_TOKENS.outlineSoft,
           minHeight: compact ? 18 : 28,

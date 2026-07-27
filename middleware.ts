@@ -21,9 +21,13 @@ export default edgeAuth((request) => {
     "/forgot-password",
     "/reset-password",
     "/verify-email",
+    "/create-network",
+    "/setup-network",
     "/privacy",
     "/terms",
     "/paused",
+    "/banned",
+    "/feedback",
     "/offline",
     "/api/auth",
     "/api/cron",
@@ -46,6 +50,10 @@ export default edgeAuth((request) => {
 
   if (session.user.accountStatus === "paused" && pathname !== "/paused") {
     return Response.redirect(new URL("/paused", request.nextUrl.origin));
+  }
+
+  if (session.user.accountStatus === "banned" && pathname !== "/banned") {
+    return Response.redirect(new URL("/banned", request.nextUrl.origin));
   }
 
   return undefined;

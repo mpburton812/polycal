@@ -17,7 +17,7 @@ import {
   Typography,
 } from "@mui/material";
 import { useRouter } from "next/navigation";
-import { useEffect, useState, useTransition, type MouseEvent } from "react";
+import { useEffect, useRef, useState, useTransition, type MouseEvent } from "react";
 
 import { respondPartnershipAction } from "@/actions/partnerships";
 import { respondResidencyAction } from "@/actions/places";
@@ -107,6 +107,8 @@ export function NotificationInbox({
   const [count, setCount] = useState(initialCount);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  /** Defer shell refresh until the popover closes so Close is not detached mid-click (PC-357). */
+  const refreshOnCloseRef = useRef(false);
 
   // Keep local inbox aligned with RSC props after router.refresh() (PC-218).
   useEffect(() => {
@@ -125,13 +127,19 @@ export function NotificationInbox({
       setItems(result.items);
       setCount(result.count);
       if (result.cleared > 0) {
-        router.refresh();
+        // Local state already matches; refreshing here remounts AppShell and
+        // detaches the open popover (e2e Close notifications hangs; PC-357).
+        refreshOnCloseRef.current = true;
       }
     });
   }
 
   function handleClose() {
     setAnchorEl(null);
+    if (refreshOnCloseRef.current) {
+      refreshOnCloseRef.current = false;
+      router.refresh();
+    }
   }
 
   function removeFromList(logId: number) {

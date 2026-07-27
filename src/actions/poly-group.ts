@@ -5,10 +5,11 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { logUserActivity } from "@/lib/audit";
-import { requireAdminAccess } from "@/lib/actions/context";
 import { getDb } from "@/lib/db/client";
 import { ensureDbReady } from "@/lib/db/ensure-ready";
-import { polyGroup } from "@/lib/db/schema";
+import { networks, polyGroup } from "@/lib/db/schema";
+import { requireNetworkAdmin, requireNetworkSession } from "@/lib/networks/context";
+import { loadNetworkSettings } from "@/lib/networks/settings";
 import {
   DEFAULT_ONBOARDING_WELCOME_MESSAGE,
   auditLogVisibilityLevels,
@@ -35,6 +36,7 @@ const settingsSchema = z.object({
   auditLogVisibility: z.enum(auditLogVisibilityLevels),
   allowUserProvisioning: z.boolean(),
   hideSleepingArrangements: z.boolean(),
+  seePartnersSleepingArrangements: z.boolean(),
   placesMapVisibility: z.enum(placesMapVisibilityLevels),
   logTailLength: z.number().int().min(0).max(1000),
   onboardingWelcomeMessage: z
@@ -49,13 +51,29 @@ const settingsSchema = z.object({
   sleepingPartnerProposalMaxDays: z.number().int().min(1).max(365),
 });
 
-function rowToSettings(row: typeof polyGroup.$inferSelect): PolyGroupSettings {
+function rowToSettings(row: {
+  name: string;
+  adminCanSeeUninvolved: boolean | null;
+  auditLogVisibility: string;
+  allowUserProvisioning: boolean;
+  hideSleepingArrangements: boolean;
+  seePartnersSleepingArrangements: boolean | null;
+  placesMapVisibility: string | null;
+  logTailLength: number;
+  onboardingWelcomeMessage: string | null;
+  proposedMaxDays: number | null;
+  atRiskTtlDays: number | null;
+  archiveGraceHours: number | null;
+  redraftDeadlineHours: number | null;
+  sleepingPartnerProposalMaxDays: number | null;
+}): PolyGroupSettings {
   return {
     name: row.name,
     adminCanSeeUninvolved: row.adminCanSeeUninvolved ?? true,
     auditLogVisibility: row.auditLogVisibility as PolyGroupSettings["auditLogVisibility"],
     allowUserProvisioning: row.allowUserProvisioning,
     hideSleepingArrangements: row.hideSleepingArrangements,
+    seePartnersSleepingArrangements: row.seePartnersSleepingArrangements ?? false,
     placesMapVisibility:
       (row.placesMapVisibility as PolyGroupSettings["placesMapVisibility"]) ?? "all",
     logTailLength: row.logTailLength,
@@ -71,10 +89,26 @@ function rowToSettings(row: typeof polyGroup.$inferSelect): PolyGroupSettings {
 
 /**
  * Loads the poly group display name for app chrome (all signed-in users).
+ * Prefers the active network name when multi-network memberships exist (PC-357).
  */
 export async function getPolyGroupDisplayNameAction(): Promise<string> {
   await ensureDbReady();
   const db = getDb();
+  try {
+    const { requireNetworkSession } = await import("@/lib/networks/context");
+    const { networks } = await import("@/lib/db/schema");
+    const networkSession = await requireNetworkSession();
+    if (networkSession.ok) {
+      const [net] = await db
+        .select({ name: networks.name })
+        .from(networks)
+        .where(eq(networks.id, networkSession.user.activeNetworkId))
+        .limit(1);
+      if (net?.name?.trim()) return net.name.trim();
+    }
+  } catch {
+    /* fall through to poly_group */
+  }
   const [row] = await db
     .select({ name: polyGroup.name })
     .from(polyGroup)
@@ -84,27 +118,40 @@ export async function getPolyGroupDisplayNameAction(): Promise<string> {
 }
 
 /**
- * Loads poly group settings for the Admin tab (PC-30).
+ * Loads network settings for the Admin tab (PC-30 / PC-364).
  */
 export async function getPolyGroupSettingsAction(): Promise<PolyGroupSettings | null> {
-  const adminResult = await requireAdminAccess();
+  const adminResult = await requireNetworkAdmin();
   if (!adminResult.ok) return null;
 
   await ensureDbReady();
-  const db = getDb();
-  const [row] = await db.select().from(polyGroup).where(eq(polyGroup.id, 1)).limit(1);
-  if (!row) return null;
-  return rowToSettings(row);
+  const settings = await loadNetworkSettings(adminResult.user.activeNetworkId);
+  if (!settings) return null;
+  return {
+    name: settings.name,
+    adminCanSeeUninvolved: settings.adminCanSeeUninvolved,
+    auditLogVisibility: settings.auditLogVisibility,
+    allowUserProvisioning: settings.allowUserProvisioning,
+    hideSleepingArrangements: settings.hideSleepingArrangements,
+    seePartnersSleepingArrangements: settings.seePartnersSleepingArrangements,
+    placesMapVisibility: settings.placesMapVisibility,
+    logTailLength: settings.logTailLength,
+    onboardingWelcomeMessage: settings.onboardingWelcomeMessage,
+    proposedMaxDays: settings.proposedMaxDays,
+    atRiskTtlDays: settings.atRiskTtlDays,
+    archiveGraceHours: settings.archiveGraceHours,
+    redraftDeadlineHours: settings.redraftDeadlineHours,
+    sleepingPartnerProposalMaxDays: settings.sleepingPartnerProposalMaxDays,
+  };
 }
 
 /**
- * Persists poly group settings (PC-30). Power management and event privacy levels
- * were removed (PC-280) — every group is admin_user mode and every proposal is open.
+ * Persists active-network settings (PC-30 / PC-364).
  */
 export async function updatePolyGroupSettingsAction(
   input: PolyGroupSettings,
 ): Promise<PolyGroupActionResult> {
-  const adminResult = await requireAdminAccess();
+  const adminResult = await requireNetworkAdmin();
   if (!adminResult.ok) {
     return { ok: false, message: adminResult.message };
   }
@@ -116,13 +163,40 @@ export async function updatePolyGroupSettingsAction(
 
   await ensureDbReady();
   const db = getDb();
-  const [current] = await db.select().from(polyGroup).where(eq(polyGroup.id, 1)).limit(1);
+  const networkId = adminResult.user.activeNetworkId;
+  const [current] = await db
+    .select({ id: networks.id })
+    .from(networks)
+    .where(eq(networks.id, networkId))
+    .limit(1);
   if (!current) {
-    return { ok: false, message: "Poly group not initialized." };
+    return { ok: false, message: "Network not found." };
   }
 
   const now = new Date().toISOString();
 
+  await db
+    .update(networks)
+    .set({
+      name: parsed.data.name,
+      adminCanSeeUninvolved: parsed.data.adminCanSeeUninvolved,
+      auditLogVisibility: parsed.data.auditLogVisibility,
+      allowUserProvisioning: parsed.data.allowUserProvisioning,
+      hideSleepingArrangements: parsed.data.hideSleepingArrangements,
+      seePartnersSleepingArrangements: parsed.data.seePartnersSleepingArrangements,
+      placesMapVisibility: parsed.data.placesMapVisibility,
+      logTailLength: parsed.data.logTailLength,
+      onboardingWelcomeMessage: parsed.data.onboardingWelcomeMessage,
+      proposedMaxDays: parsed.data.proposedMaxDays,
+      atRiskTtlDays: parsed.data.atRiskTtlDays,
+      archiveGraceHours: parsed.data.archiveGraceHours,
+      redraftDeadlineHours: parsed.data.redraftDeadlineHours,
+      sleepingPartnerProposalMaxDays: parsed.data.sleepingPartnerProposalMaxDays,
+      updatedAt: now,
+    })
+    .where(eq(networks.id, networkId));
+
+  // Legacy dual-write so poly_group-backed readers stay in sync (PC-366).
   await db
     .update(polyGroup)
     .set({
@@ -131,6 +205,7 @@ export async function updatePolyGroupSettingsAction(
       auditLogVisibility: parsed.data.auditLogVisibility,
       allowUserProvisioning: parsed.data.allowUserProvisioning,
       hideSleepingArrangements: parsed.data.hideSleepingArrangements,
+      seePartnersSleepingArrangements: parsed.data.seePartnersSleepingArrangements,
       placesMapVisibility: parsed.data.placesMapVisibility,
       logTailLength: parsed.data.logTailLength,
       onboardingWelcomeMessage: parsed.data.onboardingWelcomeMessage,
@@ -146,7 +221,7 @@ export async function updatePolyGroupSettingsAction(
   await logUserActivity(
     adminResult.user.id,
     "admin.poly_group_settings_update",
-    JSON.stringify({ name: parsed.data.name }),
+    JSON.stringify({ name: parsed.data.name, networkId }),
     "system",
   );
 
@@ -162,12 +237,10 @@ export async function updatePolyGroupSettingsAction(
  * Returns Sleeping Partners tab visibility for People & Places (PC-73 / PC-180).
  */
 export async function getPlacesMapVisibilityAction(): Promise<PlacesMapVisibility> {
+  const networkSession = await requireNetworkSession();
+  if (!networkSession.ok) return "all";
+
   await ensureDbReady();
-  const db = getDb();
-  const [row] = await db
-    .select({ placesMapVisibility: polyGroup.placesMapVisibility })
-    .from(polyGroup)
-    .where(eq(polyGroup.id, 1))
-    .limit(1);
-  return (row?.placesMapVisibility as PlacesMapVisibility) ?? "all";
+  const settings = await loadNetworkSettings(networkSession.user.activeNetworkId);
+  return settings?.placesMapVisibility ?? "all";
 }

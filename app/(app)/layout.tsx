@@ -11,7 +11,7 @@ import { UserThemeProvider } from "@/components/providers/UserThemeProvider";
 import { BrandedLoading } from "@/components/ui/BrandedLoading";
 import { auth } from "@/lib/auth";
 import { getLiveUserStatus } from "@/lib/auth-session";
-import { userHasAdminAccess } from "@/lib/admin-access";
+import { userCanSeeAdminTab } from "@/lib/admin-access";
 import { normalizeUserThemeId } from "@/lib/constants/themes";
 import { DEFAULT_NOTIFICATION_PREFS } from "@/types/notification-prefs";
 
@@ -40,17 +40,23 @@ async function AppLayoutReady({ children }: { children: React.ReactNode }) {
   if (liveStatus === "paused") {
     redirect("/paused");
   }
+  if (liveStatus === "banned") {
+    redirect("/banned");
+  }
 
   const themeId = normalizeUserThemeId(session.user.theme ?? "sage");
   const showOnboarding = !session.user.onboardingComplete;
 
   // Shell chrome can paint as soon as admin flag resolves; inbox/prefs stream in parallel.
-  const hasAdminAccessPromise = userHasAdminAccess(session.user.role);
+  const showAdminTab = userCanSeeAdminTab({
+    role: session.user.role,
+    activeNetworkRole: session.user.activeNetworkRole,
+    isPlatformAdmin: session.user.isPlatformAdmin === true,
+  });
   const notificationInboxPromise = getNotificationInboxAction();
   const notificationPrefsPromise = getNotificationPrefsAction();
   const groupNamePromise = getPolyGroupDisplayNameAction();
-
-  const hasAdminAccess = await hasAdminAccessPromise;
+  const isPlatformAdmin = session.user.isPlatformAdmin === true;
 
   return (
     <UserThemeProvider themeId={themeId}>
@@ -59,11 +65,12 @@ async function AppLayoutReady({ children }: { children: React.ReactNode }) {
           <AppShell
             displayName={session.user.displayName}
             groupName="…"
-            isAdmin={hasAdminAccess}
+            isAdmin={showAdminTab}
             avatarKey={session.user.avatarKey}
             notificationCount={0}
             notificationItems={[]}
             notificationPrefs={DEFAULT_NOTIFICATION_PREFS}
+            isPlatformAdmin={isPlatformAdmin}
           >
             <BrandedLoading label="Loading…" />
           </AppShell>
@@ -72,7 +79,8 @@ async function AppLayoutReady({ children }: { children: React.ReactNode }) {
         <AppShellWithData
           displayName={session.user.displayName}
           avatarKey={session.user.avatarKey}
-          isAdmin={hasAdminAccess}
+          isAdmin={showAdminTab}
+          isPlatformAdmin={isPlatformAdmin}
           showOnboarding={showOnboarding}
           mustChangePassword={session.user.mustChangePassword}
           themeId={themeId}
@@ -93,6 +101,7 @@ async function AppShellWithData({
   displayName,
   avatarKey,
   isAdmin,
+  isPlatformAdmin,
   showOnboarding,
   mustChangePassword,
   themeId,
@@ -105,6 +114,7 @@ async function AppShellWithData({
   displayName: string;
   avatarKey?: string;
   isAdmin: boolean;
+  isPlatformAdmin: boolean;
   showOnboarding: boolean;
   mustChangePassword: boolean;
   themeId: string;
@@ -136,6 +146,7 @@ async function AppShellWithData({
       notificationCount={notificationInbox.count}
       notificationItems={notificationInbox.items}
       notificationPrefs={notificationPrefs}
+      isPlatformAdmin={isPlatformAdmin}
     >
       {showOnboarding ? (
         <FirstLoginWizard

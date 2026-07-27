@@ -20,8 +20,25 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+- PC-362 (test): Expanded platform admin — network detail reports, inhabit admin, global user moderation with reason/duration, paused/banned screens. Change control: `2026.07.27a`.
+
 ### Changed
+- PC-362 (test): Removed Code Status from Feed; platform admin uses stacked card layout; today's calendar cells use light blue highlight; DevBar no longer shows impersonation dropdown (use Admin → Test data). Change control: `2026.07.27c`.
+- PC-362 (test): Sleeping proposals allow optional-only invitees; schedule blocks omit Confirmed on approved events. Change control: `2026.07.27a`.
+- PC-357: Multi-network tenancy — one login / many networks with header switcher; self-serve create via `/create-network` and `/setup-network`; optional import of residences and sleeping partners on join; platform admin (`/platform-admin`) for pause/caps/remove/ban. SCHEMA_VERSION 39→40. Change control: `2026.07.25e`.
+- PC-354: Public `/terms`, self-service account delete with full purge, download-my-data export; PWA maskable icon and offline navigation fallback. Change control: `2026.07.25b`.
+
+### Changed
+- PC-362: Canonical platform admin grant for username `mpburton` and notification email `mpburton@gmail.com`; one-time migration, seeds, and prod bootstrap aligned; SCHEMA_VERSION 41. Change control: `2026.07.26d`.
+- PC-356: Normalize ActionResult to `{ message }`; add `npm run lint` to dev/test/production CI; archive older changelog entries. Change control: `2026.07.25d`.
+- PC-355: SCHEMA_VERSION 38 secondary indexes; PRAGMA foreign_keys=ON; bound conflict/enforcement/board/schedule/notification scans; calendar sync concurrency; avatar Cache-Control/ETag. Change control: `2026.07.25c`.
 - PC-351: Batch sleeping syncs one all-day free Google/ICS event per night (LOCATION field + `, at Location` in title); non-batch multi-day sleeping stays one span; resolved sleeping titles omit Confirmed; SCHEMA_VERSION 37 (`calendar_event_links.night_key`). Change control: `2026.07.24e`.
+
+### Fixed
+- PC-362 (test): SCHEMA_VERSION 42 re-runs migrations so `moderation_reason` / `moderation_expires_at` apply on DBs that already recorded v41 before moderation columns shipped (restores login). Change control: `2026.07.27b`.
+- PC-362 (test): E2E navigation strict-mode flake on Rebel Alliance header. Change control: `2026.07.27a`.
+- PC-353: Phase 0 security hardenings — hashed password-reset/email-verify tokens, paused-account gate, fail-closed e2e gates, magic-byte image validation, push endpoint ownership. Change control: `2026.07.25a`.
 
 ### Added
 - PC-348 / PC-349: Onboarding Google OAuth restores Calendar step; inbox Open Proposal for partnerships; prune stale actionable notifications when the bell opens. Change control: `2026.07.24c`.

@@ -20,6 +20,7 @@ import {
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 
 import {
+  deleteFeedMilestoneAction,
   deleteNetworkChatCommentAction,
   deleteNetworkChatMessageAction,
   getFeedUpdateTokenAction,
@@ -35,7 +36,6 @@ import {
 } from "@/actions/proposals";
 import type { PersonSummary } from "@/actions/users";
 import { FeedLikeRow } from "@/components/feed/FeedLikeControl";
-import { FeedCodeStatusPanel } from "@/components/feed/FeedCodeStatusPanel";
 import {
   FeedControlsButton,
   FeedControlsDrawer,
@@ -51,8 +51,7 @@ import type {
   FeedLinkPreview,
 } from "@/lib/feed/types";
 import { extractFirstUrl } from "@/lib/feed/link-preview-core";
-import type { ChangelogEntry } from "@/lib/changelog/entries";
-import type { BuildInfo } from "@/lib/env";
+import { getAppEnvironment } from "@/lib/env";
 import { LONG_TEXT_MAX } from "@/lib/validation/string-limits";
 import { brutalPageTitleSx } from "@/theme/brutalUi";
 import { GARDEN_TOKENS } from "@/theme/tokens";
@@ -343,16 +342,10 @@ export function FeedClient({
   currentUserId,
   isAdmin,
   people,
-  buildInfo,
-  changelog,
-  latestChangelogEntry,
 }: {
   currentUserId: string;
   isAdmin: boolean;
   people: PersonSummary[];
-  buildInfo: BuildInfo;
-  changelog: ChangelogEntry[];
-  latestChangelogEntry: ChangelogEntry | null;
 }) {
   const [items, setItems] = useState<FeedItem[]>([]);
   const [activeEvents, setActiveEvents] = useState<FeedActiveEvent[]>([]);
@@ -815,6 +808,14 @@ export function FeedClient({
     });
   }
 
+  function deleteMilestone(milestoneId: string) {
+    startTransition(async () => {
+      const result = await deleteFeedMilestoneAction(milestoneId);
+      if (!result.ok) setError(result.message);
+      else await loadFeed(null, { silent: true });
+    });
+  }
+
   function deleteChatComment(commentId: string) {
     startTransition(async () => {
       const result = await deleteNetworkChatCommentAction(commentId);
@@ -829,6 +830,7 @@ export function FeedClient({
       return (
         <Box
           key={`m-${item.id}`}
+          data-testid="feed-milestone-card"
           sx={{
             border: `2px solid ${GARDEN_TOKENS.ink}`,
             borderLeft: `6px solid ${MILESTONE_RAIL}`,
@@ -836,10 +838,22 @@ export function FeedClient({
             p: 2,
           }}
         >
-          <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }} flexWrap="wrap">
-            <Chip size="small" label="Milestone" sx={{ fontWeight: 700 }} />
-            <Chip size="small" label={item.proposalType === "sleeping" ? "Sleeping" : "Event"} />
-            <Chip size="small" variant="outlined" label={item.proposalState} />
+          <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
+            <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }} flexWrap="wrap">
+              <Chip size="small" label="Milestone" sx={{ fontWeight: 700 }} />
+              <Chip size="small" label={item.proposalType === "sleeping" ? "Sleeping" : "Event"} />
+              <Chip size="small" variant="outlined" label={item.proposalState} />
+            </Stack>
+            {item.canDelete || isAdmin ? (
+              <IconButton
+                aria-label="Delete milestone"
+                size="small"
+                onClick={() => deleteMilestone(item.id)}
+                disabled={pending}
+              >
+                <DeleteOutlineIcon fontSize="small" />
+              </IconButton>
+            ) : null}
           </Stack>
           <Typography variant="subtitle1" fontWeight={700}>
             {item.proposalTitle}
@@ -1094,12 +1108,6 @@ export function FeedClient({
         onPrefsApplied={() => void loadFeed(null, { silent: false })}
       />
 
-      <FeedCodeStatusPanel
-        buildInfo={buildInfo}
-        changelog={changelog}
-        latestEntry={latestChangelogEntry}
-      />
-
       {activeEvents.length > 0 ? (
         <Box
           component="section"
@@ -1108,9 +1116,9 @@ export function FeedClient({
           sx={{
             position: "sticky",
             top:
-              buildInfo.environment === "production"
+              getAppEnvironment() === "production"
                 ? { xs: 56, sm: 64 }
-                : { xs: 132, sm: 116 },
+                : { xs: 88, sm: 72 },
             zIndex: 1100,
             bgcolor: GARDEN_TOKENS.background,
             border: `3px solid ${GARDEN_TOKENS.ink}`,

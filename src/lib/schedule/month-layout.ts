@@ -145,6 +145,7 @@ export function monthEventSpan(
       isContentMasked: event.isContentMasked,
       hasOverlap: event.hasOverlap,
       atRisk: event.atRisk,
+      isPartnerOnlySleeping: event.isPartnerOnlySleeping,
     }),
   };
 }
@@ -241,6 +242,7 @@ function variantForEvent(event: ScheduleEvent): ScheduleBlockVariant {
     isContentMasked: event.isContentMasked,
     hasOverlap: event.hasOverlap,
     atRisk: event.atRisk,
+    isPartnerOnlySleeping: event.isPartnerOnlySleeping,
   });
 }
 

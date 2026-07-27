@@ -10,7 +10,7 @@ import { createClient } from "@libsql/client";
 import { readFileSync } from "node:fs";
 
 // Keep in sync with SCHEMA_VERSION in src/lib/db/migrate.ts (PC-333).
-const EXPECTED_SCHEMA_VERSION = "38";
+const EXPECTED_SCHEMA_VERSION = "43";
 
 function loadEnvFile(envFile) {
   return Object.fromEntries(

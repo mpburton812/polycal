@@ -286,6 +286,7 @@ export interface CreateBatchSleepingDraftInput {
   titleState?: ProposalState | "draft";
   description?: string | null;
   notes?: string | null;
+  networkId?: string | null;
 }
 
 export interface CreateBatchSleepingDraftResult {
@@ -317,6 +318,7 @@ export async function createBatchSleepingDraft(
 
   await db.insert(proposals).values({
     id: proposalId,
+    networkId: input.networkId ?? null,
     title,
     description: input.description ?? null,
     proposalType: "sleeping",
