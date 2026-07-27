@@ -21,6 +21,7 @@ import {
   startOfMonth,
 } from "@/lib/schedule/month-grid";
 import { localDateKey, scheduleDayCellSx, isTodayDate } from "@/lib/schedule/dates";
+import { DEFAULT_VIEWER_TIMEZONE } from "@/lib/schedule/timezone";
 import { GARDEN_TOKENS, ORGANIC_RADIUS } from "@/theme/tokens";
 
 interface ScheduleMonthViewProps {
@@ -44,7 +45,7 @@ const CELL_PADDING = 16;
 export function ScheduleMonthView({
   monthAnchor,
   events,
-  timeZone = "UTC",
+  timeZone = DEFAULT_VIEWER_TIMEZONE,
   onEventClick,
   onDayClick,
 }: ScheduleMonthViewProps) {

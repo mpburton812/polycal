@@ -15,6 +15,7 @@ import {
   startOfWeekMonday,
 } from "@/lib/schedule/dates";
 import { sortDayEvents } from "@/lib/schedule/sort-day-events";
+import { DEFAULT_VIEWER_TIMEZONE } from "@/lib/schedule/timezone";
 import { fontFamilies } from "@/theme/fonts";
 import { GARDEN_TOKENS, ORGANIC_RADIUS } from "@/theme/tokens";
 
@@ -36,7 +37,7 @@ export function ScheduleAgendaView({
   weekStart,
   dayCount,
   events,
-  timeZone = "UTC",
+  timeZone = DEFAULT_VIEWER_TIMEZONE,
   onEventClick,
   onDayHeaderClick,
   compactOverflowLimit = 4,

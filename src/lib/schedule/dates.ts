@@ -1,6 +1,7 @@
 /** Monday-based week boundaries for the schedule tab (PC-42). */
 
 import { GARDEN_TOKENS } from "@/theme/tokens";
+import { DEFAULT_VIEWER_TIMEZONE } from "@/lib/schedule/timezone";
 
 /**
  * Returns midnight local time for the Monday starting the week containing `date`.
@@ -64,7 +65,7 @@ export function eventInRange(
 }
 
 /** Formats a day column header (e.g. "Mon 6/24") in the viewer timezone. */
-export function formatDayHeader(date: Date, timeZone = "UTC"): string {
+export function formatDayHeader(date: Date, timeZone = DEFAULT_VIEWER_TIMEZONE): string {
   return date.toLocaleDateString(undefined, {
     weekday: "short",
     month: "numeric",
@@ -78,7 +79,7 @@ export function formatEventTime(
   startAt: string,
   endAt: string | null,
   proposalType: "event" | "sleeping" = "event",
-  timeZone = "UTC",
+  timeZone = DEFAULT_VIEWER_TIMEZONE,
   isAllDay = false,
 ): string {
   const dateOnly = proposalType === "sleeping" || isAllDay;
@@ -122,7 +123,7 @@ export function formatEventTime(
 }
 
 /** ISO date key yyyy-mm-dd in the viewer timezone for grouping. */
-export function localDateKey(iso: string, timeZone = "UTC"): string {
+export function localDateKey(iso: string, timeZone = DEFAULT_VIEWER_TIMEZONE): string {
   const parts = new Intl.DateTimeFormat("en-CA", {
     timeZone,
     year: "numeric",
@@ -136,19 +137,19 @@ export function localDateKey(iso: string, timeZone = "UTC"): string {
 }
 
 /** True when `day` falls on today in the viewer timezone (PC-59). */
-export function isTodayDate(day: Date, timeZone = "UTC"): boolean {
+export function isTodayDate(day: Date, timeZone = DEFAULT_VIEWER_TIMEZONE): boolean {
   return localDateKey(day.toISOString(), timeZone) === localDateKey(new Date().toISOString(), timeZone);
 }
 
 /** True when `day` is strictly before today in the viewer timezone (PC-59). */
-export function isPastDate(day: Date, timeZone = "UTC"): boolean {
+export function isPastDate(day: Date, timeZone = DEFAULT_VIEWER_TIMEZONE): boolean {
   return localDateKey(day.toISOString(), timeZone) < localDateKey(new Date().toISOString(), timeZone);
 }
 
 /** Shared calendar cell styles for past/today emphasis (PC-59). */
 export function scheduleDayCellSx(
   day: Date,
-  timeZone = "UTC",
+  timeZone = DEFAULT_VIEWER_TIMEZONE,
 ): { borderColor: string; bgcolor: string; opacity: number } {
   const isToday = isTodayDate(day, timeZone);
   const isPast = isPastDate(day, timeZone);

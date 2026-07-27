@@ -208,16 +208,16 @@ export function ProposalDraftSleepingFields({
                         }}
                       >
                         <ToggleButton
-                          value="required"
-                          aria-label={`${person.displayName} required`}
-                        >
-                          Required
-                        </ToggleButton>
-                        <ToggleButton
                           value="optional"
                           aria-label={`${person.displayName} optional`}
                         >
                           Optional
+                        </ToggleButton>
+                        <ToggleButton
+                          value="required"
+                          aria-label={`${person.displayName} required`}
+                        >
+                          Required
                         </ToggleButton>
                       </ToggleButtonGroup>
                     </Stack>

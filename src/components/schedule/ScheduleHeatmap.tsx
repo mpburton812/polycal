@@ -5,6 +5,7 @@ import { useMemo } from "react";
 
 import type { ScheduleEvent } from "@/actions/schedule";
 import { addDays, isPastDate, isTodayDate, startOfWeekMonday } from "@/lib/schedule/dates";
+import { DEFAULT_VIEWER_TIMEZONE } from "@/lib/schedule/timezone";
 import { GARDEN_TOKENS, HEATMAP_LEVEL_COLORS } from "@/theme/tokens";
 
 const LEVEL_COLORS = [...HEATMAP_LEVEL_COLORS];
@@ -56,7 +57,7 @@ interface HeatmapCellProps {
 }
 
 /** Single busyness cell with DD/MM label (PC-56, PC-59 past/today styling). */
-function HeatmapCell({ level, day, compact = false, timeZone = "UTC" }: HeatmapCellProps) {
+function HeatmapCell({ level, day, compact = false, timeZone = DEFAULT_VIEWER_TIMEZONE }: HeatmapCellProps) {
   const label = formatHeatmapDate(day);
   const busyLabel = level === 0 ? "open" : level === 3 ? "very busy" : "busy";
   const isToday = isTodayDate(day, timeZone);
@@ -102,7 +103,7 @@ export function ScheduleHeatmap({
   weekStartIso,
   dayCount,
   layout = "week",
-  timeZone = "UTC",
+  timeZone = DEFAULT_VIEWER_TIMEZONE,
 }: {
   events: ScheduleEvent[];
   weekStartIso: string;

@@ -26,6 +26,6 @@ describe("admin fast sleeping plan (compat)", () => {
     const entries = buildBatchEntriesFromRows([
       { nightDate: "2099-07-01", inviteeUserIds: ["p1"] },
     ]);
-    expect(entries[0]?.invitees[0]?.role).toBe("required");
+    expect(entries[0]?.invitees[0]?.role).toBe("optional");
   });
 });

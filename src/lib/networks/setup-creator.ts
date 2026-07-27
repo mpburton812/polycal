@@ -169,7 +169,7 @@ export async function resolveSetupCreator(
     mustChangePassword: false,
     onboardingComplete: false,
     theme: "mint",
-    timezone: "UTC",
+    timezone: "America/New_York",
     notificationEmail: tokenEmail,
     createdAt: now,
     updatedAt: now,

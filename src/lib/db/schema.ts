@@ -77,8 +77,8 @@ export const users = sqliteTable("users", {
   notificationPrefsJson: text("notification_prefs_json"),
   /** Account-persisted Feed Controls (Who/What filters) — PC-265. */
   feedPrefsJson: text("feed_prefs_json"),
-  /** IANA timezone for schedule display normalization (PC-48 / spec §10). */
-  timezone: text("timezone").notNull().default("UTC"),
+  /** IANA timezone for schedule display normalization (PC-48 / PC-376). */
+  timezone: text("timezone").notNull().default("America/New_York"),
   /** Optional blurb shown under the user's name on People & Places (PC-117). */
   profileBio: text("profile_bio"),
   onboardingComplete: integer("onboarding_complete", { mode: "boolean" }).notNull().default(true),

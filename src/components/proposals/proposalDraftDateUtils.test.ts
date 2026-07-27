@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { localDateToStartIso, localDateToEndIso } from "./proposalDraftDateUtils";
+import {
+  localDateToStartIso,
+  localDateToEndIso,
+  localInputToIso,
+  toLocalInput,
+} from "./proposalDraftDateUtils";
 import { sleepingDateToStartIso } from "@/lib/proposals/sleeping-schedule";
 
 /**
@@ -27,5 +32,13 @@ describe("draft date helpers — sleeping vs all-day contract (PC-317)", () => {
     expect(sleepingCentral).toBe("2026-07-01T05:00:00.000Z"); // 00:00 CDT
     expect(sleepingEastern).not.toBe(allDay);
     expect(sleepingCentral).not.toBe(allDay);
+  });
+});
+
+describe("account-timezone datetime round-trip (PC-376)", () => {
+  it("round-trips evening wall times in America/New_York", () => {
+    const iso = localInputToIso("2026-07-16T18:00", "America/New_York");
+    expect(iso).toBe("2026-07-16T22:00:00.000Z");
+    expect(toLocalInput(iso, "America/New_York")).toBe("2026-07-16T18:00");
   });
 });
