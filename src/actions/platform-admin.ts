@@ -19,11 +19,17 @@ import {
   upsertMembership,
 } from "@/lib/networks/membership";
 import { requirePlatformAdmin } from "@/lib/networks/context";
-import { formatUserRole } from "@/lib/users/role-labels";
+import {
+  formatAccessLevel,
+  formatUserRole,
+  resolveAccessLevel,
+  type AccountAccessLevel,
+} from "@/lib/users/role-labels";
 import {
   moderationExpiresFromDays,
 } from "@/lib/users/moderation";
 import { LONG_TEXT_MAX, maxCharsMessage } from "@/lib/validation/string-limits";
+import type { UserRole } from "@/types/user";
 
 const moderationInputSchema = z.object({
   userId: z.string().min(1),
@@ -33,6 +39,12 @@ const moderationInputSchema = z.object({
     .min(1, "A reason is required.")
     .max(LONG_TEXT_MAX, maxCharsMessage("Reason", LONG_TEXT_MAX)),
   durationDays: z.number().int().positive().optional(),
+});
+
+/** Assignable access levels (Proxy stays activate-only). */
+const accessLevelSchema = z.object({
+  userId: z.string().min(1),
+  accessLevel: z.enum(["platform_admin", "admin", "user"]),
 });
 
 export interface PlatformNetworkMemberRow {
@@ -65,6 +77,12 @@ export interface PlatformUserRow {
   username: string;
   displayName: string;
   status: string;
+  role: UserRole;
+  isPlatformAdmin: boolean;
+  /** Resolved operator-facing access level (PC-370). */
+  accessLevel: AccountAccessLevel;
+  accessLevelLabel: string;
+  avatarKey: string | null;
   networks: { networkId: string; name: string; role: string }[];
   moderationReason: string | null;
   moderationExpiresAt: string | null;
@@ -212,7 +230,7 @@ export async function inhabitNetworkAdminAction(
 }
 
 /**
- * Lists every platform user with network memberships for the operator console (PC-362).
+ * Lists every platform user with network memberships for the operator console (PC-362 / PC-370).
  */
 export async function listPlatformUsersAction(): Promise<PlatformUserRow[]> {
   const admin = await requirePlatformAdmin();
@@ -226,6 +244,9 @@ export async function listPlatformUsersAction(): Promise<PlatformUserRow[]> {
       username: users.username,
       displayName: users.displayName,
       status: users.status,
+      role: users.role,
+      isPlatformAdmin: users.isPlatformAdmin,
+      avatarKey: users.avatarKey,
       moderationReason: users.moderationReason,
       moderationExpiresAt: users.moderationExpiresAt,
     })
@@ -255,15 +276,118 @@ export async function listPlatformUsersAction(): Promise<PlatformUserRow[]> {
     networksByUser.set(row.userId, list);
   }
 
-  return userRows.map((row) => ({
-    id: row.id,
-    username: row.username,
-    displayName: row.displayName,
-    status: row.status,
-    networks: networksByUser.get(row.id) ?? [],
-    moderationReason: row.moderationReason,
-    moderationExpiresAt: row.moderationExpiresAt,
-  }));
+  return userRows.map((row) => {
+    const accessLevel = resolveAccessLevel({
+      role: row.role,
+      isPlatformAdmin: row.isPlatformAdmin === true,
+    });
+    return {
+      id: row.id,
+      username: row.username,
+      displayName: row.displayName,
+      status: row.status,
+      role: row.role as UserRole,
+      isPlatformAdmin: row.isPlatformAdmin === true,
+      accessLevel,
+      accessLevelLabel: formatAccessLevel(accessLevel),
+      avatarKey: row.avatarKey,
+      networks: networksByUser.get(row.id) ?? [],
+      moderationReason: row.moderationReason,
+      moderationExpiresAt: row.moderationExpiresAt,
+    };
+  });
+}
+
+/**
+ * Sets a user's operator access level (Platform Admin / Admin / User). Platform
+ * admins only; cannot change own level or assign Proxy (PC-369 / PC-370).
+ */
+export async function setUserAccessLevelAction(
+  input: z.infer<typeof accessLevelSchema>,
+): Promise<{ ok: boolean; message: string; accessLevelLabel?: string }> {
+  const admin = await requirePlatformAdmin();
+  if (!admin.ok) return { ok: false, message: admin.message };
+
+  const parsed = accessLevelSchema.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, message: parsed.error.issues[0]?.message ?? "Invalid input." };
+  }
+
+  if (parsed.data.userId === admin.user.id) {
+    return { ok: false, message: "You cannot change your own access level." };
+  }
+
+  await ensureDbReady();
+  const db = getDb();
+  const [user] = await db
+    .select()
+    .from(users)
+    .where(eq(users.id, parsed.data.userId))
+    .limit(1);
+
+  if (!user || user.status === "deleted") {
+    return { ok: false, message: "User not found." };
+  }
+
+  if (user.role === "passive") {
+    return {
+      ok: false,
+      message: "Activate the proxy user before changing access level.",
+    };
+  }
+
+  const now = new Date().toISOString();
+  const nextIsPlatformAdmin = parsed.data.accessLevel === "platform_admin";
+  const nextRole: "admin" | "user" =
+    parsed.data.accessLevel === "admin"
+      ? "admin"
+      : parsed.data.accessLevel === "user"
+        ? "user"
+        : user.role === "admin"
+          ? "admin"
+          : "user";
+
+  const platformFlagChanged = (user.isPlatformAdmin === true) !== nextIsPlatformAdmin;
+
+  await db
+    .update(users)
+    .set({
+      isPlatformAdmin: nextIsPlatformAdmin,
+      role: nextRole,
+      // Invalidate sessions when platform rights change so JWT claims cannot linger.
+      sessionVersion: platformFlagChanged ? user.sessionVersion + 1 : user.sessionVersion,
+      updatedAt: now,
+    })
+    .where(eq(users.id, user.id));
+
+  const accessLevel = resolveAccessLevel({
+    role: nextRole,
+    isPlatformAdmin: nextIsPlatformAdmin,
+  });
+  const accessLevelLabel = formatAccessLevel(accessLevel);
+
+  await logUserActivity(
+    admin.user.id,
+    "platform.set_access_level",
+    JSON.stringify({
+      userId: user.id,
+      accessLevel: parsed.data.accessLevel,
+      previous: {
+        role: user.role,
+        isPlatformAdmin: user.isPlatformAdmin === true,
+      },
+    }),
+  );
+
+  revalidatePath("/platform-admin");
+  revalidatePath("/admin");
+  revalidatePath("/people-places");
+
+  return {
+    ok: true,
+    message: `Set ${user.displayName} to ${accessLevelLabel}.`,
+    accessLevelLabel,
+  };
 }
 
 async function applyModeration(
