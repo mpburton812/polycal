@@ -28,6 +28,24 @@ import { CHANGELOG_ARCHIVE } from "./entries.archive";
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "2026.07.27e",
+    date: "2026-07-27",
+    summary:
+      "Platform admins can elevate users; All Users shows access level and avatars.",
+    changes: [
+      {
+        type: "added",
+        description:
+          "Platform admins can grant or revoke Platform Admin / Admin / User access from Admin → User management and Platform Admin → All Users (PC-369 / PC-370).",
+      },
+      {
+        type: "changed",
+        description:
+          "Platform Admin All Users shows each user's avatar and access level label; access changes are available on every user block (PC-370).",
+      },
+    ],
+  },
+  {
     version: "2026.07.27d",
     date: "2026-07-27",
     summary:
