@@ -40,7 +40,7 @@ function dateInRange(isoDate: string, rangeStart: string, rangeEnd: string): boo
 }
 
 function eventLocator(page: Page, namePattern: RegExp) {
-  // Week/day blocks use aria-label "Title, Confirmed. …"; month chips use title/aria-label.
+  // Week/day blocks use aria-label "Title[, Location][, Tentative]. …"; month chips use title/aria-label.
   return page
     .getByRole("button", { name: namePattern })
     .or(page.getByTitle(namePattern))
