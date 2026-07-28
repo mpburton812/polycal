@@ -1,4 +1,5 @@
 import type { ProposalState } from "@/lib/db/schema";
+import { isSleepingLikeType } from "@/lib/proposals/sleeping-like";
 import {
   allDayBoundsForDateKey,
   expandAllDayDateKeys,
@@ -26,7 +27,7 @@ export interface ScheduleMaskingInput {
   viewerId: string;
   proposerId: string;
   inviteeUserIds: string[];
-  proposalType: "event" | "sleeping";
+  proposalType: "event" | "sleeping" | "fast_sleep" | string;
   privacyFlags: { hideSleeping: boolean };
   acceptedPartnerIds: ReadonlySet<string>;
 }
@@ -41,7 +42,7 @@ export function applyScheduleMasking(input: ScheduleMaskingInput): {
   isContentMasked: boolean;
 } {
   const sleepingMasked =
-    input.proposalType === "sleeping" &&
+    isSleepingLikeType(input.proposalType) &&
     shouldMaskSleepingForViewer(
       input.viewerId,
       input.proposerId,

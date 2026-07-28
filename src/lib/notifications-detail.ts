@@ -38,7 +38,7 @@ export function formatNotificationWhen(
   const startDate = new Date(start);
   if (Number.isNaN(startDate.getTime())) return null;
 
-  const dateOnly = opts.isAllDay === true || opts.proposalType === "sleeping";
+  const dateOnly = opts.isAllDay === true || opts.proposalType === "sleeping" || opts.proposalType === "fast_sleep";
   const baseOptions: Intl.DateTimeFormatOptions = {
     weekday: "short",
     month: "short",

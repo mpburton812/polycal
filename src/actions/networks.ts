@@ -423,6 +423,7 @@ export async function completeNetworkSetupAction(
     auditLogVisibility: "admin_only",
     hideSleepingArrangements: false,
     seePartnersSleepingArrangements: false,
+    fastSleepEnabled: true,
     placesMapVisibility: "all",
     logTailLength: 100,
     onboardingWelcomeMessage: DEFAULT_ONBOARDING_WELCOME_MESSAGE,

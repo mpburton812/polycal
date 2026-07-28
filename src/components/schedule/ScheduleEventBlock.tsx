@@ -7,6 +7,7 @@ import type { ScheduleEvent } from "@/actions/schedule";
 import { EventCategoryIcon } from "@/lib/event-icons/EventCategoryIcon";
 import { isEventIconKey } from "@/lib/event-icons/registry";
 import { MASKED_TITLE } from "@/lib/proposals/access";
+import { isSleepingLikeType } from "@/lib/proposals/sleeping-like";
 import { scheduleBlockSx, scheduleBlockVariant } from "@/lib/schedule/colors";
 import { formatEventTime } from "@/lib/schedule/dates";
 import { DEFAULT_VIEWER_TIMEZONE } from "@/lib/schedule/timezone";
@@ -68,7 +69,7 @@ export function ScheduleEventBlock({
     event.isAllDay,
   );
   const statusLabel = formatStatusLabel(event);
-  const isSleeping = event.proposalType === "sleeping";
+  const isSleeping = isSleepingLikeType(event.proposalType);
   const sleepingLines =
     isSleeping && !event.isContentMasked ? event.title.split("\n") : null;
 

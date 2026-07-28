@@ -157,11 +157,11 @@ export function formatDayHeader(date: Date, timeZone = DEFAULT_VIEWER_TIMEZONE):
 export function formatEventTime(
   startAt: string,
   endAt: string | null,
-  proposalType: "event" | "sleeping" = "event",
+  proposalType: "event" | "sleeping" | "fast_sleep" | string = "event",
   timeZone = DEFAULT_VIEWER_TIMEZONE,
   isAllDay = false,
 ): string {
-  const dateOnly = proposalType === "sleeping" || isAllDay;
+  const dateOnly = proposalType === "sleeping" || proposalType === "fast_sleep" || isAllDay;
   if (dateOnly) {
     const dateOpts: Intl.DateTimeFormatOptions = {
       weekday: "short",

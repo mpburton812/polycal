@@ -218,6 +218,7 @@ export async function persistBatchSleepingDraft(
       endAt: null,
       label: encodeBatchSlotMeta({
         batchEntryId: entry.id,
+        subjectUserId: entry.subjectUserId,
         locationId: entry.locationId,
         locationText: entry.locationText,
         bedroomIndex: entry.bedroomIndex,
@@ -287,6 +288,8 @@ export interface CreateBatchSleepingDraftInput {
   description?: string | null;
   notes?: string | null;
   networkId?: string | null;
+  /** Defaults to sleeping; FastSleep uses fast_sleep (PC-378). */
+  proposalType?: "sleeping" | "fast_sleep";
 }
 
 export interface CreateBatchSleepingDraftResult {
@@ -321,7 +324,7 @@ export async function createBatchSleepingDraft(
     networkId: input.networkId ?? null,
     title,
     description: input.description ?? null,
-    proposalType: "sleeping",
+    proposalType: input.proposalType ?? "sleeping",
     state: "draft",
     proposerId: input.proposerId,
     locationId: null,

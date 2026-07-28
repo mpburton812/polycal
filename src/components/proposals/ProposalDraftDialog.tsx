@@ -122,6 +122,9 @@ export function ProposalDraftDialog({
   const proposerName =
     people.find((p) => p.id === currentUserId)?.displayName ?? "You";
 
+  const toDraftableType = (type: string): "event" | "sleeping" =>
+    type === "event" ? "event" : "sleeping";
+
   const [proposalType, setProposalType] = useState<"event" | "sleeping">("event");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -291,7 +294,7 @@ export function ProposalDraftDialog({
           ? rowsFromBatchEntries(initialDetail.batchEntries)
           : buildEmptyGridRows(),
       );
-      setProposalType(initialDetail.proposalType);
+      setProposalType(toDraftableType(initialDetail.proposalType));
       setTitle(initialDetail.title);
       setDescription(initialDetail.description ?? "");
       setNotes(initialDetail.notes ?? "");
@@ -323,13 +326,13 @@ export function ProposalDraftDialog({
           ? initialDetail.timeSlots.map((slot) => ({
               startAt: slotStartInput(
                 slot.startAt,
-                initialDetail.proposalType,
+                toDraftableType(initialDetail.proposalType),
                 initialDetail.isAllDay,
               ),
               endAt: slot.endAt
                 ? slotStartInput(
                     slot.endAt,
-                    initialDetail.proposalType,
+                    toDraftableType(initialDetail.proposalType),
                     initialDetail.isAllDay,
                   )
                 : "",
@@ -392,7 +395,7 @@ export function ProposalDraftDialog({
         ? rowsFromBatchEntries(detail.batchEntries)
         : buildEmptyGridRows(),
     );
-    setProposalType(detail.proposalType);
+    setProposalType(toDraftableType(detail.proposalType));
     setTitle(detail.title);
     setDescription(detail.description ?? "");
     setNotes(detail.notes ?? "");
@@ -418,9 +421,9 @@ export function ProposalDraftDialog({
     setSlots(
       detail.timeSlots.length > 0
         ? detail.timeSlots.map((slot) => ({
-            startAt: slotStartInput(slot.startAt, detail.proposalType, detail.isAllDay),
+            startAt: slotStartInput(slot.startAt, toDraftableType(detail.proposalType), detail.isAllDay),
             endAt: slot.endAt
-              ? slotStartInput(slot.endAt, detail.proposalType, detail.isAllDay)
+              ? slotStartInput(slot.endAt, toDraftableType(detail.proposalType), detail.isAllDay)
               : "",
             label: slot.label ?? "",
           }))

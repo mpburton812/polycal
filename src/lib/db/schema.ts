@@ -132,6 +132,10 @@ export const polyGroup = sqliteTable("poly_group", {
   })
     .notNull()
     .default(false),
+  /** When false, FastSleep proposal entry and create action are disabled (PC-378). Default ON. */
+  fastSleepEnabled: integer("fast_sleep_enabled", { mode: "boolean" })
+    .notNull()
+    .default(true),
   placesMapVisibility: text("places_map_visibility").notNull().default("all"),
   logTailLength: integer("log_tail_length").notNull().default(100),
   onboardingWelcomeMessage: text("onboarding_welcome_message"),
@@ -180,6 +184,10 @@ export const networks = sqliteTable("networks", {
   })
     .notNull()
     .default(false),
+  /** When false, FastSleep proposal entry and create action are disabled (PC-378). Default ON. */
+  fastSleepEnabled: integer("fast_sleep_enabled", { mode: "boolean" })
+    .notNull()
+    .default(true),
   placesMapVisibility: text("places_map_visibility").notNull().default("all"),
   logTailLength: integer("log_tail_length").notNull().default(100),
   onboardingWelcomeMessage: text("onboarding_welcome_message"),
@@ -342,7 +350,7 @@ export const schemaMeta = sqliteTable("schema_meta", {
 export const proposalStates = ["draft", "proposed", "resolved", "archived"] as const;
 export type ProposalState = (typeof proposalStates)[number];
 
-export const proposalTypes = ["event", "sleeping"] as const;
+export const proposalTypes = ["event", "sleeping", "fast_sleep"] as const;
 export type ProposalType = (typeof proposalTypes)[number];
 
 export const inviteeRoles = ["required", "optional"] as const;

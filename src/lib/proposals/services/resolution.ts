@@ -38,6 +38,7 @@ import {
   cleanupResidencyProposalLinkage,
 } from "@/actions/residency-proposals";
 import { sleepingScheduleFromSlotRows } from "@/lib/proposals/sleeping-schedule";
+import { isSleepingLikeType } from "@/lib/proposals/sleeping-like";
 import {
   parseBatchEntriesJson,
   unionBatchInvitees,
@@ -245,7 +246,11 @@ export async function resolveProposal(
   db: ReturnType<typeof getDb>,
   proposal: typeof proposals.$inferSelect,
   actorUserId: string,
-  options?: { awaitCalendarSync?: boolean },
+  options?: {
+    awaitCalendarSync?: boolean;
+    /** Override default proposal.resolved log (FastSleep uses auto_resolved for one feed card). */
+    stateLogAction?: "proposal.resolved" | "proposal.auto_resolved";
+  },
 ): Promise<void> {
   const slots = await db
     .select({
@@ -275,7 +280,7 @@ export async function resolveProposal(
     scheduleStart = winner?.startAt ?? null;
     scheduleEnd = winner?.endAt ?? null;
   } else {
-    if (proposal.proposalType === "sleeping") {
+    if (isSleepingLikeType(proposal.proposalType)) {
       if (proposal.isBatchSleeping && slots.length > 0) {
         const sorted = [...slots].sort((a, b) => a.startAt.localeCompare(b.startAt));
         scheduleStart = sorted[0]?.startAt ?? null;
@@ -298,7 +303,7 @@ export async function resolveProposal(
 
   const now = new Date().toISOString();
 
-  if (proposal.proposalType === "sleeping") {
+  if (isSleepingLikeType(proposal.proposalType)) {
     const [proposerRow] = await db
       .select({ displayName: users.displayName })
       .from(users)
@@ -348,7 +353,12 @@ export async function resolveProposal(
       .where(eq(proposals.id, proposal.id));
   }
 
-  await logProposalTransition(db, proposal.id, actorUserId, "proposal.resolved");
+  await logProposalTransition(
+    db,
+    proposal.id,
+    actorUserId,
+    options?.stateLogAction ?? "proposal.resolved",
+  );
 
   const residencyMeta = parseResidencyProposalMeta(proposal.description);
   if (residencyMeta) {

@@ -56,6 +56,13 @@ const SleepingPartnerCreateDialog = dynamic(
     })),
   { ssr: false },
 );
+const FastSleepDialog = dynamic(
+  () =>
+    import("./FastSleepDialog").then((mod) => ({
+      default: mod.FastSleepDialog,
+    })),
+  { ssr: false },
+);
 
 const TAB_KEYS = ["draft", "proposed", "resolved", "archived"] as const;
 type TabKey = (typeof TAB_KEYS)[number];
@@ -109,6 +116,8 @@ interface ProposalsClientProps {
   currentUserId: string;
   /** App admin — enables oversight chrome on others' cards (PC-196). */
   isAdmin?: boolean;
+  /** Network toggle for FastSleep entry (PC-378). */
+  fastSleepEnabled?: boolean;
 }
 
 /**
@@ -121,6 +130,7 @@ export function ProposalsClient({
   residencyPlaces,
   currentUserId,
   isAdmin = false,
+  fastSleepEnabled = true,
 }: ProposalsClientProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -128,6 +138,7 @@ export function ProposalsClient({
   const [createOpen, setCreateOpen] = useState(false);
   const [createProposalType, setCreateProposalType] = useState<"event" | "sleeping">("event");
   const [partnerCreateOpen, setPartnerCreateOpen] = useState(false);
+  const [fastSleepOpen, setFastSleepOpen] = useState(false);
   const [residencyCreateOpen, setResidencyCreateOpen] = useState(false);
   const [fabMenuAnchor, setFabMenuAnchor] = useState<null | HTMLElement>(null);
   const [editDetail, setEditDetail] = useState<ProposalDetail | null>(null);
@@ -367,6 +378,17 @@ export function ProposalsClient({
         >
           Sleeping proposal
         </MenuItem>
+        {fastSleepEnabled ? (
+          <MenuItem
+            onClick={() => {
+              setFabMenuAnchor(null);
+              setFastSleepOpen(true);
+            }}
+            data-testid="fab-fast-sleep"
+          >
+            FastSleep
+          </MenuItem>
+        ) : null}
         <MenuItem
           onClick={() => {
             setFabMenuAnchor(null);
@@ -398,6 +420,12 @@ export function ProposalsClient({
         open={partnerCreateOpen}
         onClose={() => setPartnerCreateOpen(false)}
         people={people}
+        currentUserId={currentUserId}
+      />
+      <FastSleepDialog
+        open={fastSleepOpen}
+        onClose={() => setFastSleepOpen(false)}
+        places={places}
         currentUserId={currentUserId}
       />
       <ResidencyCreateDialog
