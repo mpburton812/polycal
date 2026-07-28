@@ -11,6 +11,8 @@ import {
 export const batchSleepingEntrySchema = z.object({
   id: z.string().min(1),
   nightDate: z.string().min(1),
+  /** Night subject for FastSleep (optional for legacy sleeping batches). */
+  subjectUserId: z.string().min(1).optional(),
   locationId: z.string().optional(),
   locationText: limitedString("Location", SHORT_TEXT_MAX).optional(),
   bedroomIndex: z.number().int().min(0).optional(),
@@ -34,6 +36,7 @@ export const batchSleepingEntriesSchema = z.array(batchSleepingEntrySchema).min(
 /** JSON stored on proposal_time_slots.label for per-night metadata in batch proposals. */
 export const batchSlotMetaSchema = z.object({
   batchEntryId: z.string(),
+  subjectUserId: z.string().optional(),
   locationId: z.string().optional(),
   locationText: limitedString("Location", SHORT_TEXT_MAX).optional(),
   bedroomIndex: z.number().int().min(0).optional(),
@@ -84,6 +87,23 @@ export function unionBatchInvitees(
     }
   }
   return [...map.entries()].map(([userId, role]) => ({ userId, role }));
+}
+
+/**
+ * Participant ids for FastSleep fan-out (scheduler + subjects + invitees).
+ */
+export function unionFastSleepParticipantIds(
+  schedulerId: string,
+  entries: BatchSleepingEntry[],
+): string[] {
+  const ids = new Set<string>([schedulerId]);
+  for (const entry of entries) {
+    if (entry.subjectUserId) ids.add(entry.subjectUserId);
+    for (const invitee of entry.invitees) {
+      ids.add(invitee.userId);
+    }
+  }
+  return [...ids];
 }
 
 export function newBatchEntryId(): string {

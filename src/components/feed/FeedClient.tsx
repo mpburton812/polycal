@@ -841,7 +841,16 @@ export function FeedClient({
           <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
             <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }} flexWrap="wrap">
               <Chip size="small" label="Milestone" sx={{ fontWeight: 700 }} />
-              <Chip size="small" label={item.proposalType === "sleeping" ? "Sleeping" : "Event"} />
+              <Chip
+                size="small"
+                label={
+                  item.proposalType === "fast_sleep"
+                    ? "FastSleep"
+                    : item.proposalType === "sleeping"
+                      ? "Sleeping"
+                      : "Event"
+                }
+              />
               <Chip size="small" variant="outlined" label={item.proposalState} />
             </Stack>
             {item.canDelete || isAdmin ? (

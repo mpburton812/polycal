@@ -10,6 +10,8 @@ export const FAST_SLEEPING_GRID_DAYS = 14;
 /** One night row in the shared fast sleeping plan grid (UI/input projection). */
 export const fastSleepingRowSchema = z.object({
   nightDate: z.string().min(1, "Night date is required."),
+  /** FastSleep night subject; defaults to scheduler when omitted. */
+  subjectUserId: z.string().min(1).optional(),
   inviteeUserIds: z.array(z.string().min(1)).default([]),
   /** Per-partner role; missing ids default to optional on batch build (PC-374). */
   inviteeRoles: z
@@ -81,10 +83,14 @@ export function fastSleepingRowHasContent(row: FastSleepingRow): boolean {
  * Builds batch sleeping entries from fast-plan grid rows (skips empty nights).
  * Partners default to optional unless explicitly marked required (PC-374).
  */
-export function buildBatchEntriesFromRows(rows: FastSleepingRow[]): BatchSleepingEntry[] {
+export function buildBatchEntriesFromRows(
+  rows: FastSleepingRow[],
+  defaultSubjectUserId?: string,
+): BatchSleepingEntry[] {
   return rows.filter(fastSleepingRowHasContent).map((row) => ({
     id: newBatchEntryId(),
     nightDate: row.nightDate.slice(0, 10),
+    subjectUserId: row.subjectUserId ?? defaultSubjectUserId,
     locationId: row.locationId,
     locationText: row.locationText?.trim() || undefined,
     intentionalSolo: Boolean(row.intentionalSolo),
@@ -113,6 +119,7 @@ export function rowsFromBatchEntries(
       entry.nightDate.slice(0, 10),
       {
         nightDate: entry.nightDate.slice(0, 10),
+        subjectUserId: entry.subjectUserId,
         inviteeUserIds: entry.intentionalSolo
           ? []
           : entry.invitees.map((invitee) => invitee.userId),

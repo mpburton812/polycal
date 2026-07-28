@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm";
 import { getDb } from "@/lib/db/client";
 import { polyGroup, type ProposalState, type ProposalType } from "@/lib/db/schema";
 import { loadNetworkSettings } from "@/lib/networks/settings";
+import { isSleepingLikeType } from "@/lib/proposals/sleeping-like";
 import { shouldMaskSleepingForViewer } from "@/lib/schedule/slice-auth";
 import type { AuditLogVisibility } from "@/types/poly-group";
 
@@ -155,7 +156,7 @@ export function viewerCanSeeProposalWithSleepingGate(
     acceptedPartnerIds?: ReadonlySet<string>;
   },
 ): boolean {
-  if (options.proposalType === "sleeping") {
+  if (isSleepingLikeType(options.proposalType)) {
     return viewerCanSeeSleepingProposal(viewerId, isAdmin, proposerId, inviteeUserIds, {
       adminCanSeeUninvolved: options.adminCanSeeUninvolved,
       seePartnersSleepingArrangements: options.seePartnersSleepingArrangements,
@@ -203,7 +204,7 @@ export function canViewProposalContent(input: {
   }
 
   const isPartnerOnlySleeping =
-    input.proposalType === "sleeping" &&
+    isSleepingLikeType(input.proposalType) &&
     Boolean(input.seePartnersSleepingArrangements) &&
     isPartnerOnlySleepingViewer(
       input.viewerId,
@@ -214,7 +215,7 @@ export function canViewProposalContent(input: {
 
   const contentMasked =
     Boolean(input.applyScheduleMask) &&
-    input.proposalType === "sleeping" &&
+    isSleepingLikeType(input.proposalType) &&
     shouldMaskSleepingForViewer(
       input.viewerId,
       input.proposerId,

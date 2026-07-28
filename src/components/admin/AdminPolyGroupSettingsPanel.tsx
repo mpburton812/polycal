@@ -146,6 +146,24 @@ export function AdminPolyGroupSettingsPanel({
           are not (shown in a lighter purple). Distinct from masking Busy details for uninvolved
           admins above.
         </Typography>
+        <FormControlLabel
+          control={
+            <Switch
+              checked={settings.fastSleepEnabled}
+              onChange={(e) =>
+                setSettings({
+                  ...settings,
+                  fastSleepEnabled: e.target.checked,
+                })
+              }
+            />
+          }
+          label="Enable FastSleep"
+        />
+        <Typography variant="caption" color="text.secondary" sx={{ mt: -1, display: "block" }}>
+          When on, members can auto-schedule up to 14 nights for themselves and their sleeping
+          partners&apos; arrangements without voting (PC-378).
+        </Typography>
         <FormControl fullWidth>
           <InputLabel>Sleeping Partners tab visibility</InputLabel>
           <Select

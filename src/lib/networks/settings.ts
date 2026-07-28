@@ -13,6 +13,7 @@ export type NetworkSettings = {
   auditLogVisibility: AuditLogVisibility;
   hideSleepingArrangements: boolean;
   seePartnersSleepingArrangements: boolean;
+  fastSleepEnabled: boolean;
   placesMapVisibility: PlacesMapVisibility;
   logTailLength: number;
   onboardingWelcomeMessage: string;
@@ -44,6 +45,7 @@ export async function loadNetworkSettings(
     auditLogVisibility: row.auditLogVisibility as AuditLogVisibility,
     hideSleepingArrangements: row.hideSleepingArrangements,
     seePartnersSleepingArrangements: row.seePartnersSleepingArrangements,
+    fastSleepEnabled: row.fastSleepEnabled ?? true,
     placesMapVisibility: row.placesMapVisibility as PlacesMapVisibility,
     logTailLength: row.logTailLength,
     onboardingWelcomeMessage:

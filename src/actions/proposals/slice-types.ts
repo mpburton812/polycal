@@ -13,7 +13,7 @@ export interface ProposalSliceDetail {
   startAt: string;
   endAt: string | null;
   isAllDay: boolean;
-  proposalType: "event" | "sleeping";
+  proposalType: "event" | "sleeping" | "fast_sleep";
   parentState: ProposalState;
   parentTitle: string;
   participantNames: string[];
