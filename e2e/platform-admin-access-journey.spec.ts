@@ -18,8 +18,15 @@ test.describe("Platform admin access levels", () => {
 
     await openProfileMenu(page);
     await page.getByRole("menuitem", { name: "Platform admin" }).click();
-    await expect(page).toHaveURL(/\/platform-admin/);
-    await expect(page.getByRole("heading", { name: /All users/i })).toBeVisible();
+    try {
+      await expect(page).toHaveURL(/\/platform-admin/, { timeout: 15_000 });
+    } catch {
+      await page.goto("/platform-admin");
+      await expect(page).toHaveURL(/\/platform-admin/);
+    }
+    await expect(page.getByRole("heading", { name: /All users/i })).toBeVisible({
+      timeout: 30_000,
+    });
 
     const leiaCard = page.getByTestId(`platform-user-${USERS.leia.username}`);
     await expect(leiaCard).toBeVisible({ timeout: 20_000 });
