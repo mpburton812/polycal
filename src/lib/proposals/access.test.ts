@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   MASKED_TITLE,
   canViewProposalContent,
+  viewerCanSeeFeedMilestoneAudit,
   viewerCanSeeProposal,
   viewerCanSeeProposalWithSleepingGate,
   viewerCanSeeSleepingProposal,
@@ -211,5 +212,46 @@ describe("proposal access helpers", () => {
         acceptedPartnerIds: new Set(["u1"]),
       }),
     ).toEqual({ visible: true, contentMasked: false, isPartnerOnlySleeping: false });
+  });
+});
+
+describe("viewerCanSeeFeedMilestoneAudit", () => {
+  it("shows FastSleep auto_resolved to proposer/invitee under admin_only (PC-378)", () => {
+    expect(
+      viewerCanSeeFeedMilestoneAudit(
+        "proposal.auto_resolved",
+        "admin_only",
+        false,
+        true,
+        false,
+      ),
+    ).toBe(true);
+    expect(
+      viewerCanSeeFeedMilestoneAudit(
+        "proposal.auto_resolved",
+        "admin_only",
+        false,
+        false,
+        true,
+      ),
+    ).toBe(true);
+    expect(
+      viewerCanSeeFeedMilestoneAudit(
+        "proposal.auto_resolved",
+        "admin_only",
+        false,
+        false,
+        false,
+      ),
+    ).toBe(false);
+  });
+
+  it("keeps admin_only for ordinary resolved milestones", () => {
+    expect(
+      viewerCanSeeFeedMilestoneAudit("proposal.resolved", "admin_only", false, true, false),
+    ).toBe(false);
+    expect(
+      viewerCanSeeFeedMilestoneAudit("proposal.resolved", "admin_only", true, false, false),
+    ).toBe(true);
   });
 });

@@ -11,7 +11,7 @@ import {
 } from "./helpers/navigation";
 import { expandAdminSection } from "./helpers/admin";
 import { dateOffsetIso } from "./helpers/schedule";
-import { batchNightSection } from "./helpers/proposals";
+import { batchNightSection, openNewProposalFabMenu } from "./helpers/proposals";
 
 /**
  * FastSleep user journey (PC-381): auto-confirm nights for self + partner
@@ -28,7 +28,7 @@ test.describe("FastSleep journey", () => {
     await loginWithOnboardingIfNeeded(page, USERS.han.username);
     await goToProposals(page);
 
-    await page.locator(".MuiFab-root").first().click();
+    await openNewProposalFabMenu(page);
     await page.getByTestId("fab-fast-sleep").click();
 
     const dialog = page.getByTestId("fast-sleep-dialog");
@@ -91,7 +91,8 @@ test.describe("FastSleep journey", () => {
     await logout(page);
     await loginWithOnboardingIfNeeded(page, USERS.han.username);
     await goToProposals(page);
-    await page.locator(".MuiFab-root").first().click();
+    await openNewProposalFabMenu(page);
     await expect(page.getByTestId("fab-fast-sleep")).toHaveCount(0);
+    await expect(page.getByRole("menuitem", { name: "FastSleep" })).toHaveCount(0);
   });
 });

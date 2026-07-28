@@ -60,6 +60,7 @@ import { notifyUser } from "@/lib/notifications";
 import {
   getAdminCanSeeUninvolved,
   viewerCanSeeAuditLog,
+  viewerCanSeeFeedMilestoneAudit,
   viewerCanSeeProposalWithSleepingGate,
 } from "@/lib/proposals/access";
 import { getAcceptedSleepingPartnerIds } from "@/lib/proposals/partners";
@@ -713,7 +714,17 @@ async function loadMilestoneBatch(
 
       const isProposer = row.proposerId === viewerId;
       const isInvitee = inviteeUserIds.includes(viewerId);
-      if (!viewerCanSeeAuditLog(auditVisibility, isAdmin, isProposer, isInvitee)) continue;
+      if (
+        !viewerCanSeeFeedMilestoneAudit(
+          row.action,
+          auditVisibility,
+          isAdmin,
+          isProposer,
+          isInvitee,
+        )
+      ) {
+        continue;
+      }
 
       const involvement = classifyMilestoneInvolvement(
         viewerId,
@@ -733,7 +744,8 @@ async function loadMilestoneBatch(
           inviteeUserIds,
           gateOptions,
         ),
-        nonAdminWouldSeeAudit: viewerCanSeeAuditLog(
+        nonAdminWouldSeeAudit: viewerCanSeeFeedMilestoneAudit(
+          row.action,
           auditVisibility,
           false,
           isProposer,

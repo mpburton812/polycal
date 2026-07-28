@@ -48,6 +48,16 @@ export const CHANGELOG: ChangelogEntry[] = [
         description:
           "Calendar/ICS and schedule treat FastSleep like batch sleeping; per-night subject counts as on-night for sync (PC-379).",
       },
+      {
+        type: "changed",
+        description:
+          "SCHEMA_VERSION 45 applies fast_sleep_enabled on networks/poly_group so existing DBs pick up the FastSleep admin toggle column (PC-378).",
+      },
+      {
+        type: "fixed",
+        description:
+          "FastSleep Auto-confirmed feed milestones remain visible to proposers and invitees even when network audit visibility is admin-only (PC-378).",
+      },
     ],
   },
   {

@@ -21,7 +21,7 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
-- PC-378 FastSleep proposal type (auto-confirm partner arrangements, admin toggle, feed/calendar). Change control: `2026.07.28a`.
+- PC-378 FastSleep proposal type (auto-confirm partner arrangements, admin toggle, feed/calendar); SCHEMA_VERSION 45 (`fast_sleep_enabled`). Change control: `2026.07.28a`.
 - PC-362 (test): Expanded platform admin — network detail reports, inhabit admin, global user moderation with reason/duration, paused/banned screens. Change control: `2026.07.27a`.
 
 ### Changed

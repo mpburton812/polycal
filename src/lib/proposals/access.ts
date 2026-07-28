@@ -240,3 +240,20 @@ export function viewerCanSeeAuditLog(
   if (visibility === "invitees_proposer_admin") return isAdmin || isProposer || isInvitee;
   return isAdmin;
 }
+
+/**
+ * Feed milestone audit gate — FastSleep auto-confirm is always visible to
+ * involved parties even when network audit visibility is admin_only (PC-378).
+ */
+export function viewerCanSeeFeedMilestoneAudit(
+  action: string,
+  visibility: AuditLogVisibility | string,
+  isAdmin: boolean,
+  isProposer: boolean,
+  isInvitee: boolean,
+): boolean {
+  if (action === "proposal.auto_resolved" && (isAdmin || isProposer || isInvitee)) {
+    return true;
+  }
+  return viewerCanSeeAuditLog(visibility, isAdmin, isProposer, isInvitee);
+}
