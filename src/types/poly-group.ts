@@ -23,6 +23,8 @@ export interface PolyGroupSettings {
   seePartnersSleepingArrangements: boolean;
   /** When false, FastSleep is hidden and create is rejected (PC-378). Default true. */
   fastSleepEnabled: boolean;
+  /** When false, Feed tab and feed actions are disabled (PC-385). Default true. */
+  feedEnabled: boolean;
   placesMapVisibility: PlacesMapVisibility;
   logTailLength: number;
   onboardingWelcomeMessage: string;

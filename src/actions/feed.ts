@@ -9,6 +9,7 @@ import { requireNetworkSession } from "@/lib/networks/context";
 import { loadNetworkSettings } from "@/lib/networks/settings";
 import { requireSession, withDb } from "@/lib/actions/context";
 import { userHasAdminAccess } from "@/lib/admin-access";
+import { isFeedEnabledForNetwork } from "@/lib/feed/feed-enabled";
 import {
   networkChatCommentImages,
   networkChatComments,
@@ -415,6 +416,9 @@ export async function listFeedItemsAction(
 
   // Single DB handle — parallel withDb on sqlite can stall local e2e (PC-232).
   return withDb(async (db) => {
+    if (!(await isFeedEnabledForNetwork(networkId, db))) {
+      return { ok: false, message: "Feed is disabled for this network." };
+    }
     const [prefsRow] = await db
       .select({ feedPrefsJson: users.feedPrefsJson })
       .from(users)
@@ -1086,6 +1090,9 @@ export async function postNetworkChatMessageAction(
   }
 
   return withDb(async (db) => {
+    if (!(await isFeedEnabledForNetwork(sessionResult.user.activeNetworkId, db))) {
+      return { ok: false, message: "Feed is disabled for this network." };
+    }
     const owned = await assertOwnedImageIds(db, parsed.data.imageIds ?? [], sessionResult.user.id);
     if (!owned) {
       return { ok: false, message: FEED_IMAGE_INVALID_MESSAGE };
@@ -1468,7 +1475,7 @@ export async function toggleFeedLikeAction(
   likeCount?: number;
   likedByMe?: boolean;
 }> {
-  const sessionResult = await requireSession();
+  const sessionResult = await requireNetworkSession();
   if (!sessionResult.ok) return sessionResult;
 
   const parsed = likeTargetSchema.safeParse(input);
@@ -1477,6 +1484,9 @@ export async function toggleFeedLikeAction(
   }
 
   return withDb(async (db) => {
+    if (!(await isFeedEnabledForNetwork(sessionResult.user.activeNetworkId, db))) {
+      return { ok: false, message: "Feed is disabled for this network." };
+    }
     const exists = await feedLikeTargetExists(db, parsed.data.targetType, parsed.data.targetId);
     if (!exists) {
       return { ok: false, message: "Item not found." };

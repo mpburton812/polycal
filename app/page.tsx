@@ -22,7 +22,8 @@ export const metadata: Metadata = {
 export default async function HomePage() {
   const session = await auth();
   if (session?.user?.id) {
-    redirect("/feed");
+    const { isFeedEnabledForActiveNetwork } = await import("@/lib/feed/feed-enabled");
+    redirect((await isFeedEnabledForActiveNetwork()) ? "/feed" : "/schedule");
   }
 
   return (

@@ -26,7 +26,7 @@ import {
 } from "@/lib/proposals/fast-sleep";
 import {
   buildBatchEntriesFromRows,
-  FAST_SLEEPING_GRID_DAYS,
+  FAST_SLEEPING_MAX_SLOTS,
   fastSleepingRowSchema,
 } from "@/lib/proposals/fast-sleeping-plan";
 import { createBatchSleepingDraft } from "@/lib/proposals/fast-sleeping-core";
@@ -37,7 +37,7 @@ import { formatConflictMessage } from "@/lib/proposals/conflict-message";
 import type { ProposalConflictWarning } from "@/actions/proposals";
 
 const createFastSleepSchema = z.object({
-  rows: z.array(fastSleepingRowSchema).min(1).max(FAST_SLEEPING_GRID_DAYS),
+  rows: z.array(fastSleepingRowSchema).min(1).max(FAST_SLEEPING_MAX_SLOTS),
   confirm: z.boolean().default(false),
   notes: z.string().optional(),
 });

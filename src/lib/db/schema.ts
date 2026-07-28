@@ -136,6 +136,10 @@ export const polyGroup = sqliteTable("poly_group", {
   fastSleepEnabled: integer("fast_sleep_enabled", { mode: "boolean" })
     .notNull()
     .default(true),
+  /** When false, Feed tab and feed actions are disabled (PC-385). Default ON. */
+  feedEnabled: integer("feed_enabled", { mode: "boolean" })
+    .notNull()
+    .default(true),
   placesMapVisibility: text("places_map_visibility").notNull().default("all"),
   logTailLength: integer("log_tail_length").notNull().default(100),
   onboardingWelcomeMessage: text("onboarding_welcome_message"),
@@ -186,6 +190,10 @@ export const networks = sqliteTable("networks", {
     .default(false),
   /** When false, FastSleep proposal entry and create action are disabled (PC-378). Default ON. */
   fastSleepEnabled: integer("fast_sleep_enabled", { mode: "boolean" })
+    .notNull()
+    .default(true),
+  /** When false, Feed tab and feed actions are disabled (PC-385). Default ON. */
+  feedEnabled: integer("feed_enabled", { mode: "boolean" })
     .notNull()
     .default(true),
   placesMapVisibility: text("places_map_visibility").notNull().default("all"),

@@ -86,7 +86,7 @@ export function typeBadgeLabel(
 ): string {
   if (specialKind === "residency" || cardKind === "residency") return "RESIDENCY PROPOSAL";
   if (cardKind === "partnership") return "RELATIONSHIP PROPOSAL";
-  if (type === "fast_sleep") return "FASTSLEEP";
+  if (type === "fast_sleep") return "FASTSLEEP PROPOSAL";
   return type === "sleeping" ? "SLEEPING PROPOSAL" : "EVENT PROPOSAL";
 }
 

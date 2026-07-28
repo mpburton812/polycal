@@ -25,6 +25,7 @@ export function AppShell({
   notificationItems = [],
   notificationPrefs,
   isPlatformAdmin = false,
+  feedEnabled = true,
 }: {
   children: React.ReactNode;
   displayName: string;
@@ -35,6 +36,8 @@ export function AppShell({
   notificationItems?: NotificationItem[];
   notificationPrefs: NotificationPrefs;
   isPlatformAdmin?: boolean;
+  /** When false, Feed tab is hidden (PC-385). */
+  feedEnabled?: boolean;
 }) {
   const avatarSrc = avatarSrcForKey(avatarKey);
   const vapidPublicKey = getVapidPublicKey();
@@ -70,9 +73,11 @@ export function AppShell({
         maxWidth="md"
         sx={{ py: 2, pb: 10, minHeight: "calc(100vh - 120px)" }}
       >
-        <TabSwipeRegion isAdmin={isAdmin}>{children}</TabSwipeRegion>
+        <TabSwipeRegion isAdmin={isAdmin} feedEnabled={feedEnabled}>
+          {children}
+        </TabSwipeRegion>
       </Container>
-      <AppTabs isAdmin={isAdmin} />
+      <AppTabs isAdmin={isAdmin} feedEnabled={feedEnabled} />
       <FeedbackFab />
       <Box sx={{ height: 56 }} aria-hidden />
     </>

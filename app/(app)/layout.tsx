@@ -13,6 +13,7 @@ import { auth } from "@/lib/auth";
 import { getLiveUserStatus } from "@/lib/auth-session";
 import { userCanSeeAdminTab } from "@/lib/admin-access";
 import { normalizeUserThemeId } from "@/lib/constants/themes";
+import { isFeedEnabledForActiveNetwork } from "@/lib/feed/feed-enabled";
 import { DEFAULT_NOTIFICATION_PREFS } from "@/types/notification-prefs";
 
 /**
@@ -56,6 +57,7 @@ async function AppLayoutReady({ children }: { children: React.ReactNode }) {
   const notificationInboxPromise = getNotificationInboxAction();
   const notificationPrefsPromise = getNotificationPrefsAction();
   const groupNamePromise = getPolyGroupDisplayNameAction();
+  const feedEnabledPromise = isFeedEnabledForActiveNetwork();
   const isPlatformAdmin = session.user.isPlatformAdmin === true;
 
   return (
@@ -71,6 +73,7 @@ async function AppLayoutReady({ children }: { children: React.ReactNode }) {
             notificationItems={[]}
             notificationPrefs={DEFAULT_NOTIFICATION_PREFS}
             isPlatformAdmin={isPlatformAdmin}
+            feedEnabled
           >
             <BrandedLoading label="Loading…" />
           </AppShell>
@@ -88,6 +91,7 @@ async function AppLayoutReady({ children }: { children: React.ReactNode }) {
           notificationInboxPromise={notificationInboxPromise}
           notificationPrefsPromise={notificationPrefsPromise}
           groupNamePromise={groupNamePromise}
+          feedEnabledPromise={feedEnabledPromise}
         >
           {children}
         </AppShellWithData>
@@ -109,6 +113,7 @@ async function AppShellWithData({
   notificationInboxPromise,
   notificationPrefsPromise,
   groupNamePromise,
+  feedEnabledPromise,
 }: {
   children: React.ReactNode;
   displayName: string;
@@ -122,11 +127,13 @@ async function AppShellWithData({
   notificationInboxPromise: ReturnType<typeof getNotificationInboxAction>;
   notificationPrefsPromise: ReturnType<typeof getNotificationPrefsAction>;
   groupNamePromise: ReturnType<typeof getPolyGroupDisplayNameAction>;
+  feedEnabledPromise: Promise<boolean>;
 }) {
-  const [notificationInbox, notificationPrefs, groupName] = await Promise.all([
+  const [notificationInbox, notificationPrefs, groupName, feedEnabled] = await Promise.all([
     notificationInboxPromise,
     notificationPrefsPromise,
     groupNamePromise,
+    feedEnabledPromise,
   ]);
 
   let partnerOptions: { id: string; displayName: string }[] = [];
@@ -147,6 +154,7 @@ async function AppShellWithData({
       notificationItems={notificationInbox.items}
       notificationPrefs={notificationPrefs}
       isPlatformAdmin={isPlatformAdmin}
+      feedEnabled={feedEnabled}
     >
       {showOnboarding ? (
         <FirstLoginWizard

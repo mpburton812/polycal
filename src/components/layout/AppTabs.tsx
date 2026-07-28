@@ -53,14 +53,24 @@ function FeedParrotIcon({ selected }: { selected: boolean }) {
 /**
  * Bottom tab navigation with ink border and flat fill (Garden Brutalism).
  */
-export function AppTabs({ isAdmin }: { isAdmin: boolean }) {
+export function AppTabs({
+  isAdmin,
+  feedEnabled = true,
+}: {
+  isAdmin: boolean;
+  feedEnabled?: boolean;
+}) {
   const pathname = usePathname();
-  const visibleTabs = MAIN_TAB_HREFS.filter(
-    (href) => isAdmin || href !== "/admin",
-  ).map((href) => ({ href, ...tabMeta[href] }));
+  const visibleTabs = MAIN_TAB_HREFS.filter((href) => {
+    if (!isAdmin && href === "/admin") return false;
+    if (!feedEnabled && href === "/feed") return false;
+    return true;
+  }).map((href) => ({ href, ...tabMeta[href] }));
 
   const current =
-    visibleTabs.find((t) => pathname.startsWith(t.href))?.href ?? "/feed";
+    visibleTabs.find((t) => pathname.startsWith(t.href))?.href ??
+    visibleTabs[0]?.href ??
+    "/schedule";
 
   return (
     <Paper
