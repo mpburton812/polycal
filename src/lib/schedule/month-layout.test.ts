@@ -91,12 +91,17 @@ describe("splitSpanAtWeekBoundaries", () => {
 
 describe("buildMonthLayout", () => {
   it("places timed events as single-day chips without spanning columns", () => {
-    const grid = buildMonthGrid(new Date(2099, 6, 1));
-    const start = new Date(2099, 6, 14, 18, 0, 0, 0).toISOString();
-    const end = new Date(2099, 6, 14, 20, 0, 0, 0).toISOString();
+    const grid = buildMonthGrid(new Date("2099-07-15T12:00:00.000Z"), "UTC");
     const layout = buildMonthLayout(
       grid,
-      [makeEvent({ id: "e1", startAt: start, endAt: end, title: "Volleyball" })],
+      [
+        makeEvent({
+          id: "e1",
+          startAt: "2099-07-14T18:00:00.000Z",
+          endAt: "2099-07-14T20:00:00.000Z",
+          title: "Volleyball",
+        }),
+      ],
       "UTC",
       3,
     );
@@ -107,7 +112,7 @@ describe("buildMonthLayout", () => {
   });
 
   it("assigns archived variant through layout", () => {
-    const grid = buildMonthGrid(new Date(2099, 6, 1));
+    const grid = buildMonthGrid(new Date("2099-07-15T12:00:00.000Z"), "UTC");
     const start = sleepingDateToStartIso("2099-07-10")!;
     const layout = buildMonthLayout(
       grid,
@@ -129,7 +134,7 @@ describe("buildMonthLayout", () => {
   });
 
   it("merges virtual_span_day windows into one continuous NY month bar (PC-258)", () => {
-    const grid = buildMonthGrid(new Date(2026, 6, 1));
+    const grid = buildMonthGrid(new Date("2026-07-15T12:00:00.000Z"), "America/New_York");
     const tz = "America/New_York";
     const days = ["2026-07-17", "2026-07-18", "2026-07-19", "2026-07-20"];
     const events = days.map((dateKey) =>
@@ -140,8 +145,8 @@ describe("buildMonthLayout", () => {
         title: "Cool Kids Pittsburgh Trip",
         isAllDay: true,
         state: "proposed",
-        startAt: `${dateKey}T00:00:00.000Z`,
-        endAt: `${dateKey}T23:59:59.999Z`,
+        startAt: `${dateKey}T12:00:00.000Z`,
+        endAt: `${dateKey}T12:00:00.000Z`,
         sliceKind: "virtual_span_day",
         sliceKey: dateKey,
       }),

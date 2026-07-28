@@ -344,6 +344,9 @@ export async function checkPlaceAssetConflicts(
     if (other.id === excludeProposalId || other.id === proposal.id) continue;
     if (!other.scheduledStartAt) continue;
 
+    // Bedroom-aware: specific rooms only collide with the same room (or when
+    // either side leaves bedroom unset = whole-place occupancy). Distinct
+    // bedrooms at the same place do not conflict (PC-373).
     const sameBedroom =
       proposal.bedroomIndex === null ||
       other.bedroomIndex === null ||

@@ -421,6 +421,7 @@ export type BatchNightConfig = {
   nightDate: string;
   mode: "solo" | "withInvitees";
   requiredInvitees?: string[];
+  optionalInvitees?: string[];
   locationName?: string;
   /** Free-text location when the place is not in the solo-night dropdown (PC-69). */
   customLocation?: string;
@@ -452,6 +453,14 @@ export async function configureBatchNight(
       const chip = section.getByRole("button", { name: displayName, exact: true });
       await chip.click();
       await expect(chip).toHaveClass(/MuiChip-colorPrimary|MuiChip-filled/);
+      // Partners default to optional (PC-374) — mark required when the journey needs votes.
+      await section.getByRole("button", { name: `${displayName} required` }).click();
+    }
+    for (const displayName of config.optionalInvitees ?? []) {
+      const chip = section.getByRole("button", { name: displayName, exact: true });
+      await chip.click();
+      await expect(chip).toHaveClass(/MuiChip-colorPrimary|MuiChip-filled/);
+      await section.getByRole("button", { name: `${displayName} optional` }).click();
     }
   }
 

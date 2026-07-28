@@ -328,3 +328,15 @@
 2026-07-27 | e6dfccc | PC-367 | resolve LOCATION and DESCRIPTION for sync | src/lib/calendar/payloads.test.ts
 2026-07-27 | 99eeec3 | PC-368 | elevate platform admins and show access levels | src/actions/platform-admin.ts
 2026-07-27 | 78fc055 | PC-370 | target access-level select via test id | src/components/admin/AdminUserManagementPanel.tsx
+2026-07-27 | e4b3feb | PC-372 | sleeping as day events, optional partners, NYT default | src/actions/admin-fast-sleeping.test.ts
+2026-07-27 | 50253c4 | PC-374 | type inviteeRoles record for Next build | src/components/proposals/FastSleepingPlanGrid.tsx
+2026-07-27 | 4ce3696 | PC-374 | NYT profile default, mark batch partners required, restore browser-local draft times | src/components/proposals/proposalDraftDateUtils.test.ts
+2026-07-27 | bce3969 | PC-376 | match profile TZ label spacing; seed America/New_York | src/lib/seed/e2e-burton-thompson-overlay.ts
+2026-07-27 | 49583fc | PC-376 | align onboarding TZ label with underscore-to-space display | e2e/helpers/onboarding.ts
+2026-07-27 | 1d88f48 | PC-376 | accept New_York or New York in timezone assertions | e2e/helpers/onboarding.ts
+2026-07-27 | dadec83 | PC-376 | normalize recurring all-day windows for viewer TZ | src/actions/proposals/_core.ts
+2026-07-27 | 39f2e14 | PC-376 | align week columns with viewer timezone | src/components/schedule/ScheduleAgendaView.tsx
+2026-07-27 | e4e8a2f | PC-376 | pass timezone into heatmap date keys | src/components/schedule/ScheduleHeatmap.tsx
+2026-07-27 | 260890c | PC-376 | timezone-aware month grid and civil date navigation | src/components/schedule/ScheduleClient.tsx
+2026-07-27 | b5325dd | PC-376 | fetch full civil week and stabilize month layout tests | src/lib/schedule/dates.test.ts
+2026-07-27 | 6f2be44 | PC-376 | drop unused endOfWeekSunday import in fetch-range | src/lib/schedule/fetch-range.ts

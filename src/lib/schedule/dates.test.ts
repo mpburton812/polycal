@@ -26,37 +26,53 @@ describe("isSameLocalCalendarDay", () => {
 });
 
 describe("startOfWeekMonday", () => {
-  it("returns Monday for a Wednesday", () => {
-    const wed = new Date(2026, 5, 24); // Jun 24 2026 is Wednesday
-    const monday = startOfWeekMonday(wed);
-    expect(monday.getDay()).toBe(1);
-    expect(monday.getDate()).toBe(22);
+  it("returns Monday noon-UTC for a Wednesday in America/New_York", () => {
+    const wed = new Date("2026-06-24T16:00:00.000Z"); // Wed afternoon UTC
+    const monday = startOfWeekMonday(wed, "America/New_York");
+    expect(localDateKey(monday.toISOString(), "America/New_York")).toBe("2026-06-22");
+    expect(monday.toISOString()).toBe("2026-06-22T12:00:00.000Z");
   });
 
-  it("returns prior Monday when date is Sunday", () => {
-    const sun = new Date(2026, 5, 28); // Jun 28 2026 is Sunday
-    const monday = startOfWeekMonday(sun);
-    expect(monday.getDay()).toBe(1);
-    expect(monday.getDate()).toBe(22);
+  it("returns prior Monday when date is Sunday in America/New_York", () => {
+    const sun = new Date("2026-06-28T16:00:00.000Z");
+    const monday = startOfWeekMonday(sun, "America/New_York");
+    expect(localDateKey(monday.toISOString(), "America/New_York")).toBe("2026-06-22");
+  });
+
+  it("keeps Monday aligned when host is UTC but viewer is NY (PC-376)", () => {
+    // Noon-UTC Monday stays Monday in New York; UTC midnight Monday is still Sunday evening NY.
+    const utcMondayNoon = new Date("2026-08-10T12:00:00.000Z");
+    const monday = startOfWeekMonday(utcMondayNoon, "America/New_York");
+    expect(localDateKey(monday.toISOString(), "America/New_York")).toBe("2026-08-10");
+    const sunday = addDays(monday, 6);
+    expect(localDateKey(sunday.toISOString(), "America/New_York")).toBe("2026-08-16");
+
+    const utcMondayMidnight = new Date("2026-08-10T00:00:00.000Z");
+    expect(localDateKey(utcMondayMidnight.toISOString(), "America/New_York")).toBe("2026-08-09");
+    expect(
+      localDateKey(
+        startOfWeekMonday(utcMondayMidnight, "America/New_York").toISOString(),
+        "America/New_York",
+      ),
+    ).toBe("2026-08-03");
   });
 });
 
 describe("endOfWeekSunday", () => {
-  it("ends on Sunday 23:59:59.999", () => {
-    const monday = new Date(2026, 5, 22, 0, 0, 0, 0);
-    const end = endOfWeekSunday(monday);
-    expect(end.getDay()).toBe(0);
-    expect(end.getHours()).toBe(23);
-    expect(end.getMinutes()).toBe(59);
+  it("ends on Sunday end-of-day in America/New_York", () => {
+    const monday = new Date("2026-06-22T12:00:00.000Z");
+    const end = endOfWeekSunday(monday, "America/New_York");
+    // Sunday Jun 28 23:59:59.999 EDT = Jun 29 03:59:59.999Z
+    expect(end.toISOString()).toBe("2026-06-29T03:59:59.999Z");
   });
 });
 
 describe("addDays", () => {
   it("adds days without mutating the source date", () => {
-    const start = new Date(2026, 0, 1);
+    const start = new Date("2026-01-01T12:00:00.000Z");
     const next = addDays(start, 3);
-    expect(start.getDate()).toBe(1);
-    expect(next.getDate()).toBe(4);
+    expect(start.toISOString()).toBe("2026-01-01T12:00:00.000Z");
+    expect(next.toISOString()).toBe("2026-01-04T12:00:00.000Z");
   });
 });
 

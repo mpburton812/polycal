@@ -28,6 +28,39 @@ import { CHANGELOG_ARCHIVE } from "./entries.archive";
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "2026.07.27f",
+    date: "2026-07-27",
+    summary:
+      "Sleeping as all-day events, optional partners, NYT default, draft redraft save fix.",
+    changes: [
+      {
+        type: "changed",
+        description:
+          "Sleeping arrangements render in the all-day strip as non-time day events (no 0–8am hour-grid band) (PC-372).",
+      },
+      {
+        type: "fixed",
+        description:
+          "Cancelled sleeping (including batch) no longer leaves schedule/slot ghosts that false-conflict on resubmit; place conflicts remain sleeping-only (PC-373).",
+      },
+      {
+        type: "changed",
+        description:
+          "Sleeping partners default to optional in batch/fast-plan; Required remains available (PC-374).",
+      },
+      {
+        type: "fixed",
+        description:
+          "Admins can save redrafted drafts (updateDraft matches canEdit); clearer Draft not found gates (PC-375).",
+      },
+      {
+        type: "changed",
+        description:
+          "Accounts default to America/New_York (schema/backfill/creator); proposal times format in account TZ; day-view hour labels use account TZ (PC-376). SCHEMA_VERSION 44.",
+      },
+    ],
+  },
+  {
     version: "2026.07.27e",
     date: "2026-07-27",
     summary:

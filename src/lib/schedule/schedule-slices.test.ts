@@ -30,6 +30,35 @@ describe("schedule-slices", () => {
     });
   });
 
+  it("normalizes recurring all-day parent occurrence 0 to noon-UTC (PC-376)", () => {
+    // Host-locale end-of-day encode (EDT 00:00–23:59:59.999) must land on one NY civil day.
+    const startAt = "2026-07-25T04:00:00.000Z";
+    const endAt = "2026-07-26T03:59:59.999Z";
+    const windows = buildScheduleWindows(
+      { ...baseRow, isRecurrenceParent: true, isAllDay: true },
+      [],
+      { startAt, endAt },
+      "America/New_York",
+    );
+    expect(windows).toHaveLength(1);
+    expect(windows[0]?.startAt).toBe("2026-07-25T12:00:00.000Z");
+    expect(windows[0]?.endAt).toBe("2026-07-25T12:00:00.000Z");
+  });
+
+  it("normalizes recurring all-day children to noon-UTC (PC-376)", () => {
+    const startAt = "2026-07-25T04:00:00.000Z";
+    const endAt = "2026-07-26T03:59:59.999Z";
+    const windows = buildScheduleWindows(
+      { ...baseRow, id: "child-1", isAllDay: true, parentProposalId: "series-root" },
+      [],
+      { startAt, endAt },
+      "America/New_York",
+    );
+    expect(windows).toHaveLength(1);
+    expect(windows[0]?.startAt).toBe("2026-07-25T12:00:00.000Z");
+    expect(windows[0]?.endAt).toBe("2026-07-25T12:00:00.000Z");
+  });
+
   it("tags batch sleeping slots as batch_night", () => {
     const windows = buildScheduleWindows(
       { ...baseRow, isBatchSleeping: true },

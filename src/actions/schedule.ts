@@ -340,7 +340,14 @@ export async function listScheduleEventsAction(
     let scheduled: { startAt: string; endAt: string | null } | null = null;
     let slotsForWindows = slots;
 
-    if (row.state === "resolved" || row.state === "archived") {
+    if (row.state === "archived") {
+      // Cancelled items clear scheduled*; never rebuild from leftover slots
+      // (batch sleeping used to keep occupying nights after cancel — PC-373).
+      slotsForWindows = [];
+      if (row.scheduledStartAt) {
+        scheduled = { startAt: row.scheduledStartAt, endAt: row.scheduledEndAt };
+      }
+    } else if (row.state === "resolved") {
       if (!(row.isBatchSleeping && slots.length > 0) && row.scheduledStartAt) {
         scheduled = { startAt: row.scheduledStartAt, endAt: row.scheduledEndAt };
       }
