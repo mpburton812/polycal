@@ -38,14 +38,14 @@ test.describe("FastSleep journey", () => {
     {
       const section = batchNightSection(dialog, nightSelf);
       await expect(section).toBeVisible({ timeout: 10_000 });
-      await section.getByLabel("Subject").click();
+      await section.getByLabel("Proposer").click();
       await page.getByRole("option", { name: USERS.han.displayName }).click();
       await section.getByRole("button", { name: "Solo", exact: true }).click();
     }
 
     {
       const section = batchNightSection(dialog, nightPair);
-      await section.getByLabel("Subject").click();
+      await section.getByLabel("Proposer").click();
       await page.getByRole("option", { name: USERS.han.displayName }).click();
       await section.getByRole("button", { name: "Partners", exact: true }).click();
       const leiaChip = section.getByRole("button", { name: USERS.leia.displayName, exact: true });
@@ -55,7 +55,7 @@ test.describe("FastSleep journey", () => {
 
     {
       const section = batchNightSection(dialog, nightPartnerSolo);
-      await section.getByLabel("Subject").click();
+      await section.getByLabel("Proposer").click();
       await page.getByRole("option", { name: USERS.leia.displayName }).click();
       await section.getByRole("button", { name: "Solo", exact: true }).click();
     }
