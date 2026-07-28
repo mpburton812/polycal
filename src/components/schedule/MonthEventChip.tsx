@@ -8,6 +8,7 @@ import type { ScheduleEvent } from "@/actions/schedule";
 import { EventCategoryIcon } from "@/lib/event-icons/EventCategoryIcon";
 import { isEventIconKey } from "@/lib/event-icons/registry";
 import { MASKED_TITLE } from "@/lib/proposals/access";
+import { isSleepingLikeType } from "@/lib/proposals/sleeping-like";
 import { scheduleBlockSx, type ScheduleBlockVariant } from "@/lib/schedule/colors";
 import { GARDEN_TOKENS } from "@/theme/tokens";
 
@@ -23,7 +24,7 @@ interface MonthEventChipProps {
 export function MonthEventIcon({ event, variant, onClick }: MonthEventChipProps) {
   const colors = scheduleBlockSx(variant, 0);
   const label = event.isContentMasked ? MASKED_TITLE : event.title;
-  const isSleeping = event.proposalType === "sleeping";
+  const isSleeping = isSleepingLikeType(event.proposalType);
 
   return (
     <Box

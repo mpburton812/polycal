@@ -1,4 +1,5 @@
 import type { ScheduleEvent } from "@/actions/schedule";
+import { isSleepingLikeType } from "@/lib/proposals/sleeping-like";
 import { scheduleBlockVariant, type ScheduleBlockVariant } from "@/lib/schedule/colors";
 import { localDateKey } from "@/lib/schedule/dates";
 import { eventSpanInGrid } from "@/lib/schedule/month-grid";
@@ -62,14 +63,14 @@ export function eventDisplayPriority(event: ScheduleEvent): number {
   if (event.hasOverlap) return 0;
   if (event.atRisk) return 1;
   if (event.state === "proposed") return 2;
-  if (event.proposalType === "sleeping") return 3;
+  if (isSleepingLikeType(event.proposalType)) return 3;
   if (event.state === "resolved") return 4;
   return 5;
 }
 
 /** True when the event should render as a multi-column span in month view. */
 export function isMultiDayMonthSpan(event: ScheduleEvent, timeZone: string): boolean {
-  if (event.proposalType === "sleeping") {
+  if (isSleepingLikeType(event.proposalType)) {
     if (!event.endAt) return false;
     return localDateKey(event.startAt, timeZone) !== localDateKey(event.endAt, timeZone);
   }

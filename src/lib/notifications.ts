@@ -110,7 +110,7 @@ function alertTypeAllowed(
 
   if (notificationType.startsWith("proposal")) {
     const proposalType = metadata?.proposalType;
-    if (proposalType === "sleeping") {
+    if (proposalType === "sleeping" || proposalType === "fast_sleep") {
       return prefs.alertTypes.sleepingProposals;
     }
     return prefs.alertTypes.eventProposals;

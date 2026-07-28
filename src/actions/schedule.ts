@@ -23,6 +23,7 @@ import type { ScheduleSliceKind } from "@/lib/schedule/slice-types";
 import { loadNetworkSettings } from "@/lib/networks/settings";
 import { parseBatchSlotMeta } from "@/lib/proposals/batch-sleeping";
 import { formatSleepingDisplayTitle } from "@/lib/proposals/sleeping-display";
+import { isSleepingLikeType } from "@/lib/proposals/sleeping-like";
 import {
   getAdminCanSeeUninvolved,
   MASKED_TITLE,
@@ -392,19 +393,23 @@ export async function listScheduleEventsAction(
       let windowIntentionalSolo = row.intentionalSolo;
       let windowTitle = row.title;
 
-      if (row.proposalType === "sleeping" && !isContentMasked) {
+      if (isSleepingLikeType(row.proposalType) && !isContentMasked) {
         if (row.isBatchSleeping && window.slotLabel) {
           const meta = parseBatchSlotMeta(window.slotLabel);
           if (meta) {
             windowIntentionalSolo = meta.intentionalSolo ?? row.intentionalSolo;
+            const subjectId = meta.subjectUserId ?? row.proposerId;
+            const subjectName =
+              invitees.find((person) => person.userId === subjectId)?.displayName ??
+              (subjectId === row.proposerId ? row.proposerName : subjectId);
             if (meta.intentionalSolo) {
-              windowParticipantIds = [row.proposerId];
-              windowParticipantNames = [row.proposerName];
+              windowParticipantIds = [subjectId];
+              windowParticipantNames = [subjectName];
             } else {
-              windowParticipantIds = [row.proposerId, ...meta.inviteeUserIds];
-              const names = [row.proposerName];
+              windowParticipantIds = [subjectId, ...meta.inviteeUserIds];
+              const names = [subjectName];
               for (const inviteeId of meta.inviteeUserIds) {
-                const invitee = invitees.find((row) => row.userId === inviteeId);
+                const invitee = invitees.find((person) => person.userId === inviteeId);
                 if (invitee) names.push(invitee.displayName);
               }
               windowParticipantNames = names;
@@ -414,19 +419,34 @@ export async function listScheduleEventsAction(
             } else if (meta.locationId) {
               windowLocationName = locationNameById.get(meta.locationId) ?? windowLocationName;
             }
+            windowTitle = formatSleepingDisplayTitle({
+              proposerName: subjectName,
+              inviteeNames: windowIntentionalSolo ? [] : windowParticipantNames.slice(1),
+              intentionalSolo: windowIntentionalSolo,
+              locationName: windowLocationName,
+              state: row.state === "archived" ? "resolved" : (row.state as "proposed" | "resolved"),
+              atRisk: row.atRisk,
+            });
+          } else {
+            windowTitle = formatSleepingDisplayTitle({
+              proposerName: row.proposerName,
+              inviteeNames: windowIntentionalSolo ? [] : windowParticipantNames.slice(1),
+              intentionalSolo: windowIntentionalSolo,
+              locationName: windowLocationName,
+              state: row.state === "archived" ? "resolved" : (row.state as "proposed" | "resolved"),
+              atRisk: row.atRisk,
+            });
           }
+        } else {
+          windowTitle = formatSleepingDisplayTitle({
+            proposerName: row.proposerName,
+            inviteeNames: windowIntentionalSolo ? [] : windowParticipantNames.slice(1),
+            intentionalSolo: windowIntentionalSolo,
+            locationName: windowLocationName,
+            state: row.state === "archived" ? "resolved" : (row.state as "proposed" | "resolved"),
+            atRisk: row.atRisk,
+          });
         }
-
-        windowTitle = formatSleepingDisplayTitle({
-          proposerName: row.proposerName,
-          inviteeNames: windowIntentionalSolo
-            ? []
-            : windowParticipantNames.slice(1),
-          intentionalSolo: windowIntentionalSolo,
-          locationName: windowLocationName,
-          state: row.state === "archived" ? "resolved" : (row.state as "proposed" | "resolved"),
-          atRisk: row.atRisk,
-        });
       }
 
       events.push({

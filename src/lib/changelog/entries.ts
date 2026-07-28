@@ -28,6 +28,39 @@ import { CHANGELOG_ARCHIVE } from "./entries.archive";
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "2026.07.28a",
+    date: "2026-07-28",
+    summary:
+      "FastSleep proposal type: partner-arrangement auto-confirm, admin toggle, feed/calendar wiring.",
+    changes: [
+      {
+        type: "added",
+        description:
+          "New proposalType fast_sleep with 14-night Fast Sleeping Plan grid, rule-B authority (self + partner arrangements), auto-resolve, and one Auto-confirmed feed milestone (PC-378/PC-379/PC-380).",
+      },
+      {
+        type: "added",
+        description:
+          "Admin Poly group setting Enable FastSleep (default ON) gates UI and create action (PC-378).",
+      },
+      {
+        type: "changed",
+        description:
+          "Calendar/ICS and schedule treat FastSleep like batch sleeping; per-night subject counts as on-night for sync (PC-379).",
+      },
+      {
+        type: "changed",
+        description:
+          "SCHEMA_VERSION 45 applies fast_sleep_enabled on networks/poly_group so existing DBs pick up the FastSleep admin toggle column (PC-378).",
+      },
+      {
+        type: "fixed",
+        description:
+          "FastSleep Auto-confirmed feed milestones remain visible to proposers and invitees even when network audit visibility is admin-only (PC-378).",
+      },
+    ],
+  },
+  {
     version: "2026.07.27f",
     date: "2026-07-27",
     summary:

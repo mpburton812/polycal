@@ -17,6 +17,7 @@ import {
 import { type ProposalCard as ProposalCardData } from "@/actions/proposals";
 import { DownloadIcsButton } from "@/components/calendar/DownloadIcsButton";
 import { MASKED_TITLE } from "@/lib/proposals/access";
+import { isSleepingLikeType } from "@/lib/proposals/sleeping-like";
 import { fontFamilies } from "@/theme/fonts";
 import { GARDEN_TOKENS } from "@/theme/tokens";
 
@@ -152,7 +153,7 @@ export function ProposalCard({
   const sparseBadges: string[] = [];
   if (!proposal.isContentMasked) {
     if (proposal.proposalType === "event" && proposal.isPoll) sparseBadges.push("Poll");
-    if (proposal.proposalType === "sleeping" && proposal.isBatchSleeping) {
+    if (isSleepingLikeType(proposal.proposalType) && proposal.isBatchSleeping) {
       sparseBadges.push("Batch");
     }
     // Keep At risk visible when Action needed is the emphasis chip (PC-124).
@@ -164,7 +165,7 @@ export function ProposalCard({
   }
 
   const typeAccent =
-    proposal.proposalType === "sleeping" &&
+    isSleepingLikeType(proposal.proposalType) &&
     proposal.cardKind !== "partnership" &&
     proposal.specialKind !== "residency" &&
     proposal.cardKind !== "residency"

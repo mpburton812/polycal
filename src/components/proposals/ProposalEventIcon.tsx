@@ -8,7 +8,7 @@ import { isEventIconKey } from "@/lib/event-icons/registry";
 interface ProposalEventIconProps {
   eventIconKey: string | null | undefined;
   isContentMasked: boolean;
-  proposalType: "event" | "sleeping";
+  proposalType: "event" | "sleeping" | "fast_sleep";
   size?: number;
   /** Stretch to parent height for kanban card watermarks (PC-275). */
   fillHeight?: boolean;

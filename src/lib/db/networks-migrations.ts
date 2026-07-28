@@ -97,6 +97,18 @@ export async function applyNetworksMigrations(sql: Client): Promise<void> {
     "see_partners_sleeping_arrangements",
     "INTEGER NOT NULL DEFAULT 0",
   );
+  await ensureColumn(
+    sql,
+    "networks",
+    "fast_sleep_enabled",
+    "INTEGER NOT NULL DEFAULT 1",
+  );
+  await ensureColumn(
+    sql,
+    "poly_group",
+    "fast_sleep_enabled",
+    "INTEGER NOT NULL DEFAULT 1",
+  );
 
   await sql.execute(
     `CREATE INDEX IF NOT EXISTS idx_locations_network ON locations(network_id)`,

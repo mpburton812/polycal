@@ -21,6 +21,8 @@ export interface PolyGroupSettings {
    * and they are not (PC-366). Orthogonal to hideSleepingArrangements (Busy mask).
    */
   seePartnersSleepingArrangements: boolean;
+  /** When false, FastSleep is hidden and create is rejected (PC-378). Default true. */
+  fastSleepEnabled: boolean;
   placesMapVisibility: PlacesMapVisibility;
   logTailLength: number;
   onboardingWelcomeMessage: string;

@@ -4,9 +4,11 @@
  * (stable by startAt among themselves).
  */
 
+import { isSleepingLikeType } from "@/lib/proposals/sleeping-like";
+
 export type SortableDayEvent = {
   startAt: string;
-  proposalType: "event" | "sleeping" | string;
+  proposalType: "event" | "sleeping" | "fast_sleep" | string;
 };
 
 /**
@@ -15,8 +17,8 @@ export type SortableDayEvent = {
  */
 export function sortDayEvents<T extends SortableDayEvent>(events: T[]): T[] {
   return [...events].sort((a, b) => {
-    const aSleep = a.proposalType === "sleeping";
-    const bSleep = b.proposalType === "sleeping";
+    const aSleep = isSleepingLikeType(a.proposalType);
+    const bSleep = isSleepingLikeType(b.proposalType);
     if (aSleep !== bSleep) return aSleep ? 1 : -1;
     return a.startAt.localeCompare(b.startAt);
   });
