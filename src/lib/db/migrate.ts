@@ -12,7 +12,7 @@ import { applyPerformanceIndexMigrations } from "./performance-index-migrations"
 import { applyNetworksMigrations } from "./networks-migrations";
 
 /** Bump whenever bootstrap DDL or *-migrations.ts modules change (PC-143). */
-export const SCHEMA_VERSION = "45";
+export const SCHEMA_VERSION = "46";
 
 /**
  * True when the stored schema version already matches the app target — skip

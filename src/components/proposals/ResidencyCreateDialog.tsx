@@ -87,7 +87,7 @@ export function ResidencyCreateDialog({
 
   return (
     <Dialog open={open} onClose={handleClose} fullWidth maxWidth="xs">
-      <DialogTitle>Place residency proposal</DialogTitle>
+      <DialogTitle>Residency Proposal</DialogTitle>
       <DialogContent>
         <Stack spacing={2} sx={{ pt: 1 }}>
           <Alert severity="info" sx={{ py: 0.5 }}>

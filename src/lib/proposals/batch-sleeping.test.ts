@@ -20,8 +20,8 @@ describe("batchSleepingEntriesSchema", () => {
     expect(result.success).toBe(false);
   });
 
-  it("rejects more than 14 nights", () => {
-    const entries = Array.from({ length: 15 }, (_, index) => ({
+  it("rejects more than 28 nights", () => {
+    const entries = Array.from({ length: 29 }, (_, index) => ({
       id: `night-${index}`,
       nightDate: "2099-07-01",
       intentionalSolo: true,

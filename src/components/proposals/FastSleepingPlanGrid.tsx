@@ -2,6 +2,7 @@
 
 import {
   Box,
+  Button,
   Chip,
   FormControl,
   InputLabel,
@@ -17,10 +18,12 @@ import {
 import type { PersonSummary } from "@/actions/users";
 import type { ProposalPlaceOption } from "@/actions/proposals";
 import {
+  createEmptyFastSleepingRow,
+  FAST_SLEEPING_MAX_SLOTS,
   formatFastSleepingDayLabel,
   type FastSleepingRow,
 } from "@/lib/proposals/fast-sleeping-plan";
-import { SHORT_TEXT_MAX } from "@/lib/validation/string-limits";
+import { LONG_TEXT_MAX, SHORT_TEXT_MAX } from "@/lib/validation/string-limits";
 import { GARDEN_TOKENS } from "@/theme/tokens";
 
 export interface FastSleepingPlanGridProps {
@@ -30,7 +33,7 @@ export interface FastSleepingPlanGridProps {
   locationOptions: ProposalPlaceOption[];
   disabled?: boolean;
   /**
-   * FastSleep mode: per-night subject picker + partners for the selected subject.
+   * FastSleep mode: per-night proposer picker + partners for the selected proposer.
    * When omitted, behaves as legacy admin/user batch grid (partners of one subject).
    */
   subjectPeople?: PersonSummary[];
@@ -41,9 +44,8 @@ export interface FastSleepingPlanGridProps {
 }
 
 /**
- * Shared 14-night fast sleeping plan grid (PC-116 / PC-380).
- * Each night is a bordered box; fields wrap inside the box so Location stacks
- * under Day/Partners on narrow widths without horizontal scrolling.
+ * Shared fast sleeping plan grid (PC-116 / PC-380 / PC-383).
+ * Each slot is a bordered box; FastSleep mode allows multiple slots on the same night.
  */
 export function FastSleepingPlanGrid({
   rows,
@@ -102,14 +104,52 @@ export function FastSleepingPlanGrid({
     });
   }
 
+  function addSlotForNight(index: number) {
+    if (disabled || rows.length >= FAST_SLEEPING_MAX_SLOTS) return;
+    const row = rows[index];
+    if (!row) return;
+    const next = [...rows];
+    next.splice(
+      index + 1,
+      0,
+      createEmptyFastSleepingRow(row.nightDate, defaultSubjectUserId),
+    );
+    onChange(next);
+  }
+
+  function removeSlot(index: number) {
+    if (disabled) return;
+    const row = rows[index];
+    if (!row) return;
+    const sameDateCount = rows.filter((r) => r.nightDate === row.nightDate).length;
+    if (sameDateCount <= 1) return;
+    onChange(rows.filter((_, i) => i !== index));
+  }
+
+  function slotIndexForDate(row: FastSleepingRow, index: number): number {
+    let n = 0;
+    for (let i = 0; i <= index; i += 1) {
+      if (rows[i]?.nightDate === row.nightDate) n += 1;
+    }
+    return n;
+  }
+
+  function sameDateCount(nightDate: string): number {
+    return rows.filter((r) => r.nightDate === nightDate).length;
+  }
+
   return (
     <Stack spacing={1.5} data-testid="fast-sleeping-plan-grid">
       {rows.map((row, index) => {
         const nightPartners = partnersForRow(row);
+        const rowKey = row.id ?? `${row.nightDate}-${index}`;
+        const slotN = slotIndexForDate(row, index);
+        const multiOnDate = sameDateCount(row.nightDate) > 1;
         return (
           <Box
-            key={row.nightDate}
+            key={rowKey}
             data-testid={`fast-sleep-night-${row.nightDate}`}
+            data-slot-index={slotN}
             sx={{
               border: `1px solid ${GARDEN_TOKENS.outlineSoft}`,
               borderRadius: 1,
@@ -128,13 +168,14 @@ export function FastSleepingPlanGrid({
               <Box sx={{ flex: "1 1 140px", minWidth: 120 }}>
                 <Typography variant="body2" sx={{ fontWeight: 700, mb: 1 }}>
                   {formatFastSleepingDayLabel(row.nightDate)}
+                  {multiOnDate ? ` · slot ${slotN}` : ""}
                 </Typography>
                 {subjectMode ? (
                   <FormControl fullWidth size="small" sx={{ mb: 1 }} disabled={disabled}>
-                    <InputLabel id={`fast-sleep-subject-${index}`}>Subject</InputLabel>
+                    <InputLabel id={`fast-sleep-subject-${index}`}>Proposer</InputLabel>
                     <Select
                       labelId={`fast-sleep-subject-${index}`}
-                      label="Subject"
+                      label="Proposer"
                       value={row.subjectUserId ?? defaultSubjectUserId ?? ""}
                       onChange={(event) => {
                         const subjectUserId = event.target.value || undefined;
@@ -144,7 +185,9 @@ export function FastSleepingPlanGrid({
                           inviteeRoles: {},
                         });
                       }}
-                      inputProps={{ "data-testid": `fast-sleep-subject-${row.nightDate}` }}
+                      inputProps={{
+                        "data-testid": `fast-sleep-subject-${row.nightDate}-${slotN}`,
+                      }}
                     >
                       {(subjectPeople ?? []).map((person) => (
                         <MenuItem key={person.id} value={person.id}>
@@ -270,10 +313,55 @@ export function FastSleepingPlanGrid({
                   size="small"
                   placeholder="Optional"
                   disabled={disabled}
+                  sx={{ mb: 1 }}
                   inputProps={{ maxLength: SHORT_TEXT_MAX }}
+                />
+                <TextField
+                  label="Note"
+                  value={row.comment ?? ""}
+                  onChange={(event) =>
+                    updateRow(index, {
+                      comment: event.target.value || undefined,
+                    })
+                  }
+                  fullWidth
+                  size="small"
+                  multiline
+                  minRows={2}
+                  placeholder="Optional note for this night"
+                  disabled={disabled}
+                  inputProps={{
+                    maxLength: LONG_TEXT_MAX,
+                    "data-testid": `fast-sleep-note-${row.nightDate}-${slotN}`,
+                  }}
                 />
               </Box>
             </Box>
+
+            {subjectMode ? (
+              <Stack direction="row" spacing={1} sx={{ mt: 1.5 }} flexWrap="wrap">
+                <Button
+                  size="small"
+                  variant="outlined"
+                  disabled={disabled || rows.length >= FAST_SLEEPING_MAX_SLOTS}
+                  onClick={() => addSlotForNight(index)}
+                  data-testid={`fast-sleep-add-slot-${row.nightDate}`}
+                >
+                  Add another for this night
+                </Button>
+                {multiOnDate ? (
+                  <Button
+                    size="small"
+                    color="inherit"
+                    disabled={disabled}
+                    onClick={() => removeSlot(index)}
+                    data-testid={`fast-sleep-remove-slot-${row.nightDate}-${slotN}`}
+                  >
+                    Remove this slot
+                  </Button>
+                ) : null}
+              </Stack>
+            ) : null}
           </Box>
         );
       })}

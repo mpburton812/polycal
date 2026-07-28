@@ -44,8 +44,8 @@ test.describe("Residency proposal journey", () => {
     await loginWithOnboardingIfNeeded(page, USERS.leia.username);
     await goToProposals(page);
     await page.getByRole("button", { name: "New proposal" }).click();
-    await page.getByRole("menuitem", { name: "Place residency proposal" }).click();
-    const residencyDialog = page.getByRole("dialog", { name: "Place residency proposal" });
+    await page.getByRole("menuitem", { name: "Residency Proposal" }).click();
+    const residencyDialog = page.getByRole("dialog", { name: "Residency Proposal" });
     await residencyDialog.getByLabel("Place").click();
     await page.getByRole("option", { name: PLACE }).click();
     await expect(residencyDialog.getByText(/Owners:/i)).toBeVisible();

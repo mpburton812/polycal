@@ -38,14 +38,14 @@ test.describe("FastSleep journey", () => {
     {
       const section = batchNightSection(dialog, nightSelf);
       await expect(section).toBeVisible({ timeout: 10_000 });
-      await section.getByLabel("Subject").click();
+      await section.getByLabel("Proposer").click();
       await page.getByRole("option", { name: USERS.han.displayName }).click();
       await section.getByRole("button", { name: "Solo", exact: true }).click();
     }
 
     {
       const section = batchNightSection(dialog, nightPair);
-      await section.getByLabel("Subject").click();
+      await section.getByLabel("Proposer").click();
       await page.getByRole("option", { name: USERS.han.displayName }).click();
       await section.getByRole("button", { name: "Partners", exact: true }).click();
       const leiaChip = section.getByRole("button", { name: USERS.leia.displayName, exact: true });
@@ -55,7 +55,7 @@ test.describe("FastSleep journey", () => {
 
     {
       const section = batchNightSection(dialog, nightPartnerSolo);
-      await section.getByLabel("Subject").click();
+      await section.getByLabel("Proposer").click();
       await page.getByRole("option", { name: USERS.leia.displayName }).click();
       await section.getByRole("button", { name: "Solo", exact: true }).click();
     }
@@ -80,7 +80,7 @@ test.describe("FastSleep journey", () => {
     await loginWithOnboardingIfNeeded(page, USERS.luke.username);
     await goToAdmin(page);
     await expandAdminSection(page, "Poly group settings");
-    const toggle = page.getByLabel("Enable FastSleep");
+    const toggle = page.getByLabel("Enable FastSleep Proposal");
     await expect(toggle).toBeVisible({ timeout: 15_000 });
     if (await toggle.isChecked()) {
       await toggle.click();
@@ -93,6 +93,6 @@ test.describe("FastSleep journey", () => {
     await goToProposals(page);
     await openNewProposalFabMenu(page);
     await expect(page.getByTestId("fab-fast-sleep")).toHaveCount(0);
-    await expect(page.getByRole("menuitem", { name: "FastSleep" })).toHaveCount(0);
+    await expect(page.getByRole("menuitem", { name: "FastSleep Proposal" })).toHaveCount(0);
   });
 });

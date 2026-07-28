@@ -386,7 +386,7 @@ export function ProposalsClient({
             }}
             data-testid="fab-fast-sleep"
           >
-            FastSleep
+            FastSleep Proposal
           </MenuItem>
         ) : null}
         <MenuItem
@@ -403,7 +403,7 @@ export function ProposalsClient({
             setResidencyCreateOpen(true);
           }}
         >
-          Place residency proposal
+          Residency Proposal
         </MenuItem>
       </Menu>
 
