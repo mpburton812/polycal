@@ -28,6 +28,29 @@ import { CHANGELOG_ARCHIVE } from "./entries.archive";
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "2026.07.28b",
+    date: "2026-07-28",
+    summary:
+      "FastSleep Proposal cleanup: multi-slot nights, notes, renames, and Feed admin toggle.",
+    changes: [
+      {
+        type: "added",
+        description:
+          "FastSleep Proposal grid supports multiple slots on the same night (e.g. two solos), per-slot notes, and Proposer label (PC-383).",
+      },
+      {
+        type: "changed",
+        description:
+          "UI renames: FastSleep → FastSleep Proposal; Place residency proposal → Residency Proposal; admin Enable FastSleep Proposal (PC-384).",
+      },
+      {
+        type: "added",
+        description:
+          "Admin Enable Feed toggle (default ON) hides Feed nav, redirects /feed, and rejects feed actions when off; SCHEMA_VERSION 46 (PC-385).",
+      },
+    ],
+  },
+  {
     version: "2026.07.28a",
     date: "2026-07-28",
     summary:

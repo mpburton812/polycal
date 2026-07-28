@@ -38,6 +38,7 @@ const settingsSchema = z.object({
   hideSleepingArrangements: z.boolean(),
   seePartnersSleepingArrangements: z.boolean(),
   fastSleepEnabled: z.boolean(),
+  feedEnabled: z.boolean(),
   placesMapVisibility: z.enum(placesMapVisibilityLevels),
   logTailLength: z.number().int().min(0).max(1000),
   onboardingWelcomeMessage: z
@@ -60,6 +61,7 @@ function rowToSettings(row: {
   hideSleepingArrangements: boolean;
   seePartnersSleepingArrangements: boolean | null;
   fastSleepEnabled: boolean | null;
+  feedEnabled: boolean | null;
   placesMapVisibility: string | null;
   logTailLength: number;
   onboardingWelcomeMessage: string | null;
@@ -77,6 +79,7 @@ function rowToSettings(row: {
     hideSleepingArrangements: row.hideSleepingArrangements,
     seePartnersSleepingArrangements: row.seePartnersSleepingArrangements ?? false,
     fastSleepEnabled: row.fastSleepEnabled ?? true,
+    feedEnabled: row.feedEnabled ?? true,
     placesMapVisibility:
       (row.placesMapVisibility as PolyGroupSettings["placesMapVisibility"]) ?? "all",
     logTailLength: row.logTailLength,
@@ -138,6 +141,7 @@ export async function getPolyGroupSettingsAction(): Promise<PolyGroupSettings | 
     hideSleepingArrangements: settings.hideSleepingArrangements,
     seePartnersSleepingArrangements: settings.seePartnersSleepingArrangements,
     fastSleepEnabled: settings.fastSleepEnabled,
+    feedEnabled: settings.feedEnabled,
     placesMapVisibility: settings.placesMapVisibility,
     logTailLength: settings.logTailLength,
     onboardingWelcomeMessage: settings.onboardingWelcomeMessage,
@@ -189,6 +193,7 @@ export async function updatePolyGroupSettingsAction(
       hideSleepingArrangements: parsed.data.hideSleepingArrangements,
       seePartnersSleepingArrangements: parsed.data.seePartnersSleepingArrangements,
       fastSleepEnabled: parsed.data.fastSleepEnabled,
+      feedEnabled: parsed.data.feedEnabled,
       placesMapVisibility: parsed.data.placesMapVisibility,
       logTailLength: parsed.data.logTailLength,
       onboardingWelcomeMessage: parsed.data.onboardingWelcomeMessage,
@@ -212,6 +217,7 @@ export async function updatePolyGroupSettingsAction(
       hideSleepingArrangements: parsed.data.hideSleepingArrangements,
       seePartnersSleepingArrangements: parsed.data.seePartnersSleepingArrangements,
       fastSleepEnabled: parsed.data.fastSleepEnabled,
+      feedEnabled: parsed.data.feedEnabled,
       placesMapVisibility: parsed.data.placesMapVisibility,
       logTailLength: parsed.data.logTailLength,
       onboardingWelcomeMessage: parsed.data.onboardingWelcomeMessage,

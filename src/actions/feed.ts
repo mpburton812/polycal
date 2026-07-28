@@ -9,6 +9,7 @@ import { requireNetworkSession } from "@/lib/networks/context";
 import { loadNetworkSettings } from "@/lib/networks/settings";
 import { requireSession, withDb } from "@/lib/actions/context";
 import { userHasAdminAccess } from "@/lib/admin-access";
+import { isFeedEnabledForActiveNetwork } from "@/lib/feed/feed-enabled";
 import {
   networkChatCommentImages,
   networkChatComments,
@@ -401,6 +402,10 @@ export async function listFeedItemsAction(
 }> {
   const sessionResult = await requireNetworkSession();
   if (!sessionResult.ok) return sessionResult;
+
+  if (!(await isFeedEnabledForActiveNetwork())) {
+    return { ok: false, message: "Feed is disabled for this network." };
+  }
 
   const parsed = listFeedSchema.safeParse(input);
   if (!parsed.success) {
@@ -1077,6 +1082,10 @@ export async function postNetworkChatMessageAction(
   const sessionResult = await requireNetworkSession();
   if (!sessionResult.ok) return sessionResult;
 
+  if (!(await isFeedEnabledForActiveNetwork())) {
+    return { ok: false, message: "Feed is disabled for this network." };
+  }
+
   const parsed = chatPostSchema.safeParse(input);
   if (!parsed.success) {
     return { ok: false, message: parsed.error.issues[0]?.message ?? "Invalid message." };
@@ -1470,6 +1479,10 @@ export async function toggleFeedLikeAction(
 }> {
   const sessionResult = await requireSession();
   if (!sessionResult.ok) return sessionResult;
+
+  if (!(await isFeedEnabledForActiveNetwork())) {
+    return { ok: false, message: "Feed is disabled for this network." };
+  }
 
   const parsed = likeTargetSchema.safeParse(input);
   if (!parsed.success) {

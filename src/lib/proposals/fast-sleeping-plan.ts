@@ -2,15 +2,24 @@ import { z } from "zod";
 
 import type { BatchSleepingEntry } from "@/lib/proposals/batch-sleeping";
 import { newBatchEntryId } from "@/lib/proposals/batch-sleeping-client";
-import { SHORT_TEXT_MAX, limitedString } from "@/lib/validation/string-limits";
+import {
+  LONG_TEXT_MAX,
+  SHORT_TEXT_MAX,
+  limitedString,
+} from "@/lib/validation/string-limits";
 
-/** Number of nights shown in the shared fast sleeping plan grid. */
+/** Number of civil nights shown in the shared fast sleeping plan grid. */
 export const FAST_SLEEPING_GRID_DAYS = 14;
 
-/** One night row in the shared fast sleeping plan grid (UI/input projection). */
+/** Max configured slots (allows multiple arrangements on the same night). */
+export const FAST_SLEEPING_MAX_SLOTS = 28;
+
+/** One night row / slot in the shared fast sleeping plan grid (UI/input projection). */
 export const fastSleepingRowSchema = z.object({
+  /** Stable UI key — required for multi-slot same-date lists (PC-383). */
+  id: z.string().min(1).optional(),
   nightDate: z.string().min(1, "Night date is required."),
-  /** FastSleep night subject; defaults to scheduler when omitted. */
+  /** FastSleep night subject/proposer; defaults to scheduler when omitted. */
   subjectUserId: z.string().min(1).optional(),
   inviteeUserIds: z.array(z.string().min(1)).default([]),
   /** Per-partner role; missing ids default to optional on batch build (PC-374). */
@@ -20,6 +29,8 @@ export const fastSleepingRowSchema = z.object({
   locationId: z.string().optional(),
   locationText: limitedString("Location", SHORT_TEXT_MAX).optional(),
   intentionalSolo: z.boolean().optional(),
+  /** Optional per-slot note → BatchSleepingEntry.comment. */
+  comment: limitedString("Comment", LONG_TEXT_MAX).optional(),
 });
 
 export type FastSleepingRow = z.infer<typeof fastSleepingRowSchema>;
@@ -27,7 +38,7 @@ export type FastSleepingRow = z.infer<typeof fastSleepingRowSchema>;
 /** Admin fast-add input: target user + grid rows + conflict confirm (PC-114). */
 export const adminFastSleepingPlanSchema = z.object({
   targetUserId: z.string().min(1, "Target user is required."),
-  rows: z.array(fastSleepingRowSchema).min(1).max(FAST_SLEEPING_GRID_DAYS),
+  rows: z.array(fastSleepingRowSchema).min(1).max(FAST_SLEEPING_MAX_SLOTS),
   confirm: z.boolean().default(false),
 });
 
@@ -41,6 +52,21 @@ function formatGridDate(date: Date): string {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 }
 
+/** Creates an empty slot for a civil night date. */
+export function createEmptyFastSleepingRow(
+  nightDate: string,
+  subjectUserId?: string,
+): FastSleepingRow {
+  return {
+    id: newBatchEntryId(),
+    nightDate: nightDate.slice(0, 10),
+    subjectUserId,
+    inviteeUserIds: [],
+    inviteeRoles: {},
+    intentionalSolo: false,
+  };
+}
+
 /** Builds empty grid rows for today through today+13. */
 export function buildEmptyGridRows(
   dayCount: number = FAST_SLEEPING_GRID_DAYS,
@@ -50,12 +76,7 @@ export function buildEmptyGridRows(
   return Array.from({ length: dayCount }, (_, index) => {
     const day = new Date(start);
     day.setDate(start.getDate() + index);
-    return {
-      nightDate: formatGridDate(day),
-      inviteeUserIds: [],
-      inviteeRoles: {},
-      intentionalSolo: false,
-    };
+    return createEmptyFastSleepingRow(formatGridDate(day));
   });
 }
 
@@ -75,7 +96,8 @@ export function fastSleepingRowHasContent(row: FastSleepingRow): boolean {
     row.intentionalSolo ||
       row.inviteeUserIds.length > 0 ||
       row.locationId ||
-      row.locationText?.trim(),
+      row.locationText?.trim() ||
+      row.comment?.trim(),
   );
 }
 
@@ -88,12 +110,13 @@ export function buildBatchEntriesFromRows(
   defaultSubjectUserId?: string,
 ): BatchSleepingEntry[] {
   return rows.filter(fastSleepingRowHasContent).map((row) => ({
-    id: newBatchEntryId(),
+    id: row.id?.startsWith("bse-") ? row.id : newBatchEntryId(),
     nightDate: row.nightDate.slice(0, 10),
     subjectUserId: row.subjectUserId ?? defaultSubjectUserId,
     locationId: row.locationId,
     locationText: row.locationText?.trim() || undefined,
     intentionalSolo: Boolean(row.intentionalSolo),
+    comment: row.comment?.trim() || undefined,
     invitees: row.intentionalSolo
       ? []
       : row.inviteeUserIds.map((userId) => ({
@@ -107,40 +130,61 @@ export function buildBatchEntriesFromRows(
 export const buildBatchEntriesFromAdminRows = buildBatchEntriesFromRows;
 
 /**
- * Projects existing batch entries onto a fixed 14-day grid (for draft edit).
- * Nights outside the grid window are appended after the fixed days.
+ * Projects batch entries onto the 14-day grid for edit.
+ * Multiple entries on the same nightDate become multiple slots (PC-383).
  */
 export function rowsFromBatchEntries(
   entries: BatchSleepingEntry[],
   baseRows: FastSleepingRow[] = buildEmptyGridRows(),
 ): FastSleepingRow[] {
-  const byDate = new Map(
-    entries.map((entry) => [
-      entry.nightDate.slice(0, 10),
-      {
-        nightDate: entry.nightDate.slice(0, 10),
-        subjectUserId: entry.subjectUserId,
-        inviteeUserIds: entry.intentionalSolo
-          ? []
-          : entry.invitees.map((invitee) => invitee.userId),
-        inviteeRoles: entry.intentionalSolo
-          ? {}
-          : Object.fromEntries(
-              entry.invitees.map((invitee) => [invitee.userId, invitee.role]),
-            ),
-        locationId: entry.locationId,
-        locationText: entry.locationText,
-        intentionalSolo: Boolean(entry.intentionalSolo),
-      } satisfies FastSleepingRow,
-    ]),
-  );
+  const entriesByDate = new Map<string, BatchSleepingEntry[]>();
+  for (const entry of entries) {
+    const nightDate = entry.nightDate.slice(0, 10);
+    const list = entriesByDate.get(nightDate) ?? [];
+    list.push(entry);
+    entriesByDate.set(nightDate, list);
+  }
 
-  const rows = baseRows.map((row) => byDate.get(row.nightDate) ?? row);
-  const covered = new Set(rows.map((row) => row.nightDate));
-  for (const [nightDate, row] of byDate) {
-    if (!covered.has(nightDate)) {
-      rows.push(row);
+  const rows: FastSleepingRow[] = [];
+  const covered = new Set<string>();
+
+  for (const base of baseRows) {
+    const nightDate = base.nightDate.slice(0, 10);
+    const nightEntries = entriesByDate.get(nightDate);
+    if (!nightEntries || nightEntries.length === 0) {
+      rows.push({ ...base, id: base.id ?? newBatchEntryId() });
+      continue;
+    }
+    covered.add(nightDate);
+    for (const entry of nightEntries) {
+      rows.push(entryToRow(entry));
     }
   }
-  return rows.slice(0, FAST_SLEEPING_GRID_DAYS);
+
+  for (const [nightDate, nightEntries] of entriesByDate) {
+    if (covered.has(nightDate)) continue;
+    for (const entry of nightEntries) {
+      rows.push(entryToRow(entry));
+    }
+  }
+
+  return rows.slice(0, FAST_SLEEPING_MAX_SLOTS);
+}
+
+function entryToRow(entry: BatchSleepingEntry): FastSleepingRow {
+  return {
+    id: entry.id,
+    nightDate: entry.nightDate.slice(0, 10),
+    subjectUserId: entry.subjectUserId,
+    inviteeUserIds: entry.intentionalSolo
+      ? []
+      : entry.invitees.map((invitee) => invitee.userId),
+    inviteeRoles: entry.intentionalSolo
+      ? {}
+      : Object.fromEntries(entry.invitees.map((invitee) => [invitee.userId, invitee.role])),
+    locationId: entry.locationId,
+    locationText: entry.locationText,
+    intentionalSolo: Boolean(entry.intentionalSolo),
+    comment: entry.comment,
+  };
 }

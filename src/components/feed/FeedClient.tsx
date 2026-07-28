@@ -845,7 +845,7 @@ export function FeedClient({
                 size="small"
                 label={
                   item.proposalType === "fast_sleep"
-                    ? "FastSleep"
+                    ? "FastSleep Proposal"
                     : item.proposalType === "sleeping"
                       ? "Sleeping"
                       : "Event"

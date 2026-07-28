@@ -14,6 +14,7 @@ export type NetworkSettings = {
   hideSleepingArrangements: boolean;
   seePartnersSleepingArrangements: boolean;
   fastSleepEnabled: boolean;
+  feedEnabled: boolean;
   placesMapVisibility: PlacesMapVisibility;
   logTailLength: number;
   onboardingWelcomeMessage: string;
@@ -46,6 +47,7 @@ export async function loadNetworkSettings(
     hideSleepingArrangements: row.hideSleepingArrangements,
     seePartnersSleepingArrangements: row.seePartnersSleepingArrangements,
     fastSleepEnabled: row.fastSleepEnabled ?? true,
+    feedEnabled: row.feedEnabled ?? true,
     placesMapVisibility: row.placesMapVisibility as PlacesMapVisibility,
     logTailLength: row.logTailLength,
     onboardingWelcomeMessage:

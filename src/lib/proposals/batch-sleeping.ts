@@ -31,7 +31,7 @@ export const batchSleepingEntrySchema = z.object({
 
 export type BatchSleepingEntry = z.infer<typeof batchSleepingEntrySchema>;
 
-export const batchSleepingEntriesSchema = z.array(batchSleepingEntrySchema).min(1).max(14);
+export const batchSleepingEntriesSchema = z.array(batchSleepingEntrySchema).min(1).max(28);
 
 /** JSON stored on proposal_time_slots.label for per-night metadata in batch proposals. */
 export const batchSlotMetaSchema = z.object({

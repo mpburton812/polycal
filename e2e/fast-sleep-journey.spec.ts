@@ -80,7 +80,7 @@ test.describe("FastSleep journey", () => {
     await loginWithOnboardingIfNeeded(page, USERS.luke.username);
     await goToAdmin(page);
     await expandAdminSection(page, "Poly group settings");
-    const toggle = page.getByLabel("Enable FastSleep");
+    const toggle = page.getByLabel("Enable FastSleep Proposal");
     await expect(toggle).toBeVisible({ timeout: 15_000 });
     if (await toggle.isChecked()) {
       await toggle.click();
@@ -93,6 +93,6 @@ test.describe("FastSleep journey", () => {
     await goToProposals(page);
     await openNewProposalFabMenu(page);
     await expect(page.getByTestId("fab-fast-sleep")).toHaveCount(0);
-    await expect(page.getByRole("menuitem", { name: "FastSleep" })).toHaveCount(0);
+    await expect(page.getByRole("menuitem", { name: "FastSleep Proposal" })).toHaveCount(0);
   });
 });

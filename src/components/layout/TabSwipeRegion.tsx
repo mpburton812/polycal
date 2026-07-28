@@ -37,17 +37,21 @@ function isInteractiveOrHorizontalScroll(target: EventTarget | null): boolean {
 export function TabSwipeRegion({
   children,
   isAdmin,
+  feedEnabled = true,
 }: {
   children: ReactNode;
   isAdmin: boolean;
+  feedEnabled?: boolean;
 }) {
   const router = useRouter();
   const pathname = usePathname();
   const startRef = useRef<{ x: number; y: number; ignore: boolean } | null>(null);
 
-  const visibleHrefs = isAdmin
-    ? [...MAIN_TAB_HREFS]
-    : MAIN_TAB_HREFS.filter((href) => href !== "/admin");
+  const visibleHrefs = MAIN_TAB_HREFS.filter((href) => {
+    if (!isAdmin && href === "/admin") return false;
+    if (!feedEnabled && href === "/feed") return false;
+    return true;
+  });
 
   const onPointerDown = useCallback((event: PointerEvent<HTMLDivElement>) => {
     if (event.pointerType === "mouse" && event.buttons !== 1) return;
