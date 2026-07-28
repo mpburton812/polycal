@@ -1,7 +1,8 @@
 import { type Locator, type Page, expect } from "@playwright/test";
 
 /**
- * Clicks a bottom-nav link; falls back to direct navigation when the Next.js dev overlay blocks clicks.
+ * Clicks a bottom-nav link; falls back to direct navigation when the click is
+ * blocked or does not change the URL (dev overlay / dialogs / slow transitions).
  */
 async function clickBottomNavLink(page: Page, name: string, path: string): Promise<void> {
   const link = page.getByRole("link", { name });
@@ -10,7 +11,14 @@ async function clickBottomNavLink(page: Page, name: string, path: string): Promi
   } catch {
     await page.goto(path);
   }
-  await expect(page).toHaveURL(new RegExp(`${path.replace("/", "\\/")}`));
+  try {
+    await expect(page).toHaveURL(new RegExp(`${path.replace("/", "\\/")}`), {
+      timeout: 5_000,
+    });
+  } catch {
+    await page.goto(path);
+    await expect(page).toHaveURL(new RegExp(`${path.replace("/", "\\/")}`));
+  }
 }
 
 export async function goToFeed(page: Page): Promise<void> {

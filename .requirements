@@ -342,3 +342,4 @@
 2026-07-27 | 6f2be44 | PC-376 | drop unused endOfWeekSunday import in fetch-range | src/lib/schedule/fetch-range.ts
 2026-07-28 | 1784447 | PC-378 | add FastSleep auto-confirm proposal type | src/actions/fast-sleep.ts
 2026-07-28 | 96ae2e4 | PC-378 | FastSleep migrate bump and feed/journey gates | src/actions/feed.ts
+2026-07-28 | ad20616 | PC-378 | fall back to goto when bottom-nav click does not navigate | e2e/helpers/navigation.ts
