@@ -345,3 +345,4 @@
 2026-07-28 | ad20616 | PC-378 | fall back to goto when bottom-nav click does not navigate | e2e/helpers/navigation.ts
 2026-07-28 | 00dd2f3 | PC-378 | harden platform-admin nav wait for cold compile | e2e/platform-admin-access-journey.spec.ts
 2026-07-28 | 4f51f90 | PC-383 | multi-slot nights, renames, and Feed toggle | src/actions/fast-sleep.ts
+2026-07-28 | fa1e9a5 | PC-383 | use Proposer label in FastSleep journey | e2e/fast-sleep-journey.spec.ts
