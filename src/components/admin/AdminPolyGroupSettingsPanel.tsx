@@ -158,11 +158,28 @@ export function AdminPolyGroupSettingsPanel({
               }
             />
           }
-          label="Enable FastSleep"
+          label="Enable FastSleep Proposal"
         />
         <Typography variant="caption" color="text.secondary" sx={{ mt: -1, display: "block" }}>
           When on, members can auto-schedule up to 14 nights for themselves and their sleeping
-          partners&apos; arrangements without voting (PC-378).
+          partners&apos; arrangements without voting (FastSleep Proposal, PC-378).
+        </Typography>
+        <FormControlLabel
+          control={
+            <Switch
+              checked={settings.feedEnabled}
+              onChange={(e) =>
+                setSettings({
+                  ...settings,
+                  feedEnabled: e.target.checked,
+                })
+              }
+            />
+          }
+          label="Enable Feed"
+        />
+        <Typography variant="caption" color="text.secondary" sx={{ mt: -1, display: "block" }}>
+          When off, the Feed tab is hidden and members are redirected to Schedule (PC-385).
         </Typography>
         <FormControl fullWidth>
           <InputLabel>Sleeping Partners tab visibility</InputLabel>
