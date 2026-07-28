@@ -39,7 +39,7 @@ export interface FeedMilestone {
   actorName: string | null;
   createdAt: string;
   proposalTitle: string;
-  proposalType: "event" | "sleeping";
+  proposalType: "event" | "sleeping" | "fast_sleep";
   proposalState: string;
   masked: boolean;
   /**

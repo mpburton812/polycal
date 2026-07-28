@@ -15,6 +15,12 @@ export async function applyAdminMigrations(sql: Client): Promise<void> {
     "see_partners_sleeping_arrangements",
     "INTEGER NOT NULL DEFAULT 0",
   );
+  await ensureColumn(
+    sql,
+    "poly_group",
+    "fast_sleep_enabled",
+    "INTEGER NOT NULL DEFAULT 1",
+  );
   await ensureColumn(sql, "poly_group", "places_map_visibility", "TEXT NOT NULL DEFAULT 'all'");
 
   await sql.execute(`

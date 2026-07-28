@@ -340,3 +340,5 @@
 2026-07-27 | 260890c | PC-376 | timezone-aware month grid and civil date navigation | src/components/schedule/ScheduleClient.tsx
 2026-07-27 | b5325dd | PC-376 | fetch full civil week and stabilize month layout tests | src/lib/schedule/dates.test.ts
 2026-07-27 | 6f2be44 | PC-376 | drop unused endOfWeekSunday import in fetch-range | src/lib/schedule/fetch-range.ts
+2026-07-28 | 1784447 | PC-378 | add FastSleep auto-confirm proposal type | src/actions/fast-sleep.ts
+2026-07-28 | 96ae2e4 | PC-378 | FastSleep migrate bump and feed/journey gates | src/actions/feed.ts

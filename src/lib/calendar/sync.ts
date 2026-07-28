@@ -78,9 +78,10 @@ async function loadCalendarNameContext(
   inviteeIds: string[],
 ): Promise<CalendarPayloadNameContext> {
   const batchEntries = parseBatchEntriesJson(proposal.batchEntriesJson);
-  const batchIds = batchEntries.flatMap((entry) =>
-    entry.invitees.map((inv) => inv.userId),
-  );
+  const batchIds = batchEntries.flatMap((entry) => [
+    ...(entry.subjectUserId ? [entry.subjectUserId] : []),
+    ...entry.invitees.map((inv) => inv.userId),
+  ]);
   const ids = [...new Set([proposal.proposerId, ...inviteeIds, ...batchIds])];
 
   const locationIds = [

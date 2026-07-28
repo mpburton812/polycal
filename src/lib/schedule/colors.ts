@@ -5,6 +5,7 @@ import {
   SCHEDULE_SEMANTIC_COLORS,
   type ScheduleSemanticVariant,
 } from "@/theme/tokens";
+import { isSleepingLikeType } from "@/lib/proposals/sleeping-like";
 
 /** @deprecated Use GARDEN_TOKENS / SCHEDULE_SEMANTIC_COLORS — kept for imports during migration. */
 export const SCHEDULE_COLORS = {
@@ -22,7 +23,7 @@ export type ScheduleBlockVariant = ScheduleSemanticVariant;
  */
 export function scheduleBlockVariant(event: {
   state: "proposed" | "resolved" | "archived";
-  proposalType: "event" | "sleeping";
+  proposalType: "event" | "sleeping" | "fast_sleep" | string;
   isContentMasked: boolean;
   hasOverlap: boolean;
   atRisk: boolean;
@@ -34,7 +35,7 @@ export function scheduleBlockVariant(event: {
   if (event.hasOverlap) return "conflict";
   if (event.atRisk) return "at_risk";
   if (event.state === "proposed") return "proposed";
-  if (event.proposalType === "sleeping") {
+  if (isSleepingLikeType(event.proposalType)) {
     return event.isPartnerOnlySleeping ? "resolved_sleeping_partner" : "resolved_sleeping";
   }
   return "resolved_event";

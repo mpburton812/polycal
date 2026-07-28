@@ -10,6 +10,7 @@ import {
   formatSleepingDisplayTitle,
   stripConfirmedFromSleepingTitle,
 } from "@/lib/proposals/sleeping-display";
+import { isSleepingLikeType } from "@/lib/proposals/sleeping-like";
 
 export type ProposalRow = typeof proposals.$inferSelect;
 
@@ -22,7 +23,7 @@ export interface CalendarEventPayload {
   isAllDay: boolean;
   /** When true, mark free/transparent (sleeping arrangements). */
   transparencyFree: boolean;
-  proposalType: "event" | "sleeping";
+  proposalType: "event" | "sleeping" | "fast_sleep";
   /**
    * Stable key for multi-event sync (PC-351).
    * Empty string for non-batch / single span; YYYY-MM-DD for each batch night.
@@ -83,7 +84,7 @@ export function buildCalendarEventPayloads(
   nameCtx?: CalendarPayloadNameContext,
   recipientUserId?: string,
 ): CalendarEventPayload[] {
-  if (proposal.proposalType === "sleeping" && proposal.isBatchSleeping) {
+  if (isSleepingLikeType(proposal.proposalType) && proposal.isBatchSleeping) {
     return buildBatchSleepingPayloads(proposal, nameCtx, recipientUserId);
   }
 
@@ -108,7 +109,7 @@ function buildSingleCalendarEventPayload(
 ): CalendarEventPayload | null {
   if (!proposal.scheduledStartAt) return null;
 
-  const isSleeping = proposal.proposalType === "sleeping";
+  const isSleeping = isSleepingLikeType(proposal.proposalType);
   const startAt = proposal.scheduledStartAt;
   let endAt = proposal.scheduledEndAt;
   let isAllDay = proposal.isAllDay || isSleeping;
@@ -186,7 +187,9 @@ function buildBatchSleepingPayloads(
       endAt: startAt,
       isAllDay: true,
       transparencyFree: true,
-      proposalType: "sleeping",
+      proposalType: isSleepingLikeType(proposal.proposalType)
+        ? proposal.proposalType
+        : "sleeping",
       nightKey,
     });
   }
@@ -194,12 +197,19 @@ function buildBatchSleepingPayloads(
   return payloads;
 }
 
-function userOnBatchNight(
+/**
+ * Whether a user appears on a batch night (proposer legacy path, subject, or invitee).
+ * FastSleep nights use subjectUserId so the scheduler need not attend (PC-379).
+ */
+export function userOnBatchNight(
   proposerId: string,
   entry: BatchSleepingEntry,
   userId: string,
 ): boolean {
-  if (userId === proposerId) return true;
+  const subjectId = entry.subjectUserId ?? proposerId;
+  if (userId === subjectId) return true;
+  // Legacy batch sleeping without subject: proposer is on every night.
+  if (!entry.subjectUserId && userId === proposerId) return true;
   if (entry.intentionalSolo) return false;
   return entry.invitees.some((inv) => inv.userId === userId);
 }
@@ -228,17 +238,20 @@ function batchNightTitle(
   location: string | null,
   nameCtx?: CalendarPayloadNameContext,
 ): string {
-  if (!nameCtx?.proposerName) {
+  const subjectId = entry.subjectUserId ?? proposal.proposerId;
+  const subjectName =
+    nameCtx?.displayNameByUserId[subjectId] ?? nameCtx?.proposerName;
+  if (!subjectName) {
     return stripConfirmedFromSleepingTitle(proposal.title);
   }
   const inviteeNames = entry.intentionalSolo
     ? []
     : entry.invitees
-        .map((inv) => nameCtx.displayNameByUserId[inv.userId])
+        .map((inv) => nameCtx?.displayNameByUserId[inv.userId])
         .filter((n): n is string => Boolean(n?.trim()));
 
   return formatSleepingDisplayTitle({
-    proposerName: nameCtx.proposerName,
+    proposerName: subjectName,
     inviteeNames,
     intentionalSolo: Boolean(entry.intentionalSolo),
     locationName: location,

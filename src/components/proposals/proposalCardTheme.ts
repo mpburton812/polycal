@@ -1,5 +1,6 @@
 /** Shared PolyCal proposal card palette and helpers — Garden Brutalism (PC-40). */
 import { sleepingCalendarDayEnd } from "@/lib/proposals/sleeping-schedule";
+import { isSleepingLikeType } from "@/lib/proposals/sleeping-like";
 import { DEFAULT_VIEWER_TIMEZONE } from "@/lib/schedule/timezone";
 import {
   EVENT_BLOCK_ROTATIONS,
@@ -31,12 +32,12 @@ export const ADMIN_ONLY_FEED_COMMENT_BG = "#FFF59D";
 export function formatTimeRange(
   start: string | null,
   end: string | null,
-  proposalType: "event" | "sleeping" = "event",
+  proposalType: "event" | "sleeping" | "fast_sleep" | string = "event",
   isAllDay = false,
   timeZone: string = DEFAULT_VIEWER_TIMEZONE,
 ): string | null {
   if (!start) return null;
-  if (proposalType === "sleeping" || isAllDay) {
+  if (isSleepingLikeType(proposalType) || isAllDay) {
     const range = formatDateRange(start, end, timeZone);
     return isAllDay && range ? `All day · ${range}` : range;
   }
@@ -85,6 +86,7 @@ export function typeBadgeLabel(
 ): string {
   if (specialKind === "residency" || cardKind === "residency") return "RESIDENCY PROPOSAL";
   if (cardKind === "partnership") return "RELATIONSHIP PROPOSAL";
+  if (type === "fast_sleep") return "FASTSLEEP";
   return type === "sleeping" ? "SLEEPING PROPOSAL" : "EVENT PROPOSAL";
 }
 
@@ -94,13 +96,13 @@ export function typeBadgeLabel(
  */
 export function isPastSchedule(
   startIso: string | undefined,
-  proposalType: "event" | "sleeping" = "event",
+  proposalType: "event" | "sleeping" | "fast_sleep" | string = "event",
 ): boolean {
   if (!startIso) return false;
   const start = new Date(startIso);
   if (Number.isNaN(start.getTime())) return false;
   const compareTime =
-    proposalType === "sleeping" ? sleepingCalendarDayEnd(startIso).getTime() : start.getTime();
+    isSleepingLikeType(proposalType) ? sleepingCalendarDayEnd(startIso).getTime() : start.getTime();
   return compareTime < Date.now();
 }
 
@@ -157,7 +159,7 @@ export function typeChipSxForProposal(
       letterSpacing: 0.5,
     } as const;
   }
-  if (proposalType === "sleeping") {
+  if (isSleepingLikeType(proposalType)) {
     return {
       bgcolor: "#C4B5E8",
       color: "#2E2450",

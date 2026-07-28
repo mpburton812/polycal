@@ -1,8 +1,9 @@
 import { intervalsOverlap } from "@/lib/schedule/dates";
 import { sleepingCalendarDayEnd } from "@/lib/proposals/sleeping-schedule";
+import { isSleepingLikeType } from "@/lib/proposals/sleeping-like";
 
 export interface OverlapCandidate {
-  proposalType: "event" | "sleeping";
+  proposalType: "event" | "sleeping" | "fast_sleep" | string;
   startAt: string;
   endAt: string | null;
   participantIds: string[];
@@ -18,7 +19,7 @@ const DAY_BUCKET_THRESHOLD = 32;
  * the calendar day so same-night arrangements correctly detect as overlapping.
  */
 function overlapEndBound(event: Pick<OverlapCandidate, "proposalType" | "startAt" | "endAt">): string {
-  if (event.proposalType !== "sleeping") return event.endAt ?? event.startAt;
+  if (!isSleepingLikeType(event.proposalType)) return event.endAt ?? event.startAt;
   return sleepingCalendarDayEnd(event.endAt ?? event.startAt).toISOString();
 }
 

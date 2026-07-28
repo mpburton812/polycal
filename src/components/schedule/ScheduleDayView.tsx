@@ -6,6 +6,7 @@ import { useMemo } from "react";
 import type { ScheduleEvent } from "@/actions/schedule";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ScheduleEventBlock } from "@/components/schedule/ScheduleEventBlock";
+import { isSleepingLikeType } from "@/lib/proposals/sleeping-like";
 import {
   formatDayHeader,
   localDateKey,
@@ -30,7 +31,7 @@ interface ScheduleDayViewProps {
  * (non-time day events — PC-372). Timed events stay on the hour grid.
  */
 function isAllDayLaneEvent(event: ScheduleEvent): boolean {
-  return event.isAllDay || event.proposalType === "sleeping";
+  return event.isAllDay || isSleepingLikeType(event.proposalType);
 }
 
 /** Minutes from local midnight for an instant in the viewer timezone. */
@@ -102,8 +103,8 @@ export function ScheduleDayView({
     }
     // Sleeping last within the all-day strip (PC-364 ordering preserved).
     allDay.sort((a, b) => {
-      const aSleep = a.proposalType === "sleeping";
-      const bSleep = b.proposalType === "sleeping";
+      const aSleep = isSleepingLikeType(a.proposalType);
+      const bSleep = isSleepingLikeType(b.proposalType);
       if (aSleep !== bSleep) return aSleep ? 1 : -1;
       return a.startAt.localeCompare(b.startAt);
     });
