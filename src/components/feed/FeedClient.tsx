@@ -386,24 +386,29 @@ export function FeedClient({
       const silent = options?.silent ?? false;
       if (append) setLoadingMore(true);
       else if (!silent) setLoading(true);
-      const result = await listFeedItemsAction({ cursor: cursor ?? null, limit: 20 });
-      if (!result.ok || !result.items) {
-        setError(result.message);
-      } else {
-        setItems((prev) => (append ? [...prev, ...result.items!] : result.items!));
-        setNextCursor(result.nextCursor ?? null);
-        if (!append) {
-          const nextActiveEvents = result.activeEvents ?? [];
-          setActiveEvents(nextActiveEvents);
-          // Baseline silent polls against the server's cheap fingerprint (PC-336).
-          updateTokenRef.current = result.updateToken ?? null;
+      try {
+        const result = await listFeedItemsAction({ cursor: cursor ?? null, limit: 20 });
+        if (!result.ok || !result.items) {
+          setError(result.message);
+        } else {
+          setItems((prev) => (append ? [...prev, ...result.items!] : result.items!));
+          setNextCursor(result.nextCursor ?? null);
+          if (!append) {
+            const nextActiveEvents = result.activeEvents ?? [];
+            setActiveEvents(nextActiveEvents);
+            // Baseline silent polls against the server's cheap fingerprint (PC-336).
+            updateTokenRef.current = result.updateToken ?? null;
+          }
         }
-      }
-      if (!silent || append) {
-        setLoading(false);
-        setLoadingMore(false);
-      } else {
-        setLoadingMore(false);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to load feed.");
+      } finally {
+        if (!silent || append) {
+          setLoading(false);
+          setLoadingMore(false);
+        } else {
+          setLoadingMore(false);
+        }
       }
     },
     [],
