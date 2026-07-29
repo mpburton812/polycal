@@ -71,9 +71,10 @@ Shared helpers: `src/lib/actions/context.ts` (`requireSession`, `requireAdminAcc
 
 | Capability | `role === "admin"` | Notes |
 |------------|-------------------|--------|
-| Admin tab / panel | Yes | Power-management / “all admins” was removed in PC-280 |
+| Admin panel (`/admin`) | Yes (also network_admin / platform admin) | Entry via **header profile menu** (below Platform admin), not bottom tabs (PC-393). Platform dashboard lives only on `/platform-admin`. |
 | Pause/delete users | Yes | |
 | Impersonation | Yes when `AUTH_IMPERSONATION_SECRET` is set | Admin User management (prod allowed); Test data / DevBar non-prod only |
+| Message of the Day | Network admin (network scope) / Platform admin (all nodes) | Pop-up via `MotdPopupHost`; dismiss-once ack; optional `endsAt` (PC-392) |
 | Sleeping proposal visibility | Involved-only (hard default) | Proposer, invitees, and admins when `adminCanSeeUninvolved`; masked copy shows “Busy” / Hidden for non-participants |
 
 Server actions that gate on admin use `userHasAdminAccess` (role-based; no delegated power-management).

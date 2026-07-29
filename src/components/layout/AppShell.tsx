@@ -5,6 +5,7 @@ import { AppHeader } from "@/components/layout/AppHeader";
 import { AppTabs } from "@/components/layout/AppTabs";
 import { DevBar } from "@/components/layout/DevBar";
 import { TabSwipeRegion } from "@/components/layout/TabSwipeRegion";
+import { MotdPopupHost } from "@/components/motd/MotdPopupHost";
 import { PushSubscriptionManager } from "@/components/notifications/PushSubscriptionManager";
 import { avatarSrcForKey } from "@/lib/constants/avatars";
 import { getAppEnvironment } from "@/lib/env";
@@ -66,6 +67,7 @@ export function AppShell({
           notificationItems={notificationItems}
           avatarSrc={avatarSrc}
           isPlatformAdmin={isPlatformAdmin}
+          canSeeAdmin={isAdmin}
         />
       </Box>
       <Container
@@ -79,6 +81,7 @@ export function AppShell({
       </Container>
       <AppTabs isAdmin={isAdmin} feedEnabled={feedEnabled} />
       <FeedbackFab />
+      <MotdPopupHost />
       <Box sx={{ height: 56 }} aria-hidden />
     </>
   );

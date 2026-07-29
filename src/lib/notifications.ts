@@ -172,6 +172,7 @@ export function resolveNotificationUrl(
   if (notificationType.startsWith("residency")) return "/places";
   if (notificationType.startsWith("place")) return "/places";
   if (notificationType.startsWith("proposal")) return "/proposals";
+  if (notificationType === "motd") return "/feed";
   return "/proposals";
 }
 

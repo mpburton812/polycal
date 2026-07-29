@@ -5,15 +5,14 @@ import { redirect } from "next/navigation";
 import { listActivityLogAction } from "@/actions/admin";
 import {
   getActiveNetworkDashboardAction,
-  getPlatformDashboardAction,
-  setNetworkStatusAction,
-  updatePlatformSettingsAction,
 } from "@/actions/networks";
+import {
+  getNetworkMotdAdminStateAction,
+} from "@/actions/motd";
 import { getPolyGroupSettingsAction } from "@/actions/poly-group";
 import { listAdminUsersAction } from "@/actions/users";
 import { AdminCodeStatusPanel } from "@/components/admin/AdminCodeStatusPanel";
 import { AdminNetworkDashboardPanel } from "@/components/admin/AdminNetworkDashboardPanel";
-import { AdminPlatformDashboardPanel } from "@/components/admin/AdminPlatformDashboardPanel";
 import { auth } from "@/lib/auth";
 import { userCanSeeAdminTab, userHasAdminAccess } from "@/lib/admin-access";
 import { CHANGELOG, getLatestChangelogEntry } from "@/lib/changelog/entries";
@@ -94,13 +93,15 @@ export default async function AdminPage() {
     adminUsers,
     logEntries,
     networkDashboard,
-    platformDashboard,
+    networkMotd,
   ] = await Promise.all([
     isLegacyAdmin ? getPolyGroupSettingsAction() : Promise.resolve(null),
     isLegacyAdmin ? listAdminUsersAction() : Promise.resolve([]),
     isLegacyAdmin ? listActivityLogAction() : Promise.resolve([]),
     isNetworkAdmin ? getActiveNetworkDashboardAction() : Promise.resolve(null),
-    isPlatformAdmin ? getPlatformDashboardAction() : Promise.resolve(null),
+    isNetworkAdmin
+      ? getNetworkMotdAdminStateAction().then((r) => (r.ok ? r.data : null))
+      : Promise.resolve(null),
   ]);
 
   if (isLegacyAdmin && !settings) {
@@ -119,13 +120,9 @@ export default async function AdminPage() {
           latestEntry={getLatestChangelogEntry()}
         />
         {networkDashboard && (
-          <AdminNetworkDashboardPanel dashboard={networkDashboard} />
-        )}
-        {platformDashboard && (
-          <AdminPlatformDashboardPanel
-            initialDashboard={platformDashboard}
-            setNetworkStatusAction={setNetworkStatusAction}
-            updatePlatformSettingsAction={updatePlatformSettingsAction}
+          <AdminNetworkDashboardPanel
+            dashboard={networkDashboard}
+            initialMotd={networkMotd}
           />
         )}
         {isLegacyAdmin && settings && (
