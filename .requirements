@@ -352,3 +352,4 @@
 2026-07-29 | 307f6b0 | PC-393 | assert banner before opening Admin profile menu | e2e/navigation.spec.ts
 2026-07-29 | bb5ff3b | PC-392 | swallow MotdPopupHost fetch errors | src/components/motd/MotdPopupHost.tsx
 2026-07-29 | 1edd3e9 | PC-392 | log MOTD inbox archive in .requirements | src/actions/motd.ts
+2026-07-29 | 44dde3f | PC-392 | harden midnight event visibility wait for day-boundary journey | e2e/helpers/schedule.ts
