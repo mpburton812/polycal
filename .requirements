@@ -354,3 +354,4 @@
 2026-07-29 | 1edd3e9 | PC-392 | log MOTD inbox archive in .requirements | src/actions/motd.ts
 2026-07-29 | 44dde3f | PC-392 | harden midnight event visibility wait for day-boundary journey | e2e/helpers/schedule.ts
 2026-07-29 | 67a2660 | PC-392 | dismiss MOTD and scroll for midnight calendar asserts | e2e/self-appointment-day-boundary-journey.spec.ts
+2026-07-29 | dae3096 | PC-392 | harden draft card + reminder drawer asserts | e2e/dates-times-journey.spec.ts

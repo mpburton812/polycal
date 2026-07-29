@@ -168,6 +168,19 @@ export async function exitDraftDialog(dialog: Locator): Promise<void> {
   await expect(dialog).toBeHidden();
 }
 
+/**
+ * After Exit, reloads the Drafts board so a just-saved card is not missed during a
+ * mid-flight router.refresh() (flake seen on production CI for Window drafts).
+ */
+export async function expectDraftCardAfterExit(
+  page: Page,
+  title: string | RegExp,
+): Promise<void> {
+  await goToProposals(page);
+  await selectProposalTab(page, "Drafts");
+  await expect(proposalCard(page, title)).toBeVisible({ timeout: 20_000 });
+}
+
 /** Selects an optional event category icon in the draft dialog (PC-116). */
 export async function selectEventIcon(dialog: Locator, a11yLabel: string): Promise<void> {
   await expandDraftMoreOptions(dialog);
