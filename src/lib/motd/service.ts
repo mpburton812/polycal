@@ -208,19 +208,36 @@ export async function listUnackedMotdsForViewer(
 
 /**
  * Records dismiss-once acknowledgment. Idempotent.
+ * @returns true when a new acknowledgment row was inserted.
  */
 export async function acknowledgeMotd(
   db: Db,
   motdId: string,
   userId: string,
-): Promise<void> {
+): Promise<boolean> {
+  if (await isAcknowledged(db, motdId, userId)) {
+    return false;
+  }
   const now = new Date().toISOString();
-  await db
-    .insert(motdAcknowledgments)
-    .values({
-      motdId,
-      userId,
-      acknowledgedAt: now,
-    })
-    .onConflictDoNothing();
+  await db.insert(motdAcknowledgments).values({
+    motdId,
+    userId,
+    acknowledgedAt: now,
+  });
+  return true;
+}
+
+/**
+ * Loads a MOTD by id (any status) for inbox archival after dismiss.
+ */
+export async function getMotdById(
+  db: Db,
+  motdId: string,
+): Promise<MotdPublic | null> {
+  const [row] = await db
+    .select()
+    .from(motdMessages)
+    .where(eq(motdMessages.id, motdId))
+    .limit(1);
+  return row ? toPublic(row) : null;
 }

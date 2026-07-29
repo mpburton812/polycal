@@ -36,7 +36,7 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: "added",
         description:
-          "Message of the Day: platform and network scoped pop-ups (max 255 chars, optional end time, dismiss-once acknowledgment, soft poll delivery) (PC-392).",
+          "Message of the Day: platform and network scoped pop-ups (max 255 chars, optional end time, dismiss-once acknowledgment with inbox archive, soft poll delivery) (PC-392).",
       },
       {
         type: "changed",

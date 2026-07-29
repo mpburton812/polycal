@@ -83,7 +83,8 @@ export function MotdAdminForm({
       <Typography variant="body2" color="text.secondary">
         Sends a pop-up to users on this {scopeLabel.toLowerCase()}. Max{" "}
         {MOTD_MAX_BODY_LENGTH} characters. Optional end date stops delivery
-        after that time. Users who dismiss see it only once.
+        after that time. Dismissing the pop-up acknowledges it once and keeps a
+        copy in Notifications.
       </Typography>
       {current && (
         <Alert severity="info">

@@ -8,6 +8,7 @@ import {
   clearActiveMotdsForScope,
   expireStaleMotds,
   getActiveMotdForScope,
+  getMotdById,
   listUnackedMotdsForViewer,
   publishMotd,
 } from "@/lib/motd/service";
@@ -22,6 +23,7 @@ import {
   requireNetworkSession,
   requirePlatformAdmin,
 } from "@/lib/networks/context";
+import { revalidateNotificationShellPaths } from "@/lib/notifications-revalidate";
 
 export type MotdActionResult<T> =
   | { ok: true; data: T }
@@ -55,6 +57,7 @@ export async function getActiveMotdsForViewerAction(): Promise<
 
 /**
  * Dismiss-once acknowledgment for an MOTD.
+ * On first dismiss, archives a copy into the in-app notification inbox (PC-392).
  */
 export async function acknowledgeMotdAction(
   motdId: string,
@@ -73,8 +76,30 @@ export async function acknowledgeMotdAction(
   }
   await ensureDbReady();
   const db = getDb();
-  await acknowledgeMotd(db, motdId.trim(), userId);
-  return { ok: true, data: { id: motdId.trim() } };
+  const id = motdId.trim();
+  const newlyAcked = await acknowledgeMotd(db, id, userId);
+  if (newlyAcked) {
+    const motd = await getMotdById(db, id);
+    if (motd) {
+      const scopeLabel =
+        motd.scope === "platform" ? "Platform message" : "Network message";
+      // In-app archive only — user already saw the pop-up; avoid push/email re-alert.
+      await logUserActivity(
+        userId,
+        "notification.motd",
+        JSON.stringify({
+          message: `${scopeLabel}: ${motd.body}`,
+          url: "/feed",
+          motdId: motd.id,
+          scope: motd.scope,
+          networkId: motd.networkId,
+        }),
+        "system",
+      );
+      revalidateNotificationShellPaths();
+    }
+  }
+  return { ok: true, data: { id } };
 }
 
 /**
