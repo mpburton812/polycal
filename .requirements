@@ -350,3 +350,4 @@
 2026-07-29 | e204c95 | PC-392 | platform/network MOTD, Admin under menu, colored icons | src/actions/motd.ts
 2026-07-29 | 24cc12e | PC-393 | match Admin menu item with exact name | e2e/helpers/navigation.ts
 2026-07-29 | 307f6b0 | PC-393 | assert banner before opening Admin profile menu | e2e/navigation.spec.ts
+2026-07-29 | bb5ff3b | PC-392 | swallow MotdPopupHost fetch errors | src/components/motd/MotdPopupHost.tsx
