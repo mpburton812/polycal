@@ -39,7 +39,7 @@ export async function goToPeoplePlaces(page: Page): Promise<void> {
 
 export async function goToAdmin(page: Page): Promise<void> {
   await openProfileMenu(page);
-  const item = page.getByRole("menuitem", { name: "Admin" });
+  const item = page.getByRole("menuitem", { name: "Admin", exact: true });
   try {
     await item.click({ timeout: 8_000 });
   } catch {
