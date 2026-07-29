@@ -25,6 +25,13 @@ export async function GET(request: Request): Promise<NextResponse> {
   const db = getDb();
   await runProposalEnforcement(db);
   const remindersSent = await runEventReminders(db);
+  const { expireStaleMotds } = await import("@/lib/motd/service");
+  const motdsExpired = await expireStaleMotds(db);
 
-  return NextResponse.json({ ok: true, ranAt: new Date().toISOString(), remindersSent });
+  return NextResponse.json({
+    ok: true,
+    ranAt: new Date().toISOString(),
+    remindersSent,
+    motdsExpired,
+  });
 }

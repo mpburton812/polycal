@@ -1,6 +1,7 @@
 "use client";
 
 import CalendarMonthIcon from "@mui/icons-material/CalendarMonth";
+import AdminPanelSettingsIcon from "@mui/icons-material/AdminPanelSettings";
 import LogoutIcon from "@mui/icons-material/Logout";
 import SettingsIcon from "@mui/icons-material/Settings";
 import {
@@ -38,6 +39,7 @@ export function AppHeader({
   notificationItems = [],
   avatarSrc,
   isPlatformAdmin = false,
+  canSeeAdmin = false,
 }: {
   displayName: string;
   groupName: string;
@@ -45,6 +47,8 @@ export function AppHeader({
   notificationItems?: NotificationItem[];
   avatarSrc?: string;
   isPlatformAdmin?: boolean;
+  /** Network / legacy / platform admins — Admin lives in this menu (PC-393). */
+  canSeeAdmin?: boolean;
 }) {
   const router = useRouter();
   const { data: session, update } = useSession();
@@ -74,6 +78,11 @@ export function AppHeader({
   function goToPlatformAdmin() {
     closeProfileMenu();
     router.push("/platform-admin");
+  }
+
+  function goToAdmin() {
+    closeProfileMenu();
+    router.push("/admin");
   }
 
   function logout() {
@@ -206,9 +215,17 @@ export function AppHeader({
           {isPlatformAdmin && (
             <MenuItem onClick={goToPlatformAdmin}>
               <ListItemIcon>
-                <SettingsIcon fontSize="small" />
+                <AdminPanelSettingsIcon fontSize="small" />
               </ListItemIcon>
               <ListItemText>Platform admin</ListItemText>
+            </MenuItem>
+          )}
+          {canSeeAdmin && (
+            <MenuItem onClick={goToAdmin}>
+              <ListItemIcon>
+                <AdminPanelSettingsIcon fontSize="small" />
+              </ListItemIcon>
+              <ListItemText>Admin</ListItemText>
             </MenuItem>
           )}
           <MenuItem onClick={logout}>

@@ -18,7 +18,7 @@ test.describe("App navigation (admin)", () => {
     await expectAuthenticatedShell(page);
   });
 
-  test("bottom nav includes Feed first, then Schedule, Proposals, People & Places, and Admin", async ({
+  test("bottom nav includes Feed first, then Schedule, Proposals, and People & Places; Admin is in the profile menu", async ({
     page,
   }) => {
     const nav = page.getByRole("navigation", { name: "Main navigation" });
@@ -28,7 +28,9 @@ test.describe("App navigation (admin)", () => {
     await expect(nav.getByRole("link", { name: "Schedule" })).toBeVisible();
     await expect(nav.getByRole("link", { name: "Proposals" })).toBeVisible();
     await expect(nav.getByRole("link", { name: "People & Places" })).toBeVisible();
-    await expect(nav.getByRole("link", { name: "Admin" })).toBeVisible();
+    await expect(nav.getByRole("link", { name: "Admin" })).toHaveCount(0);
+    await openProfileMenu(page);
+    await expect(page.getByRole("menuitem", { name: "Admin" })).toBeVisible();
     const banner = page.getByRole("banner");
     // Network label is poly_group name or switcher value; MUI may render it twice in the banner (PC-357).
     await expect(banner.getByText("Rebel Alliance", { exact: true }).first()).toBeVisible();
@@ -41,9 +43,10 @@ test.describe("App navigation (admin)", () => {
     await expect(page.getByRole("heading", { name: "Feed" })).toBeVisible();
   });
 
-  test("profile menu opens settings and logout entries", async ({ page }) => {
+  test("profile menu opens settings, admin, and logout entries", async ({ page }) => {
     await openProfileMenu(page);
     await expect(page.getByRole("menuitem", { name: "Settings" })).toBeVisible();
+    await expect(page.getByRole("menuitem", { name: "Admin" })).toBeVisible();
     await expect(page.getByRole("menuitem", { name: "Logout" })).toBeVisible();
   });
 
@@ -69,9 +72,11 @@ test.describe("App navigation (admin)", () => {
 });
 
 test.describe("App navigation (standard user)", () => {
-  test("non-admin user does not see Admin tab", async ({ page }) => {
+  test("non-admin user does not see Admin in the profile menu", async ({ page }) => {
     await login(page, USERS.han.username);
     const nav = page.getByRole("navigation", { name: "Main navigation" });
     await expect(nav.getByRole("link", { name: "Admin" })).toHaveCount(0);
+    await openProfileMenu(page);
+    await expect(page.getByRole("menuitem", { name: "Admin" })).toHaveCount(0);
   });
 });

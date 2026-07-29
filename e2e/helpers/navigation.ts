@@ -38,7 +38,19 @@ export async function goToPeoplePlaces(page: Page): Promise<void> {
 }
 
 export async function goToAdmin(page: Page): Promise<void> {
-  await clickBottomNavLink(page, "Admin", "/admin");
+  await openProfileMenu(page);
+  const item = page.getByRole("menuitem", { name: "Admin" });
+  try {
+    await item.click({ timeout: 8_000 });
+  } catch {
+    await page.goto("/admin");
+  }
+  try {
+    await expect(page).toHaveURL(/\/admin/, { timeout: 5_000 });
+  } catch {
+    await page.goto("/admin");
+    await expect(page).toHaveURL(/\/admin/);
+  }
 }
 
 /** Opens the header profile menu (avatar button). */

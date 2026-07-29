@@ -21,11 +21,13 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- PC-391–PC-394 MOTD (platform/network pop-ups), Admin under profile menu, multi-color event icons; SCHEMA_VERSION 47 (`motd_messages`, `motd_acknowledgments`). Change control: `2026.07.29a`.
 - PC-383–PC-385 FastSleep Proposal cleanup: multi-slot same night, per-slot notes, Proposer label; Residency Proposal rename; Admin Enable Feed (default ON); SCHEMA_VERSION 46. Change control: `2026.07.28b`.
 - PC-378 FastSleep proposal type (auto-confirm partner arrangements, admin toggle, feed/calendar); SCHEMA_VERSION 45 (`fast_sleep_enabled`). Change control: `2026.07.28a`.
 - PC-362 (test): Expanded platform admin — network detail reports, inhabit admin, global user moderation with reason/duration, paused/banned screens. Change control: `2026.07.27a`.
 
 ### Changed
+- PC-393: Admin is no longer a bottom tab; Platform dashboard only on `/platform-admin`. Change control: `2026.07.29a`.
 - PC-362 (test): Removed Code Status from Feed; platform admin uses stacked card layout; today's calendar cells use light blue highlight; DevBar no longer shows impersonation dropdown (use Admin → Test data). Change control: `2026.07.27c`.
 - PC-362 (test): Sleeping proposals allow optional-only invitees; schedule blocks omit Confirmed on approved events. Change control: `2026.07.27a`.
 - PC-357: Multi-network tenancy — one login / many networks with header switcher; self-serve create via `/create-network` and `/setup-network`; optional import of residences and sleeping partners on join; platform admin (`/platform-admin`) for pause/caps/remove/ban. SCHEMA_VERSION 39→40. Change control: `2026.07.25e`.

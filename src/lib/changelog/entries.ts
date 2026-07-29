@@ -28,6 +28,29 @@ import { CHANGELOG_ARCHIVE } from "./entries.archive";
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "2026.07.29a",
+    date: "2026-07-29",
+    summary:
+      "MOTD pop-ups, Admin under header menu, multi-color event icons.",
+    changes: [
+      {
+        type: "added",
+        description:
+          "Message of the Day: platform and network scoped pop-ups (max 255 chars, optional end time, dismiss-once acknowledgment, soft poll delivery) (PC-392).",
+      },
+      {
+        type: "changed",
+        description:
+          "Admin removed from bottom tabs; opened from the profile menu under Platform admin. Duplicate Platform panel removed from /admin (PC-393).",
+      },
+      {
+        type: "changed",
+        description:
+          "Event category icons use multi-color Garden Brutalism fills with richer paths; watermark placement/opacity unchanged (PC-394).",
+      },
+    ],
+  },
+  {
     version: "2026.07.28b",
     date: "2026-07-28",
     summary:
