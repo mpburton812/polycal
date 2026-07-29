@@ -30,9 +30,13 @@ export function MotdPopupHost() {
   const [acking, setAcking] = useState(false);
 
   const refresh = useCallback(async () => {
-    const result = await getActiveMotdsForViewerAction();
-    if (!result.ok) return;
-    setQueue(result.data);
+    try {
+      const result = await getActiveMotdsForViewerAction();
+      if (!result.ok) return;
+      setQueue(result.data);
+    } catch {
+      // Ignore transient network / session errors so the shell stays usable.
+    }
   }, []);
 
   useEffect(() => {
