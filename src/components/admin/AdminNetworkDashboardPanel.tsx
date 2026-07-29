@@ -8,7 +8,13 @@ import {
   Typography,
 } from "@mui/material";
 
+import {
+  clearNetworkMotdAction,
+  publishNetworkMotdAction,
+} from "@/actions/motd";
 import { AdminCollapsibleSection } from "@/components/admin/AdminCollapsibleSection";
+import { MotdAdminForm } from "@/components/motd/MotdAdminForm";
+import type { MotdAdminState } from "@/lib/motd/types";
 import { brutalPaperSx } from "@/theme/brutalUi";
 
 export type NetworkDashboardData = {
@@ -23,12 +29,14 @@ export type NetworkDashboardData = {
 };
 
 /**
- * Active-network summary for network admins (PC-363).
+ * Active-network summary for network admins (PC-363) + MOTD (PC-392).
  */
 export function AdminNetworkDashboardPanel({
   dashboard,
+  initialMotd = null,
 }: {
   dashboard: NetworkDashboardData;
+  initialMotd?: MotdAdminState | null;
 }) {
   return (
     <AdminCollapsibleSection title="Network">
@@ -61,6 +69,14 @@ export function AdminNetworkDashboardPanel({
             <Typography variant="caption" color="text.secondary">
               Network ID: {dashboard.networkId}
             </Typography>
+          </Box>
+          <Box sx={{ pt: 1, borderTop: "1px solid", borderColor: "divider" }}>
+            <MotdAdminForm
+              scopeLabel="Network"
+              initial={initialMotd}
+              publishAction={publishNetworkMotdAction}
+              clearAction={clearNetworkMotdAction}
+            />
           </Box>
         </Stack>
       </Paper>

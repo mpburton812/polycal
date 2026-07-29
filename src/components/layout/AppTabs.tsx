@@ -1,6 +1,5 @@
 "use client";
 
-import AdminPanelSettingsIcon from "@mui/icons-material/AdminPanelSettings";
 import EventNoteIcon from "@mui/icons-material/EventNote";
 import GroupsIcon from "@mui/icons-material/Groups";
 import HowToVoteIcon from "@mui/icons-material/HowToVote";
@@ -30,7 +29,6 @@ const tabMeta: Record<(typeof MAIN_TAB_HREFS)[number], TabMeta> = {
   "/schedule": { label: "Schedule", icon: EventNoteIcon },
   "/proposals": { label: "Proposals", icon: HowToVoteIcon },
   "/people-places": { label: "People & Places", icon: GroupsIcon },
-  "/admin": { label: "Admin", icon: AdminPanelSettingsIcon },
 };
 
 /**
@@ -62,7 +60,6 @@ export function AppTabs({
 }) {
   const pathname = usePathname();
   const visibleTabs = MAIN_TAB_HREFS.filter((href) => {
-    if (!isAdmin && href === "/admin") return false;
     if (!feedEnabled && href === "/feed") return false;
     return true;
   }).map((href) => ({ href, ...tabMeta[href] }));

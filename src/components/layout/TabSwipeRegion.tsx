@@ -48,7 +48,6 @@ export function TabSwipeRegion({
   const startRef = useRef<{ x: number; y: number; ignore: boolean } | null>(null);
 
   const visibleHrefs = MAIN_TAB_HREFS.filter((href) => {
-    if (!isAdmin && href === "/admin") return false;
     if (!feedEnabled && href === "/feed") return false;
     return true;
   });

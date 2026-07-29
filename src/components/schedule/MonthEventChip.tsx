@@ -62,7 +62,6 @@ export function MonthEventIcon({ event, variant, onClick }: MonthEventChipProps)
           iconKey={event.eventIconKey}
           sx={{
             fontSize: 16,
-            color: colors.bgcolor,
             filter: `drop-shadow(0 0 0.75px ${colors.color})`,
           }}
         />

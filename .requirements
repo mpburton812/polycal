@@ -347,3 +347,10 @@
 2026-07-28 | 4f51f90 | PC-383 | multi-slot nights, renames, and Feed toggle | src/actions/fast-sleep.ts
 2026-07-28 | fa1e9a5 | PC-383 | use Proposer label in FastSleep journey | e2e/fast-sleep-journey.spec.ts
 2026-07-28 | cf3cef0 | PC-385 | check feedEnabled on shared db handle to avoid SQLite stalls | src/actions/feed.ts
+2026-07-29 | e204c95 | PC-392 | platform/network MOTD, Admin under menu, colored icons | src/actions/motd.ts
+2026-07-29 | 24cc12e | PC-393 | match Admin menu item with exact name | e2e/helpers/navigation.ts
+2026-07-29 | 307f6b0 | PC-393 | assert banner before opening Admin profile menu | e2e/navigation.spec.ts
+2026-07-29 | bb5ff3b | PC-392 | swallow MotdPopupHost fetch errors | src/components/motd/MotdPopupHost.tsx
+2026-07-29 | 1edd3e9 | PC-392 | log MOTD inbox archive in .requirements | src/actions/motd.ts
+2026-07-29 | 44dde3f | PC-392 | harden midnight event visibility wait for day-boundary journey | e2e/helpers/schedule.ts
+2026-07-29 | 67a2660 | PC-392 | dismiss MOTD and scroll for midnight calendar asserts | e2e/self-appointment-day-boundary-journey.spec.ts
