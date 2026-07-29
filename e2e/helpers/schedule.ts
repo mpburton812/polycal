@@ -1,23 +1,13 @@
 import { type Page, expect } from "@playwright/test";
 
 import { fillProposalDateRange, selectDraftScheduleMode } from "./datePickers";
+import { dismissMotdDialogIfOpen } from "./motd";
 import { goToSchedule } from "./navigation";
 import { openEventProposalDraft, submitProposalDraft } from "./proposals";
 
-const SCHEDULE_VIEW_STORAGE_KEY = "polycal.schedule.view";
+export { dismissMotdDialogIfOpen } from "./motd";
 
-/**
- * Dismisses an MOTD pop-up if present so it cannot block schedule / nav clicks (PC-392).
- */
-export async function dismissMotdDialogIfOpen(page: Page): Promise<void> {
-  const dialog = page.getByRole("dialog").filter({
-    has: page.getByRole("heading", { name: /^(Platform|Network) message$/ }),
-  });
-  if (await dialog.isVisible().catch(() => false)) {
-    await dialog.getByRole("button", { name: "OK" }).click();
-    await expect(dialog).toHaveCount(0, { timeout: 5_000 }).catch(() => {});
-  }
-}
+const SCHEDULE_VIEW_STORAGE_KEY = "polycal.schedule.view";
 
 /** ISO yyyy-MM-dd offset from today. */
 export function dateOffsetIso(daysFromToday: number): string {

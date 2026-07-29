@@ -4,6 +4,7 @@ import { login } from "./helpers/auth";
 import { USERS } from "./helpers/constants";
 import { runEnforcementCron } from "./helpers/cron";
 import { minutesFromNowDateTime } from "./helpers/datePickers";
+import { dismissMotdDialogIfOpen } from "./helpers/motd";
 import { goToProposals } from "./helpers/navigation";
 import { expectInAppNotification } from "./helpers/notifications";
 import { createAndSubmitSoloEventWithReminder } from "./helpers/proposals";
@@ -19,6 +20,7 @@ test.describe("Event reminder journey", () => {
 
     await login(page, USERS.luke.username);
     await goToProposals(page);
+    await dismissMotdDialogIfOpen(page);
     await createAndSubmitSoloEventWithReminder(page, {
       title,
       start,
@@ -39,7 +41,9 @@ test.describe("Event reminder journey", () => {
     const end = minutesFromNowDateTime(75);
 
     await login(page, USERS.luke.username);
+    await dismissMotdDialogIfOpen(page);
     await page.goto("/profile");
+    await dismissMotdDialogIfOpen(page);
     await page.getByRole("checkbox", { name: "Reminders" }).uncheck();
     await page.getByRole("button", { name: "Save notification preferences" }).click();
     await expect(page.getByText(/Notification preferences saved/i)).toBeVisible({
@@ -47,6 +51,7 @@ test.describe("Event reminder journey", () => {
     });
 
     await goToProposals(page);
+    await dismissMotdDialogIfOpen(page);
     await createAndSubmitSoloEventWithReminder(page, {
       title,
       start,
@@ -57,8 +62,10 @@ test.describe("Event reminder journey", () => {
 
     await runEnforcementCron(request);
     await page.reload();
+    await dismissMotdDialogIfOpen(page);
     await page.getByRole("button", { name: /notifications/i }).click();
     await expect(page.getByText(new RegExp(`Reminder:.*${title}`, "i"))).toHaveCount(0);
-    await page.getByRole("button", { name: "Close notifications" }).click();
+    // Drawer can remount when MOTD archive / inbox refresh races; Escape is enough cleanup.
+    await page.keyboard.press("Escape");
   });
 });
