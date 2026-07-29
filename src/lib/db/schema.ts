@@ -797,6 +797,43 @@ export const calendarEventLinks = sqliteTable(
   (table) => [unique().on(table.userId, table.proposalId, table.nightKey)],
 );
 
+/**
+ * Admin-broadcast Message of the Day (platform-wide or per network) — PC-392.
+ * At most one active row per scope is enforced in publish actions.
+ */
+export const motdMessages = sqliteTable(
+  "motd_messages",
+  {
+    id: text("id").primaryKey(),
+    scope: text("scope").notNull(), // platform | network
+    networkId: text("network_id").references(() => networks.id),
+    body: text("body").notNull(),
+    createdByUserId: text("created_by_user_id").references(() => users.id),
+    createdAt: text("created_at").notNull(),
+    endsAt: text("ends_at"),
+    status: text("status").notNull().default("active"), // active | cleared | expired
+  },
+  (table) => [
+    index("idx_motd_messages_scope_status").on(table.scope, table.status),
+    index("idx_motd_messages_network_status").on(table.networkId, table.status),
+  ],
+);
+
+/** Per-user dismiss-once acknowledgments for MOTD pop-ups — PC-392. */
+export const motdAcknowledgments = sqliteTable(
+  "motd_acknowledgments",
+  {
+    motdId: text("motd_id")
+      .notNull()
+      .references(() => motdMessages.id),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id),
+    acknowledgedAt: text("acknowledged_at").notNull(),
+  },
+  (table) => [unique().on(table.motdId, table.userId)],
+);
+
 /** Queued ICS downloads when email is unavailable or Both is selected — PC-340. */
 export const calendarIcsPending = sqliteTable("calendar_ics_pending", {
   id: text("id").primaryKey(),
@@ -825,6 +862,8 @@ export const schema = {
   networkMembers,
   networkSetupTokens,
   platformSettings,
+  motdMessages,
+  motdAcknowledgments,
   locations,
   userActivityLog,
   storedImages,

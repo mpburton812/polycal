@@ -8,11 +8,12 @@ import {
 } from "./helpers/datePickers";
 import { USERS } from "./helpers/constants";
 import { goToProposals } from "./helpers/navigation";
+import { dismissMotdDialogIfOpen } from "./helpers/motd";
 import {
   exitDraftDialog,
+  expectDraftCardAfterExit,
   expandDraftMoreOptions,
   openEventProposalDraft,
-  proposalCard,
 } from "./helpers/proposals";
 
 /**
@@ -24,6 +25,7 @@ test.describe("Proposal When dates and times journey", () => {
     void _freshDb;
     await login(page, USERS.luke.username);
     await goToProposals(page);
+    await dismissMotdDialogIfOpen(page);
   });
 
   test("All Day: typing 1 or 2 into End day does not clobber Day", async ({ page }) => {
@@ -95,7 +97,7 @@ test.describe("Proposal When dates and times journey", () => {
     await dialog.getByRole("button", { name: "Save", exact: true }).click();
     await expect(dialog.getByRole("button", { name: "Submit" })).toBeVisible({ timeout: 15_000 });
     await exitDraftDialog(dialog);
-    await expect(proposalCard(page, title)).toBeVisible();
+    await expectDraftCardAfterExit(page, title);
   });
 
   test("Window: valid timed start/end saves as draft", async ({ page }) => {
@@ -108,7 +110,7 @@ test.describe("Proposal When dates and times journey", () => {
     await dialog.getByRole("button", { name: "Save", exact: true }).click();
     await expect(dialog.getByRole("button", { name: "Submit" })).toBeVisible({ timeout: 15_000 });
     await exitDraftDialog(dialog);
-    await expect(proposalCard(page, title)).toBeVisible();
+    await expectDraftCardAfterExit(page, title);
   });
 
   test("Window: End auto-extends when Start moves past End", async ({ page }) => {
@@ -168,6 +170,6 @@ test.describe("Proposal When dates and times journey", () => {
     await dialog.getByRole("button", { name: "Save", exact: true }).click();
     await expect(dialog.getByRole("button", { name: "Submit" })).toBeVisible({ timeout: 15_000 });
     await exitDraftDialog(dialog);
-    await expect(proposalCard(page, title)).toBeVisible();
+    await expectDraftCardAfterExit(page, title);
   });
 });

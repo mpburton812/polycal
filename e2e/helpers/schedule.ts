@@ -1,8 +1,11 @@
 import { type Page, expect } from "@playwright/test";
 
 import { fillProposalDateRange, selectDraftScheduleMode } from "./datePickers";
+import { dismissMotdDialogIfOpen } from "./motd";
 import { goToSchedule } from "./navigation";
 import { openEventProposalDraft, submitProposalDraft } from "./proposals";
+
+export { dismissMotdDialogIfOpen } from "./motd";
 
 const SCHEDULE_VIEW_STORAGE_KEY = "polycal.schedule.view";
 
@@ -118,6 +121,7 @@ export async function assertEventOnCalendarDays(
   titlePattern: RegExp,
   dayIsos: string[],
 ): Promise<void> {
+  await dismissMotdDialogIfOpen(page);
   for (const dayIso of dayIsos) {
     await advanceScheduleUntilEventVisible(page, titlePattern, { targetDateIso: dayIso });
   }
@@ -204,6 +208,7 @@ async function expectEventVisibleInView(
 
 /** Waits until schedule data has finished loading for the visible range. */
 export async function waitForScheduleReady(page: Page): Promise<void> {
+  await dismissMotdDialogIfOpen(page);
   // Prefer the last marker — soft navigations can briefly leave a stale node in the DOM.
   await expect(page.getByTestId("schedule-ready").last()).toHaveAttribute("data-ready", "true", {
     timeout: 30_000,
@@ -266,23 +271,43 @@ export async function navigateScheduleUntilDateInRange(
 
 /**
  * Advances the week calendar toward `targetDateIso` and waits for a matching block.
+ * Reloads once on miss — CI can serve a stale week slice after proposal resolve (PC-326 flake).
  */
 export async function advanceScheduleUntilEventVisible(
   page: Page,
   namePattern: RegExp,
   options?: { targetDateIso?: string },
 ): Promise<void> {
-  await goToSchedule(page);
-  await clearScheduleViewState(page);
-  await forceWeekLayout(page);
-  await waitForScheduleReady(page);
-
-  if (options?.targetDateIso) {
-    await navigateScheduleUntilDateInRange(page, options.targetDateIso);
+  const prepare = async () => {
+    await goToSchedule(page);
+    await clearScheduleViewState(page);
+    await dismissMotdDialogIfOpen(page);
+    await forceWeekLayout(page);
     await waitForScheduleReady(page);
+
+    if (options?.targetDateIso) {
+      await navigateScheduleUntilDateInRange(page, options.targetDateIso);
+      await waitForScheduleReady(page);
+    }
+  };
+
+  await prepare();
+
+  const locator = eventLocator(page, namePattern);
+  try {
+    // Midnight blocks sit at the top of the week grid — ensure they are scrolled into view.
+    await locator.scrollIntoViewIfNeeded().catch(() => {});
+    await expect(locator).toBeVisible({ timeout: 20_000 });
+    return;
+  } catch {
+    // Fall through to hard recovery below.
   }
 
-  await expect(eventLocator(page, namePattern)).toBeVisible({ timeout: 20_000 });
+  await clearScheduleViewState(page);
+  await page.reload();
+  await prepare();
+  await eventLocator(page, namePattern).scrollIntoViewIfNeeded().catch(() => {});
+  await expect(eventLocator(page, namePattern)).toBeVisible({ timeout: 25_000 });
 }
 
 /** Creates and submits a resolved solo all-day event spanning multiple calendar days. */

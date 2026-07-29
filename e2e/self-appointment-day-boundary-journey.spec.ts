@@ -18,8 +18,9 @@ const COMMENT = "E2E self-appointment day boundary";
 /**
  * Prefer mid-week targets: DAYS_OUT=3 from Thu/Fri lands on Sun, and 11pm→midnight
  * overnight events can fall off the visible week range (flake after local midnight).
+ * Use 7 days out so 12am 1h blocks stay inside a full upcoming week on CI.
  */
-const DAYS_OUT = 5;
+const DAYS_OUT = 7;
 const WEEKLY_OCCURRENCES = 3;
 
 type Case = {
