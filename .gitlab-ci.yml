@@ -1,0 +1,72 @@
+# GitLab CI — PolyCal (secondary / legacy mirror)
+#
+# Primary promotion and gates run on **GitHub Actions** (see `.github/workflows/`
+# and docs/DEV-PROMOTION.md). Keep this file only if a GitLab remote still runs
+# pipelines; otherwise it is unused. Do not add new gates here without mirroring
+# them on GitHub first.
+
+stages:
+  - validate
+  - sync
+
+default:
+  image: node:22-alpine
+  cache:
+    key:
+      files:
+        - package-lock.json
+    paths:
+      - node_modules/
+
+validate-jira-commits:
+  stage: validate
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH =~ /^feature\//
+  before_script:
+    - apk add --no-cache git
+    - npm ci
+  script:
+    - sh scripts/ci-validate-jira-commits.sh
+
+npm-audit:
+  stage: validate
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "dev"
+    - if: $CI_COMMIT_BRANCH =~ /^feature\// && $CI_PIPELINE_SOURCE == "push"
+  before_script:
+    - npm ci
+  script:
+    - sh scripts/ci-npm-audit.sh
+
+jira-sync-in-progress:
+  stage: sync
+  rules:
+    - if: $CI_COMMIT_BRANCH =~ /^feature\// && $CI_PIPELINE_SOURCE == "push"
+  before_script:
+    - apk add --no-cache git
+    - npm ci
+  script:
+    - sh scripts/ci-jira-sync-on-feature-push.sh
+  allow_failure: true
+
+jira-sync-in-review:
+  stage: sync
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "dev"
+  before_script:
+    - apk add --no-cache git
+    - npm ci
+  script:
+    - sh scripts/ci-jira-sync-on-pr.sh
+  allow_failure: true
+
+jira-sync-on-merge:
+  stage: sync
+  rules:
+    - if: $CI_COMMIT_BRANCH == "dev"
+  before_script:
+    - apk add --no-cache git
+    - npm ci
+  script:
+    - sh scripts/ci-jira-sync-on-merge.sh

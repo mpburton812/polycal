@@ -1,0 +1,357 @@
+# .requirements â€” PolyCal requirement traceability log
+#
+# Full workflow: docs/REQUIREMENTS-WORKFLOW.md
+#
+# PURPOSE
+#   Append-only audit trail linking implemented work to Jira (PC-xxx) and git commits.
+#   Jira holds planned work; this file records what was delivered and where.
+#
+# FORMAT (pipe-delimited, one requirement per line)
+#   YYYY-MM-DD | <commit-sha> | PC-<n> | <requirement summary> | <primary module path>
+#
+# RULES
+#   - Do not edit or delete completed rows.
+#   - Every commit on feature/* branches MUST include a Jira key (PC-123) in the message.
+#   - Rows are appended automatically by scripts/append-requirement.ts after each commit.
+#   - If .requirements changes after a commit, include it in your next commit or amend.
+#
+# EXAMPLE
+#   2026-06-18 | a1b2c3d | PC-42 | Add weekly calendar view | src/app/calendar/page.tsx
+#
+# --- log entries below this line ---
+2026-06-18 | 9f543bc | PC-2 | add requirements workflow and Jira traceability | .cursorrules
+2026-06-18 | b1b2aef | PC-2 | correct branch detection in requirements append | scripts/append-requirement.ts
+2026-06-18 | 8631064 | PC-2 | sync requirements log entry for append fix | n/a
+2026-06-18 | 428d8a0 | PC-2 | auto-stage .requirements after post-commit | .husky/post-commit
+2026-06-18 | 8b444c4 | PC-2 | append requirements log for post-commit staging | n/a
+2026-06-18 | 6b085f1 | PC-2 | prevent requirements log append loop | .husky/post-commit
+2026-06-18 | 980341c | PC-3 | add npm audit gate for feature to dev | .cursorrules
+2026-06-18 | 08caf34 | PC-4 | automate Jira status sync across promotion workflow | .cursorrules
+2026-06-18 | f2e64c4 | PC-5 | require GitHub PR for feature to dev promotion | .cursorrules
+2026-06-18 | 335f798 | PC-5 | add merge feature shortcut for dev promotion | README.md
+2026-06-18 | 0ce8a0a | PC-5 | Windows compatibility for merge-feature CLI | scripts/merge-feature.ts
+2026-06-23 | ef2bd2a | PC-20 | Phase 0 scaffold â€” shell, auth, DB, dev bar, PWA | src/actions/dev.ts
+2026-06-23 | ca48194 | PC-20 | resolve npm audit findings via overrides | package.json
+2026-06-23 | 316265c | PC-20 | add workflow config for PC Jira project | .workflow.json
+2026-06-23 | d1b8107 | PC-21 | edge-safe middleware for Vercel deploy | src/lib/auth.config.ts
+2026-06-23 | 7771ffc | PC-21 | keep middleware free of drizzle imports | src/lib/auth.config.ts
+2026-06-23 | acb9f48 | PC-21 | root auth.config for Vercel Edge middleware | src/lib/auth.config.ts
+2026-06-23 | b4d410c | PC-21 | JWT-only Edge middleware for Vercel | auth.config.ts
+2026-06-23 | 4f98b9b | PC-21 | cookie-only Edge middleware (no __dirname) | middleware.ts
+2026-06-23 | 29a1613 | PC-22 | remove Edge instrumentation DB bundle causing __dirname 500 | src/lib/auth.ts
+2026-06-23 | 699447b | PC-28 | Phase 1 foundation for test data and profile | src/actions/admin.ts
+2026-06-23 | 80cf0ec | PC-27 | set per-environment AUTH_URL in Vercel sync scripts | scripts/sync-vercel-preview-env.mjs
+2026-06-23 | 63f44d9 | PC-35 | Phase 2 People and Places foundation | src/actions/partnerships.ts
+2026-06-23 | 30353d0 | PC-20 | fixed environment banner colors independent of theme | src/components/layout/DevBar.tsx
+2026-06-23 | afc8be2 | PC-35 | People and Places UX and admin force reload | src/actions/admin.ts
+2026-06-23 | 79fc854 | PC-35 | use static z-index in AppShell sticky header | src/components/layout/AppShell.tsx
+2026-06-24 | f83a76c | PC-35 | correct username availability validation and error messages | src/actions/users.ts
+2026-06-24 | d23d1a1 | PC-35 | lock add-person dialog after create and add admin user edit/delete | src/actions/users.ts
+2026-06-24 | 3c6a190 | PC-8 | admin tab, profile gaps, passive activation and onboarding | src/actions/admin.ts
+2026-06-24 | cc9fed8 | PC-8 | admin tab, profile gaps, passive activation and onboarding | src/actions/admin.ts
+2026-06-24 | 9e5e40e | PC-8 | admin tab, profile gaps, passive activation and onboarding | src/actions/admin.ts
+2026-06-24 | f175bec | PC-8 | refine admin user mgmt, people UX, and onboarding welcome | src/actions/admin.ts
+2026-06-24 | 24de1f6 | PC-35 | fix people/places UX and first-login password | src/actions/places.ts
+2026-06-24 | c2462f7 | PC-40 | Phase 4 proposals foundation and place delete workflow | src/actions/places.ts
+2026-06-24 | 004e626 | PC-40 | add proposal voting, draft editing, and time slots | src/actions/proposals.ts
+2026-06-24 | 54579be | PC-40 | add proposal comments, cancel/re-draft, and poll draft UI | src/actions/proposals.ts
+2026-06-24 | cf61fe4 | PC-40 | poll matrix voting, conflict checks, and proposal card UI | src/actions/proposals.ts
+2026-06-24 | 28b026d | PC-40 | shared proposal card theme and draft dialog layout | src/components/proposals/ProposalCard.tsx
+2026-06-24 | 703cdac | PC-40 | poll rules, privacy masking, recurrence, and bedroom locks | src/actions/proposals.ts
+2026-06-24 | f5b49fb | PC-40 | add Playwright E2E suite, CI workflow, and promotion gates | src/lib/seed/reset-test-database.ts
+2026-06-24 | 720db88 | PC-40 | Phase 4 close-out — collision engine, notification inbox, bedroom picker | src/actions/notifications.ts
+2026-06-24 | cda7c09 | PC-42 | Phase 6 schedule tab with weekly calendar, filters, and planning mode | src/actions/schedule.ts
+2026-06-24 | pending | PC-43 | Surface sleeping partnership proposals on Proposals Kanban | src/actions/proposals.ts
+2026-06-24 | pending | PC-43 | Actionable notification inbox with partnership accept/decline | src/components/layout/NotificationInbox.tsx
+2026-06-24 | pending | PC-43 | Web Push subscriptions and service worker push handler | src/lib/push.ts
+2026-06-24 | pending | PC-43 | Notification email verification hook on profile | src/actions/profile.ts
+2026-06-24 | pending | PC-43 | Solo event toggle and post-create Submit in draft dialog | src/components/proposals/ProposalDraftDialog.tsx
+2026-06-24 | pending | PC-43 | Calendar blocks show stakeholders; week anchor resets to today | src/components/schedule/ScheduleEventBlock.tsx
+2026-06-24 | fc0c8aa | PC-43 | Phase 5 notifications and proposal UX fixes | src/actions/partnerships.ts
+2026-06-24 | 5a43490 | PC-43 | fix lifecycle E2E for draft dialog stay-open UX | e2e/proposals-lifecycle.spec.ts
+2026-06-24 | 10deb8f | PC-44 | admin UX, proposal polish, and header improvements | src/actions/partnerships.ts
+2026-06-24 | 386df9d | PC-45 | complete phases 2, 7, and 8 foundations | src/actions/poly-group.ts
+2026-06-24 | 7814576 | PC-46 | phase 9 enforcement and Playwright E2E updates | src/lib/proposals/enforcement.ts
+2026-06-25 | 39601d0 | PC-47 | fix draft conflict UX, places dialog, and admin accordions | src/components/admin/AdminActivityLogPanel.tsx
+2026-06-25 | a2d2d12 | PC-48 | attendee updates, enforcement cron, timezone, and schedule UX | src/actions/profile.ts
+2026-06-25 | 09df410 | PC-48 | attendee updates, enforcement cron, timezone, and schedule UX | src/actions/profile.ts
+2026-06-25 | f2c79bc | PC-48 | update E2E for pickers, clone draft, and collapsible places | e2e/helpers/datePickers.ts
+2026-06-25 | 0155c5a | PC-48 | fix strict mode on voting E2E assertion | e2e/proposals-voting.spec.ts
+2026-06-25 | 77d33ea | PC-48 | fix strict mode on voting E2E assertion | e2e/proposals-voting.spec.ts
+2026-06-25 | 976dc59 | PC-49 | poll optional voting UX and matrix readability | src/actions/proposals.ts
+2026-06-25 | 7261426 | PC-50 | partnership copy, network alerts, cancel close | src/actions/partnerships.ts
+2026-06-25 | 0304a5d | PC-51 | add Render enforcement cron blueprint and script | CHANGELOG.md
+2026-06-25 | 92f97d7 | PC-52 | Burton-Thompson test seed and environment validation scripts | src/components/admin/AdminTestDataPanel.tsx
+2026-06-25 | 346a648 | PC-52 | Burton-Thompson test seed and environment validation scripts | src/components/admin/AdminTestDataPanel.tsx
+2026-06-25 | c0f03cc | PC-52 | admin user provisioning E2E and onboarding wizard fix | src/actions/onboarding.ts
+2026-06-25 | db52d00 | PC-53 | launch ops gaps — recovery TTL, heatmap, email, admin gender | src/actions/poly-group.ts
+2026-06-26 | 7bfd9f4 | PC-53 | proposal UX — perf, sleeping dates, activity log, attendee votes | src/actions/proposals.ts
+2026-06-27 | 87a0c94 | PC-55 | paused users, open resolved comments, and E2E journeys | src/actions/proposals.ts
+2026-06-27 | 616944c | PC-55 | keep demo proposed fixtures voteable all day | src/lib/seed/demo-proposals.ts
+2026-06-27 | 45cb108 | PC-55 | keep demo proposals in week and voteable | src/lib/seed/demo-proposals.ts
+2026-06-27 | 59047a7 | PC-55 | harden paused-user redirects and E2E admin helpers | src/lib/auth-session.ts
+2026-06-27 | 7fc19c4 | PC-55 | use heading click for admin accordion E2E helper | src/actions/proposals.ts
+2026-06-27 | 82bacc1 | PC-56 | residency Kanban workflow, toast UX, and schedule polish | src/actions/partnerships.ts
+2026-06-27 | d58a217 | PC-56 | assert vote feedback via toast in E2E specs | e2e/helpers/toast.ts
+2026-06-27 | e9fa7a0 | PC-56 | add Jira backfill workflow for .. gap | .github/workflows/jira-backfill-gap.yml
+2026-06-27 | 1e7c04c | PC-56 | run Jira gap backfill before CI status sync | scripts/backfill-jira-kanban-gap.ts
+2026-06-27 | ef49fa8 | PC-56 | use Jira search/jql API for gap backfill | scripts/backfill-jira-kanban-gap.ts
+2026-06-27 | 3273364 | PC-56 | probe Jira keys for gap backfill instead of search API | scripts/backfill-jira-kanban-gap.ts
+2026-06-27 | f89acaa | PC-56 | improve Jira backfill diagnostics when project is invisible | scripts/backfill-jira-kanban-gap.ts
+2026-06-27 | 0310ca9 | PC-56 | wire declined residency Kanban cards to correct workflow | src/actions/proposals.ts
+2026-06-27 | 52ef03a | PC-57 | launch readiness Jira tickets and resilient Jira CI sync | .github/workflows/jira-create-launch-tickets.yml
+2026-06-27 | 62aca5c | PC-57 | load Jira creds from .env.local and auto-create in CI | scripts/ci-jira-sync-on-feature-push.sh
+2026-06-27 | 041bf44 | PC-58 | push opt-in, schedule calendar UX, and sleeping block styling | src/components/layout/AppShell.tsx
+2026-06-27 | ea8848e | PC-58 | VAPID validation tooling and web-push ESM import | src/lib/push.ts
+2026-06-28 | 784cf1f | PC-59 | batch sleeping proposals, partner UX, and promotion rules | src/actions/proposals.ts
+2026-06-28 | 1f0576c | PC-59 | align Playwright with sleeping proposal UX | e2e/helpers/proposals.ts
+2026-06-28 | a6aed82 | PC-59 | schedule polish, proposal UX fixes, and journey E2E | src/actions/profile.ts
+2026-06-28 | 21e232f | PC-59 | stabilize schedule seed event E2E across week boundaries | e2e/schedule.spec.ts
+2026-06-28 | 95c3d62 | PC-60 | migrate residency and group name proposals to standard draft workflow | src/actions/places.ts
+2026-06-28 | a279ef8 | PC-60 | include proposals access module required by CI build | src/lib/proposals/access.test.ts
+2026-06-28 | 8eacedf | PC-59 | security hardening, notifications UX, and CI promotion gates | src/actions/dev.ts
+2026-06-28 | c0d0cf0 | PC-59 | wait for residency dialog close before people-places nav | e2e/residency-proposal-journey.spec.ts
+2026-06-28 | a0b41c9 | PC-59 | close residency dialog before people-places navigation | e2e/residency-proposal-journey.spec.ts
+2026-06-28 | e08ea9b | PC-59 | stabilize schedule E2E week scan for ensureFuture seed slots | e2e/schedule.spec.ts
+2026-06-28 | c538df1 | PC-61 | split death-star poll journey into serial phases | e2e/death-star-poll-journey.spec.ts
+2026-06-28 | eb1e134 | PC-62 | split proposals into domain modules | src/actions/proposals.ts
+2026-06-29 | d799926 | PC-65 | complete proposals UX, alerts, reminders, and calendar fixes | src/actions/proposals/_core.ts
+2026-06-29 | dcf9b44 | PC-66 | backlog week 1-2 — display layer, draft fix, board split | src/actions/proposals.ts
+2026-06-29 | aaa32cd | PC-69 | backlog week 3 — batch partners + group rename E2E journeys | app/api/e2e/reset/route.ts
+2026-06-29 | 6ebf517 | PC-70 | backlog week 4 — event reminder and alert prefs E2E journeys | src/types/notification-prefs.test.ts
+2026-06-29 | a64aa81 | PC-71 | backlog week 5 — CI sharding, JSON audit, schema verify, _core split | src/actions/proposals.ts
+2026-06-29 | 36d8bf7 | PC-71 | close JSON audit gaps, schema v13 checks, 4-shard CI | src/actions/admin.ts
+2026-06-30 | 19efe1b | PC-72 | CI sharding, audit tail, journeys, and parallel docs | src/actions/places.ts
+2026-06-30 | 9937746 | PC-72 | record PR #124 dev-to-test CI shard timings | docs/PROMOTION-TIMINGS.md
+2026-06-30 | 032538b | PC-62 | sleeping calendar UX epic - | src/actions/admin.ts
+2026-06-30 | 010126d | PC-70 | align E2E with Save draft button label | e2e/birthday-party-journey.spec.ts
+2026-06-30 | fb4d948 | PC-62 | align E2E with sleeping auto titles and Exit draft UX | e2e/helpers/auth.ts
+2026-06-30 | 6f6a95a | PC-40 | extend Playful Collective theme to all app pages | src/actions/onboarding.ts
+2026-07-01 | 743e1e3 | PC-40 | Garden Brutalism and Playful Collective theme across app | src/actions/onboarding.ts
+2026-07-01 | a4be87b | PC-40 | raise toast z-index above bottom nav for E2E visibility | src/components/providers/ToastProvider.tsx
+2026-07-06 | 5817a2b | PC-55 | Outlook-style month view, batch vote, and archive fixes | src/actions/schedule.ts
+2026-07-06 | d06faaa | PC-55 | use exact Mon match to avoid Month button collision | e2e/schedule.spec.ts
+2026-07-06 | b18c8ee | PC-74 | schedule slices with sliceTag comments and detach | src/actions/proposals.ts
+2026-07-06 | 4a8f751 | PC-74 | fix schedule slice journey navigation and setup | e2e/batch-sleeping-journey.spec.ts
+2026-07-06 | 4e57e4a | PC-74 | use week navigation and title locators for slice journeys | e2e/helpers/schedule.ts
+2026-07-06 | f225e22 | PC-74 | match recurring child card titles flexibly | e2e/recurrence-slice-journey.spec.ts
+2026-07-07 | c811a18 | PC-74 | stabilize CI — keep recurrence slice journey, revert flaky schedule nav tests | e2e/batch-sleeping-journey.spec.ts
+2026-07-07 | 9a6ac5a | PC-75 | harden slice auth, E2E navigation, and schedule stability | src/actions/proposals/_core.ts
+2026-07-07 | 561d3f7 | PC-75 | clear schedule localStorage after navigation, not on about:blank | e2e/batch-sleeping-journey.spec.ts
+2026-07-07 | 5b8c873 | PC-76 | track invitee viewed_at separate from vote status | src/actions/proposals/_core.ts
+2026-07-07 | f4e60d5 | PC-77 | month view fetch range, icons, and legend swatches | src/components/schedule/MonthEventChip.tsx
+2026-07-07 | ce7fe31 | PC-77 | use first month icon locator for duplicate event buttons | e2e/schedule.spec.ts
+2026-07-07 | 3c3149e | PC-104 | week-1 remediation deliverables and backlog tooling | src/actions/profile.ts
+2026-07-07 | cb98e23 | PC-97 | UserRole typing for context helpers and exclude test files from build | src/actions/server-actions.auth.test.ts
+2026-07-07 | dac6836 | PC-75 | harden E2E routes, impersonation, avatars, headers | src/actions/admin.ts
+2026-07-07 | a8ba1c9 | PC-77 | refresh JWT sessionVersion after self-service password change | src/actions/profile.ts
+2026-07-07 | 2b0b585 | PC-86 | Sprint A E2E journeys and action context adoption | src/actions/admin.ts
+2026-07-07 | 8884a63 | PC-98 | Sprint B services split and E2E journeys | src/actions/proposals/_core.ts
+2026-07-07 | d840805 | PC-104 | production change log 2026.07.09 for Admin Code Status | src/lib/changelog/entries.ts
+2026-07-09 | fd699c7 | PC-112 | custom avatar crop zoom-out and black-image fix | src/actions/profile.ts
+2026-07-09 | cb8e303 | PC-112 | disambiguate This night slice dialog heading | e2e/batch-sleeping-journey.spec.ts
+2026-07-09 | bc8b43f | PC-112 | disambiguate This day slice dialog heading | e2e/multi-day-event-slice-journey.spec.ts
+2026-07-09 | d6ebe3b | PC-114 | MAP defaults, avatars, detach migration, schedule UI polish | src/actions/partnerships.ts
+2026-07-09 | f5c8a70 | PC-114 | MAP defaults, avatars, detach migration, schedule UI polish | src/actions/partnerships.ts
+2026-07-09 | 48b4478 | PC-115 | event schedule views user journey E2E suite | src/actions/proposals/_core.ts
+2026-07-09 | 996cf0d | PC-115 | event schedule views user journey E2E suite | src/actions/proposals/_core.ts
+2026-07-09 | ba3b751 | PC-116 | event category icons phase 1 — registry, DB, picker, week view | src/actions/proposals/_core.ts
+2026-07-09 | ed8af9a | PC-117 | retrigger CI after rebase | n/a
+2026-07-09 | db56edc | PC-118 | admin fast sleeping plan add | src/actions/admin-fast-sleeping.test.ts
+2026-07-09 | 96866d0 | PC-118 | merge origin/dev into feature branch | n/a
+2026-07-09 | c6a0e45 | PC-118 | default unset timezone to US Eastern | src/lib/schedule/timezone.test.ts
+2026-07-09 | 148c39f | PC-118 | include profileBio in partner list action | src/actions/admin-fast-sleeping.ts
+2026-07-10 | 1addee1 | PC-114 | share fast sleeping plan core and responsive grid | src/actions/admin-fast-sleeping.test.ts
+2026-07-10 | 855aef8 | PC-116 | update batch sleeping E2E for shared fast plan grid | src/components/proposals/FastSleepingPlanGrid.tsx
+2026-07-10 | 225201e | PC-114 | harden draft update and all-day move E2E | src/actions/proposals/_core.ts
+2026-07-10 | db22e02 | PC-114 | stabilize all-day event move in schedule journey E2E | e2e/event-schedule-views-journey.spec.ts
+2026-07-10 | 6488786 | PC-118 | add alpha tester feedback system | src/actions/alpha-feedback.ts
+2026-07-10 | 463bb93 | PC-122 | exclude apps/ from Next.js TypeScript project | tsconfig.json
+2026-07-10 | 863baa6 | PC-120 | avoid Send feedback aria-label colliding with End fields | src/components/feedback/FeedbackFab.tsx
+2026-07-10 | ecf00fd | PC-122 | proxy Vercel protection bypass for alpha feedback tracker | src/lib/alpha-feedback/cors.ts
+2026-07-10 | eae0d8c | PC-119 | run migrations before test DB wipe | src/lib/seed/reset-test-database.ts
+2026-07-10 | f9f4c8d | PC-124 | redesign card and draft UX for events and sleeping | src/actions/proposals/_core.ts
+2026-07-10 | 774513c | PC-124 | restore At risk badge and update E2E for card/detail UX | src/components/proposals/ProposalCard.tsx
+2026-07-10 | 052b295 | PC-124 | append requirements log and finish icon E2E fix | e2e/event-icons.spec.ts
+2026-07-10 | 0008e0e | PC-128 | add tracker web build workflow and document CI boundaries | src/lib/changelog/entries.ts
+2026-07-10 | df1da7f | PC-130 | add ESLint flat config and pin eslint-config-next to 15.x | AGENTS.md
+2026-07-10 | 8429661 | PC-131 | align tracker React with root; document no workspaces | apps/alpha-feedback-tracker/package-lock.json
+2026-07-10 | 10ad7c7 | PC-132 | extract ProposalDraftDialog section components | src/components/proposals/ProposalConflictConfirmDialog.tsx
+2026-07-10 | f6daafd | PC-130 | merge origin/dev and resolve changelog conflicts | n/a
+2026-07-10 | d1b36de | PC-134 | gate privacy options; feedback archive and delete | src/actions/poly-group.ts
+2026-07-10 | 1b35d4e | PC-138 | loading UX and faster tab/layout fetches | src/components/proposals/ProposalDetailDialog.tsx
+2026-07-10 | 254d69a | PC-138 | keep Close after vote reload and soften e2e dismiss | src/components/proposals/ProposalDetailDialog.tsx
+2026-07-10 | 14208ef | PC-143 | migration short-circuit, lighter JWT, dynamic dialogs | src/components/proposals/ProposalsClient.tsx
+2026-07-10 | 80a5118 | PC-143 | unit tests for migration version short-circuit | src/lib/db/migrate.test.ts
+2026-07-10 | 74a99a5 | PC-144 | keep JWT DB refresh during onboarding; wait for Schedule | auth.config.ts
+2026-07-10 | ade301d | PC-146 | UX cleanup — detach fix, toast, modes, date range | src/actions/proposals/slices.ts
+2026-07-10 | d87c73b | PC-146 | type PickersDayProps and restore invitees on recurring helper | src/components/proposals/ProposalDateRangeField.tsx
+2026-07-10 | a5206dd | PC-146 | impersonation journey + reliable date-range fills | e2e/helpers/datePickers.ts
+2026-07-10 | cc84feb | PC-153 | ISO text fields synced with date-range calendar | src/components/proposals/ProposalDateRangeField.tsx
+2026-07-11 | ab609a0 | PC-154 | user UX — roles, onboarding OK, hide deleted, wrap | src/actions/onboarding.ts
+2026-07-11 | 004d64a | PC-154 | expect latest changelog version 2026.07.11 | e2e/admin-code-status-journey.spec.ts
+2026-07-11 | 7517f1d | PC-160 | Resend Scope C — harden, credentials, forgot password | src/actions/password-reset.ts
+2026-07-11 | dda66f6 | PC-164 | UX refactor — chrome, day sheet, agenda, URL/a11y | src/components/proposals/ProposalDraftDialog.tsx
+2026-07-11 | dfff89f | PC-164 | reliable schedule loading flag and Today button a11y name | src/components/schedule/ScheduleClient.tsx
+2026-07-11 | 3a66138 | PC-167 | stop schedule URL sync remount loop sticking pending | src/components/schedule/ScheduleClient.tsx
+2026-07-11 | 1bb30c2 | PC-168 | bump SCHEMA_VERSION to 21 for password_reset columns | src/lib/changelog/entries.ts
+2026-07-11 | 265fbfa | PC-174 | shared CI build, storageState, SAFE_PARALLEL workers | src/lib/changelog/entries.ts
+2026-07-11 | b6cdd47 | PC-174 | include-hidden-files when uploading .next artifact | .github/workflows/e2e.yml
+2026-07-12 | d5dcdf0 | PC-170 | mobile user rows, prod impersonation, recurring modes | src/components/admin/AdminUserManagementPanel.tsx
+2026-07-12 | 9582570 | PC-180 | rename MAP tab to Sleeping Partners | src/actions/partnerships.ts
+2026-07-12 | dba0487 | PC-182 | lightbox, comment log, notify on Save | src/lib/alpha-feedback/comment-log.test.ts
+2026-07-12 | cb6dce3 | PC-185 | place owners, immediate add, self-join role pick | src/actions/places.ts
+2026-07-12 | 8c5ec31 | PC-191 | stabilize dev navigation and forgot-password hydration | e2e/helpers/navigation.ts
+2026-07-12 | 7b8fc3c | PC-191 | fix residency journey member locator strict mode | e2e/residency-proposal-journey.spec.ts
+2026-07-13 | 171e071 | PC-193 | people, onboarding, and proposal polish release | src/actions/places.ts
+2026-07-13 | 9a58625 | PC-192 | change control log for 2026.07.13 promotion | src/lib/changelog/entries.ts
+2026-07-13 | f8a6231 | PC-192 | assert latest changelog version dynamically | e2e/admin-code-status-journey.spec.ts
+2026-07-13 | e5f1ee9 | PC-199 | remove place members and fix residency self-join UX | src/actions/places.ts
+2026-07-13 | 2572930 | PC-202 | splash, tab swipe, Day schedule view, legend cleanup | src/components/layout/AppShell.tsx
+2026-07-13 | f67e9b8 | PC-202 | disable update overlay under Playwright e2e | src/components/pwa/PwaUpdateGate.tsx
+2026-07-13 | fd9bfd7 | PC-207 | branded verify-email landing and API redirect | src/actions/profile.ts
+2026-07-13 | 1c6e987 | PC-207 | assert verify-email CTAs as links | e2e/verify-email.spec.ts
+2026-07-14 | 8cb4638 | PC-209 | stop End day keystrokes overwriting Day | src/components/proposals/ProposalDateRangeField.tsx
+2026-07-14 | e085907 | PC-213 | isolate mobile DB and harden multi-server harness | src/lib/changelog/entries.ts
+2026-07-14 | 1efb338 | PC-213 | wait for group-rename draft navigation | e2e/group-name-proposal-journey.spec.ts
+2026-07-14 | 4e6948e | PC-214 | fix journeys npm script under tsx/Windows | scripts/e2e-run-journeys.ts
+2026-07-14 | 7101ab6 | PC-221 | Ready For Testing status and stable ticket IDs | src/actions/alpha-feedback.ts
+2026-07-14 | 7e4128c | PC-223 | capability identifier and icons for MSI build | apps/alpha-feedback-tracker/src-tauri/capabilities/default.json
+2026-07-14 | 17f4018 | PC-223 | append requirements log for tracker MSI fix | n/a
+2026-07-14 | ceae3f8 | PC-222 | cast libsql Row via unknown for ticket backfill | src/lib/db/alpha-feedback-migrations.ts
+2026-07-14 | d6ea653 | PC-217 | clear actionable inbox on proposal vote | src/actions/notifications.ts
+2026-07-14 | 4f9b05b | PC-219 | assert actionable inbox clear after vote, not title | e2e/helpers/notifications.ts
+2026-07-15 | 74d19d6 | PC-216 | merge(dev): resolve conflicts after alpha-feedback PR #247 | n/a
+2026-07-15 | c2d4aed | PC-224 | milestones chat and sleeping network visibility | src/actions/admin.ts
+2026-07-15 | e19ba49 | PC-224 | expect Feed as post-login home after tab move | e2e/admin-create-user.spec.ts
+2026-07-15 | 9042168 | PC-224 | navigate to Feed after first-login OK | src/components/onboarding/FirstLoginWizard.tsx
+2026-07-15 | 9a96da2 | PC-224 | combine Feed tests to avoid mid-serial DB reset flake | e2e/feed.spec.ts
+2026-07-15 | 6cfda98 | PC-224 | harden Feed landing after onboarding | src/actions/onboarding.ts
+2026-07-15 | 781535a | PC-224 | wait for onboarding complete before Feed assert | e2e/admin-create-user.spec.ts
+2026-07-15 | 942b7a8 | PC-224 | hard-navigate to Feed after welcome OK | src/components/onboarding/FirstLoginWizard.tsx
+2026-07-15 | a5815a5 | PC-224 | retry database reset under serial worker load | e2e/helpers/db.ts
+2026-07-15 | 4da34af | PC-224 | wipe network_chat_messages before users on reset | src/lib/seed/reset-test-database.ts
+2026-07-15 | d2d8d58 | PC-231 | unified timeline with comments, images, reply push | src/actions/feed.ts
+2026-07-15 | 0e62ae3 | PC-231 | add feed-migrations module and requirements log | src/lib/db/feed-migrations.ts
+2026-07-15 | 52c242c | PC-239 | parrot likes on milestones, chats, and comments | src/actions/feed.ts
+2026-07-15 | 3de16d5 | PC-239 | scope likers assertion to dialog | e2e/feed-likes-journey.spec.ts
+2026-07-15 | 7dedd60 | PC-239 | retry event visibility after reload | e2e/helpers/schedule.ts
+2026-07-16 | 8fb3f42 | PC-239 | hard-navigate schedule views helper | e2e/helpers/schedule.ts
+2026-07-16 | 986090d | PC-239 | silent poll fingerprint and CI harden | src/actions/feed.ts
+2026-07-16 | 3970426 | PC-239 | keep all-day end date on redraft move | e2e/event-schedule-views-journey.spec.ts
+2026-07-16 | 757e15e | PC-239 | promotion entry for likes and silent poll | src/lib/changelog/entries.ts
+2026-07-16 | 1ddf6e1 | PC-239 | use last range marker under strict mode | e2e/helpers/schedule.ts
+2026-07-16 | 4da3896 | PC-244 | six bug-fix batch for limits, logs, passive proxy, images | src/actions/feed.ts
+2026-07-16 | e5fd9ee | PC-245 | assert human-readable admin log labels | e2e/residency-proposal-journey.spec.ts
+2026-07-16 | 7c9adf0 | PC-250 | yellow background for admin-only-visible comments | src/actions/feed.ts
+2026-07-16 | 0ede5bd | PC-252 | wrap, Code Status, proxy vote expand, Passive→Proxy | src/actions/admin-fast-sleeping.ts
+2026-07-16 | d57ce81 | PC-252 | isolate propose pending from save refresh | src/components/admin/AdminPolyGroupSettingsPanel.tsx
+2026-07-17 | a374076 | PC-257 | collapse Code Status by default with chevron expand | src/components/feed/FeedClient.tsx
+2026-07-17 | 308cff2 | PC-257 | fix Code Status collapse chevron selector | e2e/feed-code-status-journey.spec.ts
+2026-07-17 | 2d6b7cf | PC-257 | raise Code Status journey timeout for suite load | e2e/feed-code-status-journey.spec.ts
+2026-07-20 | f4b1802 | PC-258 | six-item batch — month spans, feed image, parrot, drafts, batch, conflicts | src/actions/admin-fast-sleeping.ts
+2026-07-20 | a685cf5 | PC-261 | remove sync re-exports from use server notifications | src/actions/notifications.ts
+2026-07-20 | 6579fb2 | PC-261 | scope inbox title and expect draft-return copy | e2e/batch-sleeping-partners-journey.spec.ts
+2026-07-20 | 31c509c | PC-258 | patch brace-expansion and js-yaml via npm audit | n/a
+2026-07-20 | 7b2d259 | PC-264 | Feed Controls presets, Detailed Tweaking, votes, larger bird | src/actions/feed.ts
+2026-07-20 | 39142b1 | PC-270 | match nav parrot to tabs; like birds half size | src/components/feed/FeedLikeControl.tsx
+2026-07-20 | c93f061 | PC-271 | consolidated production release notes | src/lib/changelog/entries.ts
+2026-07-20 | d3f5608 | PC-273 | proposal enforcement days, sleeping TTL, admin visibility | src/actions/feed.ts
+2026-07-20 | bdc3b27 | PC-273 | add Jira ticket script for proposal enforcement UX | scripts/create-pc-proposal-enforcement-ux.mjs
+2026-07-20 | 0b9501f | PC-273 | assert Proposal enforcement heading exactly | e2e/admin-schedule.spec.ts
+2026-07-20 | 5eaed09 | PC-277 | enlarge like bird to 3x prior size | src/components/feed/feedIconSizes.test.ts
+2026-07-21 | b20413e | PC-278 | keep optional invitees visible after resolve | src/actions/proposals/_core.ts
+2026-07-21 | b544c2c | PC-279 | Facebook-style URL link previews | src/actions/feed.ts
+2026-07-21 | e730a3c | PC-280 | cleanup batch — removals, privacy purge, sleeping fixes | src/actions/feed.ts
+2026-07-21 | b7ef68d | PC-280 | drop tab blurb assert; sleeping archive is involved-only | e2e/admin-schedule.spec.ts
+2026-07-21 | 5adf633 | PC-282 | post-280 cleanup — TZ sleeping, security, perf, Playwright | src/actions/feed.ts
+2026-07-21 | 980ee97 | PC-282 | allow newline after Enter in feed composer assert | e2e/feed.spec.ts
+2026-07-21 | 55fa0c8 | PC-289 | production wipe script keeps people/places, clears schedule+chat | src/lib/changelog/entries.ts
+2026-07-21 | c2f1f16 | PC-289 | delete notification dismissals before activity log in prod wipe | scripts/wipe-production-schedule-keep-people.ts
+2026-07-22 | 153d400 | PC-290 | store batch sleeping nights in proposer timezone | src/actions/proposals/_core.ts
+2026-07-22 | ea2a69d | PC-291 | nudge pending voters, expiry timers, admin delete | src/actions/proposals.ts
+2026-07-22 | 169d3c8 | PC-296 | avoid admin Delete card click and At risk strict match | src/components/proposals/ProposalCard.tsx
+2026-07-22 | f28c735 | PC-298 | sticky happening-now pins and named notify actors | src/actions/admin.ts
+2026-07-22 | 793937f | PC-299 | match actor-named vote notify copy | e2e/batch-sleeping-partners-journey.spec.ts
+2026-07-22 | 611ccf2 | PC-301 | all-day single-day span, slice admin errors, Tentative title | src/actions/proposals/_core.ts
+2026-07-22 | fcb6b10 | PC-305 | visibility/partners SSOT and Busy mask copy | src/actions/feed.ts
+2026-07-22 | 1a9cbe7 | PC-305 | restore getDb import in network-notify | src/actions/schedule.ts
+2026-07-22 | c1c18cf | PC-317 | date-only contract + conflict/calendar parity | src/actions/proposals/_core.ts
+2026-07-22 | c1c18cf | PC-318 | conflict parity via buildScheduleWindows + widened overlap windows | src/lib/proposals/conflict-windows.ts
+2026-07-22 | c1c18cf | PC-319 | unit tests: same-day all-day, same-night sleeping, event×sleeping PC-59, draft date contract | src/lib/proposals/conflict-windows.test.ts
+2026-07-22 | c6aae60 | PC-320 | consolidate state-transition logging + notify fan-out [][][][] | src/actions/proposals/_core.ts
+2026-07-22 | 33cee27 | PC-325 | poll invitee paths and midnight/11pm self-appointment journeys | src/lib/changelog/entries.ts
+2026-07-22 | f3fea5e | PC-325 | merge(dev): resolve changelog conflicts for | n/a
+2026-07-22 | 956e1f8 | PC-325 | merge(dev): resync changelog for | n/a
+2026-07-22 | 2399786 | PC-327 | carve conflict/resolution + lifecycle/comment actions out of _core ( ) | src/actions/proposals.ts
+2026-07-22 | c984114 | PC-330 | bump next to 15.5.21 for audit GHSA patches | n/a
+2026-07-22 | acf8fb3 | PC-330 | log Next bump and Epic 4-6 backlog scripts | scripts/create-pc-auth-prefs-polish-backlog.mjs
+2026-07-22 | 6a72523 | PC-331 | schema hygiene - stop ensuring dead columns, guard legacy backfills, bump SCHEMA_VERSION 35 ( ) | src/lib/changelog/entries.ts
+2026-07-22 | 22a5dfe | PC-334 | unify admin gates on requireAdminAccess, drop onboarding SMS UI, fix quiet-hours copy, cheap feed update token ( ) | src/actions/admin.ts
+2026-07-23 | 683acb1 | PC-334 | avoid week-edge flake for 11pm self-appointment journeys () | e2e/self-appointment-day-boundary-journey.spec.ts
+2026-07-23 | 61f2fe0 | PC-337 | Google OAuth sync and iCal/ICS delivery | src/actions/calendar.ts
+2026-07-23 | 4ae4b3b | PC-337 | bump next-auth/@auth/core for npm audit | n/a
+2026-07-23 | b6be286 | PC-337 | move OAuth cookie const out of use server | src/actions/calendar.ts
+2026-07-23 | 34aa7fa | PC-337 | disambiguate calendar vs quiet-hours locators | e2e/helpers/onboarding.ts
+2026-07-23 | e6020ae | PC-337 | keep Vercel alive for post-resolve sync | src/lib/calendar/sync.ts
+2026-07-23 | 87a2f6c | PC-345 | Download ICS on cards and inbox | src/actions/proposals/_core.ts
+2026-07-23 | 7540b10 | PC-345 | await ICS sync in E2E so Download ICS is ready | src/actions/proposals/lifecycle.ts
+2026-07-23 | 473570c | PC-345 | seed ICS prefs via harness API for download journey | app/api/e2e/calendar-ics-prefs/route.ts
+2026-07-23 | f632822 | PC-345 | seed ICS prefs via page.request on worker DB | app/api/e2e/calendar-ics-prefs/route.ts
+2026-07-23 | 0303e6e | PC-345 | sync ICS on solo auto-resolve and harden download journey | src/actions/proposals/_core.ts
+2026-07-24 | 6df5a32 | PC-344 | public policy page and Google Limited Use alignment | src/actions/calendar.ts
+2026-07-24 | fa4d93a | PC-344 | expect isImpersonating on requireSession | src/lib/actions/context.test.ts
+2026-07-24 | f1fdb0c | PC-346 | clear calendar and child FKs before hard-delete | src/actions/proposals/hard-delete-cascade.test.ts
+2026-07-24 | 38cbc3d | PC-346 | clear calendar and child FKs before hard-delete | src/actions/proposals/hard-delete-cascade.test.ts
+2026-07-24 | fa524c5 | PC-346 | notify Google sync outcomes and harden Fast sleeping push | src/actions/calendar.ts
+2026-07-24 | 5b800c2 | PC-348 | restore Calendar after Google OAuth and prune inbox | src/actions/calendar.ts
+2026-07-24 | d3e58ef | PC-348 | bump postcss override to clear GHSA-r28c audit gate | package.json
+2026-07-24 | 8a18336 | PC-350 | suite-scoped serial/safe Playwright shards | src/lib/changelog/entries.ts
+2026-07-24 | e0b4073 | PC-351 | per-night batch Google/ICS events without Confirmed | src/lib/calendar/ics.test.ts
+2026-07-25 | 7c2174d | PC-353 | hash link tokens, pause gates, timing-safe secrets | src/actions/admin.ts
+2026-07-25 | 09f3a10 | PC-355 | indexes, FK pragma, bounded scans, sync concurrency | src/actions/notifications.ts
+2026-07-25 | 1644a50 | PC-354 | retrigger Jira commit validation after rebase | n/a
+2026-07-25 | 354b811 | PC-356 | retrigger Jira commit validation after rebase | n/a
+2026-07-25 | 48dd5d5 | PC-356 | fall back Jira range after force-push | scripts/ci-validate-jira-commits.sh
+2026-07-25 | 1c614c8 | PC-357 | shared-DB multi-network tenancy with switcher and journeys | src/actions/networks.ts
+2026-07-25 | 7111419 | PC-357 | wipe and rebackfill networks on e2e DB reset | src/lib/seed/reset-test-database.ts
+2026-07-25 | 0c0a8bd | PC-357 | move join-import out of server actions for e2e | src/actions/networks.ts
+2026-07-25 | ccd31ed | PC-357 | drop unused schema imports | src/actions/networks.ts
+2026-07-25 | 4c048ba | PC-357 | do not re-export lib helpers from use server | src/actions/networks.ts
+2026-07-25 | 23e9567 | PC-357 | scope sleeping partnership unique by networkId | src/lib/db/migrate.ts
+2026-07-25 | c294f44 | PC-357 | restore places and admin delete after tenant reset | src/actions/places.ts
+2026-07-25 | 753ac8a | PC-357 | defer inbox refresh so Close is not detached | src/components/layout/NotificationInbox.tsx
+2026-07-26 | pending | PC-363 | network setup admin account choice + Admin network dashboard | app/setup-network/page.tsx
+2026-07-27 | e307fba | PC-362 | fill pause ModerationDialog reason in admin helper | e2e/helpers/admin.ts
+2026-07-27 | 57b1b92 | PC-364 | put sleeping last and in 0-8am day band | src/components/schedule/ScheduleAgendaView.tsx
+2026-07-27 | 56336cd | PC-365 | milestone soft-delete and partner sleeping | src/actions/feed.ts
+2026-07-27 | e6dfccc | PC-367 | resolve LOCATION and DESCRIPTION for sync | src/lib/calendar/payloads.test.ts
+2026-07-27 | 99eeec3 | PC-368 | elevate platform admins and show access levels | src/actions/platform-admin.ts
+2026-07-27 | 78fc055 | PC-370 | target access-level select via test id | src/components/admin/AdminUserManagementPanel.tsx
+2026-07-27 | e4b3feb | PC-372 | sleeping as day events, optional partners, NYT default | src/actions/admin-fast-sleeping.test.ts
+2026-07-27 | 50253c4 | PC-374 | type inviteeRoles record for Next build | src/components/proposals/FastSleepingPlanGrid.tsx
+2026-07-27 | 4ce3696 | PC-374 | NYT profile default, mark batch partners required, restore browser-local draft times | src/components/proposals/proposalDraftDateUtils.test.ts
+2026-07-27 | bce3969 | PC-376 | match profile TZ label spacing; seed America/New_York | src/lib/seed/e2e-burton-thompson-overlay.ts
+2026-07-27 | 49583fc | PC-376 | align onboarding TZ label with underscore-to-space display | e2e/helpers/onboarding.ts
+2026-07-27 | 1d88f48 | PC-376 | accept New_York or New York in timezone assertions | e2e/helpers/onboarding.ts
+2026-07-27 | dadec83 | PC-376 | normalize recurring all-day windows for viewer TZ | src/actions/proposals/_core.ts
+2026-07-27 | 39f2e14 | PC-376 | align week columns with viewer timezone | src/components/schedule/ScheduleAgendaView.tsx
+2026-07-27 | e4e8a2f | PC-376 | pass timezone into heatmap date keys | src/components/schedule/ScheduleHeatmap.tsx
+2026-07-27 | 260890c | PC-376 | timezone-aware month grid and civil date navigation | src/components/schedule/ScheduleClient.tsx
+2026-07-27 | b5325dd | PC-376 | fetch full civil week and stabilize month layout tests | src/lib/schedule/dates.test.ts
+2026-07-27 | 6f2be44 | PC-376 | drop unused endOfWeekSunday import in fetch-range | src/lib/schedule/fetch-range.ts
+2026-07-28 | 1784447 | PC-378 | add FastSleep auto-confirm proposal type | src/actions/fast-sleep.ts
+2026-07-28 | 96ae2e4 | PC-378 | FastSleep migrate bump and feed/journey gates | src/actions/feed.ts
+2026-07-28 | ad20616 | PC-378 | fall back to goto when bottom-nav click does not navigate | e2e/helpers/navigation.ts
+2026-07-28 | 00dd2f3 | PC-378 | harden platform-admin nav wait for cold compile | e2e/platform-admin-access-journey.spec.ts
+2026-07-28 | 4f51f90 | PC-383 | multi-slot nights, renames, and Feed toggle | src/actions/fast-sleep.ts
+2026-07-28 | fa1e9a5 | PC-383 | use Proposer label in FastSleep journey | e2e/fast-sleep-journey.spec.ts
+2026-07-28 | cf3cef0 | PC-385 | check feedEnabled on shared db handle to avoid SQLite stalls | src/actions/feed.ts
+2026-07-29 | e204c95 | PC-392 | platform/network MOTD, Admin under menu, colored icons | src/actions/motd.ts
+2026-07-29 | 24cc12e | PC-393 | match Admin menu item with exact name | e2e/helpers/navigation.ts
+2026-07-29 | 307f6b0 | PC-393 | assert banner before opening Admin profile menu | e2e/navigation.spec.ts
+2026-07-29 | bb5ff3b | PC-392 | swallow MotdPopupHost fetch errors | src/components/motd/MotdPopupHost.tsx
+2026-07-29 | 1edd3e9 | PC-392 | log MOTD inbox archive in .requirements | src/actions/motd.ts
+2026-07-29 | 44dde3f | PC-392 | harden midnight event visibility wait for day-boundary journey | e2e/helpers/schedule.ts
+2026-07-29 | 67a2660 | PC-392 | dismiss MOTD and scroll for midnight calendar asserts | e2e/self-appointment-day-boundary-journey.spec.ts
+2026-07-29 | dae3096 | PC-392 | harden draft card + reminder drawer asserts | e2e/dates-times-journey.spec.ts

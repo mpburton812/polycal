@@ -1,0 +1,11 @@
+#!/usr/bin/env sh
+# Reject commits on feature/* branches that omit a Jira key (PC-xxx).
+branch="$(git rev-parse --abbrev-ref HEAD)"
+
+case "$branch" in
+  feature/*)
+    npx tsx scripts/validate-jira-commits.ts --file "$1" --branch "$branch"
+    ;;
+  *)
+    ;;
+esac

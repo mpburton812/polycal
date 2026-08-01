@@ -1,0 +1,18 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Default capability for the main tracker window (core + scoped HTTP).",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "http:default",
+    {
+      "identifier": "http:allow-fetch",
+      "allow": [
+        { "url": "http://localhost:*" },
+        { "url": "https://*.vercel.app" },
+        { "url": "https://polycal-ebon.vercel.app" }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,48 @@
+import { Suspense } from "react";
+import { Typography } from "@mui/material";
+import { redirect } from "next/navigation";
+
+import { listProposalBoardAction, listProposalPlaceOptionsAction, listResidencyPlaceOptionsAction } from "@/actions/proposals";
+import { getFastSleepEnabledAction } from "@/actions/fast-sleep";
+import { listPeopleAction } from "@/actions/users";
+import { ProposalsClient } from "@/components/proposals/ProposalsClient";
+import { auth } from "@/lib/auth";
+import { userHasAdminAccess } from "@/lib/admin-access";
+import { brutalPageTitleSx } from "@/theme/brutalUi";
+import type { UserRole } from "@/types/user";
+
+export default async function ProposalsPage() {
+  const session = await auth();
+  if (!session?.user) {
+    redirect("/login");
+  }
+
+  const isAdmin = await userHasAdminAccess(session.user.role as UserRole);
+
+  const [board, people, places, residencyPlaces, fastSleepEnabled] = await Promise.all([
+    listProposalBoardAction(),
+    listPeopleAction(),
+    listProposalPlaceOptionsAction(),
+    listResidencyPlaceOptionsAction(),
+    getFastSleepEnabledAction(),
+  ]);
+
+  return (
+    <>
+      <Typography variant="h5" component="h1" gutterBottom sx={brutalPageTitleSx}>
+        Proposals
+      </Typography>
+      <Suspense fallback={null}>
+        <ProposalsClient
+          board={board}
+          people={people}
+          places={places}
+          residencyPlaces={residencyPlaces}
+          currentUserId={session.user.id}
+          isAdmin={isAdmin}
+          fastSleepEnabled={fastSleepEnabled}
+        />
+      </Suspense>
+    </>
+  );
+}

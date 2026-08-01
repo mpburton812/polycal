@@ -1,0 +1,27 @@
+name: Jira create launch readiness tickets
+
+on:
+  workflow_dispatch:
+
+jobs:
+  jira-create-launch-tickets:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Create PC-57 launch readiness Epic and P0/P1 stories
+        env:
+          JIRA_BASE_URL: ${{ secrets.JIRA_BASE_URL }}
+          JIRA_EMAIL: ${{ secrets.JIRA_EMAIL }}
+          JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
+        run: npx tsx scripts/create-launch-readiness-tickets.ts

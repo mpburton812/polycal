@@ -1,0 +1,171 @@
+"use client";
+
+import type { ScheduleFilterMode } from "@/actions/schedule";
+import { civilDateAtNoonUtc, localDateKey, startOfWeekMonday } from "@/lib/schedule/dates";
+import { startOfMonth } from "@/lib/schedule/month-grid";
+import { DEFAULT_VIEWER_TIMEZONE } from "@/lib/schedule/timezone";
+
+const STORAGE_KEY = "polycal.schedule.view";
+
+export type ScheduleCalendarLayout = "day" | "week" | "month";
+
+/** Unified chrome control: Day | Week | 2 weeks | Month (PC-164 / PC-204). */
+export type SchedulePeriodMode = "day" | "week" | "twoWeek" | "month";
+
+export interface ScheduleViewState {
+  weekStartIso: string;
+  monthAnchorIso: string;
+  calendarLayout: ScheduleCalendarLayout;
+  compact: boolean;
+  filterMode: ScheduleFilterMode;
+  filterPersonId: string;
+}
+
+export function periodModeFromState(
+  state: Pick<ScheduleViewState, "calendarLayout" | "compact">,
+): SchedulePeriodMode {
+  if (state.calendarLayout === "month") return "month";
+  if (state.calendarLayout === "day") return "day";
+  return state.compact ? "twoWeek" : "week";
+}
+
+export function applyPeriodMode(
+  state: ScheduleViewState,
+  mode: SchedulePeriodMode,
+): ScheduleViewState {
+  if (mode === "month") {
+    return { ...state, calendarLayout: "month", compact: false };
+  }
+  if (mode === "day") {
+    return { ...state, calendarLayout: "day", compact: false };
+  }
+  return {
+    ...state,
+    calendarLayout: "week",
+    compact: mode === "twoWeek",
+  };
+}
+
+const DEFAULT_STATE = (): ScheduleViewState => {
+  const now = new Date();
+  const monday = startOfWeekMonday(now);
+  return {
+    weekStartIso: monday.toISOString(),
+    monthAnchorIso: startOfMonth(now).toISOString(),
+    calendarLayout: "week",
+    compact: false,
+    filterMode: "whole",
+    filterPersonId: "",
+  };
+};
+
+/**
+ * Reads persisted schedule UI preferences from localStorage (PC-42 / PC-164).
+ * Anchors are persisted so returning to Schedule restores the last viewed period.
+ */
+export function loadScheduleViewState(): ScheduleViewState {
+  const defaults = DEFAULT_STATE();
+  if (typeof window === "undefined") return defaults;
+  try {
+    const raw = window.localStorage.getItem(STORAGE_KEY);
+    if (!raw) return defaults;
+    const parsed = JSON.parse(raw) as Partial<ScheduleViewState>;
+    const layout = parsed.calendarLayout;
+    const calendarLayout: ScheduleCalendarLayout =
+      layout === "day" || layout === "week" || layout === "month"
+        ? layout
+        : defaults.calendarLayout;
+    return {
+      ...defaults,
+      compact: parsed.compact ?? defaults.compact,
+      calendarLayout,
+      filterMode: parsed.filterMode ?? defaults.filterMode,
+      filterPersonId: parsed.filterPersonId ?? defaults.filterPersonId,
+      weekStartIso: parsed.weekStartIso ?? defaults.weekStartIso,
+      monthAnchorIso: parsed.monthAnchorIso ?? defaults.monthAnchorIso,
+    };
+  } catch {
+    return defaults;
+  }
+}
+
+/**
+ * Persists schedule UI preferences including last-viewed anchors (PC-164).
+ */
+export function saveScheduleViewState(state: ScheduleViewState): void {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+}
+
+export interface ScheduleUrlParams {
+  layout?: SchedulePeriodMode;
+  anchor?: string;
+  open?: string;
+}
+
+/**
+ * Parses schedule URL query params (PC-167).
+ */
+export function parseScheduleUrlParams(search: string): ScheduleUrlParams {
+  const params = new URLSearchParams(search.startsWith("?") ? search.slice(1) : search);
+  const layoutRaw = params.get("layout");
+  const layout =
+    layoutRaw === "day" ||
+    layoutRaw === "week" ||
+    layoutRaw === "twoWeek" ||
+    layoutRaw === "month"
+      ? layoutRaw
+      : undefined;
+  const anchor = params.get("anchor") ?? undefined;
+  const open = params.get("open") ?? undefined;
+  return { layout, anchor, open };
+}
+
+/**
+ * Builds schedule URL search string from view state (PC-167).
+ * Anchor uses local calendar YYYY-MM-DD (not UTC slice of ISO) to avoid remount loops.
+ */
+export function buildScheduleUrlSearch(
+  state: ScheduleViewState,
+  openProposalId?: string | null,
+): string {
+  const params = new URLSearchParams();
+  params.set("layout", periodModeFromState(state));
+  const anchorDate =
+    state.calendarLayout === "month"
+      ? new Date(state.monthAnchorIso)
+      : new Date(state.weekStartIso);
+  params.set("anchor", localCalendarDateKey(anchorDate));
+  if (openProposalId) params.set("open", openProposalId);
+  return params.toString();
+}
+
+/** Local calendar day as yyyy-MM-dd (PC-167). */
+export function localCalendarDateKey(date: Date): string {
+  const pad = (value: number) => String(value).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
+/**
+ * Anchors “Today” — Monday of current week + current month (PC-164).
+ * Day mode overrides weekStartIso to local noon of today in ScheduleClient.
+ */
+export function todayAnchors(
+  now = new Date(),
+): Pick<ScheduleViewState, "weekStartIso" | "monthAnchorIso"> {
+  return {
+    weekStartIso: startOfWeekMonday(now).toISOString(),
+    monthAnchorIso: startOfMonth(now).toISOString(),
+  };
+}
+
+/**
+ * Normalizes an anchor to noon-UTC on that civil day in `timeZone` (PC-204 / PC-376).
+ */
+export function startOfLocalDayNoon(
+  date: Date,
+  timeZone: string = DEFAULT_VIEWER_TIMEZONE,
+): Date {
+  const key = localDateKey(date.toISOString(), timeZone);
+  return civilDateAtNoonUtc(key);
+}

@@ -1,0 +1,155 @@
+name: E2E tests
+
+concurrency:
+  group: e2e-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+on:
+  pull_request:
+    branches:
+      - dev
+      - test
+  push:
+    branches:
+      - "feature/**"
+
+jobs:
+  # Skip feature push E2E when an open PR already covers the same head (PC-239).
+  decide:
+    runs-on: ubuntu-latest
+    outputs:
+      run_e2e: ${{ steps.decide.outputs.run_e2e }}
+    steps:
+      - id: decide
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            echo "run_e2e=true" >> "$GITHUB_OUTPUT"
+            echo "PR event — run E2E"
+            exit 0
+          fi
+          # push to feature/** — skip if an open PR from this branch exists
+          COUNT=$(gh api \
+            "repos/${{ github.repository }}/pulls?head=${{ github.repository_owner }}:${{ github.ref_name }}&state=open" \
+            --jq 'length')
+          if [ "$COUNT" -gt 0 ]; then
+            echo "run_e2e=false" >> "$GITHUB_OUTPUT"
+            echo "Open PR covers ${{ github.ref_name }} — skip push E2E"
+          else
+            echo "run_e2e=true" >> "$GITHUB_OUTPUT"
+            echo "No open PR — run E2E on push"
+          fi
+
+  build:
+    needs: decide
+    if: needs.decide.outputs.run_e2e == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Next.js app
+        run: npm run build
+        env:
+          # Build-time placeholders; Playwright shards supply real e2e env at runtime (PC-174).
+          AUTH_SECRET: e2e-test-auth-secret-min-32-characters
+          NEXT_PUBLIC_APP_ENV: feature
+
+      - name: Upload Next build
+        uses: actions/upload-artifact@v5
+        with:
+          name: next-build
+          include-hidden-files: true
+          path: |
+            .next
+            public
+          retention-days: 1
+
+  # Suite-scoped shards: serial×3 + safe×2 so workers:1 serial is not packed into shards 1–2 (PC-350).
+  playwright:
+    needs: [decide, build]
+    if: needs.decide.outputs.run_e2e == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    name: playwright (${{ matrix.suite }} ${{ matrix.shard }}/${{ matrix.shards }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - suite: serial
+            shard: 1
+            shards: 3
+            workers: "1"
+            include_mobile: "0"
+            projects: "--project=chromium-serial"
+          - suite: serial
+            shard: 2
+            shards: 3
+            workers: "1"
+            include_mobile: "0"
+            projects: "--project=chromium-serial"
+          - suite: serial
+            shard: 3
+            shards: 3
+            workers: "1"
+            include_mobile: "0"
+            projects: "--project=chromium-serial"
+          - suite: safe
+            shard: 1
+            shards: 2
+            workers: "2"
+            include_mobile: "1"
+            projects: "--project=chromium-safe --project=mobile-chrome"
+          - suite: safe
+            shard: 2
+            shards: 2
+            workers: "2"
+            include_mobile: "1"
+            projects: "--project=chromium-safe --project=mobile-chrome"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Download Next build
+        uses: actions/download-artifact@v5
+        with:
+          name: next-build
+
+      - name: Install Playwright browsers
+        run: npx playwright install chromium --with-deps
+
+      - name: Run Playwright ${{ matrix.suite }} ${{ matrix.shard }}/${{ matrix.shards }}
+        run: npm run test:e2e:ci -- ${{ matrix.projects }} --shard=${{ matrix.shard }}/${{ matrix.shards }}
+        env:
+          CI: "1"
+          E2E_PARALLEL_WORKERS: ${{ matrix.workers }}
+          E2E_INCLUDE_MOBILE: ${{ matrix.include_mobile }}
+
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v5
+        with:
+          name: playwright-report-${{ matrix.suite }}-${{ matrix.shard }}
+          path: playwright-report/
+          retention-days: 7

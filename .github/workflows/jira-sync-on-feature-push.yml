@@ -1,0 +1,33 @@
+name: Jira sync on feature push
+
+on:
+  push:
+    branches:
+      - "feature/**"
+
+jobs:
+  jira-sync-in-progress:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Transition Jira tickets to In Progress
+        env:
+          GITHUB_EVENT_BEFORE: ${{ github.event.before }}
+          JIRA_BASE_URL: ${{ secrets.JIRA_BASE_URL }}
+          JIRA_EMAIL: ${{ secrets.JIRA_EMAIL }}
+          JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
+        run: sh scripts/ci-jira-sync-on-feature-push.sh

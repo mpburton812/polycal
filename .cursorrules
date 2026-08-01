@@ -1,0 +1,77 @@
+# System Directive: Vibe Coding & Architecture Standards
+# Updated on 20260718 #mpburton
+# used for PolyCal App
+
+You are an AI programming assistant. You must adhere strictly to the following architectural, security, and documentation constraints for all code generation, refactoring, and project management tasks.
+
+## 1. Environment & Branching Strategy
+- **Branch Structure:** Enforce a strict Git flow utilizing `feature`, `dev`, `test`, and `production` branches. Code generation should assume execution within a `feature` branch until promotion.
+- **Agent-owned pull requests (no manual PR step):** Cursor/Cloud agents **must** open and maintain promotion PRs themselves — the user should **not** need to run `gh pr create` or open a PR in the GitHub UI. After committing and pushing work on a promotion branch, use the **ManagePullRequest** tool to `create_pr` or `update_pr` (set `branch_name`, `base_branch`, title, and body with summary, Jira keys, and test plan). Create or update the PR before ending the turn whenever work is pushed and ready for review or promotion. Do **not** tell the user to open the PR manually. Merge PRs only when the user explicitly requests merge.
+- **Dev Promotion (feature → dev):** **Always** promote via a **GitHub Pull Request** — never direct `git push origin dev` or local merge-and-push to `dev`. **Agent workflow:** run promotion gates (`npm audit`, `npm run test:unit`), push `feature/*` or `cursor/*`, then **ManagePullRequest** `create_pr` with `base_branch: dev` (or `update_pr` if one exists). **Local developer shortcut:** `npm run merge-feature` (see `docs/DEV-PROMOTION.md`). CI must pass before merge. This triggers Jira In Review (PR open) and Done (merge) automation.
+- **Test Promotion (dev → test):** **Always** promote via a **GitHub Pull Request** — never direct push to `test`. **Agent workflow:** push, then **ManagePullRequest** `create_pr` with `base_branch: test` and `branch_name: dev` (or update the existing promotion PR). CI must pass before merge.
+- **Production Promotion (test → production):** **Always** promote via a **GitHub Pull Request** — never direct push to `production`. **Agent workflow:** push, then **ManagePullRequest** `create_pr` with `base_branch: production` and `branch_name: test` (or update the existing promotion PR). CI must pass before merge. **User journey testing is mandatory** before opening or merging this PR (see **User journey testing** below).
+- **User journey testing:** Multi-step Playwright flows in `e2e/*journey*.spec.ts` and any script-driven or manual browser verification of realistic end-user paths. Distinct from unit tests (Vitest) and from CI’s full Playwright job, which may still run on PRs as an automated safety net.
+  - **Production (`test` → `production`):** **Always mandatory.** Before opening or merging the promotion PR, run the full user journey suite locally (`npx playwright test e2e/*journey*.spec.ts` after `npm run test:e2e` prepare, or `npm run test:e2e` for full parity) and resolve all failures. Document pass status in the PR test plan.
+  - **Dev (`feature` → `dev`) and test (`dev` → `test`):** **Not mandatory by default.** Run user journey tests only when the user’s promotion request explicitly includes the phrase **`user test`** (case-insensitive). Without `user test`, promote after `npm audit`, Vitest, and green CI — do not block on local user journey runs or wait for journey-level manual verification unless requested.
+  - When `user test` is requested for dev/test promotion: run user journey specs, fix regressions, and note results in the PR test plan before merge.
+  - **No demo recordings:** Do **not** capture screen recordings or demo videos as walkthrough artifacts. Demonstrate and verify changes with automated tests (Vitest/Playwright), plus screenshots and logs where helpful, and describe manual verification in text. Skip video capture entirely.
+- **CI Playwright (`e2e.yml`):** Runs the full `e2e/` suite on PRs to `dev`/`test` and on `feature/**` pushes. PR checks must be green before merge. On failure: inspect `playwright-report/` (`npm run test:e2e:report`) and `test-results/`.
+- **Data Isolation:** Maintain strict logical and physical separation between non-production (`dev`/`test`) and `production` databases.
+- **Database Seeding:** Generate and maintain dedicated seeding scripts that populate `dev` and `test` environments with predictable, reset-friendly, realistic test scenarios derived from current and previous builds. Ensure production deployments strictly exclude all seeding logic and dummy data.
+
+## 2. Documentation & Traceability
+- **Requirement Breakdown:** Deconstruct broad feature requests into individual, discrete requirements before writing code. Link these specific requirements directly to their corresponding code modules.
+- **Requirement Logging:** Automatically log every individual requirement addressed per commit into a dedicated `.requirements` file in the project root.
+- **PolyCal Requirements Workflow:** Follow `docs/REQUIREMENTS-WORKFLOW.md` — Jira (PC) is planning source of truth; `.requirements` is the append-only delivery log; every `feature/*` commit must reference `PC-xxx`. Create Epic + tickets before implementation. **Jira status:** agent sets In Progress at start and In Review before PR if needed; CI automates In Progress (feature push), In Review (PR→dev), and Done (merge→dev). Never set Done before merge to `dev`.
+- **Inline Documentation:** Generate comprehensive docstrings for all new functions. Inline comments must explicitly explain the "why" (context/purpose) and "how" (algorithmic approach), avoiding redundant descriptions of the "what".
+- **Living Documents:** Update the project changelog and relevant architectural design documents for every significant structural or functional modification.
+
+## 3. Security Standards
+- **Core Framework:** Strictly enforce OWASP Top Ten security principles across all layers of the application.
+- **Zero Trust / Deny-by-Default:** Implement a deny-by-default architecture. Assume all input is malicious.
+- **Defense-in-Depth:** Validate and sanitize all external data inputs. Encrypt all sensitive data in transit and at rest.
+- **Secrets Management:** Never generate code that hardcodes API keys, tokens, or sensitive configuration values. Rely exclusively on secure environment variables and external secret managers.
+
+## 4. UI/UX & Accessibility Standards
+- **Design Systems:** Adhere strictly to Material Design or Human Interface Guidelines (platform-dependent) to guarantee consistent layout, typography, and intuitive navigation.
+- **Accessibility (a11y):** Implement fundamental accessibility standards by default. This includes mandatory `alt` text for all media, semantic HTML, keyboard navigability, and clear visual cues/state changes for interactive elements.
+
+## 5. Code Quality & Dependency Management
+- **Formatting:** Output code that strictly conforms to the project's established linter and formatter configurations.
+- **Dependency Auditing:** Continuously monitor and recommend updates for third-party dependencies to patch security vulnerabilities and optimize performance.
+- **`npm audit` Gate (feature → dev):** Before any push or merge request from `feature/*` to `dev`, run `npm audit` and **resolve all reported issues** (critical, high, moderate, and low). Apply fixes via `npm audit fix`, targeted dependency upgrades, or documented compensating controls when no fix exists. Do not promote to `dev` with unresolved audit findings unless the user explicitly approves an exception documented in the MR/PR description.
+- **Promotion test gates (by target):**
+  - **feature → dev / dev → test:** `npm audit` (feature → dev only), Vitest (`npm run test:unit`), green CI. User journey tests **only** when the promotion request includes **`user test`**.
+  - **test → production:** `npm audit`, Vitest, green CI on the promotion PR chain, and **mandatory user journey testing** (see §1). Production PR descriptions must note user journey pass status.
+
+## 6. Testing & CI/CD Workflow Generation
+When generating or modifying `.github/workflows/` files, adhere to these explicit pipeline definitions:
+
+- **Playwright E2E (`e2e.yml`):**
+  - **Trigger:** Pull Request to `dev` or `test`; push to `feature/**`.
+  - **Actions Required:** `npm ci` → `npx playwright install chromium --with-deps` → `npm run test:e2e:ci`.
+  - **Validation:** Full `e2e/` suite against isolated `e2e.db` (Star Wars seed). Fail the pipeline on any test failure.
+  - **Artifacts:** Upload `playwright-report/` on failure.
+
+- **Dev Environment Workflow (`dev.yml`):**
+  - **Trigger:** Pull Request or merge from `feature` to `dev`.
+  - **Actions Required:** Instruct the generation of missing unit, integration, and Playwright tests for the promoted code.
+  - **Validation:** Execute automated checks against OWASP Top Ten compliance and accessibility standards. Run `npm audit` and fail the pipeline on unresolved vulnerabilities (or enforce the same policy via `.gitlab-ci.yml` when using GitLab). Run Playwright E2E via `e2e.yml` (or inline equivalent).
+  - **Execution:** Run the full test suite and report pass/fail status directly to the GitHub PR.
+
+- **Test Environment Workflow (`test.yml`):**
+  - **Trigger:** Promotion from `dev` to `test`.
+  - **Actions Required:** Confirm CI is green on the promoting PR. Assess whether new user journeys are needed when the promotion request included **`user test`**.
+  - **Execution:** CI runs Playwright via `e2e.yml`. User journey verification is **not** a default agent gate for this tier unless **`user test`** was requested.
+
+- **Production Environment Workflow (`production.yml`):**
+  - **Trigger:** Promotion from `test` to `production`.
+  - **Actions Required:** Confirm Playwright E2E and `npm audit` passed on the promoting PR chain; **mandatory user journey testing** before merge; no new code may reach `production` without green CI on the `test` → `production` PR and documented user journey pass status.
+
+## 7. User Management & Identity Architecture
+- **Authentication & Persistence:** Implement stateless, persistent authentication using industry-standard protocols (e.g., JWTs stored in HttpOnly secure cookies, or OAuth 2.0). Explicitly prohibit storing sensitive session tokens in LocalStorage or SessionStorage.
+- **Role-Based Access Control (RBAC):** Enforce strict, hierarchical access control with explicitly defined roles (e.g., `User`, `Manager`, `Admin`). Require authorization validation at both the frontend (route guarding and component visibility) and the backend (API endpoint execution).
+- **Self-Service & Profile Management:** Generate isolated, contemporary interfaces for users to manage their profiles, application preferences, and security settings (e.g., password rotation).
+- **Administrative Controls:** Design a dedicated administrative dashboard decoupled from the standard user interface. Include specific capabilities for user lifecycle management (create, read, update, suspend, delete), role assignment, and system-wide configuration updates.
+- **State Management:** Utilize centralized frontend state management to securely maintain and propagate the user's active session, role, and localized preferences across the application architecture without requiring redundant database queries.
+- **Audit Logging:** Automatically log all critical identity events
