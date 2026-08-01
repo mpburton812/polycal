@@ -6,7 +6,7 @@ import { isNonProductionEnvironment } from "@/lib/env";
 import {
   locationResidents,
   locations,
-  polyGroup,
+  networks,
   sleepingPartnerships,
   users,
   type UserRole,
@@ -113,10 +113,11 @@ export async function seedTestFamilyFoundation(options?: {
   );
   const adminUserId = userIdByUsername.get("mpburton") ?? TEST_FAMILY_USERS[0].id;
 
-  await db.insert(polyGroup).values({
-    id: 1,
+  await db.insert(networks).values({
+    id: "seed-network-burton-thompson",
     name: "Burton-Thompson",
     allowUserProvisioning: false,
+    createdAt: now,
     updatedAt: now,
   });
 

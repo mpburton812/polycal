@@ -98,7 +98,7 @@ export const users = sqliteTable("users", {
   updatedAt: text("updated_at").notNull(),
 });
 
-/** Singleton poly-group metadata row (id must always be 1). */
+/** @deprecated Legacy singleton settings table — app reads from `networks` only. */
 export const polyGroup = sqliteTable("poly_group", {
   id: integer("id").primaryKey(),
   name: text("name").notNull(),
@@ -160,8 +160,7 @@ export const polyGroup = sqliteTable("poly_group", {
 });
 
 /**
- * Product tenant (PC-357) — replaces singleton poly_group as the settings +
- * isolation boundary. poly_group remains for legacy dual-write during transition.
+ * Product tenant (PC-357) — settings and isolation boundary for scheduling data.
  */
 export const networks = sqliteTable("networks", {
   id: text("id").primaryKey(),

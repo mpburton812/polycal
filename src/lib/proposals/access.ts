@@ -1,11 +1,9 @@
-import { eq } from "drizzle-orm";
-
 import { getDb } from "@/lib/db/client";
-import { polyGroup, type ProposalState, type ProposalType } from "@/lib/db/schema";
-import { loadNetworkSettings } from "@/lib/networks/settings";
+import { type ProposalState, type ProposalType } from "@/lib/db/schema";
+import { loadNetworkSettings, resolveNetworkSettings } from "@/lib/networks/settings";
 import { isSleepingLikeType } from "@/lib/proposals/sleeping-like";
 import { shouldMaskSleepingForViewer } from "@/lib/schedule/slice-auth";
-import type { AuditLogVisibility } from "@/types/poly-group";
+import type { AuditLogVisibility } from "@/types/network-settings";
 
 /** Title shown when sleeping details are masked on calendar/slice (PC-307). */
 export const MASKED_TITLE = "Busy";
@@ -48,16 +46,8 @@ export async function getAdminCanSeeUninvolved(
   db: ReturnType<typeof getDb> = getDb(),
   networkId?: string,
 ): Promise<boolean> {
-  if (networkId) {
-    const settings = await loadNetworkSettings(networkId, db);
-    return settings?.adminCanSeeUninvolved ?? true;
-  }
-  const [group] = await db
-    .select({ adminCanSeeUninvolved: polyGroup.adminCanSeeUninvolved })
-    .from(polyGroup)
-    .where(eq(polyGroup.id, 1))
-    .limit(1);
-  return group?.adminCanSeeUninvolved ?? true;
+  const settings = await resolveNetworkSettings(db, networkId);
+  return settings?.adminCanSeeUninvolved ?? true;
 }
 
 /** Whether the viewer may see a proposal in a non-draft column. */

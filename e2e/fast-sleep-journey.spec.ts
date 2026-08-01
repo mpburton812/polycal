@@ -79,7 +79,7 @@ test.describe("FastSleep journey", () => {
 
     await loginWithOnboardingIfNeeded(page, USERS.luke.username);
     await goToAdmin(page);
-    await expandAdminSection(page, "Poly group settings");
+    await expandAdminSection(page, "Network settings");
     const toggle = page.getByLabel("Enable FastSleep Proposal");
     await expect(toggle).toBeVisible({ timeout: 15_000 });
     if (await toggle.isChecked()) {

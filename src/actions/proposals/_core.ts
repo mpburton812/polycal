@@ -13,7 +13,6 @@ import { ensureDbReady } from "@/lib/db/ensure-ready";
 import { requireNetworkSession } from "@/lib/networks/context";
 import {
   locations,
-  polyGroup,
   proposalComments,
   proposalInvitees,
   proposalSlotVotes,
@@ -119,42 +118,6 @@ function parseRecurrenceRule(raw: string | null): RecurrenceRule | null {
 function serializeRecurrenceRule(rule: RecurrenceRule | undefined): string | null {
   if (!rule) return null;
   return JSON.stringify(rule);
-}
-
-/** Loads proposal audit-log visibility policy from poly group settings (PC-45). */
-async function getAuditLogVisibility(
-  db: ReturnType<typeof getDb>,
-): Promise<(typeof polyGroup.$inferSelect)["auditLogVisibility"]> {
-  const [group] = await db
-    .select({ auditLogVisibility: polyGroup.auditLogVisibility })
-    .from(polyGroup)
-    .where(eq(polyGroup.id, 1))
-    .limit(1);
-  return group?.auditLogVisibility ?? "admin_only";
-}
-
-/**
- * Filters proposal state log entries per poly-group audit visibility (PC-45).
- */
-function filterStateLogForViewer(
-  logRows: ProposalStateLogView[],
-  visibility: string,
-  viewerId: string,
-  isAdmin: boolean,
-  isProposer: boolean,
-  isInvitee: boolean,
-): ProposalStateLogView[] {
-  if (
-    viewerCanSeeAuditLog(
-      visibility,
-      isAdmin,
-      isProposer,
-      isInvitee,
-    )
-  ) {
-    return logRows;
-  }
-  return [];
 }
 
 import { optionalInviteeVotesPending } from "@/lib/proposals/poll-utils";

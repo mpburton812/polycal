@@ -18,7 +18,6 @@ import {
   locationResidents,
   locations,
   networkMembers,
-  polyGroup,
   proposalInvitees,
   proposalSlotVotes,
   proposals,
@@ -34,6 +33,7 @@ import {
   upsertMembership,
 } from "@/lib/networks/membership";
 import { requireNetworkSession } from "@/lib/networks/context";
+import { loadNetworkSettings } from "@/lib/networks/settings";
 import {
   ACCOUNT_DELETE_CONFIRMATION_PHRASE,
   anonymizedUserFields,
@@ -140,10 +140,12 @@ async function canProvisionUsers(): Promise<boolean> {
   if (!session?.user) return false;
   if (session.user.role === "admin") return true;
 
+  const networkSession = await requireNetworkSession();
+  if (!networkSession.ok) return false;
+
   await ensureDbReady();
-  const db = getDb();
-  const [group] = await db.select().from(polyGroup).where(eq(polyGroup.id, 1)).limit(1);
-  return Boolean(group?.allowUserProvisioning);
+  const settings = await loadNetworkSettings(networkSession.user.activeNetworkId);
+  return Boolean(settings?.allowUserProvisioning);
 }
 
 function slugify(value: string): string {

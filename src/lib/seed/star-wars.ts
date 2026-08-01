@@ -3,7 +3,7 @@ import { hash } from "bcryptjs";
 
 import { getDb } from "@/lib/db/client";
 import { isNonProductionEnvironment } from "@/lib/env";
-import { locationResidents, locations, polyGroup, users, type UserRole } from "@/lib/db/schema";
+import { locationResidents, locations, networks, users, type UserRole } from "@/lib/db/schema";
 
 const DEFAULT_PASSWORD = "ChangeMe123!";
 
@@ -138,10 +138,11 @@ export async function seedStarWarsFoundation(options?: {
   const now = new Date().toISOString();
   const passwordHash = await hash(DEFAULT_PASSWORD, 12);
 
-  await db.insert(polyGroup).values({
-    id: 1,
+  await db.insert(networks).values({
+    id: "seed-network-rebel-alliance",
     name: "Rebel Alliance",
     allowUserProvisioning: false,
+    createdAt: now,
     updatedAt: now,
   });
 
