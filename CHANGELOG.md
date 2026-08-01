@@ -21,6 +21,7 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Changed
+- Schema refactor phase 2: network-aware admin authorization; sync `users.role` from network memberships. Change control: `2026.08.01b`.
 - Schema refactor phase 1: retire poly_group app reads; route settings through networks; rename Poly Group → Network in admin UI. Change control: `2026.08.01a`.
 
 ### Added

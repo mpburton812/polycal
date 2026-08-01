@@ -6,7 +6,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { auth } from "@/lib/auth";
-import { userHasAdminAccess } from "@/lib/admin-access";
+import { adminAccessFromSessionUser, userHasAdminAccess } from "@/lib/admin-access";
 import { latestIcsPendingIdsByProposal } from "@/lib/calendar/pending-ics";
 import { getDb } from "@/lib/db/client";
 import { ensureDbReady } from "@/lib/db/ensure-ready";
@@ -301,7 +301,7 @@ export async function listSleepingLocationOptionsAction(
   if (!session?.user) return [];
 
   const db = getDb();
-  const isAdmin = await userHasAdminAccess(session.user.role);
+  const isAdmin = await userHasAdminAccess(adminAccessFromSessionUser(session.user));
   const placeSelect = {
     id: locations.id,
     name: locations.name,
@@ -344,7 +344,7 @@ export async function listProposalPlaceOptionsAction(): Promise<ProposalPlaceOpt
   if (!session?.user) return [];
 
   const db = getDb();
-  const isAdmin = await userHasAdminAccess(session.user.role);
+  const isAdmin = await userHasAdminAccess(adminAccessFromSessionUser(session.user));
 
   const placeSelect = {
     id: locations.id,
@@ -603,7 +603,7 @@ export async function adminCheckProposalConflictsAction(
   proposalId: string,
 ): Promise<{ ok: boolean; message: string; warnings: ProposalConflictWarning[] }> {
   const session = await auth();
-  if (!session?.user || !(await userHasAdminAccess(session.user.role))) {
+  if (!session?.user || !(await userHasAdminAccess(adminAccessFromSessionUser(session.user)))) {
     return { ok: false, message: "Admin access required.", warnings: [] };
   }
 
@@ -846,7 +846,7 @@ export async function updateDraftProposalAction(
     return { ok: false, message: "Draft not found." };
   }
 
-  const isAdmin = await userHasAdminAccess(session.user.role);
+  const isAdmin = await userHasAdminAccess(adminAccessFromSessionUser(session.user));
   const isOwner = proposal.proposerId === session.user.id;
   // Match canEdit: proposer or admin may update drafts (PC-375).
   if (!isOwner && !isAdmin) {
@@ -1311,7 +1311,7 @@ export async function getProposalDetailAction(
 
   await ensureDbReady();
   const db = getDb();
-  const isAdmin = await userHasAdminAccess(session.user.role);
+  const isAdmin = await userHasAdminAccess(adminAccessFromSessionUser(session.user));
   const adminCanSeeUninvolved = await getAdminCanSeeUninvolved(db);
 
   const [row] = await db
@@ -1849,7 +1849,7 @@ export async function castProposalVoteAction(
     return { ok: false, message: "Proposal is not open for voting." };
   }
 
-  const isAdmin = await userHasAdminAccess(session.user.role);
+  const isAdmin = await userHasAdminAccess(adminAccessFromSessionUser(session.user));
   const targetUserId = parsed.data.onBehalfOfUserId ?? session.user.id;
   const isProxy = Boolean(parsed.data.onBehalfOfUserId);
 

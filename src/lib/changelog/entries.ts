@@ -28,6 +28,29 @@ import { CHANGELOG_ARCHIVE } from "./entries.archive";
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "2026.08.01b",
+    date: "2026-08-01",
+    summary:
+      "Schema refactor phase 2: network-aware admin authorization; sync users.role from memberships.",
+    changes: [
+      {
+        type: "changed",
+        description:
+          "Admin access gates use active network role and platform admin flag instead of legacy users.role alone.",
+      },
+      {
+        type: "changed",
+        description:
+          "users.role is kept as a denormalized cache synced from network membership on upsert (syncDenormalizedUserRole).",
+      },
+      {
+        type: "changed",
+        description:
+          "Removed legacy isActiveNetworkAdmin fallback to users.role === admin; impersonation JWT checks network_admin.",
+      },
+    ],
+  },
+  {
     version: "2026.08.01a",
     date: "2026-08-01",
     summary:

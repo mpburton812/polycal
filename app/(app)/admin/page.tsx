@@ -14,7 +14,11 @@ import { listAdminUsersAction } from "@/actions/users";
 import { AdminCodeStatusPanel } from "@/components/admin/AdminCodeStatusPanel";
 import { AdminNetworkDashboardPanel } from "@/components/admin/AdminNetworkDashboardPanel";
 import { auth } from "@/lib/auth";
-import { userCanSeeAdminTab, userHasAdminAccess } from "@/lib/admin-access";
+import {
+  adminAccessFromSessionUser,
+  resolveAdminAccess,
+  userCanSeeAdminTab,
+} from "@/lib/admin-access";
 import { CHANGELOG, getLatestChangelogEntry } from "@/lib/changelog/entries";
 import { isImpersonationConfigured } from "@/lib/auth/impersonation";
 import { getBuildInfo, isNonProductionEnvironment } from "@/lib/env";
@@ -83,7 +87,7 @@ export default async function AdminPage() {
     redirect("/feed");
   }
 
-  const isLegacyAdmin = await userHasAdminAccess(session.user.role);
+  const isLegacyAdmin = resolveAdminAccess(adminAccessFromSessionUser(session.user));
   const isPlatformAdmin = session.user.isPlatformAdmin === true;
   const isNetworkAdmin =
     activeNetworkRole === "network_admin" || isLegacyAdmin || isPlatformAdmin;

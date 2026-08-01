@@ -3,7 +3,7 @@
 import { and, asc, eq, gte, inArray, isNotNull, isNull, lte, or } from "drizzle-orm";
 import { z } from "zod";
 
-import { userHasAdminAccess } from "@/lib/admin-access";
+import { adminAccessFromSessionUser, userHasAdminAccess } from "@/lib/admin-access";
 import { requireNetworkSession } from "@/lib/networks/context";
 import { withDb } from "@/lib/actions/context";
 import { getDb } from "@/lib/db/client";
@@ -164,7 +164,7 @@ export async function listScheduleEventsAction(
   const isAdmin =
     sessionResult.user.activeNetworkRole === "network_admin" ||
     sessionResult.user.isPlatformAdmin ||
-    (await userHasAdminAccess(sessionResult.user.role));
+    (await userHasAdminAccess(adminAccessFromSessionUser(sessionResult.user)));
   const [viewerRow] = await db
     .select({ timezone: users.timezone })
     .from(users)
