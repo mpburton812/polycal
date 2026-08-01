@@ -28,6 +28,23 @@ import { CHANGELOG_ARCHIVE } from "./entries.archive";
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "2026.08.01c",
+    date: "2026-08-01",
+    summary: "Schema refactor phase 3: modularize Drizzle schema by domain.",
+    changes: [
+      {
+        type: "changed",
+        description:
+          "Split monolithic schema.ts into domain modules under src/lib/db/schema/ (identity, networks, proposals, feed, calendar, etc.).",
+      },
+      {
+        type: "changed",
+        description:
+          "schema.ts is now a thin re-export shim; existing @/lib/db/schema imports unchanged.",
+      },
+    ],
+  },
+  {
     version: "2026.08.01b",
     date: "2026-08-01",
     summary:
