@@ -1,5 +1,9 @@
 import { auth } from "@/lib/auth";
-import { userHasAdminAccess } from "@/lib/admin-access";
+import {
+  adminAccessFromSessionUser,
+  resolveAdminAccess,
+  userHasAdminAccess,
+} from "@/lib/admin-access";
 import { getDb } from "@/lib/db/client";
 import { ensureDbReady } from "@/lib/db/ensure-ready";
 import type { UserRole } from "@/types/user";
@@ -52,15 +56,27 @@ export async function requireSession():
  */
 export async function requireAdminAccess():
   Promise<{ ok: true; user: SessionUser } | ActionContextError> {
-  const sessionResult = await requireSession();
-  if (!sessionResult.ok) {
-    return sessionResult;
+  const session = await auth();
+  if (!session?.user?.id) {
+    return { ok: false, message: "Sign in required." };
   }
-  const isAdmin = await userHasAdminAccess(sessionResult.user.role);
-  if (!isAdmin) {
+  if (session.user.accountStatus === "paused") {
+    return { ok: false, message: PAUSED_ACCOUNT_MESSAGE };
+  }
+  if (session.user.accountStatus === "banned") {
+    return { ok: false, message: "Your account has been banned." };
+  }
+  if (!resolveAdminAccess(adminAccessFromSessionUser(session.user))) {
     return { ok: false, message: "Admin access required." };
   }
-  return sessionResult;
+  return {
+    ok: true,
+    user: {
+      id: session.user.id,
+      role: session.user.role as UserRole,
+      isImpersonating: session.user.isImpersonating === true,
+    },
+  };
 }
 
 /**

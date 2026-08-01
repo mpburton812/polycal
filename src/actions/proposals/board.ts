@@ -3,7 +3,7 @@
 import { and, asc, desc, eq, inArray, ne, or } from "drizzle-orm";
 
 import { auth } from "@/lib/auth";
-import { userHasAdminAccess } from "@/lib/admin-access";
+import { adminAccessFromSessionUser, userHasAdminAccess } from "@/lib/admin-access";
 import { requireNetworkSession } from "@/lib/networks/context";
 import { getDb } from "@/lib/db/client";
 import { ensureDbReady } from "@/lib/db/ensure-ready";
@@ -88,7 +88,7 @@ export async function listProposalBoardAction(): Promise<ProposalBoard> {
   const isAdmin =
     networkSession.user.activeNetworkRole === "network_admin" ||
     networkSession.user.isPlatformAdmin ||
-    (await userHasAdminAccess(networkSession.user.role));
+    (await userHasAdminAccess(adminAccessFromSessionUser(networkSession.user)));
   const adminCanSeeUninvolved = await getAdminCanSeeUninvolved(db, networkId);
   const adminSeesAll = isAdmin && adminCanSeeUninvolved;
   const nowIso = new Date().toISOString();

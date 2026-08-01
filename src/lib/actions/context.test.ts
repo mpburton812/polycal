@@ -5,7 +5,8 @@ vi.mock("@/lib/auth", () => ({
 }));
 
 vi.mock("@/lib/admin-access", () => ({
-  userHasAdminAccess: vi.fn(),
+  resolveAdminAccess: vi.fn(),
+  adminAccessFromSessionUser: vi.fn((user) => user),
 }));
 
 vi.mock("@/lib/db/ensure-ready", () => ({
@@ -17,7 +18,7 @@ vi.mock("@/lib/db/client", () => ({
 }));
 
 import { auth } from "@/lib/auth";
-import { userHasAdminAccess } from "@/lib/admin-access";
+import { adminAccessFromSessionUser, resolveAdminAccess } from "@/lib/admin-access";
 import { getDb } from "@/lib/db/client";
 import {
   PAUSED_ACCOUNT_MESSAGE,
@@ -29,7 +30,9 @@ import {
 describe("action context helpers", () => {
   beforeEach(() => {
     vi.mocked(auth).mockReset();
-    vi.mocked(userHasAdminAccess).mockReset();
+    vi.mocked(resolveAdminAccess).mockReset();
+    vi.mocked(adminAccessFromSessionUser).mockReset();
+    vi.mocked(adminAccessFromSessionUser).mockImplementation((user) => user);
   });
 
   it("requireSession returns error when unsigned", async () => {
@@ -76,22 +79,22 @@ describe("action context helpers", () => {
       user: { id: "u1", role: "admin", accountStatus: "paused" },
       expires: "",
     } as never);
-    vi.mocked(userHasAdminAccess).mockResolvedValue(true);
+    vi.mocked(resolveAdminAccess).mockReturnValue(true);
     const result = await requireAdminAccess();
     expect(result).toEqual({ ok: false, message: PAUSED_ACCOUNT_MESSAGE });
-    expect(userHasAdminAccess).not.toHaveBeenCalled();
+    expect(resolveAdminAccess).not.toHaveBeenCalled();
   });
 
-  it("requireAdminAccess checks userHasAdminAccess", async () => {
+  it("requireAdminAccess checks resolveAdminAccess", async () => {
     vi.mocked(auth).mockResolvedValue({
       user: { id: "u1", role: "user" },
       expires: "",
     } as never);
-    vi.mocked(userHasAdminAccess).mockResolvedValue(false);
+    vi.mocked(resolveAdminAccess).mockReturnValue(false);
     const denied = await requireAdminAccess();
     expect(denied).toEqual({ ok: false, message: "Admin access required." });
 
-    vi.mocked(userHasAdminAccess).mockResolvedValue(true);
+    vi.mocked(resolveAdminAccess).mockReturnValue(true);
     const allowed = await requireAdminAccess();
     expect(allowed.ok).toBe(true);
   });

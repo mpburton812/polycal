@@ -77,7 +77,11 @@ async function hasAdminSessionJwt(): Promise<boolean> {
       secret,
       secureCookie,
     });
-    if (token?.role === "admin") {
+    if (
+      token?.role === "admin" ||
+      token?.activeNetworkRole === "network_admin" ||
+      token?.isPlatformAdmin === true
+    ) {
       return true;
     }
   }

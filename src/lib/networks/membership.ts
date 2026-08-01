@@ -4,6 +4,7 @@ import { randomUUID } from "crypto";
 import { getDb } from "@/lib/db/client";
 import { networkMembers, networks, users } from "@/lib/db/schema";
 import type { NetworkMemberRole } from "@/types/network";
+import { networkRoleToLegacyRole } from "@/types/network";
 
 export type MembershipRow = {
   id: string;
@@ -85,6 +86,27 @@ export async function getMembership(
 }
 
 /**
+ * Keeps users.role aligned with the user's highest active network membership
+ * (denormalized cache for legacy call sites — schema refactor phase 2).
+ */
+export async function syncDenormalizedUserRole(userId: string): Promise<void> {
+  const memberships = await listActiveMemberships(userId);
+  const primary =
+    memberships.find((m) => m.role === "network_admin") ?? memberships[0];
+  if (!primary) return;
+
+  const db = getDb();
+  const now = new Date().toISOString();
+  await db
+    .update(users)
+    .set({
+      role: networkRoleToLegacyRole(primary.role),
+      updatedAt: now,
+    })
+    .where(eq(users.id, userId));
+}
+
+/**
  * Upserts an active membership. Used by create/join and passive follow (PC-357).
  */
 export async function upsertMembership(input: {
@@ -114,6 +136,7 @@ export async function upsertMembership(input: {
         updatedAt: now,
       })
       .where(eq(networkMembers.id, existing.id));
+    await syncDenormalizedUserRole(input.userId);
     return existing.id;
   }
 
@@ -127,6 +150,7 @@ export async function upsertMembership(input: {
     createdAt: now,
     updatedAt: now,
   });
+  await syncDenormalizedUserRole(input.userId);
   return id;
 }
 

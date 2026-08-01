@@ -32,6 +32,7 @@ import {
   removeMembership,
   upsertMembership,
 } from "@/lib/networks/membership";
+import { resolveAdminAccess } from "@/lib/admin-access";
 import { requireNetworkSession } from "@/lib/networks/context";
 import { loadNetworkSettings } from "@/lib/networks/settings";
 import {
@@ -138,7 +139,15 @@ export interface UserActionResult {
 async function canProvisionUsers(): Promise<boolean> {
   const session = await auth();
   if (!session?.user) return false;
-  if (session.user.role === "admin") return true;
+  if (
+    resolveAdminAccess({
+      role: session.user.role,
+      activeNetworkRole: session.user.activeNetworkRole,
+      isPlatformAdmin: session.user.isPlatformAdmin,
+    })
+  ) {
+    return true;
+  }
 
   const networkSession = await requireNetworkSession();
   if (!networkSession.ok) return false;
