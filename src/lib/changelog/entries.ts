@@ -28,6 +28,29 @@ import { CHANGELOG_ARCHIVE } from "./entries.archive";
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "2026.08.01a",
+    date: "2026-08-01",
+    summary:
+      "Schema refactor phase 1: retire poly_group app reads; rename Poly Group to Network.",
+    changes: [
+      {
+        type: "changed",
+        description:
+          "All settings reads and writes route through the networks table; poly_group dual-write removed from admin settings save.",
+      },
+      {
+        type: "changed",
+        description:
+          "Admin UI and API surface renamed from Poly Group to Network (settings panel, display name, seeds).",
+      },
+      {
+        type: "changed",
+        description:
+          "Seeds insert networks rows directly; deprecated shims remain at poly-group.ts for transitional imports.",
+      },
+    ],
+  },
+  {
     version: "2026.07.29a",
     date: "2026-07-29",
     summary:
