@@ -1,17 +1,18 @@
 "use client";
 
 import { Box, Typography } from "@mui/material";
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 
 import type { ScheduleEvent } from "@/actions/schedule";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ScheduleEventBlock } from "@/components/schedule/ScheduleEventBlock";
 import {
+  addDays,
   formatDayHeader,
   isTodayDate,
   localDateKey,
   scheduleDayCellSx,
-  scheduleDaysStartingToday,
+  startOfWeekMonday,
 } from "@/lib/schedule/dates";
 import { sortDayEvents } from "@/lib/schedule/sort-day-events";
 import { DEFAULT_VIEWER_TIMEZONE } from "@/lib/schedule/timezone";
@@ -31,6 +32,7 @@ interface ScheduleAgendaViewProps {
 
 /**
  * Mobile-friendly agenda list grouped by day (PC-166).
+ * Scrolls so Today is the first visible day section (PC-400).
  */
 export function ScheduleAgendaView({
   weekStart,
@@ -42,10 +44,17 @@ export function ScheduleAgendaView({
   compactOverflowLimit = 4,
   onDayOverflowClick,
 }: ScheduleAgendaViewProps) {
-  const days = useMemo(
-    () => scheduleDaysStartingToday(weekStart, dayCount, timeZone),
-    [weekStart, dayCount, timeZone],
-  );
+  const days = useMemo(() => {
+    const monday = startOfWeekMonday(weekStart, timeZone);
+    return Array.from({ length: dayCount }, (_, index) => addDays(monday, index));
+  }, [weekStart, dayCount, timeZone]);
+
+  const todayRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    // Pin Today at the top of the scrollable agenda without dropping earlier weekdays (PC-400).
+    todayRef.current?.scrollIntoView({ block: "start", behavior: "instant" in window ? "instant" : "auto" });
+  }, [days, timeZone]);
 
   const eventsByDay = useMemo(() => {
     const map = new Map<string, ScheduleEvent[]>();
@@ -81,6 +90,7 @@ export function ScheduleAgendaView({
         return (
           <Box
             key={key}
+            ref={isToday ? todayRef : undefined}
             sx={{
               border: `2px solid ${GARDEN_TOKENS.ink}`,
               borderRadius: ORGANIC_RADIUS,
