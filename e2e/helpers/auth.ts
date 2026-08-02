@@ -1,6 +1,7 @@
 import { type Page, expect } from "@playwright/test";
 
 import { SEED_PASSWORD } from "./constants";
+import { dismissBlockingDialogsIfOpen } from "./motd";
 import { completeFirstLoginOnboarding } from "./onboarding";
 import { openProfileMenu } from "./navigation";
 
@@ -87,6 +88,7 @@ export async function expectLoginRejected(page: Page, username: string): Promise
  * Signs out through the header profile menu (full user journey).
  */
 export async function signOutViaMenu(page: Page): Promise<void> {
+  await dismissBlockingDialogsIfOpen(page);
   await openProfileMenu(page);
   await page.getByRole("menuitem", { name: "Logout" }).click();
   await page.waitForURL(/\/login/);
@@ -110,6 +112,7 @@ export async function logout(page: Page): Promise<void> {
 
 /** Asserts the main bottom navigation is visible (authenticated shell). */
 export async function expectAuthenticatedShell(page: Page): Promise<void> {
+  await dismissBlockingDialogsIfOpen(page);
   await expect(page.getByRole("navigation", { name: "Main navigation" })).toBeVisible();
 }
 

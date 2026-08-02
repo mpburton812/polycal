@@ -28,6 +28,65 @@ import { CHANGELOG_ARCHIVE } from "./entries.archive";
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "2026.08.02e",
+    date: "2026-08-02",
+    summary: "Promote cleanup UX polish to production (PC-395–PC-402).",
+    changes: [
+      {
+        type: "changed",
+        description:
+          "test → production promotion of post-schema cleanup, Google sync failure CTA, schedule/feed UX (PC-395–PC-402).",
+      },
+    ],
+  },
+  {
+    version: "2026.08.02d",
+    date: "2026-08-02",
+    summary: "Promote cleanup UX polish to test (PC-395–PC-402).",
+    changes: [
+      {
+        type: "changed",
+        description:
+          "dev → test promotion of post-schema cleanup, Google sync failure CTA, schedule/feed UX (PC-395–PC-402).",
+      },
+    ],
+  },
+  {
+    version: "2026.08.02c",
+    date: "2026-08-02",
+    summary:
+      "Post-schema cleanup, schedule/feed UX polish, Google sync failure CTA (PC-395–PC-402).",
+    changes: [
+      {
+        type: "changed",
+        description:
+          "Network-aware admin gates; retired poly_group app shims (table retained); hot-path settings memo + batch writes (PC-396, PC-397).",
+      },
+      {
+        type: "added",
+        description:
+          "Google Calendar sync failure dialog and inbox CTA to /profile#calendar-integration (PC-398).",
+      },
+      {
+        type: "fixed",
+        description:
+          "Partner-only sleeping schedule taps show access-denied copy instead of “no longer available” (PC-399).",
+      },
+      {
+        type: "changed",
+        description: "Week and two-week views start with Today (PC-400).",
+      },
+      {
+        type: "added",
+        description: "Comment composer on Feed happening-now pins (PC-401).",
+      },
+      {
+        type: "fixed",
+        description: "Centered karaoke mic and tightened beer glyph geometry (PC-402).",
+      },
+    ],
+  },
+  {
     version: "2026.08.02b",
     date: "2026-08-02",
     summary: "Promote schema refactor (phases 1–3) to production.",

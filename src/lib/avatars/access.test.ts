@@ -2,6 +2,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/lib/admin-access", () => ({
   userHasAdminAccess: vi.fn(),
+  adminAccessFromUserRow: vi.fn(({ role }: { role: string }) => ({
+    role,
+    activeNetworkRole: role === "admin" ? "network_admin" : undefined,
+  })),
 }));
 
 vi.mock("@/lib/db/client", () => ({

@@ -55,7 +55,6 @@ export async function resetTestDatabase(): Promise<{
   await client.execute("DELETE FROM network_members");
   await client.execute("DELETE FROM networks");
   await client.execute("DELETE FROM users");
-  await client.execute("DELETE FROM poly_group");
   // Allow networks backfill to re-run after reseed (PC-357).
   await client.execute(
     `DELETE FROM schema_meta WHERE key = 'networks_backfill_v1'`,

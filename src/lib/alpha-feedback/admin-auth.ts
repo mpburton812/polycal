@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
 import { auth } from "@/lib/auth";
-import { adminAccessFromSessionUser, userHasAdminAccess } from "@/lib/admin-access";
+import { adminAccessFromSessionUser, adminAccessFromUserRow, userHasAdminAccess } from "@/lib/admin-access";
 import {
   issueAdminApiToken,
   verifyAdminApiToken,
@@ -46,12 +46,17 @@ export async function requireAdminApiAccess(
         role: users.role,
         status: users.status,
         displayName: users.displayName,
+        isPlatformAdmin: users.isPlatformAdmin,
       })
       .from(users)
       .where(eq(users.id, tokenUser.id))
       .limit(1);
 
-    if (!row || row.status !== "active" || !(await userHasAdminAccess(row.role as UserRole))) {
+    if (
+      !row ||
+      row.status !== "active" ||
+      !(await userHasAdminAccess(adminAccessFromUserRow(row)))
+    ) {
       return {
         ok: false,
         response: NextResponse.json({ error: "Forbidden" }, { status: 403 }),
@@ -116,7 +121,7 @@ export async function loginAdminApi(
     return { ok: false, message: "Invalid credentials." };
   }
 
-  if (!(await userHasAdminAccess(row.role as UserRole))) {
+  if (!(await userHasAdminAccess(adminAccessFromUserRow(row)))) {
     return { ok: false, message: "Admin access required." };
   }
 

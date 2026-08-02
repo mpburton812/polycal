@@ -56,6 +56,8 @@ const NOTIFICATION_TYPE_LABELS: Record<string, string> = {
   partnership_declined: "Partnership declined",
   alpha_feedback_update: "Feedback update",
   calendar_ics_pending: "Calendar ICS",
+  calendar_google_failed: "Google Calendar sync",
+  calendar_google_synced: "Google Calendar sync",
 };
 
 function formatNotificationType(type: string): string {
@@ -196,6 +198,17 @@ export function NotificationInbox({
       if (!result.ok) return;
       setItems([]);
       setCount(0);
+      router.refresh();
+    });
+  }
+
+  function openCalendarSettings(logId: number) {
+    startTransition(async () => {
+      const result = await dismissNotificationAction(logId);
+      if (!result.ok) return;
+      removeFromList(logId);
+      handleClose();
+      router.push("/profile#calendar-integration");
       router.refresh();
     });
   }
@@ -469,6 +482,16 @@ export function NotificationInbox({
                           Maintain accept
                         </Button>
                       </>
+                    )}
+                    {item.type === "calendar_google_failed" && (
+                      <Button
+                        size="small"
+                        variant="contained"
+                        disabled={pending}
+                        onClick={() => openCalendarSettings(item.id)}
+                      >
+                        Open calendar settings
+                      </Button>
                     )}
                     {item.type === "calendar_ics_pending" &&
                       typeof item.metadata.pendingId === "string" && (

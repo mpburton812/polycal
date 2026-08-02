@@ -63,6 +63,8 @@ export interface FeedActiveEvent {
   scheduledStartAt: string;
   scheduledEndAt: string | null;
   proposalState: string;
+  /** Whether the viewer may comment from the happening-now pin (PC-401). */
+  canComment: boolean;
 }
 
 export interface NetworkChatMessage {

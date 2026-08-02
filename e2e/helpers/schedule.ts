@@ -1,11 +1,11 @@
 import { type Page, expect } from "@playwright/test";
 
 import { fillProposalDateRange, selectDraftScheduleMode } from "./datePickers";
-import { dismissMotdDialogIfOpen } from "./motd";
+import { dismissBlockingDialogsIfOpen, dismissMotdDialogIfOpen } from "./motd";
 import { goToSchedule } from "./navigation";
 import { openEventProposalDraft, submitProposalDraft } from "./proposals";
 
-export { dismissMotdDialogIfOpen } from "./motd";
+export { dismissMotdDialogIfOpen, dismissBlockingDialogsIfOpen } from "./motd";
 
 const SCHEDULE_VIEW_STORAGE_KEY = "polycal.schedule.view";
 
@@ -121,7 +121,7 @@ export async function assertEventOnCalendarDays(
   titlePattern: RegExp,
   dayIsos: string[],
 ): Promise<void> {
-  await dismissMotdDialogIfOpen(page);
+  await dismissBlockingDialogsIfOpen(page);
   for (const dayIso of dayIsos) {
     await advanceScheduleUntilEventVisible(page, titlePattern, { targetDateIso: dayIso });
   }
@@ -208,7 +208,7 @@ async function expectEventVisibleInView(
 
 /** Waits until schedule data has finished loading for the visible range. */
 export async function waitForScheduleReady(page: Page): Promise<void> {
-  await dismissMotdDialogIfOpen(page);
+  await dismissBlockingDialogsIfOpen(page);
   // Prefer the last marker — soft navigations can briefly leave a stale node in the DOM.
   await expect(page.getByTestId("schedule-ready").last()).toHaveAttribute("data-ready", "true", {
     timeout: 30_000,
@@ -252,6 +252,7 @@ export async function navigateScheduleUntilDateInRange(
   const target = parseIsoDate(targetDateIso).getTime();
 
   for (let step = 0; step < maxSteps; step += 1) {
+    await dismissBlockingDialogsIfOpen(page);
     await waitForScheduleReady(page);
     const range = await readVisibleRange(page);
     if (dateInRange(targetDateIso, range.start, range.end)) {
@@ -281,7 +282,7 @@ export async function advanceScheduleUntilEventVisible(
   const prepare = async () => {
     await goToSchedule(page);
     await clearScheduleViewState(page);
-    await dismissMotdDialogIfOpen(page);
+    await dismissBlockingDialogsIfOpen(page);
     await forceWeekLayout(page);
     await waitForScheduleReady(page);
 

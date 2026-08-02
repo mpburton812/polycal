@@ -1,10 +1,9 @@
 import { and, eq } from "drizzle-orm";
 
-import { userHasAdminAccess } from "@/lib/admin-access";
+import { userHasAdminAccess, type AdminAccessSession } from "@/lib/admin-access";
 import type { getDb } from "@/lib/db/client";
 import { locationResidents } from "@/lib/db/schema";
 import type { PlaceRole } from "@/types/relationship";
-import type { UserRole } from "@/types/user";
 
 type Db = ReturnType<typeof getDb>;
 
@@ -14,10 +13,10 @@ type Db = ReturnType<typeof getDb>;
 export async function userIsPlaceOwner(
   db: Db,
   userId: string,
-  role: UserRole,
+  access: AdminAccessSession,
   locationId: string,
 ): Promise<boolean> {
-  if (await userHasAdminAccess(role)) return true;
+  if (await userHasAdminAccess(access)) return true;
 
   const [row] = await db
     .select({ id: locationResidents.id })

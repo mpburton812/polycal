@@ -1,5 +1,7 @@
 import { type Locator, type Page, expect } from "@playwright/test";
 
+import { dismissBlockingDialogsIfOpen } from "./motd";
+
 /**
  * Clicks a bottom-nav link; falls back to direct navigation when the click is
  * blocked or does not change the URL (dev overlay / dialogs / slow transitions).
@@ -55,6 +57,7 @@ export async function goToAdmin(page: Page): Promise<void> {
 
 /** Opens the header profile menu (avatar button). */
 export async function openProfileMenu(page: Page): Promise<void> {
+  await dismissBlockingDialogsIfOpen(page);
   await page.getByRole("button", { name: /Profile menu for/i }).click();
   await expect(page.getByRole("menu")).toBeVisible();
 }

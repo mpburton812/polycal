@@ -119,17 +119,18 @@ function renderIconPaths(iconKey: EventIconKey) {
     case "karaoke_mic":
       return (
         <>
-          <rect x="25" y="12" width="14" height="26" rx="7" fill={C.mic} stroke={C.ink} strokeWidth="1.2" />
-          <rect x="28" y="16" width="8" height="14" rx="4" fill={C.micLite} opacity={0.85} />
+          {/* Capsule centered on x=32; stand and base aligned to vertical midline (PC-402). */}
+          <rect x="25" y="10" width="14" height="28" rx="7" fill={C.mic} stroke={C.ink} strokeWidth="1.2" />
+          <rect x="29" y="14" width="6" height="16" rx="3" fill={C.micLite} opacity={0.85} />
           <path
-            d="M20 30c0 9.4 5.8 16.5 14.5 16.5S49 39.4 49 30"
+            d="M21 32c0 8.5 4.9 14.5 11 14.5S43 40.5 43 32"
             fill="none"
             stroke={C.mustard}
-            strokeWidth="3.2"
+            strokeWidth="3"
             strokeLinecap="round"
           />
-          <line x1="32" y1="46.5" x2="32" y2="54" stroke={C.ink} strokeWidth="3.2" strokeLinecap="round" />
-          <line x1="22" y1="54" x2="42" y2="54" stroke={C.ink} strokeWidth="3.2" strokeLinecap="round" />
+          <line x1="32" y1="46.5" x2="32" y2="54" stroke={C.ink} strokeWidth="3" strokeLinecap="round" />
+          <line x1="24" y1="54" x2="40" y2="54" stroke={C.ink} strokeWidth="3" strokeLinecap="round" />
         </>
       );
     case "gaming_meeple":
@@ -159,21 +160,21 @@ function renderIconPaths(iconKey: EventIconKey) {
       return (
         <>
           <path
-            d="M20 18h22v28c0 3.5-2.5 6-6 6H26c-3.5 0-6-2.5-6-6V18z"
+            d="M18 18h22v28c0 3.5-2.5 6-6 6H24c-3.5 0-6-2.5-6-6V18z"
             fill={C.beer}
             stroke={C.ink}
             strokeWidth="1.3"
           />
           <path
-            d="M42 22h7c2.8 0 5 2.4 5 5.4v8.2c0 7.2-4.8 12.4-12 12.4"
+            d="M40 22h6c2.4 0 4.2 2 4.2 4.6v7.6c0 6.2-4 10.8-10.2 10.8"
             fill="none"
             stroke={C.beerDark}
-            strokeWidth="3"
+            strokeWidth="2.8"
             strokeLinecap="round"
           />
-          <rect x="24" y="20" width="14" height="8" rx="2" fill={C.foamWhite} />
-          <path d="M24 38h14" stroke={C.beerDark} strokeWidth="2" opacity={0.45} />
-          <path d="M22 16h18c1 0 2 1 2 2v2H20v-2c0-1 1-2 2-2z" fill={C.foamWhite} stroke={C.ink} strokeWidth="0.8" />
+          <rect x="22" y="20" width="14" height="8" rx="2" fill={C.foamWhite} />
+          <path d="M22 38h14" stroke={C.beerDark} strokeWidth="2" opacity={0.45} />
+          <path d="M20 16h18c1 0 2 1 2 2v2H18v-2c0-1 1-2 2-2z" fill={C.foamWhite} stroke={C.ink} strokeWidth="0.8" />
         </>
       );
     case "outdoors_tree":
