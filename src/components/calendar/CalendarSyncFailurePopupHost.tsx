@@ -22,6 +22,7 @@ const POLL_MS = 60_000;
 
 /**
  * Surfaces Google Calendar sync failures with a deep link to profile settings (PC-398).
+ * Skipped under E2E so modal aria-hiding does not break shell assertions.
  */
 export function CalendarSyncFailurePopupHost() {
   const pathname = usePathname();
@@ -30,6 +31,7 @@ export function CalendarSyncFailurePopupHost() {
   const [busy, setBusy] = useState(false);
 
   const refresh = useCallback(async () => {
+    if (process.env.NEXT_PUBLIC_E2E_TEST_MODE === "1") return;
     try {
       const result = await getNotificationInboxAction();
       if (!result.ok) return;
@@ -41,6 +43,7 @@ export function CalendarSyncFailurePopupHost() {
   }, []);
 
   useEffect(() => {
+    if (process.env.NEXT_PUBLIC_E2E_TEST_MODE === "1") return;
     void refresh();
     const id = window.setInterval(() => void refresh(), POLL_MS);
     function onVisible() {
@@ -57,6 +60,7 @@ export function CalendarSyncFailurePopupHost() {
     void refresh();
   }, [pathname, refresh]);
 
+  if (process.env.NEXT_PUBLIC_E2E_TEST_MODE === "1") return null;
   if (!item) return null;
 
   async function dismissOnly() {
