@@ -28,6 +28,18 @@ import { CHANGELOG_ARCHIVE } from "./entries.archive";
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "2026.08.02b",
+    date: "2026-08-02",
+    summary: "Promote schema refactor (phases 1–3) to production.",
+    changes: [
+      {
+        type: "changed",
+        description:
+          "Production receives poly_group retirement, network-aware admin auth, and modular Drizzle schema (2026.08.01a–c).",
+      },
+    ],
+  },
+  {
     version: "2026.08.02a",
     date: "2026-08-02",
     summary: "Promote schema refactor (phases 1–3) to test environment.",

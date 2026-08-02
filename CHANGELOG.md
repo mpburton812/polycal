@@ -21,6 +21,7 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Changed
+- Promote schema refactor phases 1–3 to production (2026.08.01a–c). Change control: `2026.08.02b`.
 - Promote schema refactor phases 1–3 to test (2026.08.01a–c). Change control: `2026.08.02a`.
 - Schema refactor phase 3: split Drizzle schema into domain modules under `src/lib/db/schema/`. Change control: `2026.08.01c`.
 - Schema refactor phase 2: network-aware admin authorization; sync `users.role` from network memberships. Change control: `2026.08.01b`.
