@@ -45,6 +45,8 @@ export function AppShell({
   const vapidPublicKey = getVapidPublicKey();
   /** Restore colored env banner (DEV red / TEST yellow / …) (PC-172). */
   const showEnvBanner = getAppEnvironment() !== "production";
+  /** Runtime E2E flag — available on the server even when the client bundle was built without NEXT_PUBLIC_E2E_TEST_MODE (PC-398). */
+  const e2eTestMode = process.env.E2E_TEST_MODE === "1";
 
   return (
     <>
@@ -83,7 +85,7 @@ export function AppShell({
       <AppTabs isAdmin={isAdmin} feedEnabled={feedEnabled} />
       <FeedbackFab />
       <MotdPopupHost />
-      <CalendarSyncFailurePopupHost />
+      <CalendarSyncFailurePopupHost disabled={e2eTestMode} />
       <Box sx={{ height: 56 }} aria-hidden />
     </>
   );
