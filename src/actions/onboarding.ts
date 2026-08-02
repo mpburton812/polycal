@@ -9,9 +9,10 @@ import { AVATAR_OPTIONS, isCustomAvatarKey, type AvatarKey } from "@/lib/constan
 import { isUserThemeId, normalizeUserThemeId, type UserThemeId } from "@/lib/constants/themes";
 import { getDb } from "@/lib/db/client";
 import { ensureDbReady } from "@/lib/db/ensure-ready";
-import { polyGroup, users } from "@/lib/db/schema";
+import { users } from "@/lib/db/schema";
+import { loadNetworkSettings } from "@/lib/networks/settings";
 import { resolveTimezone } from "@/lib/schedule/timezone";
-import { DEFAULT_ONBOARDING_WELCOME_MESSAGE } from "@/types/poly-group";
+import { DEFAULT_ONBOARDING_WELCOME_MESSAGE } from "@/types/network-settings";
 import { profileBioSchema } from "@/lib/users/profile-bio";
 
 const AVATAR_KEYS = AVATAR_OPTIONS.map((option) => option.key);
@@ -133,9 +134,10 @@ export async function prepareOnboardingWelcomeAction(): Promise<{
     return { ok: false, message: "Change your password before finishing onboarding." };
   }
 
-  const [group] = await db.select().from(polyGroup).where(eq(polyGroup.id, 1)).limit(1);
+  const networkId = session.user.activeNetworkId;
+  const settings = networkId ? await loadNetworkSettings(networkId, db) : null;
   const welcomeMessage =
-    group?.onboardingWelcomeMessage?.trim() || DEFAULT_ONBOARDING_WELCOME_MESSAGE;
+    settings?.onboardingWelcomeMessage?.trim() || DEFAULT_ONBOARDING_WELCOME_MESSAGE;
 
   return { ok: true, message: "Welcome ready.", welcomeMessage };
 }
@@ -169,9 +171,10 @@ export async function completeOnboardingAction(): Promise<{
     return { ok: false, message: "Change your password before finishing onboarding." };
   }
 
-  const [group] = await db.select().from(polyGroup).where(eq(polyGroup.id, 1)).limit(1);
+  const networkId = session.user.activeNetworkId;
+  const settings = networkId ? await loadNetworkSettings(networkId, db) : null;
   const welcomeMessage =
-    group?.onboardingWelcomeMessage?.trim() || DEFAULT_ONBOARDING_WELCOME_MESSAGE;
+    settings?.onboardingWelcomeMessage?.trim() || DEFAULT_ONBOARDING_WELCOME_MESSAGE;
 
   if (!row.onboardingComplete) {
     const now = new Date().toISOString();

@@ -6,7 +6,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { auth } from "@/lib/auth";
-import { userHasAdminAccess } from "@/lib/admin-access";
+import { adminAccessFromSessionUser, userHasAdminAccess } from "@/lib/admin-access";
 import { logUserActivity } from "@/lib/audit";
 import { formatActivityLogDetails } from "@/lib/audit/activity-log-display";
 import { getDb } from "@/lib/db/client";
@@ -526,7 +526,7 @@ export async function updatePlaceAction(
     return { ok: false, message: "Place not found." };
   }
 
-  const isAdmin = await userHasAdminAccess(session.user.role);
+  const isAdmin = await userHasAdminAccess(adminAccessFromSessionUser(session.user));
   if (!(await userCanEditPlace(db, session.user.id, session.user.role, parsed.data.placeId))) {
     return { ok: false, message: "You can only edit places you created or where you are a resident." };
   }
@@ -1072,7 +1072,7 @@ export async function getResidencyProposalDetailAction(
     return { ok: false, message: "Residency proposal not found." };
   }
 
-  const isAdmin = await userHasAdminAccess(session.user.role);
+  const isAdmin = await userHasAdminAccess(adminAccessFromSessionUser(session.user));
   const isParticipant =
     row.userId === session.user.id || row.proposedById === session.user.id;
   if (!isParticipant && !isAdmin) {
@@ -1175,7 +1175,7 @@ export async function addResidencyCommentAction(
     return { ok: false, message: "Cannot comment on this residency proposal." };
   }
 
-  const isAdmin = await userHasAdminAccess(session.user.role);
+  const isAdmin = await userHasAdminAccess(adminAccessFromSessionUser(session.user));
   const isParticipant =
     row.userId === session.user.id || row.proposedById === session.user.id;
   if (!isParticipant && !isAdmin) {
@@ -1239,7 +1239,7 @@ export async function deleteDeclinedResidencyAction(
     return { ok: false, message: "Declined residency draft not found." };
   }
 
-  const isAdmin = await userHasAdminAccess(session.user.role);
+  const isAdmin = await userHasAdminAccess(adminAccessFromSessionUser(session.user));
   if (!isAdmin && row.proposedById !== session.user.id) {
     return { ok: false, message: "Only the proposer can remove this draft." };
   }

@@ -138,17 +138,15 @@ export async function requirePlatformAdmin(): Promise<
 }
 
 /**
- * True when the user may administer the active network (legacy role bridge).
+ * True when the user may administer the active network.
  */
 export async function isActiveNetworkAdmin(
   userId: string,
   networkId: string,
-  legacyRole: UserRole,
+  _legacyRole: UserRole,
   isPlatformAdmin: boolean,
 ): Promise<boolean> {
   if (isPlatformAdmin) return true;
   const membership = await getMembership(userId, networkId);
-  if (membership?.role === "network_admin") return true;
-  // Transition: pre-migration JWTs still carry role=admin on the singleton network.
-  return legacyRole === "admin";
+  return membership?.role === "network_admin";
 }

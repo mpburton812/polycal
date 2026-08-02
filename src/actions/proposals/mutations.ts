@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 
 import { cleanupResidencyProposalLinkage } from "@/actions/residency-proposals";
 import { auth } from "@/lib/auth";
-import { userHasAdminAccess } from "@/lib/admin-access";
+import { adminAccessFromSessionUser, userHasAdminAccess } from "@/lib/admin-access";
 import { logUserActivity } from "@/lib/audit";
 import { getDb } from "@/lib/db/client";
 import { ensureDbReady } from "@/lib/db/ensure-ready";
@@ -97,7 +97,7 @@ export async function deleteDraftProposalAction(
     .where(eq(proposals.id, proposalId))
     .limit(1);
 
-  const isAdmin = await userHasAdminAccess(session.user.role);
+  const isAdmin = await userHasAdminAccess(adminAccessFromSessionUser(session.user));
   const isOwner = proposal?.proposerId === session.user.id;
   if (!proposal || proposal.state !== "draft" || (!isOwner && !isAdmin)) {
     return { ok: false, message: "Draft not found." };
@@ -124,7 +124,7 @@ export async function adminDeleteProposalAction(
     return { ok: false, message: "Sign in required." };
   }
 
-  const isAdmin = await userHasAdminAccess(session.user.role);
+  const isAdmin = await userHasAdminAccess(adminAccessFromSessionUser(session.user));
   if (!isAdmin) {
     return { ok: false, message: "Admin access required." };
   }

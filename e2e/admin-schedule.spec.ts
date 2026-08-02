@@ -18,10 +18,10 @@ test.describe("Admin", () => {
   test("loads admin panels for admin user", async ({ page }) => {
     await expect(page.getByRole("heading", { name: "Admin", level: 1 })).toBeVisible();
     await expect(
-      page.getByText("Poly group settings, user management, and system log"),
+      page.getByText("Network settings, user management, and system log"),
     ).toHaveCount(0);
     await expect(page.getByRole("heading", { name: "Code Status", level: 2 })).toBeVisible();
-    await expect(page.getByRole("heading", { name: "Poly group settings", level: 2 })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Network settings", level: 2 })).toBeVisible();
     await expect(
       page.getByRole("heading", { name: "System administrator log", level: 2 }),
     ).toBeVisible();
@@ -48,7 +48,7 @@ test.describe("Admin", () => {
   });
 
   test("shows proposal enforcement settings for admin", async ({ page }) => {
-    await expandAdminSection(page, "Poly group settings");
+    await expandAdminSection(page, "Network settings");
     await expect(page.getByRole("heading", { name: "Proposal enforcement" })).toBeVisible();
     await expect(page.getByLabel("Max days in proposed")).toBeVisible();
     await expect(page.getByLabel("At-risk draft TTL (days)")).toBeVisible();

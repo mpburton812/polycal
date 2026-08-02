@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
 import { auth } from "@/lib/auth";
-import { userHasAdminAccess } from "@/lib/admin-access";
+import { adminAccessFromSessionUser, userHasAdminAccess } from "@/lib/admin-access";
 import {
   issueAdminApiToken,
   verifyAdminApiToken,
@@ -76,7 +76,7 @@ export async function requireAdminApiAccess(
       response: NextResponse.json({ error: "Forbidden" }, { status: 403 }),
     };
   }
-  if (!(await userHasAdminAccess(session.user.role as UserRole))) {
+  if (!(await userHasAdminAccess(adminAccessFromSessionUser(session.user)))) {
     return {
       ok: false,
       response: NextResponse.json({ error: "Forbidden" }, { status: 403 }),

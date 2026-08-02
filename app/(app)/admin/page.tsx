@@ -9,12 +9,16 @@ import {
 import {
   getNetworkMotdAdminStateAction,
 } from "@/actions/motd";
-import { getPolyGroupSettingsAction } from "@/actions/poly-group";
+import { getNetworkSettingsAction } from "@/actions/network-settings";
 import { listAdminUsersAction } from "@/actions/users";
 import { AdminCodeStatusPanel } from "@/components/admin/AdminCodeStatusPanel";
 import { AdminNetworkDashboardPanel } from "@/components/admin/AdminNetworkDashboardPanel";
 import { auth } from "@/lib/auth";
-import { userCanSeeAdminTab, userHasAdminAccess } from "@/lib/admin-access";
+import {
+  adminAccessFromSessionUser,
+  resolveAdminAccess,
+  userCanSeeAdminTab,
+} from "@/lib/admin-access";
 import { CHANGELOG, getLatestChangelogEntry } from "@/lib/changelog/entries";
 import { isImpersonationConfigured } from "@/lib/auth/impersonation";
 import { getBuildInfo, isNonProductionEnvironment } from "@/lib/env";
@@ -30,10 +34,10 @@ function AdminPanelFallback() {
 }
 
 /** Heavy admin panels code-split so the page shell paints first (PC-145). */
-const AdminPolyGroupSettingsPanel = dynamic(
+const AdminNetworkSettingsPanel = dynamic(
   () =>
-    import("@/components/admin/AdminPolyGroupSettingsPanel").then((mod) => ({
-      default: mod.AdminPolyGroupSettingsPanel,
+    import("@/components/admin/AdminNetworkSettingsPanel").then((mod) => ({
+      default: mod.AdminNetworkSettingsPanel,
     })),
   { loading: () => <AdminPanelFallback /> },
 );
@@ -83,7 +87,7 @@ export default async function AdminPage() {
     redirect("/feed");
   }
 
-  const isLegacyAdmin = await userHasAdminAccess(session.user.role);
+  const isLegacyAdmin = resolveAdminAccess(adminAccessFromSessionUser(session.user));
   const isPlatformAdmin = session.user.isPlatformAdmin === true;
   const isNetworkAdmin =
     activeNetworkRole === "network_admin" || isLegacyAdmin || isPlatformAdmin;
@@ -95,7 +99,7 @@ export default async function AdminPage() {
     networkDashboard,
     networkMotd,
   ] = await Promise.all([
-    isLegacyAdmin ? getPolyGroupSettingsAction() : Promise.resolve(null),
+    isLegacyAdmin ? getNetworkSettingsAction() : Promise.resolve(null),
     isLegacyAdmin ? listAdminUsersAction() : Promise.resolve([]),
     isLegacyAdmin ? listActivityLogAction() : Promise.resolve([]),
     isNetworkAdmin ? getActiveNetworkDashboardAction() : Promise.resolve(null),
@@ -127,7 +131,7 @@ export default async function AdminPage() {
         )}
         {isLegacyAdmin && settings && (
           <>
-            <AdminPolyGroupSettingsPanel initialSettings={settings} />
+            <AdminNetworkSettingsPanel initialSettings={settings} />
             <AdminFastSleepingPlanPanel users={adminUsers} />
             <AdminUserManagementPanel
               users={adminUsers}

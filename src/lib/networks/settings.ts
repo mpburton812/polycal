@@ -2,8 +2,11 @@ import { eq } from "drizzle-orm";
 
 import { getDb } from "@/lib/db/client";
 import { networks } from "@/lib/db/schema";
-import { DEFAULT_ONBOARDING_WELCOME_MESSAGE } from "@/types/poly-group";
-import type { AuditLogVisibility, PlacesMapVisibility } from "@/types/poly-group";
+import {
+  DEFAULT_ONBOARDING_WELCOME_MESSAGE,
+  type AuditLogVisibility,
+  type PlacesMapVisibility,
+} from "@/types/network-settings";
 
 export type NetworkSettings = {
   networkId: string;
@@ -58,4 +61,20 @@ export async function loadNetworkSettings(
     redraftDeadlineHours: row.redraftDeadlineHours,
     sleepingPartnerProposalMaxDays: row.sleepingPartnerProposalMaxDays,
   };
+}
+
+/**
+ * Resolves settings for a specific network, or the first active network when
+ * `networkId` is omitted (cron / legacy call sites).
+ */
+export async function resolveNetworkSettings(
+  db: ReturnType<typeof getDb> = getDb(),
+  networkId?: string | null,
+): Promise<NetworkSettings | null> {
+  if (networkId) {
+    return loadNetworkSettings(networkId, db);
+  }
+  const [row] = await db.select({ id: networks.id }).from(networks).limit(1);
+  if (!row) return null;
+  return loadNetworkSettings(row.id, db);
 }

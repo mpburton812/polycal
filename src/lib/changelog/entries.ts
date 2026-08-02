@@ -28,6 +28,93 @@ import { CHANGELOG_ARCHIVE } from "./entries.archive";
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "2026.08.02b",
+    date: "2026-08-02",
+    summary: "Promote schema refactor (phases 1–3) to production.",
+    changes: [
+      {
+        type: "changed",
+        description:
+          "Production receives poly_group retirement, network-aware admin auth, and modular Drizzle schema (2026.08.01a–c).",
+      },
+    ],
+  },
+  {
+    version: "2026.08.02a",
+    date: "2026-08-02",
+    summary: "Promote schema refactor (phases 1–3) to test environment.",
+    changes: [
+      {
+        type: "changed",
+        description:
+          "Test environment receives poly_group retirement, network-aware admin auth, and modular Drizzle schema (2026.08.01a–c).",
+      },
+    ],
+  },
+  {
+    version: "2026.08.01c",
+    date: "2026-08-01",
+    summary: "Schema refactor phase 3: modularize Drizzle schema by domain.",
+    changes: [
+      {
+        type: "changed",
+        description:
+          "Split monolithic schema.ts into domain modules under src/lib/db/schema/ (identity, networks, proposals, feed, calendar, etc.).",
+      },
+      {
+        type: "changed",
+        description:
+          "schema.ts is now a thin re-export shim; existing @/lib/db/schema imports unchanged.",
+      },
+    ],
+  },
+  {
+    version: "2026.08.01b",
+    date: "2026-08-01",
+    summary:
+      "Schema refactor phase 2: network-aware admin authorization; sync users.role from memberships.",
+    changes: [
+      {
+        type: "changed",
+        description:
+          "Admin access gates use active network role and platform admin flag instead of legacy users.role alone.",
+      },
+      {
+        type: "changed",
+        description:
+          "users.role is kept as a denormalized cache synced from network membership on upsert (syncDenormalizedUserRole).",
+      },
+      {
+        type: "changed",
+        description:
+          "Removed legacy isActiveNetworkAdmin fallback to users.role === admin; impersonation JWT checks network_admin.",
+      },
+    ],
+  },
+  {
+    version: "2026.08.01a",
+    date: "2026-08-01",
+    summary:
+      "Schema refactor phase 1: retire poly_group app reads; rename Poly Group to Network.",
+    changes: [
+      {
+        type: "changed",
+        description:
+          "All settings reads and writes route through the networks table; poly_group dual-write removed from admin settings save.",
+      },
+      {
+        type: "changed",
+        description:
+          "Admin UI and API surface renamed from Poly Group to Network (settings panel, display name, seeds).",
+      },
+      {
+        type: "changed",
+        description:
+          "Seeds insert networks rows directly; deprecated shims remain at poly-group.ts for transitional imports.",
+      },
+    ],
+  },
+  {
     version: "2026.07.29a",
     date: "2026-07-29",
     summary:
