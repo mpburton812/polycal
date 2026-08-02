@@ -74,8 +74,9 @@ export function addDays(date: Date, days: number): Date {
 }
 
 /**
- * Builds a Mon-based day window then rotates so today is first (wraps past days)
- * for week / 2-week agenda views (PC-400).
+ * Builds a Mon-based day window then starts at today (chronological forward).
+ * Past days in the window are dropped and replaced by days after the window end
+ * so week / 2-week lists keep Today first without wrapping (PC-400).
  */
 export function scheduleDaysStartingToday(
   weekStart: Date,
@@ -90,7 +91,14 @@ export function scheduleDaysStartingToday(
     (day) => localDateKey(day.toISOString(), timeZone) === todayKey,
   );
   if (todayIndex <= 0) return days;
-  return [...days.slice(todayIndex), ...days.slice(0, todayIndex)];
+
+  const fromToday = days.slice(todayIndex);
+  const need = dayCount - fromToday.length;
+  if (need <= 0) return fromToday.slice(0, dayCount);
+
+  const last = days[days.length - 1]!;
+  const extras = Array.from({ length: need }, (_, index) => addDays(last, index + 1));
+  return [...fromToday, ...extras];
 }
 
 /**
