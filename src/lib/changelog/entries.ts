@@ -28,6 +28,18 @@ import { CHANGELOG_ARCHIVE } from "./entries.archive";
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "2026.08.02d",
+    date: "2026-08-02",
+    summary: "Promote cleanup UX polish to test (PC-395–PC-402).",
+    changes: [
+      {
+        type: "changed",
+        description:
+          "dev → test promotion of post-schema cleanup, Google sync failure CTA, schedule/feed UX (PC-395–PC-402).",
+      },
+    ],
+  },
+  {
     version: "2026.08.02c",
     date: "2026-08-02",
     summary:
