@@ -88,6 +88,7 @@ export async function expectLoginRejected(page: Page, username: string): Promise
  * Signs out through the header profile menu (full user journey).
  */
 export async function signOutViaMenu(page: Page): Promise<void> {
+  await dismissBlockingDialogsIfOpen(page);
   await openProfileMenu(page);
   await page.getByRole("menuitem", { name: "Logout" }).click();
   await page.waitForURL(/\/login/);
