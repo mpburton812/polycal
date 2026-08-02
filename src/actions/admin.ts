@@ -3,6 +3,7 @@
 import { desc, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 
+import { auth } from "@/lib/auth";
 import { logUserActivity } from "@/lib/audit";
 import {
   formatActivityLogDetails,
@@ -16,7 +17,8 @@ import {
 import { ensureDbReady } from "@/lib/db/ensure-ready";
 import { getAppEnvironment, isNonProductionEnvironment } from "@/lib/env";
 import { getDb } from "@/lib/db/client";
-import { polyGroup, userActivityLog, users } from "@/lib/db/schema";
+import { userActivityLog, users } from "@/lib/db/schema";
+import { loadNetworkSettings } from "@/lib/networks/settings";
 
 import { resetTestDatabase } from "@/lib/seed/reset-test-database";
 
@@ -175,8 +177,10 @@ export async function listActivityLogAction(): Promise<ActivityLogEntry[]> {
 
   await ensureDbReady();
   const db = getDb();
-  const [group] = await db.select().from(polyGroup).where(eq(polyGroup.id, 1)).limit(1);
-  const tail = group?.logTailLength ?? 100;
+  const session = await auth();
+  const networkId = session?.user?.activeNetworkId;
+  const settings = networkId ? await loadNetworkSettings(networkId, db) : null;
+  const tail = settings?.logTailLength ?? 100;
   if (tail === 0) return [];
 
   const rows = await db

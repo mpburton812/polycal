@@ -14,7 +14,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { auth } from "@/lib/auth";
-import { userHasAdminAccess } from "@/lib/admin-access";
+import { adminAccessFromSessionUser, userHasAdminAccess } from "@/lib/admin-access";
 import { getDb } from "@/lib/db/client";
 import { ensureDbReady } from "@/lib/db/ensure-ready";
 import {
@@ -107,7 +107,7 @@ export async function updateResolvedAttendeesAction(
   await ensureDbReady();
   const db = getDb();
   await runProposalEnforcement(db);
-  const isAdmin = await userHasAdminAccess(session.user.role);
+  const isAdmin = await userHasAdminAccess(adminAccessFromSessionUser(session.user));
 
   const [proposal] = await db
     .select()
@@ -421,7 +421,7 @@ export async function rescheduleProposalAction(
     return { ok: false, message: "Sign in required." };
   }
 
-  const isAdmin = await userHasAdminAccess(session.user.role);
+  const isAdmin = await userHasAdminAccess(adminAccessFromSessionUser(session.user));
   if (!isAdmin) {
     return { ok: false, message: "Admin access required." };
   }
@@ -602,7 +602,7 @@ export async function cancelProposalAction(
     return { ok: false, message: "Proposal cannot be cancelled." };
   }
 
-  const isAdmin = await userHasAdminAccess(session.user.role);
+  const isAdmin = await userHasAdminAccess(adminAccessFromSessionUser(session.user));
   if (proposal.proposerId !== session.user.id && !isAdmin) {
     return { ok: false, message: "Only the proposer or an admin can cancel." };
   }
@@ -785,7 +785,7 @@ export async function nudgePendingVotersAction(
     return { ok: false, message: "Proposal not found." };
   }
 
-  const isAdmin = await userHasAdminAccess(session.user.role);
+  const isAdmin = await userHasAdminAccess(adminAccessFromSessionUser(session.user));
   if (proposal.proposerId !== session.user.id && !isAdmin) {
     return { ok: false, message: "Only the proposer or an admin can nudge voters." };
   }

@@ -8,7 +8,7 @@ import { z } from "zod";
 import { requireNetworkSession } from "@/lib/networks/context";
 import { loadNetworkSettings } from "@/lib/networks/settings";
 import { requireSession, withDb } from "@/lib/actions/context";
-import { userHasAdminAccess } from "@/lib/admin-access";
+import { adminAccessFromSessionUser, userHasAdminAccess } from "@/lib/admin-access";
 import { isFeedEnabledForNetwork } from "@/lib/feed/feed-enabled";
 import {
   networkChatCommentImages,
@@ -412,7 +412,7 @@ export async function listFeedItemsAction(
   const cursor = parseFeedCursor(parsed.data.cursor ?? null);
   const viewerId = sessionResult.user.id;
   const networkId = sessionResult.user.activeNetworkId;
-  const isAdmin = await userHasAdminAccess(sessionResult.user.role);
+  const isAdmin = await userHasAdminAccess(adminAccessFromSessionUser(sessionResult.user));
 
   // Single DB handle — parallel withDb on sqlite can stall local e2e (PC-232).
   return withDb(async (db) => {
@@ -1301,7 +1301,7 @@ export async function deleteNetworkChatMessageAction(
   const id = z.string().min(1).safeParse(messageId);
   if (!id.success) return { ok: false, message: "Invalid message." };
 
-  const isAdmin = await userHasAdminAccess(sessionResult.user.role);
+  const isAdmin = await userHasAdminAccess(adminAccessFromSessionUser(sessionResult.user));
 
   return withDb(async (db) => {
     const [row] = await db
@@ -1341,7 +1341,7 @@ export async function deleteFeedMilestoneAction(
   const id = z.string().min(1).safeParse(milestoneId);
   if (!id.success) return { ok: false, message: "Invalid milestone." };
 
-  const isAdmin = await userHasAdminAccess(sessionResult.user.role);
+  const isAdmin = await userHasAdminAccess(adminAccessFromSessionUser(sessionResult.user));
   if (!isAdmin) {
     return { ok: false, message: "Not allowed to delete this milestone." };
   }
@@ -1380,7 +1380,7 @@ export async function deleteNetworkChatCommentAction(
   const id = z.string().min(1).safeParse(commentId);
   if (!id.success) return { ok: false, message: "Invalid comment." };
 
-  const isAdmin = await userHasAdminAccess(sessionResult.user.role);
+  const isAdmin = await userHasAdminAccess(adminAccessFromSessionUser(sessionResult.user));
 
   return withDb(async (db) => {
     const [row] = await db
