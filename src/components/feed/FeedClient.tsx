@@ -1154,7 +1154,9 @@ export function FeedClient({
             }}
           />
           <Stack spacing={1}>
-            {activeEvents.map((event) => (
+            {activeEvents.map((event) => {
+              const draftKey = `active-${event.proposalId}`;
+              return (
               <Box
                 key={event.proposalId}
                 data-testid="feed-active-event"
@@ -1183,8 +1185,37 @@ export function FeedClient({
                 >
                   Open proposal
                 </Button>
+                {event.canComment ? (
+                  <Stack direction="row" spacing={1} alignItems="flex-end" sx={{ mt: 1.25 }}>
+                    <TextField
+                      fullWidth
+                      size="small"
+                      multiline
+                      minRows={1}
+                      maxRows={3}
+                      placeholder="Comment on this event…"
+                      value={commentDrafts[draftKey] ?? ""}
+                      onChange={(e) =>
+                        setCommentDrafts((prev) => ({ ...prev, [draftKey]: e.target.value }))
+                      }
+                      inputProps={{ maxLength: LONG_TEXT_MAX }}
+                      InputProps={{
+                        endAdornment: (
+                          <Button
+                            size="small"
+                            disabled={pending || !(commentDrafts[draftKey] ?? "").trim()}
+                            onClick={() => postMilestoneComment(event.proposalId, draftKey)}
+                          >
+                            Post
+                          </Button>
+                        ),
+                      }}
+                    />
+                  </Stack>
+                ) : null}
               </Box>
-            ))}
+              );
+            })}
           </Stack>
         </Box>
       ) : null}

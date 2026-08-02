@@ -8,6 +8,7 @@ import {
   intervalsOverlap,
   isSameLocalCalendarDay,
   localDateKey,
+  scheduleDaysStartingToday,
   startOfWeekMonday,
 } from "./dates";
 
@@ -55,6 +56,17 @@ describe("startOfWeekMonday", () => {
         "America/New_York",
       ),
     ).toBe("2026-08-03");
+  });
+});
+
+describe("scheduleDaysStartingToday", () => {
+  it("rotates so today is the first day in a week window (PC-400)", () => {
+    const weekStart = new Date("2026-07-27T12:00:00.000Z"); // Monday week of Jul 27
+    const friday = new Date("2026-07-31T16:00:00.000Z");
+    const days = scheduleDaysStartingToday(weekStart, 7, "America/New_York", friday);
+    expect(localDateKey(days[0]!.toISOString(), "America/New_York")).toBe("2026-07-31");
+    expect(days).toHaveLength(7);
+    expect(localDateKey(days[6]!.toISOString(), "America/New_York")).toBe("2026-07-30");
   });
 });
 

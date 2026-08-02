@@ -1,23 +1,33 @@
 import { and, eq, or } from "drizzle-orm";
 
-import { userHasAdminAccess } from "@/lib/admin-access";
+import {
+  adminAccessFromUserRow,
+  userHasAdminAccess,
+  type AdminAccessSession,
+} from "@/lib/admin-access";
 import { getDb } from "@/lib/db/client";
 import { sleepingPartnerships } from "@/lib/db/schema";
 import type { UserRole } from "@/types/user";
 
 /**
  * Whether a viewer may stream another user's custom avatar blob (PC-78).
+ * Prefer passing {@link AdminAccessSession}; bare UserRole is legacy (PC-396).
  */
 export async function canViewerAccessCustomAvatar(
   viewerId: string,
-  viewerRole: UserRole,
+  viewerAccess: UserRole | AdminAccessSession,
   ownerId: string,
 ): Promise<boolean> {
   if (viewerId === ownerId) {
     return true;
   }
 
-  if (await userHasAdminAccess(viewerRole)) {
+  const access =
+    typeof viewerAccess === "string"
+      ? adminAccessFromUserRow({ role: viewerAccess })
+      : viewerAccess;
+
+  if (await userHasAdminAccess(access)) {
     return true;
   }
 
@@ -42,9 +52,5 @@ export async function canViewerAccessCustomAvatar(
     )
     .limit(1);
 
-  if (partnership) {
-    return true;
-  }
-
-  return false;
+  return Boolean(partnership);
 }

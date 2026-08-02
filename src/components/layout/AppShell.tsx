@@ -6,6 +6,7 @@ import { AppTabs } from "@/components/layout/AppTabs";
 import { DevBar } from "@/components/layout/DevBar";
 import { TabSwipeRegion } from "@/components/layout/TabSwipeRegion";
 import { MotdPopupHost } from "@/components/motd/MotdPopupHost";
+import { CalendarSyncFailurePopupHost } from "@/components/calendar/CalendarSyncFailurePopupHost";
 import { PushSubscriptionManager } from "@/components/notifications/PushSubscriptionManager";
 import { avatarSrcForKey } from "@/lib/constants/avatars";
 import { getAppEnvironment } from "@/lib/env";
@@ -82,6 +83,7 @@ export function AppShell({
       <AppTabs isAdmin={isAdmin} feedEnabled={feedEnabled} />
       <FeedbackFab />
       <MotdPopupHost />
+      <CalendarSyncFailurePopupHost />
       <Box sx={{ height: 56 }} aria-hidden />
     </>
   );

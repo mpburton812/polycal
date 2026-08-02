@@ -7,12 +7,11 @@ import type { ScheduleEvent } from "@/actions/schedule";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ScheduleEventBlock } from "@/components/schedule/ScheduleEventBlock";
 import {
-  addDays,
   formatDayHeader,
   isTodayDate,
   localDateKey,
   scheduleDayCellSx,
-  startOfWeekMonday,
+  scheduleDaysStartingToday,
 } from "@/lib/schedule/dates";
 import { sortDayEvents } from "@/lib/schedule/sort-day-events";
 import { DEFAULT_VIEWER_TIMEZONE } from "@/lib/schedule/timezone";
@@ -44,10 +43,10 @@ export function ScheduleWeekView({
   onEventClick,
   onDayOverflowClick,
 }: ScheduleWeekViewProps) {
-  const days = useMemo(() => {
-    const monday = startOfWeekMonday(weekStart, timeZone);
-    return Array.from({ length: dayCount }, (_, index) => addDays(monday, index));
-  }, [weekStart, dayCount, timeZone]);
+  const days = useMemo(
+    () => scheduleDaysStartingToday(weekStart, dayCount, timeZone),
+    [weekStart, dayCount, timeZone],
+  );
 
   const eventsByDay = useMemo(() => {
     const map = new Map<string, ScheduleEvent[]>();

@@ -35,7 +35,7 @@ import {
   DEFAULT_PLATFORM_SETTINGS,
   type PlatformSettings,
 } from "@/types/network";
-import { DEFAULT_ONBOARDING_WELCOME_MESSAGE } from "@/types/poly-group";
+import { DEFAULT_ONBOARDING_WELCOME_MESSAGE } from "@/types/network-settings";
 import { auth } from "@/lib/auth";
 
 const SETUP_TOKEN_TTL_MS = 15 * 60 * 1000;

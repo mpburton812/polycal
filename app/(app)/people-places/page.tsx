@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 
 import { listPlacesAction } from "@/actions/places";
 import { listSleepingPartnershipMapEdgesAction } from "@/actions/partnerships";
-import { getPlacesMapVisibilityAction } from "@/actions/poly-group";
+import { getPlacesMapVisibilityAction } from "@/actions/network-settings";
 import { listPeopleAction, getProvisioningPolicyAction } from "@/actions/users";
 import { auth } from "@/lib/auth";
 import { userHasAdminAccess } from "@/lib/admin-access";

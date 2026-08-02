@@ -109,10 +109,10 @@ async function main() {
     failures.push(`expected ${expectedCounts.proposals} proposals, found ${proposalCount}`);
   }
 
-  const group = await client.execute("SELECT name FROM poly_group WHERE id = 1");
+  const group = await client.execute("SELECT name FROM networks ORDER BY created_at ASC LIMIT 1");
   if (group.rows[0]?.name !== TEST_FAMILY_FIXTURE.groupName) {
     failures.push(
-      `expected group ${TEST_FAMILY_FIXTURE.groupName}, got ${group.rows[0]?.name ?? "none"}`,
+      `expected network ${TEST_FAMILY_FIXTURE.groupName}, got ${group.rows[0]?.name ?? "none"}`,
     );
   }
 

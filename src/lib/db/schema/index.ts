@@ -21,8 +21,8 @@ import {
   networkChatMessages,
   storedImages,
 } from "./feed";
-import { schemaMeta } from "./infra";
-import { polyGroup, users } from "./identity";
+import { schemaMeta, rateLimitBuckets } from "./infra";
+import { users } from "./identity";
 import {
   networkMembers,
   networkSetupTokens,
@@ -47,7 +47,6 @@ import {
 
 export const schema = {
   users,
-  polyGroup,
   networks,
   networkMembers,
   networkSetupTokens,
@@ -59,6 +58,7 @@ export const schema = {
   storedImages,
   alphaFeedbackSubmissions,
   schemaMeta,
+  rateLimitBuckets,
   proposals,
   proposalInvitees,
   proposalSlotVotes,

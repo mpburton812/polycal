@@ -38,7 +38,7 @@ import {
   type PartnershipView,
   type SleepingPartnershipMapEdge,
 } from "@/actions/partnerships";
-import type { PlacesMapVisibility } from "@/types/poly-group";
+import type { PlacesMapVisibility } from "@/types/network-settings";
 import { SleepingMapView } from "@/components/people-places/SleepingMapView";
 import {
   createPlaceAction,

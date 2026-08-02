@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { eq, inArray } from "drizzle-orm";
 
-import { userHasAdminAccess } from "@/lib/admin-access";
+import { adminAccessFromUserRow, userHasAdminAccess } from "@/lib/admin-access";
 import { getDb } from "@/lib/db/client";
 import {
   locations,
@@ -26,6 +26,7 @@ import {
   getEligibleLocationIdsForUser,
 } from "@/lib/proposals/partners";
 import { resolveTimezone } from "@/lib/schedule/timezone";
+import type { AdminAccessSession } from "@/lib/admin-access";
 import type { UserRole } from "@/types/user";
 
 export type BatchLocationPolicy = "network" | "exists";
@@ -83,7 +84,7 @@ export async function assertBatchLocationAllowed(
     return { ok: true };
   }
 
-  if (await userHasAdminAccess(role as UserRole)) {
+  if (await userHasAdminAccess(adminAccessFromUserRow({ role: role as UserRole }))) {
     return { ok: true };
   }
 

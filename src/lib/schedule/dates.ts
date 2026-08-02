@@ -74,6 +74,26 @@ export function addDays(date: Date, days: number): Date {
 }
 
 /**
+ * Builds a Mon-based day window then rotates so today is first (wraps past days)
+ * for week / 2-week agenda views (PC-400).
+ */
+export function scheduleDaysStartingToday(
+  weekStart: Date,
+  dayCount: number,
+  timeZone: string = DEFAULT_VIEWER_TIMEZONE,
+  now: Date = new Date(),
+): Date[] {
+  const monday = startOfWeekMonday(weekStart, timeZone);
+  const days = Array.from({ length: dayCount }, (_, index) => addDays(monday, index));
+  const todayKey = localDateKey(now.toISOString(), timeZone);
+  const todayIndex = days.findIndex(
+    (day) => localDateKey(day.toISOString(), timeZone) === todayKey,
+  );
+  if (todayIndex <= 0) return days;
+  return [...days.slice(todayIndex), ...days.slice(0, todayIndex)];
+}
+
+/**
  * Instant for wall-clock `hour:minute:second.ms` on civil `dateKey` in `timeZone` (PC-376).
  */
 export function zonedWallTimeToUtc(

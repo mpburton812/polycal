@@ -5,7 +5,7 @@ import { and, eq, inArray, isNull } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
-import { userHasAdminAccess } from "@/lib/admin-access";
+import { adminAccessFromSessionUser, adminAccessFromUserRow, userHasAdminAccess } from "@/lib/admin-access";
 import { logUserActivity } from "@/lib/audit";
 import { getDb } from "@/lib/db/client";
 import { ensureDbReady } from "@/lib/db/ensure-ready";
@@ -25,6 +25,7 @@ import {
   parseResidencyProposalMeta,
   serializeResidencyProposalMeta,
 } from "@/lib/proposals/special-proposals";
+import type { AdminAccessSession } from "@/lib/admin-access";
 import type { UserRole } from "@/types/user";
 
 const residencyDraftSchema = z.object({
@@ -42,11 +43,11 @@ const residencyDraftSchema = z.object({
 async function assertResidencyProposalAllowed(
   db: ReturnType<typeof getDb>,
   proposerId: string,
-  proposerRole: UserRole,
+  proposerAccess: AdminAccessSession,
   locationId: string,
   targetUserId: string,
 ): Promise<{ ok: true; placeName: string; targetName: string } | { ok: false; message: string }> {
-  const isAdmin = await userHasAdminAccess(proposerRole);
+  const isAdmin = await userHasAdminAccess(proposerAccess);
   if (!isAdmin && targetUserId !== proposerId) {
     return { ok: false, message: "You can only propose yourself for a place." };
   }
@@ -116,7 +117,7 @@ export async function createResidencyDraftProposalAction(
   const allowed = await assertResidencyProposalAllowed(
     db,
     session.user.id,
-    session.user.role as UserRole,
+    adminAccessFromSessionUser(session.user),
     parsed.data.locationId,
     parsed.data.targetUserId,
   );
