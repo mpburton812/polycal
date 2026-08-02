@@ -357,3 +357,4 @@
 2026-07-29 | dae3096 | PC-392 | harden draft card + reminder drawer asserts | e2e/dates-times-journey.spec.ts
 2026-08-02 | ba924c8 | PC-396 | post-schema cleanup and schedule/feed UX polish | src/actions/feed.ts
 2026-08-02 | 084b096 | PC-398 | skip calendar sync failure modal in E2E so shell nav stays accessible | src/components/calendar/CalendarSyncFailurePopupHost.tsx
+2026-08-02 | 6c17642 | PC-400 | keep Today-first schedule days chronological for range nav | src/lib/schedule/dates.test.ts
