@@ -36,6 +36,22 @@ export function adminAccessFromSessionUser(user: {
 }
 
 /**
+ * Builds admin access from a DB user row. Denormalized `users.role === "admin"`
+ * maps to network_admin (synced on membership upsert) — PC-396.
+ */
+export function adminAccessFromUserRow(row: {
+  role: UserRole | string;
+  isPlatformAdmin?: boolean | null;
+}): AdminAccessSession {
+  const role = row.role as UserRole;
+  return {
+    role,
+    isPlatformAdmin: row.isPlatformAdmin === true,
+    activeNetworkRole: role === "admin" ? "network_admin" : undefined,
+  };
+}
+
+/**
  * Whether the user may access admin-only features.
  *
  * - Pass an {@link AdminAccessSession} (or auth user) for network-aware checks.
@@ -48,6 +64,7 @@ export async function userHasAdminAccess(
   if (typeof input === "object") {
     return resolveAdminAccess(input);
   }
+  // Denormalized legacy role string — prefer AdminAccessSession at call sites (PC-396).
   return input === "admin";
 }
 

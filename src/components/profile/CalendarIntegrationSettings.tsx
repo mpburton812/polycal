@@ -5,6 +5,7 @@
  */
 import {
   Alert,
+  Box,
   Button,
   FormControl,
   FormControlLabel,
@@ -371,6 +372,12 @@ export function CalendarIntegrationSettings({
     </Stack>
   );
 
-  if (compact) return body;
-  return <Paper sx={{ ...brutalPaperSx, p: 2, mb: 2 }}>{body}</Paper>;
+  if (compact) {
+    return <Box id="calendar-integration">{body}</Box>;
+  }
+  return (
+    <Paper id="calendar-integration" sx={{ ...brutalPaperSx, p: 2, mb: 2 }}>
+      {body}
+    </Paper>
+  );
 }

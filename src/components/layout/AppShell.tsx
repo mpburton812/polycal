@@ -6,6 +6,7 @@ import { AppTabs } from "@/components/layout/AppTabs";
 import { DevBar } from "@/components/layout/DevBar";
 import { TabSwipeRegion } from "@/components/layout/TabSwipeRegion";
 import { MotdPopupHost } from "@/components/motd/MotdPopupHost";
+import { CalendarSyncFailurePopupHost } from "@/components/calendar/CalendarSyncFailurePopupHost";
 import { PushSubscriptionManager } from "@/components/notifications/PushSubscriptionManager";
 import { avatarSrcForKey } from "@/lib/constants/avatars";
 import { getAppEnvironment } from "@/lib/env";
@@ -44,6 +45,8 @@ export function AppShell({
   const vapidPublicKey = getVapidPublicKey();
   /** Restore colored env banner (DEV red / TEST yellow / …) (PC-172). */
   const showEnvBanner = getAppEnvironment() !== "production";
+  /** Runtime E2E flag — available on the server even when the client bundle was built without NEXT_PUBLIC_E2E_TEST_MODE (PC-398). */
+  const e2eTestMode = process.env.E2E_TEST_MODE === "1";
 
   return (
     <>
@@ -82,6 +85,7 @@ export function AppShell({
       <AppTabs isAdmin={isAdmin} feedEnabled={feedEnabled} />
       <FeedbackFab />
       <MotdPopupHost />
+      <CalendarSyncFailurePopupHost disabled={e2eTestMode} />
       <Box sx={{ height: 56 }} aria-hidden />
     </>
   );

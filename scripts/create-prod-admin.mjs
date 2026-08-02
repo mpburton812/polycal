@@ -76,13 +76,20 @@ await client.execute({
   ],
 });
 
-const group = await client.execute("SELECT id FROM poly_group WHERE id = 1");
-if (group.rows.length === 0) {
+const network = await client.execute("SELECT id FROM networks LIMIT 1");
+if (network.rows.length === 0) {
+  const networkId = `net-${randomUUID()}`;
   await client.execute({
-    sql: "INSERT INTO poly_group (id, name, updated_at) VALUES (1, ?, ?)",
-    args: ["PolyCal", now],
+    sql: `INSERT INTO networks (
+      id, name, status, allow_user_provisioning, admin_can_see_uninvolved,
+      audit_log_visibility, hide_sleeping_arrangements, see_partners_sleeping_arrangements,
+      fast_sleep_enabled, feed_enabled, places_map_visibility, log_tail_length,
+      proposed_max_days, at_risk_ttl_days, archive_grace_hours, redraft_deadline_hours,
+      sleeping_partner_proposal_max_days, created_at, updated_at
+    ) VALUES (?, ?, 'active', 0, 1, 'admin_only', 0, 0, 1, 1, 'all', 100, 0, 7, 24, 24, 14, ?, ?)`,
+    args: [networkId, "PolyCal", now, now],
   });
-  console.log("Created default poly_group row");
+  console.log("Created default networks row");
 }
 
 await client.execute({

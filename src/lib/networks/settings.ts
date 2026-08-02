@@ -1,4 +1,5 @@
 import { eq } from "drizzle-orm";
+import { cache } from "react";
 
 import { getDb } from "@/lib/db/client";
 import { networks } from "@/lib/db/schema";
@@ -28,19 +29,27 @@ export type NetworkSettings = {
   sleepingPartnerProposalMaxDays: number;
 };
 
-/**
- * Loads per-network settings from the `networks` row (PC-363 isolation).
- */
-export async function loadNetworkSettings(
-  networkId: string,
-  db: ReturnType<typeof getDb> = getDb(),
-): Promise<NetworkSettings | null> {
-  const [row] = await db
-    .select()
-    .from(networks)
-    .where(eq(networks.id, networkId))
-    .limit(1);
-  if (!row) return null;
+type NetworkSettingsRow = {
+  id: string;
+  name: string;
+  allowUserProvisioning: boolean;
+  adminCanSeeUninvolved: boolean;
+  auditLogVisibility: string;
+  hideSleepingArrangements: boolean;
+  seePartnersSleepingArrangements: boolean;
+  fastSleepEnabled: boolean | null;
+  feedEnabled: boolean | null;
+  placesMapVisibility: string;
+  logTailLength: number;
+  onboardingWelcomeMessage: string | null;
+  proposedMaxDays: number;
+  atRiskTtlDays: number;
+  archiveGraceHours: number;
+  redraftDeadlineHours: number;
+  sleepingPartnerProposalMaxDays: number;
+};
+
+function mapNetworkRow(row: NetworkSettingsRow): NetworkSettings {
   return {
     networkId: row.id,
     name: row.name,
@@ -61,6 +70,77 @@ export async function loadNetworkSettings(
     redraftDeadlineHours: row.redraftDeadlineHours,
     sleepingPartnerProposalMaxDays: row.sleepingPartnerProposalMaxDays,
   };
+}
+
+/**
+ * Request-memoized load of network settings (avoids duplicate round-trips in
+ * feed/schedule/admin gates within one server turn) — PC-397.
+ */
+const loadNetworkSettingsMemo = cache(async (networkId: string): Promise<NetworkSettings | null> => {
+  const db = getDb();
+  const [row] = await db
+    .select({
+      id: networks.id,
+      name: networks.name,
+      allowUserProvisioning: networks.allowUserProvisioning,
+      adminCanSeeUninvolved: networks.adminCanSeeUninvolved,
+      auditLogVisibility: networks.auditLogVisibility,
+      hideSleepingArrangements: networks.hideSleepingArrangements,
+      seePartnersSleepingArrangements: networks.seePartnersSleepingArrangements,
+      fastSleepEnabled: networks.fastSleepEnabled,
+      feedEnabled: networks.feedEnabled,
+      placesMapVisibility: networks.placesMapVisibility,
+      logTailLength: networks.logTailLength,
+      onboardingWelcomeMessage: networks.onboardingWelcomeMessage,
+      proposedMaxDays: networks.proposedMaxDays,
+      atRiskTtlDays: networks.atRiskTtlDays,
+      archiveGraceHours: networks.archiveGraceHours,
+      redraftDeadlineHours: networks.redraftDeadlineHours,
+      sleepingPartnerProposalMaxDays: networks.sleepingPartnerProposalMaxDays,
+    })
+    .from(networks)
+    .where(eq(networks.id, networkId))
+    .limit(1);
+  if (!row) return null;
+  return mapNetworkRow(row);
+});
+
+/**
+ * Loads per-network settings from the `networks` row (PC-363 isolation).
+ * When `db` is omitted (typical), results are request-memoized via React.cache.
+ */
+export async function loadNetworkSettings(
+  networkId: string,
+  db?: ReturnType<typeof getDb>,
+): Promise<NetworkSettings | null> {
+  if (!db) {
+    return loadNetworkSettingsMemo(networkId);
+  }
+  const [row] = await db
+    .select({
+      id: networks.id,
+      name: networks.name,
+      allowUserProvisioning: networks.allowUserProvisioning,
+      adminCanSeeUninvolved: networks.adminCanSeeUninvolved,
+      auditLogVisibility: networks.auditLogVisibility,
+      hideSleepingArrangements: networks.hideSleepingArrangements,
+      seePartnersSleepingArrangements: networks.seePartnersSleepingArrangements,
+      fastSleepEnabled: networks.fastSleepEnabled,
+      feedEnabled: networks.feedEnabled,
+      placesMapVisibility: networks.placesMapVisibility,
+      logTailLength: networks.logTailLength,
+      onboardingWelcomeMessage: networks.onboardingWelcomeMessage,
+      proposedMaxDays: networks.proposedMaxDays,
+      atRiskTtlDays: networks.atRiskTtlDays,
+      archiveGraceHours: networks.archiveGraceHours,
+      redraftDeadlineHours: networks.redraftDeadlineHours,
+      sleepingPartnerProposalMaxDays: networks.sleepingPartnerProposalMaxDays,
+    })
+    .from(networks)
+    .where(eq(networks.id, networkId))
+    .limit(1);
+  if (!row) return null;
+  return mapNetworkRow(row);
 }
 
 /**

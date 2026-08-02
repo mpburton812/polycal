@@ -25,7 +25,6 @@ import { parseBatchSlotMeta } from "@/lib/proposals/batch-sleeping";
 import { formatSleepingDisplayTitle } from "@/lib/proposals/sleeping-display";
 import { isSleepingLikeType } from "@/lib/proposals/sleeping-like";
 import {
-  getAdminCanSeeUninvolved,
   MASKED_TITLE,
   canViewProposalContent,
 } from "@/lib/proposals/access";
@@ -85,11 +84,11 @@ async function getSchedulePrivacyFlags(
   adminCanSeeUninvolved: boolean;
   seePartnersSleepingArrangements: boolean;
 }> {
-  const adminCanSeeUninvolved = await getAdminCanSeeUninvolved(db, networkId);
+  // Single settings load — adminCanSeeUninvolved comes from the same row (PC-397).
   const settings = await loadNetworkSettings(networkId, db);
   return {
     hideSleeping: settings?.hideSleepingArrangements ?? false,
-    adminCanSeeUninvolved,
+    adminCanSeeUninvolved: settings?.adminCanSeeUninvolved ?? true,
     seePartnersSleepingArrangements: settings?.seePartnersSleepingArrangements ?? false,
   };
 }
