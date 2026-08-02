@@ -23,15 +23,23 @@ const POLL_MS = 60_000;
 /**
  * Surfaces Google Calendar sync failures with a deep link to profile settings (PC-398).
  * Skipped under E2E so modal aria-hiding does not break shell assertions.
+ * Prefer `disabled` from the server shell (`E2E_TEST_MODE`) — CI builds do not
+ * inline `NEXT_PUBLIC_E2E_TEST_MODE` into the client bundle.
  */
-export function CalendarSyncFailurePopupHost() {
+export function CalendarSyncFailurePopupHost({
+  disabled = false,
+}: {
+  disabled?: boolean;
+} = {}) {
   const pathname = usePathname();
   const router = useRouter();
   const [item, setItem] = useState<NotificationItem | null>(null);
   const [busy, setBusy] = useState(false);
+  const skip =
+    disabled || process.env.NEXT_PUBLIC_E2E_TEST_MODE === "1";
 
   const refresh = useCallback(async () => {
-    if (process.env.NEXT_PUBLIC_E2E_TEST_MODE === "1") return;
+    if (skip) return;
     try {
       const result = await getNotificationInboxAction();
       if (!result.ok) return;
@@ -40,10 +48,10 @@ export function CalendarSyncFailurePopupHost() {
     } catch {
       // Ignore transient errors — shell must stay usable.
     }
-  }, []);
+  }, [skip]);
 
   useEffect(() => {
-    if (process.env.NEXT_PUBLIC_E2E_TEST_MODE === "1") return;
+    if (skip) return;
     void refresh();
     const id = window.setInterval(() => void refresh(), POLL_MS);
     function onVisible() {
@@ -54,13 +62,13 @@ export function CalendarSyncFailurePopupHost() {
       window.clearInterval(id);
       document.removeEventListener("visibilitychange", onVisible);
     };
-  }, [refresh]);
+  }, [refresh, skip]);
 
   useEffect(() => {
     void refresh();
   }, [pathname, refresh]);
 
-  if (process.env.NEXT_PUBLIC_E2E_TEST_MODE === "1") return null;
+  if (skip) return null;
   if (!item) return null;
 
   async function dismissOnly() {
