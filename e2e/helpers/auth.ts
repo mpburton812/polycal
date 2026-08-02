@@ -1,6 +1,7 @@
 import { type Page, expect } from "@playwright/test";
 
 import { SEED_PASSWORD } from "./constants";
+import { dismissBlockingDialogsIfOpen } from "./motd";
 import { completeFirstLoginOnboarding } from "./onboarding";
 import { openProfileMenu } from "./navigation";
 
@@ -110,12 +111,7 @@ export async function logout(page: Page): Promise<void> {
 
 /** Asserts the main bottom navigation is visible (authenticated shell). */
 export async function expectAuthenticatedShell(page: Page): Promise<void> {
-  // Non-modal dismiss if a calendar sync failure dialog is open (PC-398).
-  const syncDialog = page.getByRole("dialog", { name: /Google Calendar sync failed/i });
-  if (await syncDialog.isVisible().catch(() => false)) {
-    await syncDialog.getByRole("button", { name: "Dismiss" }).click();
-    await expect(syncDialog).toBeHidden({ timeout: 5_000 });
-  }
+  await dismissBlockingDialogsIfOpen(page);
   await expect(page.getByRole("navigation", { name: "Main navigation" })).toBeVisible();
 }
 
