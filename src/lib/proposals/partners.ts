@@ -18,11 +18,29 @@ export async function getAcceptedSleepingPartnerIds(
   userId: string,
   networkId?: string,
 ): Promise<Set<string>> {
+  const map = await getAcceptedSleepingPartnerIdsForUsers(db, [userId], networkId);
+  return map.get(userId) ?? new Set();
+}
+
+/**
+ * Batch partner lookup for many subjects in one query (PC-397).
+ */
+export async function getAcceptedSleepingPartnerIdsForUsers(
+  db: Db,
+  userIds: string[],
+  networkId?: string,
+): Promise<Map<string, Set<string>>> {
+  const result = new Map<string, Set<string>>();
+  for (const id of userIds) {
+    result.set(id, new Set());
+  }
+  if (userIds.length === 0) return result;
+
   const partnershipFilters = [
     eq(sleepingPartnerships.status, "accepted"),
     or(
-      eq(sleepingPartnerships.userLowId, userId),
-      eq(sleepingPartnerships.userHighId, userId),
+      inArray(sleepingPartnerships.userLowId, userIds),
+      inArray(sleepingPartnerships.userHighId, userIds),
     ),
   ];
   if (networkId) {
@@ -36,9 +54,16 @@ export async function getAcceptedSleepingPartnerIds(
     .from(sleepingPartnerships)
     .where(and(...partnershipFilters));
 
-  return new Set(
-    partnershipRows.map((row) => (row.userLowId === userId ? row.userHighId : row.userLowId)),
-  );
+  const wanted = new Set(userIds);
+  for (const row of partnershipRows) {
+    if (wanted.has(row.userLowId)) {
+      result.get(row.userLowId)!.add(row.userHighId);
+    }
+    if (wanted.has(row.userHighId)) {
+      result.get(row.userHighId)!.add(row.userLowId);
+    }
+  }
+  return result;
 }
 
 /**

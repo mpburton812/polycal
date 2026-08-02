@@ -6,7 +6,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { auth } from "@/lib/auth";
-import { adminAccessFromSessionUser, userHasAdminAccess } from "@/lib/admin-access";
+import { adminAccessFromSessionUser, adminAccessFromUserRow, userHasAdminAccess, type AdminAccessSession } from "@/lib/admin-access";
 import { latestIcsPendingIdsByProposal } from "@/lib/calendar/pending-ics";
 import { getDb } from "@/lib/db/client";
 import { ensureDbReady } from "@/lib/db/ensure-ready";
@@ -68,14 +68,18 @@ import { logProposalTransition } from "@/lib/proposals/services/state-log";
 import { wipeProposalVotes } from "@/lib/proposals/services/votes";
 import {
   getAcceptedSleepingPartnerIds as loadAcceptedSleepingPartnerIds,
+  getAcceptedSleepingPartnerIdsForUsers as loadAcceptedSleepingPartnerIdsForUsers,
   getEligibleLocationIdsForUser as loadEligibleLocationIdsForUser,
   getEligibleLocationIdsForUsers as loadEligibleLocationIdsForUsers,
 } from "@/lib/proposals/partners";
 import {
   getAdminCanSeeUninvolved,
+  isPartnerOnlySleepingViewer,
   viewerCanSeeAuditLog,
   viewerCanSeeProposalWithSleepingGate,
 } from "@/lib/proposals/access";
+import { isSleepingLikeType } from "@/lib/proposals/sleeping-like";
+import { loadNetworkSettings } from "@/lib/networks/settings";
 import { buildPartnershipProposalCopy } from "@/lib/partnerships/copy";
 import type { UserRole } from "@/types/user";
 
@@ -398,7 +402,7 @@ export async function listResidencyPlaceOptionsAction(): Promise<ProposalPlaceOp
 async function assertLocationAllowed(
   db: ReturnType<typeof getDb>,
   userId: string,
-  role: string,
+  access: AdminAccessSession | string,
   locationId: string | undefined,
   locationText?: string,
   networkId?: string,
@@ -421,7 +425,9 @@ async function assertLocationAllowed(
     return { ok: false, error: "Selected place was not found." };
   }
 
-  if (await userHasAdminAccess(role as UserRole)) {
+  const adminAccess =
+    typeof access === "string" ? adminAccessFromUserRow({ role: access }) : access;
+  if (await userHasAdminAccess(adminAccess)) {
     return { ok: true };
   }
 
@@ -452,17 +458,20 @@ async function replaceInvitees(
       list.findIndex((row) => row.userId === invitee.userId) === index,
   );
 
-  for (const invitee of uniqueInvitees) {
-    await db.insert(proposalInvitees).values({
+  if (uniqueInvitees.length === 0) return;
+
+  // Batch insert — one RTT for all invitees (PC-397).
+  await db.insert(proposalInvitees).values(
+    uniqueInvitees.map((invitee) => ({
       id: `pi-${randomUUID()}`,
       proposalId,
       userId: invitee.userId,
       role: invitee.role,
-      voteStatus: "not_seen",
+      voteStatus: "not_seen" as const,
       addedByUserId: proposerId,
       createdAt: now,
-    });
-  }
+    })),
+  );
 }
 
 async function replaceTimeSlots(
@@ -480,9 +489,11 @@ async function replaceTimeSlots(
   await db.delete(proposalTimeSlots).where(eq(proposalTimeSlots.proposalId, proposalId));
   const now = new Date().toISOString();
 
-  for (let index = 0; index < slots.length; index += 1) {
-    const slot = slots[index];
-    await db.insert(proposalTimeSlots).values({
+  if (slots.length === 0) return;
+
+  // Batch insert — one RTT for all slots (PC-397).
+  await db.insert(proposalTimeSlots).values(
+    slots.map((slot, index) => ({
       id: `pts-${randomUUID()}`,
       proposalId,
       startAt: slot.startAt,
@@ -491,8 +502,8 @@ async function replaceTimeSlots(
       sortOrder: slot.sortOrder ?? index,
       isAllDay: slot.isAllDay ?? false,
       createdAt: now,
-    });
-  }
+    })),
+  );
 }
 
 /**
@@ -716,7 +727,7 @@ export async function createDraftProposalAction(
   const locationCheck = await assertLocationAllowed(
     db,
     session.user.id,
-    session.user.role,
+    adminAccessFromSessionUser(session.user),
     parsed.data.locationId,
     parsed.data.locationText,
     networkId,
@@ -854,9 +865,9 @@ export async function updateDraftProposalAction(
   }
 
   // Admin edits keep the original proposer's identity for invitee checks;
-  // location checks still use the actor role so admins can pick any place (PC-375).
+  // location checks still use the actor session so network admins can pick any place (PC-375 / PC-396).
   const subjectUserId = proposal.proposerId;
-  const locationActorRole = session.user.role as UserRole;
+  const locationActorAccess = adminAccessFromSessionUser(session.user);
 
   if (isNonScheduleProposal(proposal.description)) {
     return { ok: false, message: "This draft cannot be edited here." };
@@ -870,7 +881,7 @@ export async function updateDraftProposalAction(
   if (isBatchSleeping) {
     const validation = await validateBatchSleepingEntries(db, {
       subjectUserId,
-      subjectRole: locationActorRole,
+      subjectRole: session.user.role as UserRole,
       entries: batchEntries,
       locationPolicy: "network",
     });
@@ -912,7 +923,7 @@ export async function updateDraftProposalAction(
   const locationCheck = await assertLocationAllowed(
     db,
     subjectUserId,
-    locationActorRole,
+    locationActorAccess,
     parsed.data.locationId,
     parsed.data.locationText,
     networkId,
@@ -1343,6 +1354,7 @@ export async function getProposalDetailAction(
       batchEntriesJson: proposals.batchEntriesJson,
       reminderOffsetMinutes: proposals.reminderOffsetMinutes,
       eventIconKey: proposals.eventIconKey,
+      networkId: proposals.networkId,
       locationBedroomNames: locations.bedroomNames,
       locationBedroomCount: locations.bedroomCount,
     })
@@ -1383,6 +1395,31 @@ export async function getProposalDetailAction(
       adminCanSeeUninvolved,
     })
   ) {
+    // Partner-only schedule viewers can see the block but not open detail (PC-399).
+    const settings = row.networkId ? await loadNetworkSettings(row.networkId, db) : null;
+    if (
+      settings?.seePartnersSleepingArrangements &&
+      isSleepingLikeType(row.proposalType)
+    ) {
+      const partnerIds = await loadAcceptedSleepingPartnerIds(
+        db,
+        session.user.id,
+        row.networkId ?? undefined,
+      );
+      if (
+        isPartnerOnlySleepingViewer(
+          session.user.id,
+          row.proposerId,
+          inviteeUserIds,
+          partnerIds,
+        )
+      ) {
+        return {
+          ok: false,
+          message: "You do not have access to this event's detail.",
+        };
+      }
+    }
     return { ok: false, message: "Proposal not found." };
   }
 
@@ -1390,15 +1427,18 @@ export async function getProposalDetailAction(
   const userFacingDescription = proposalDescriptionForDisplay(row.description);
   // Detail dialog never applies schedule sleeping mask (PC-306) — content stays unmasked.
 
-  // Preload sleeping partners for each proxy (passive) invitee so UI can show vote controls (PC-255).
+  // Preload sleeping partners for each proxy (passive) invitee so UI can show vote controls (PC-255 / PC-397).
   const proxyPartnerIdsByUser = new Map<string, Set<string>>();
-  for (const invitee of inviteeRows) {
-    if (invitee.userRole !== "passive") continue;
-    if (proxyPartnerIdsByUser.has(invitee.userId)) continue;
-    proxyPartnerIdsByUser.set(
-      invitee.userId,
-      await loadAcceptedSleepingPartnerIds(db, invitee.userId),
-    );
+  const passiveUserIds = [
+    ...new Set(
+      inviteeRows.filter((invitee) => invitee.userRole === "passive").map((invitee) => invitee.userId),
+    ),
+  ];
+  if (passiveUserIds.length > 0) {
+    const partnersByUser = await loadAcceptedSleepingPartnerIdsForUsers(db, passiveUserIds);
+    for (const userId of passiveUserIds) {
+      proxyPartnerIdsByUser.set(userId, partnersByUser.get(userId) ?? new Set());
+    }
   }
 
   const slotRows = await db

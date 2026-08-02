@@ -59,7 +59,6 @@ import { composeFeedFingerprint } from "@/lib/feed/update-token";
 import { isFeedMilestoneVisibleViaAdminOnly } from "@/lib/feed/admin-only-visibility";
 import { notifyUser } from "@/lib/notifications";
 import {
-  getAdminCanSeeUninvolved,
   viewerCanSeeAuditLog,
   viewerCanSeeFeedMilestoneAudit,
   viewerCanSeeProposalWithSleepingGate,
@@ -68,7 +67,7 @@ import { getAcceptedSleepingPartnerIds } from "@/lib/proposals/partners";
 import { formatProposalLogLine } from "@/lib/proposals/state-log-format";
 import { canCommentOnProposal } from "@/lib/schedule/slice-auth";
 import { readFeedImageUploads } from "@/lib/feed/images";
-import type { AuditLogVisibility } from "@/types/poly-group";
+import type { AuditLogVisibility } from "@/types/network-settings";
 import {
   DEFAULT_FEED_PREFS,
   detectPresetId,
@@ -290,8 +289,8 @@ async function loadActiveEvents(
     inviteesByProposal.set(invitee.proposalId, list);
   }
 
-  const adminCanSeeUninvolved = await getAdminCanSeeUninvolved(db, networkId);
   const settings = await loadNetworkSettings(networkId, db);
+  const adminCanSeeUninvolved = settings?.adminCanSeeUninvolved ?? true;
   const auditVisibility = (settings?.auditLogVisibility ?? "admin_only") as AuditLogVisibility;
 
   const activeEvents: FeedActiveEvent[] = [];
@@ -333,6 +332,10 @@ async function loadActiveEvents(
       scheduledStartAt: row.scheduledStartAt,
       scheduledEndAt: row.scheduledEndAt,
       proposalState: row.state,
+      canComment: canCommentOnProposal({
+        state: row.state as "draft" | "proposed" | "resolved" | "archived",
+        isContentMasked: false,
+      }),
     });
   }
 
@@ -635,8 +638,8 @@ async function loadMilestoneBatch(
   networkId: string,
 ): Promise<FeedItem[]> {
   {
-    const adminCanSeeUninvolved = await getAdminCanSeeUninvolved(db, networkId);
     const settings = await loadNetworkSettings(networkId, db);
+    const adminCanSeeUninvolved = settings?.adminCanSeeUninvolved ?? true;
     const auditVisibility = (settings?.auditLogVisibility ?? "admin_only") as AuditLogVisibility;
 
     const allowedActions = milestoneActionsForPrefs(prefs);

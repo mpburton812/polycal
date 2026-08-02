@@ -74,6 +74,33 @@ export function addDays(date: Date, days: number): Date {
 }
 
 /**
+ * Builds dayCount civil days starting at today (viewer TZ), used when callers
+ * want a forward-looking window without Mon-based wrapping (PC-400).
+ */
+export function scheduleDaysStartingToday(
+  weekStart: Date,
+  dayCount: number,
+  timeZone: string = DEFAULT_VIEWER_TIMEZONE,
+  now: Date = new Date(),
+): Date[] {
+  const monday = startOfWeekMonday(weekStart, timeZone);
+  const days = Array.from({ length: dayCount }, (_, index) => addDays(monday, index));
+  const todayKey = localDateKey(now.toISOString(), timeZone);
+  const todayIndex = days.findIndex(
+    (day) => localDateKey(day.toISOString(), timeZone) === todayKey,
+  );
+  // Agenda/week views keep Mon→… order and scroll Today into view; this helper
+  // remains for forward-only windows and unit coverage.
+  if (todayIndex <= 0) return days;
+  const fromToday = days.slice(todayIndex);
+  const need = dayCount - fromToday.length;
+  if (need <= 0) return fromToday.slice(0, dayCount);
+  const last = days[days.length - 1]!;
+  const extras = Array.from({ length: need }, (_, index) => addDays(last, index + 1));
+  return [...fromToday, ...extras];
+}
+
+/**
  * Instant for wall-clock `hour:minute:second.ms` on civil `dateKey` in `timeZone` (PC-376).
  */
 export function zonedWallTimeToUtc(

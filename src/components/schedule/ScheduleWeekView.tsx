@@ -1,7 +1,7 @@
 "use client";
 
 import { Box, Typography } from "@mui/material";
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 
 import type { ScheduleEvent } from "@/actions/schedule";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -34,6 +34,7 @@ const COMPACT_VISIBLE = 3;
 
 /**
  * Renders a multi-day column grid with events grouped by local day (PC-42).
+ * Compact list scrolls so Today is first visible (PC-400).
  */
 export function ScheduleWeekView({
   weekStart,
@@ -48,6 +49,16 @@ export function ScheduleWeekView({
     const monday = startOfWeekMonday(weekStart, timeZone);
     return Array.from({ length: dayCount }, (_, index) => addDays(monday, index));
   }, [weekStart, dayCount, timeZone]);
+
+  const todayRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!compact) return;
+    todayRef.current?.scrollIntoView({
+      block: "start",
+      behavior: "instant" in window ? "instant" : "auto",
+    });
+  }, [compact, days, timeZone]);
 
   const eventsByDay = useMemo(() => {
     const map = new Map<string, ScheduleEvent[]>();
@@ -86,6 +97,7 @@ export function ScheduleWeekView({
           return (
             <Box
               key={key}
+              ref={isToday ? todayRef : undefined}
               sx={{
                 display: "flex",
                 alignItems: "flex-start",

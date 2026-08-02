@@ -119,10 +119,10 @@ function isFutureScheduledEvent(scheduledStartAt: string | null): boolean {
 async function userCanEditPlace(
   db: ReturnType<typeof getDb>,
   userId: string,
-  role: UserRole,
+  access: ReturnType<typeof adminAccessFromSessionUser>,
   placeId: string,
 ): Promise<boolean> {
-  if (await userHasAdminAccess(role)) return true;
+  if (await userHasAdminAccess(access)) return true;
 
   const [place] = await db.select().from(locations).where(eq(locations.id, placeId)).limit(1);
   if (!place) return false;
@@ -149,10 +149,10 @@ async function userCanEditPlace(
 async function userCanDeletePlace(
   db: ReturnType<typeof getDb>,
   userId: string,
-  role: UserRole,
+  access: ReturnType<typeof adminAccessFromSessionUser>,
   placeId: string,
 ): Promise<boolean> {
-  if (await userHasAdminAccess(role)) return true;
+  if (await userHasAdminAccess(access)) return true;
 
   const [place] = await db.select().from(locations).where(eq(locations.id, placeId)).limit(1);
   if (!place) return false;
@@ -191,7 +191,7 @@ export async function getPlaceDeleteImpactAction(
     return { ok: false, message: "Place not found." };
   }
 
-  if (!(await userCanDeletePlace(db, session.user.id, session.user.role, placeId))) {
+  if (!(await userCanDeletePlace(db, session.user.id, adminAccessFromSessionUser(session.user), placeId))) {
     return { ok: false, message: "You cannot delete this place." };
   }
 
@@ -527,7 +527,7 @@ export async function updatePlaceAction(
   }
 
   const isAdmin = await userHasAdminAccess(adminAccessFromSessionUser(session.user));
-  if (!(await userCanEditPlace(db, session.user.id, session.user.role, parsed.data.placeId))) {
+  if (!(await userCanEditPlace(db, session.user.id, adminAccessFromSessionUser(session.user), parsed.data.placeId))) {
     return { ok: false, message: "You can only edit places you created or where you are a resident." };
   }
 
@@ -576,7 +576,7 @@ export async function deletePlaceAction(
     return { ok: false, message: "Place not found." };
   }
 
-  if (!(await userCanDeletePlace(db, session.user.id, session.user.role, placeId))) {
+  if (!(await userCanDeletePlace(db, session.user.id, adminAccessFromSessionUser(session.user), placeId))) {
     return { ok: false, message: "You cannot delete this place." };
   }
 
@@ -633,7 +633,7 @@ export async function addPersonToPlaceAction(
     !(await userIsPlaceOwner(
       db,
       session.user.id,
-      session.user.role as UserRole,
+      adminAccessFromSessionUser(session.user),
       parsed.data.locationId,
     ))
   ) {
@@ -750,7 +750,7 @@ export async function updatePlaceMemberRoleAction(
     !(await userIsPlaceOwner(
       db,
       session.user.id,
-      session.user.role as UserRole,
+      adminAccessFromSessionUser(session.user),
       parsed.data.locationId,
     ))
   ) {
@@ -867,7 +867,7 @@ export async function removePersonFromPlaceAction(
     !(await userIsPlaceOwner(
       db,
       session.user.id,
-      session.user.role as UserRole,
+      adminAccessFromSessionUser(session.user),
       parsed.data.locationId,
     ))
   ) {

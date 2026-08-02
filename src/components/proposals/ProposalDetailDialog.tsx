@@ -174,6 +174,8 @@ export function ProposalDetailDialog({
   const [pending, startTransition] = useTransition();
   /** True while the initial detail fetch for the open dialog is in flight (PC-138). */
   const [detailLoading, setDetailLoading] = useState(false);
+  /** Surfaced when detail load fails with an explicit access/availability message (PC-399). */
+  const [unavailableMessage, setUnavailableMessage] = useState<string | null>(null);
 
   function notifyResult(result: { ok: boolean; message: string }) {
     showToast(result.message, result.ok ? "success" : "error");
@@ -182,18 +184,19 @@ export function ProposalDetailDialog({
   function reloadDetail(id: string, options?: { isInitial?: boolean }) {
     if (options?.isInitial) {
       setDetailLoading(true);
+      setUnavailableMessage(null);
     }
     startTransition(async () => {
       try {
         const result = await getProposalDetailAction(id);
         if (!result.ok || !result.detail) {
-          // The proposal may have left the viewer's scope after their own action
-          // (e.g. a decline that reverts it to a draft only the proposer can see).
-          // Clear the detail silently so a reload error doesn't clobber the
-          // action's own success toast (fixes a flaky "Vote recorded" assertion).
           setDetail(null);
+          if (options?.isInitial && result.message) {
+            setUnavailableMessage(result.message);
+          }
           return;
         }
+        setUnavailableMessage(null);
         setDetail(result.detail);
       } finally {
         if (options?.isInitial) {
@@ -207,6 +210,7 @@ export function ProposalDetailDialog({
     if (!open || !proposalId) {
       setDetail(null);
       setDetailLoading(false);
+      setUnavailableMessage(null);
       setCommentText("");
       setConflictWarnings([]);
       setShowConflictConfirm(false);
@@ -645,7 +649,11 @@ export function ProposalDetailDialog({
           )}
           {!detailLoading && !detail && (
             <Typography variant="body2" color="text.secondary">
-              This proposal is no longer available.
+              {unavailableMessage &&
+              unavailableMessage !== "Proposal not found." &&
+              unavailableMessage !== "Sign in required."
+                ? unavailableMessage
+                : "This proposal is no longer available."}
             </Typography>
           )}
           {detail && (

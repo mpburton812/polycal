@@ -2,11 +2,11 @@ import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
 import { auth } from "@/lib/auth";
+import { adminAccessFromSessionUser } from "@/lib/admin-access";
 import { canViewerAccessCustomAvatar } from "@/lib/avatars/access";
 import { getDb } from "@/lib/db/client";
 import { ensureDbReady } from "@/lib/db/ensure-ready";
 import { storedImages, users } from "@/lib/db/schema";
-import type { UserRole } from "@/types/user";
 
 /**
  * Serves user-uploaded avatar blobs from `stored_images` (PC-45).
@@ -43,7 +43,7 @@ export async function GET(
 
   const allowed = await canViewerAccessCustomAvatar(
     session.user.id,
-    session.user.role as UserRole,
+    adminAccessFromSessionUser(session.user),
     owner.id,
   );
   if (!allowed) {

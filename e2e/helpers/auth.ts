@@ -1,6 +1,7 @@
 import { type Page, expect } from "@playwright/test";
 
 import { SEED_PASSWORD } from "./constants";
+import { dismissBlockingDialogsIfOpen } from "./motd";
 import { completeFirstLoginOnboarding } from "./onboarding";
 import { openProfileMenu } from "./navigation";
 
@@ -110,6 +111,7 @@ export async function logout(page: Page): Promise<void> {
 
 /** Asserts the main bottom navigation is visible (authenticated shell). */
 export async function expectAuthenticatedShell(page: Page): Promise<void> {
+  await dismissBlockingDialogsIfOpen(page);
   await expect(page.getByRole("navigation", { name: "Main navigation" })).toBeVisible();
 }
 
