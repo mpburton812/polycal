@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import { redirect } from "next/navigation";
 
 import { listPeopleAction } from "@/actions/users";
-import { getPolyGroupDisplayNameAction } from "@/actions/poly-group";
+import { getNetworkDisplayNameAction } from "@/actions/network-settings";
 import { getNotificationInboxAction } from "@/actions/notifications";
 import { getNotificationPrefsAction } from "@/actions/profile";
 import { AppShell } from "@/components/layout/AppShell";
@@ -56,7 +56,7 @@ async function AppLayoutReady({ children }: { children: React.ReactNode }) {
   });
   const notificationInboxPromise = getNotificationInboxAction();
   const notificationPrefsPromise = getNotificationPrefsAction();
-  const groupNamePromise = getPolyGroupDisplayNameAction();
+  const groupNamePromise = getNetworkDisplayNameAction();
   const feedEnabledPromise = isFeedEnabledForActiveNetwork();
   const isPlatformAdmin = session.user.isPlatformAdmin === true;
 
@@ -126,7 +126,7 @@ async function AppShellWithData({
   userId: string;
   notificationInboxPromise: ReturnType<typeof getNotificationInboxAction>;
   notificationPrefsPromise: ReturnType<typeof getNotificationPrefsAction>;
-  groupNamePromise: ReturnType<typeof getPolyGroupDisplayNameAction>;
+  groupNamePromise: ReturnType<typeof getNetworkDisplayNameAction>;
   feedEnabledPromise: Promise<boolean>;
 }) {
   const [notificationInbox, notificationPrefs, groupName, feedEnabled] = await Promise.all([

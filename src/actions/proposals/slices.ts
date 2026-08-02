@@ -6,12 +6,11 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { auth } from "@/lib/auth";
-import { userHasAdminAccess } from "@/lib/admin-access";
+import { adminAccessFromSessionUser, userHasAdminAccess } from "@/lib/admin-access";
 import { getDb } from "@/lib/db/client";
 import { ensureDbReady } from "@/lib/db/ensure-ready";
 import {
   locations,
-  polyGroup,
   proposalComments,
   proposalInvitees,
   proposalTimeSlots,
@@ -43,6 +42,7 @@ import { formatSliceTag } from "@/lib/schedule/slice-types";
 import { canCommentOnProposal, validateSliceMembership } from "@/lib/schedule/slice-auth";
 import { localDateKey } from "@/lib/schedule/dates";
 import { resolveTimezone } from "@/lib/schedule/timezone";
+import { loadNetworkSettings } from "@/lib/networks/settings";
 import type { ProposalSliceDetail } from "./slice-types";
 
 type DbExecutor = ReturnType<typeof getDb> | Parameters<Parameters<ReturnType<typeof getDb>["transaction"]>[0]>[0];
@@ -62,18 +62,14 @@ const sliceDetailSchema = z.object({
 
 const detachSliceSchema = sliceDetailSchema;
 
-async function getSlicePrivacyFlags(db: ReturnType<typeof getDb>) {
-  const [group] = await db
-    .select({
-      hideSleepingArrangements: polyGroup.hideSleepingArrangements,
-      seePartnersSleepingArrangements: polyGroup.seePartnersSleepingArrangements,
-    })
-    .from(polyGroup)
-    .where(eq(polyGroup.id, 1))
-    .limit(1);
+async function getSlicePrivacyFlags(
+  db: ReturnType<typeof getDb>,
+  networkId?: string | null,
+) {
+  const settings = networkId ? await loadNetworkSettings(networkId, db) : null;
   return {
-    hideSleeping: group?.hideSleepingArrangements ?? false,
-    seePartnersSleepingArrangements: group?.seePartnersSleepingArrangements ?? false,
+    hideSleeping: settings?.hideSleepingArrangements ?? false,
+    seePartnersSleepingArrangements: settings?.seePartnersSleepingArrangements ?? false,
   };
 }
 
@@ -157,16 +153,7 @@ export async function getProposalSliceDetailAction(
 
   await ensureDbReady();
   const db = getDb();
-  const isAdmin = await userHasAdminAccess(session.user.role);
-  const privacyFlags = await getSlicePrivacyFlags(db);
-  const adminCanSeeUninvolved = await getAdminCanSeeUninvolved(db);
-  const partnerIds = await getAcceptedSleepingPartnerIds(db, session.user.id);
-  const [viewerRow] = await db
-    .select({ timezone: users.timezone })
-    .from(users)
-    .where(eq(users.id, session.user.id))
-    .limit(1);
-  const viewerTimeZone = resolveTimezone(viewerRow?.timezone);
+  const isAdmin = await userHasAdminAccess(adminAccessFromSessionUser(session.user));
   const { rootProposalId, sliceKind, sliceKey } = parsed.data;
   const sliceTag = formatSliceTag(sliceKind, sliceKey);
   if (!sliceTag) {
@@ -191,6 +178,7 @@ export async function getProposalSliceDetailAction(
       isBatchSleeping: proposals.isBatchSleeping,
       batchEntriesJson: proposals.batchEntriesJson,
       atRisk: proposals.atRisk,
+      networkId: proposals.networkId,
     })
     .from(proposals)
     .innerJoin(users, eq(proposals.proposerId, users.id))
@@ -201,6 +189,16 @@ export async function getProposalSliceDetailAction(
   if (!row) {
     return { ok: false, message: "Proposal not found." };
   }
+
+  const [viewerRow] = await db
+    .select({ timezone: users.timezone })
+    .from(users)
+    .where(eq(users.id, session.user.id))
+    .limit(1);
+  const viewerTimeZone = resolveTimezone(viewerRow?.timezone);
+  const privacyFlags = await getSlicePrivacyFlags(db, row.networkId);
+  const adminCanSeeUninvolved = await getAdminCanSeeUninvolved(db, row.networkId ?? undefined);
+  const partnerIds = await getAcceptedSleepingPartnerIds(db, session.user.id);
 
   const inviteeRows = await db
     .select({
@@ -407,7 +405,7 @@ export async function detachProposalSliceAction(
 
   await ensureDbReady();
   const db = getDb();
-  const isAdmin = await userHasAdminAccess(session.user.role);
+  const isAdmin = await userHasAdminAccess(adminAccessFromSessionUser(session.user));
   const { rootProposalId, sliceKind, sliceKey } = parsed.data;
   const actor = actorNotifyFields(session.user);
 

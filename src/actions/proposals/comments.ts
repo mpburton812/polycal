@@ -15,7 +15,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { auth } from "@/lib/auth";
-import { userHasAdminAccess } from "@/lib/admin-access";
+import { adminAccessFromSessionUser, userHasAdminAccess } from "@/lib/admin-access";
 import { getDb } from "@/lib/db/client";
 import { ensureDbReady } from "@/lib/db/ensure-ready";
 import {
@@ -161,7 +161,7 @@ export async function deleteProposalCommentAction(
 
   await ensureDbReady();
   const db = getDb();
-  const isAdmin = await userHasAdminAccess(session.user.role);
+  const isAdmin = await userHasAdminAccess(adminAccessFromSessionUser(session.user));
 
   const [row] = await db
     .select({

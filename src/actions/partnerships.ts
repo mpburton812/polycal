@@ -5,7 +5,7 @@ import { and, eq, inArray, or } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
-import { userHasAdminAccess } from "@/lib/admin-access";
+import { adminAccessFromSessionUser, userHasAdminAccess } from "@/lib/admin-access";
 import { logUserActivity } from "@/lib/audit";
 import { dismissNotificationsForPartnership } from "@/actions/notifications";
 import { getDb } from "@/lib/db/client";
@@ -66,7 +66,7 @@ export async function listPartnershipsForUserAction(
     return [];
   }
 
-  const isAdmin = await userHasAdminAccess(networkSession.user.role);
+  const isAdmin = await userHasAdminAccess(adminAccessFromSessionUser(networkSession.user));
   if (networkSession.user.id !== userId && !isAdmin) {
     throw new Error("Forbidden");
   }
@@ -515,7 +515,7 @@ export async function listSleepingPartnershipMapEdgesAction(): Promise<SleepingP
   const db = getDb();
   const settings = await loadNetworkSettings(networkSession.user.activeNetworkId, db);
   const visibility = settings?.placesMapVisibility ?? "all";
-  const isAdmin = await userHasAdminAccess(networkSession.user.role);
+  const isAdmin = await userHasAdminAccess(adminAccessFromSessionUser(networkSession.user));
   if (visibility === "none") return [];
   if (visibility === "admins" && !isAdmin) return [];
 

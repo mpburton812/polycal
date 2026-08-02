@@ -62,7 +62,7 @@ export function AdminActivityLogPanel({ entries }: { entries: ActivityLogEntry[]
     >
       {entries.length === 0 ? (
         <Typography color="text.secondary">
-          No log entries to display. Increase log tail length in poly group settings.
+          No log entries to display. Increase log tail length in network settings.
         </Typography>
       ) : (
         <Box sx={{ overflowX: "auto", maxHeight: 400 }}>

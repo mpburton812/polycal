@@ -20,6 +20,11 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Changed
+- Schema refactor phase 3: split Drizzle schema into domain modules under `src/lib/db/schema/`. Change control: `2026.08.01c`.
+- Schema refactor phase 2: network-aware admin authorization; sync `users.role` from network memberships. Change control: `2026.08.01b`.
+- Schema refactor phase 1: retire poly_group app reads; route settings through networks; rename Poly Group → Network in admin UI. Change control: `2026.08.01a`.
+
 ### Added
 - PC-391–PC-394 MOTD (platform/network pop-ups), Admin under profile menu, multi-color event icons; SCHEMA_VERSION 47 (`motd_messages`, `motd_acknowledgments`). Change control: `2026.07.29a`.
 - PC-383–PC-385 FastSleep Proposal cleanup: multi-slot same night, per-slot notes, Proposer label; Residency Proposal rename; Admin Enable Feed (default ON); SCHEMA_VERSION 46. Change control: `2026.07.28b`.
