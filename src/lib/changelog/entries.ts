@@ -75,6 +75,18 @@ export const CHANGELOG: ChangelogEntry[] = [
     ],
   },
   {
+    version: "2026.08.02a",
+    date: "2026-08-02",
+    summary: "Promote schema refactor (phases 1–3) to test environment.",
+    changes: [
+      {
+        type: "changed",
+        description:
+          "Test environment receives poly_group retirement, network-aware admin auth, and modular Drizzle schema (2026.08.01a–c).",
+      },
+    ],
+  },
+  {
     version: "2026.08.01c",
     date: "2026-08-01",
     summary: "Schema refactor phase 3: modularize Drizzle schema by domain.",
