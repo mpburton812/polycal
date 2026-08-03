@@ -1093,13 +1093,22 @@ function PeoplePlacesClientInner({
 }: PeoplePlacesClientProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [tab, setTab] = useState(0);
+  const [tab, setTab] = useState(() => {
+    // Survive soft-nav remounts so Places/People selection returns after swipe (PC-407).
+    if (typeof window === "undefined") return 0;
+    const stored = Number(window.sessionStorage.getItem("polycal.peoplePlaces.tab"));
+    return Number.isFinite(stored) && stored >= 0 ? stored : 0;
+  });
   const showMapTab =
     placesMapVisibility === "all" || (placesMapVisibility === "admins" && isAdmin);
   const [createOpen, setCreateOpen] = useState(false);
   const [createPlaceOpen, setCreatePlaceOpen] = useState(false);
   const [selectedPersonId, setSelectedPersonId] = useState<string | null>(null);
   const [highlightPartnershipId, setHighlightPartnershipId] = useState<string | null>(null);
+
+  useEffect(() => {
+    window.sessionStorage.setItem("polycal.peoplePlaces.tab", String(tab));
+  }, [tab]);
 
   useEffect(() => {
     const partnershipId = searchParams.get("partnership");

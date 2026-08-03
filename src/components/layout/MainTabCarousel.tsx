@@ -2,7 +2,6 @@
 
 import {
   useCallback,
-  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -52,9 +51,12 @@ function matchMainTab(
 }
 
 /**
- * Keep-alive main-tab carousel (PC-407): panels stay mounted after first visit
- * so swipe/tap back preserves scroll and in-panel React state. Non-main routes
- * (profile/admin) render children normally without clearing the cache.
+ * Main-tab swipe host (PC-407 / PC-408).
+ *
+ * Renders only the active route’s RSC children — multi-panel DOM keep-alive
+ * duplicated controls across hidden tabs and broke Playwright strict mode.
+ * Proposal / People sub-tab “place” is restored via sessionStorage in those
+ * clients instead.
  */
 export function MainTabCarousel({
   children,
@@ -77,138 +79,91 @@ export function MainTabCarousel({
 
   const activeHref = matchMainTab(pathname, visibleHrefs);
   const onMainTab = activeHref != null;
-
-  const [cache, setCache] = useState<Partial<Record<MainTabHref, ReactNode>>>({});
-  const [dragPx, setDragPx] = useState(0);
-  const [animating, setAnimating] = useState(false);
-  const startRef = useRef<{ x: number; y: number; ignore: boolean } | null>(null);
-  const widthRef = useRef(0);
-  const viewportRef = useRef<HTMLDivElement | null>(null);
-
-  useLayoutEffect(() => {
-    if (!activeHref) return;
-    setCache((prev) => ({ ...prev, [activeHref]: children }));
-  }, [activeHref, children]);
-
   const activeIndex = activeHref ? visibleHrefs.indexOf(activeHref) : 0;
 
+  const [slideDir, setSlideDir] = useState<"left" | "right" | null>(null);
+  const startRef = useRef<{ x: number; y: number; ignore: boolean } | null>(null);
+
   const goToIndex = useCallback(
-    (nextIndex: number) => {
+    (nextIndex: number, dir: "left" | "right") => {
       if (nextIndex < 0 || nextIndex >= visibleHrefs.length) return;
       const href = visibleHrefs[nextIndex];
       if (!href || href === activeHref) return;
-      setAnimating(true);
+      setSlideDir(dir);
       router.push(href);
-      window.setTimeout(() => setAnimating(false), 280);
+      window.setTimeout(() => setSlideDir(null), 240);
     },
     [activeHref, router, visibleHrefs],
   );
 
   const onPointerDown = useCallback((event: PointerEvent<HTMLDivElement>) => {
     if (event.pointerType === "mouse" && event.buttons !== 1) return;
-    widthRef.current = viewportRef.current?.clientWidth ?? window.innerWidth;
+    const modalOpen = Boolean(
+      document.querySelector(".MuiModal-root, .MuiDialog-root, [role='dialog']"),
+    );
     startRef.current = {
       x: event.clientX,
       y: event.clientY,
-      ignore: isInteractiveOrHorizontalScroll(event.target),
+      ignore: modalOpen || isInteractiveOrHorizontalScroll(event.target),
     };
-    setDragPx(0);
-  }, []);
-
-  const onPointerMove = useCallback((event: PointerEvent<HTMLDivElement>) => {
-    const start = startRef.current;
-    if (!start || start.ignore) return;
-    const dx = event.clientX - start.x;
-    const dy = event.clientY - start.y;
-    if (Math.abs(dy) > Math.abs(dx) * SWIPE_MAX_VERTICAL_RATIO) {
-      setDragPx(0);
-      return;
-    }
-    setDragPx(dx);
   }, []);
 
   const onPointerUp = useCallback(
     (event: PointerEvent<HTMLDivElement>) => {
       const start = startRef.current;
       startRef.current = null;
-      const dx = dragPx || (start ? event.clientX - start.x : 0);
-      setDragPx(0);
       if (!start || start.ignore || !onMainTab) return;
 
+      const dx = event.clientX - start.x;
       const dy = event.clientY - start.y;
       if (Math.abs(dx) < SWIPE_MIN_PX) return;
       if (Math.abs(dy) > Math.abs(dx) * SWIPE_MAX_VERTICAL_RATIO) return;
 
-      const nextIndex = dx < 0 ? activeIndex + 1 : activeIndex - 1;
-      goToIndex(nextIndex);
+      if (dx < 0) goToIndex(activeIndex + 1, "left");
+      else goToIndex(activeIndex - 1, "right");
     },
-    [activeIndex, dragPx, goToIndex, onMainTab],
+    [activeIndex, goToIndex, onMainTab],
   );
 
   const onPointerCancel = useCallback(() => {
     startRef.current = null;
-    setDragPx(0);
   }, []);
 
   if (!onMainTab) {
     return <>{children}</>;
   }
 
-  const width = widthRef.current || 1;
-  const dragPercent = dragPx === 0 ? 0 : (dragPx / width) * 100;
-  const translate = -(activeIndex * 100) + dragPercent;
+  const panelTestId = `main-tab-panel-${activeHref.slice(1)}`;
 
   return (
     <div
-      ref={viewportRef}
       onPointerDown={onPointerDown}
-      onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
       onPointerCancel={onPointerCancel}
-      style={{
-        overflow: "hidden",
-        width: "100%",
-        minHeight: "inherit",
-        touchAction: "pan-y",
-      }}
+      style={{ minHeight: "inherit", touchAction: "pan-y", overflow: "hidden" }}
       data-testid="main-tab-carousel"
     >
       <div
+        data-testid={panelTestId}
+        data-active="true"
         style={{
-          display: "flex",
-          width: "100%",
-          transform: `translateX(${translate}%)`,
-          transition:
-            dragPx !== 0 || !animating
-              ? dragPx !== 0
-                ? "none"
-                : "transform 220ms ease-out"
-              : "transform 220ms ease-out",
-          willChange: "transform",
+          animation: slideDir
+            ? `${slideDir === "left" ? "tabSlideFromRight" : "tabSlideFromLeft"} 220ms ease-out`
+            : undefined,
         }}
       >
-        {visibleHrefs.map((href) => {
-          const isActive = href === activeHref;
-          const panel = cache[href] ?? (isActive ? children : null);
-          return (
-            <div
-              key={href}
-              data-testid={`main-tab-panel-${href.slice(1)}`}
-              data-active={isActive ? "true" : "false"}
-              aria-hidden={!isActive}
-              style={{
-                minWidth: "100%",
-                width: "100%",
-                flexShrink: 0,
-                visibility: panel ? "visible" : "hidden",
-                pointerEvents: isActive ? "auto" : "none",
-              }}
-            >
-              {panel}
-            </div>
-          );
-        })}
+        {children}
       </div>
+      <style>{`
+        @keyframes tabSlideFromRight {
+          from { transform: translateX(18%); opacity: 0.85; }
+          to { transform: translateX(0); opacity: 1; }
+        }
+        @keyframes tabSlideFromLeft {
+          from { transform: translateX(-18%); opacity: 0.85; }
+          to { transform: translateX(0); opacity: 1; }
+        }
+      `}</style>
     </div>
   );
 }

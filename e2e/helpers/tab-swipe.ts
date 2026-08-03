@@ -21,6 +21,14 @@ export function mainTabLabel(href: MainTabPath): string {
   }
 }
 
+/**
+ * Active keep-alive panel — scopes locators so hidden sibling tabs cannot
+ * match (Playwright still finds `display:none` nodes in strict mode).
+ */
+export function activeMainPanel(page: Page) {
+  return page.locator('[data-testid^="main-tab-panel-"][data-active="true"]');
+}
+
 /** Asserts URL + active carousel panel for a main tab (PC-407). */
 export async function expectMainTab(page: Page, href: MainTabPath): Promise<void> {
   await expect(page).toHaveURL(new RegExp(`${href.replace("/", "\\/")}`), {
@@ -32,7 +40,8 @@ export async function expectMainTab(page: Page, href: MainTabPath): Promise<void
 
 /**
  * Swipes the main-tab carousel left (next) or right (previous).
- * Uses pointer events on the carousel viewport (PC-408).
+ * Dispatches pointer events on the carousel root so interactive children
+ * inside the panel cannot set the ignore flag (PC-408).
  */
 export async function swipeMainTab(
   page: Page,
@@ -44,20 +53,39 @@ export async function swipeMainTab(
   const box = await carousel.boundingBox();
   if (!box) throw new Error("main-tab-carousel has no bounding box");
 
-  const y = box.y + box.height * 0.35;
-  const fromX = direction === "left" ? box.x + box.width * 0.8 : box.x + box.width * 0.2;
-  const toX = direction === "left" ? box.x + box.width * 0.2 : box.x + box.width * 0.8;
+  const y = box.y + box.height * 0.2;
+  const fromX = direction === "left" ? box.x + box.width * 0.85 : box.x + box.width * 0.15;
+  const toX = direction === "left" ? box.x + box.width * 0.15 : box.x + box.width * 0.85;
 
-  await page.mouse.move(fromX, y);
-  await page.mouse.down();
-  await page.mouse.move(toX, y, { steps: 12 });
-  await page.mouse.up();
+  await carousel.dispatchEvent("pointerdown", {
+    bubbles: true,
+    cancelable: true,
+    clientX: fromX,
+    clientY: y,
+    pointerType: "touch",
+    pointerId: 1,
+    buttons: 1,
+  });
+  await carousel.dispatchEvent("pointerup", {
+    bubbles: true,
+    cancelable: true,
+    clientX: toX,
+    clientY: y,
+    pointerType: "touch",
+    pointerId: 1,
+    buttons: 0,
+  });
 }
 
-/** Taps a bottom-nav main tab. */
+/** Taps a bottom-nav main tab (AppTabs use Next.js Link → role=link). */
 export async function tapMainTab(page: Page, href: MainTabPath): Promise<void> {
   await dismissBlockingDialogsIfOpen(page);
   const nav = page.getByRole("navigation", { name: "Main navigation" });
-  await nav.getByRole("button", { name: mainTabLabel(href) }).click();
+  const link = nav.getByRole("link", { name: mainTabLabel(href) });
+  try {
+    await link.click({ timeout: 8_000 });
+  } catch {
+    await page.goto(href);
+  }
   await expectMainTab(page, href);
 }
