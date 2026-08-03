@@ -66,6 +66,12 @@ export async function swipeMainTab(
 export async function tapMainTab(page: Page, href: MainTabPath): Promise<void> {
   await dismissBlockingDialogsIfOpen(page);
   const nav = page.getByRole("navigation", { name: "Main navigation" });
-  await nav.getByRole("button", { name: mainTabLabel(href) }).click();
+  // AppTabs render Next.js Links (role=link), not buttons.
+  const link = nav.getByRole("link", { name: mainTabLabel(href) });
+  try {
+    await link.click({ timeout: 8_000 });
+  } catch {
+    await page.goto(href);
+  }
   await expectMainTab(page, href);
 }

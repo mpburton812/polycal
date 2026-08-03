@@ -56,10 +56,11 @@ function matchMainTab(
  * tree stays mounted under `display: none` so sub-tab / client state survive.
  *
  * Critical: Next.js can deliver RSC `children` one frame before/after
- * `usePathname()` updates. Always render live `children` in the active panel,
- * and only freeze a tab into the cache when the browser URL agrees with the
- * active href — otherwise Schedule can be cached under the Feed panel and
- * Playwright sees duplicate controls.
+ * `usePathname()` updates. Only seed/freeze a tab when the browser URL agrees
+ * with the active href — otherwise Schedule can be cached under the Feed panel.
+ *
+ * On revisit, prefer the cached tree over fresh RSC `children` so proposal /
+ * people-places sub-tabs are not remounted (PC-407 keep-alive contract).
  */
 export function MainTabCarousel({
   children,
@@ -86,7 +87,7 @@ export function MainTabCarousel({
   const [cache, setCache] = useState<Partial<Record<MainTabHref, ReactNode>>>({});
   const [slideDir, setSlideDir] = useState<"left" | "right" | null>(null);
   const startRef = useRef<{ x: number; y: number; ignore: boolean } | null>(null);
-  /** Last URL-confirmed children for the active tab — used when freezing on leave. */
+  /** Last URL-confirmed node for the active tab — used when freezing on leave. */
   const snapshotRef = useRef<{ href: MainTabHref; node: ReactNode } | null>(null);
 
   useLayoutEffect(() => {
@@ -100,12 +101,20 @@ export function MainTabCarousel({
     if (prev && prev.href !== activeHref) {
       setCache((c) => ({ ...c, [prev.href]: prev.node }));
     }
-    snapshotRef.current = { href: activeHref, node: children };
 
-    // Drop any other key that incorrectly points at this same element instance.
     setCache((c) => {
-      let changed = false;
-      const next: Partial<Record<MainTabHref, ReactNode>> = { ...c };
+      const existing = c[activeHref];
+      // Revisit: keep the cached fiber so client sub-tab state survives.
+      const node = existing ?? children;
+      snapshotRef.current = { href: activeHref, node };
+
+      let changed = existing == null;
+      const next: Partial<Record<MainTabHref, ReactNode>> = {
+        ...c,
+        [activeHref]: node,
+      };
+
+      // Drop any other key that incorrectly points at this same element instance.
       for (const key of Object.keys(next) as MainTabHref[]) {
         if (key !== activeHref && next[key] === children) {
           delete next[key];
@@ -174,8 +183,8 @@ export function MainTabCarousel({
     >
       {visibleHrefs.map((href) => {
         const isActive = href === activeHref;
-        // Live RSC children always win for the active tab (never a stale cache entry).
-        const panel = isActive ? children : (cache[href] ?? null);
+        // Prefer keep-alive cache on revisit; seed from live RSC children on first visit.
+        const panel = cache[href] ?? (isActive ? children : null);
         if (!panel) return null;
         return (
           <div

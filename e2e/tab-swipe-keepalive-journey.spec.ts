@@ -4,6 +4,7 @@ import { login } from "./helpers/auth";
 import { USERS } from "./helpers/constants";
 import { dismissBlockingDialogsIfOpen } from "./helpers/motd";
 import {
+  activeMainPanel,
   expectMainTab,
   swipeMainTab,
   tapMainTab,
@@ -64,19 +65,17 @@ test.describe("Tab swipe keepalive journey", () => {
     await dismissBlockingDialogsIfOpen(page);
     await goToProposals(page);
     await selectProposalTab(page, "Resolved");
-    await expect(page.getByRole("tab", { name: /Resolved/i })).toHaveAttribute(
-      "aria-selected",
-      "true",
-    );
+    await expect(
+      activeMainPanel(page).getByRole("tab", { name: /Resolved/i }),
+    ).toHaveAttribute("aria-selected", "true");
 
     await swipeMainTab(page, "left");
     await expectMainTab(page, "/people-places");
     await swipeMainTab(page, "right");
     await expectMainTab(page, "/proposals");
-    await expect(page.getByRole("tab", { name: /Resolved/i })).toHaveAttribute(
-      "aria-selected",
-      "true",
-    );
+    await expect(
+      activeMainPanel(page).getByRole("tab", { name: /Resolved/i }),
+    ).toHaveAttribute("aria-selected", "true");
   });
 
   test("people places Places sub-tab preserved after swipe", async ({ page }) => {
@@ -84,20 +83,18 @@ test.describe("Tab swipe keepalive journey", () => {
     await login(page, USERS.luke.username);
     await dismissBlockingDialogsIfOpen(page);
     await tapMainTab(page, "/people-places");
-    await page.getByRole("tab", { name: /^Places$/i }).click();
-    await expect(page.getByRole("tab", { name: /^Places$/i })).toHaveAttribute(
-      "aria-selected",
-      "true",
-    );
+    await activeMainPanel(page).getByRole("tab", { name: /^Places$/i }).click();
+    await expect(
+      activeMainPanel(page).getByRole("tab", { name: /^Places$/i }),
+    ).toHaveAttribute("aria-selected", "true");
 
     await swipeMainTab(page, "right");
     await expectMainTab(page, "/proposals");
     await swipeMainTab(page, "left");
     await expectMainTab(page, "/people-places");
-    await expect(page.getByRole("tab", { name: /^Places$/i })).toHaveAttribute(
-      "aria-selected",
-      "true",
-    );
+    await expect(
+      activeMainPanel(page).getByRole("tab", { name: /^Places$/i }),
+    ).toHaveAttribute("aria-selected", "true");
   });
 
   test("feed swipe away and back stays on feed", async ({ page }) => {
