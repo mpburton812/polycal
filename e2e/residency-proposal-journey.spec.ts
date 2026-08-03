@@ -8,6 +8,7 @@ import { goToAdmin, goToPeoplePlaces, goToProposals, selectProposalTab } from ".
 import { expectInAppNotification } from "./helpers/notifications";
 import { addPersonToPlace, expandPlace } from "./helpers/people-places";
 import { proposalCard } from "./helpers/proposals";
+import { activeMainPanel } from "./helpers/tab-swipe";
 
 const PLACE = "Cloud City";
 const RESIDENCY_TITLE = `Residency at ${PLACE}`;
@@ -75,7 +76,9 @@ test.describe("Residency proposal journey", () => {
 
     await goToPeoplePlaces(page);
     await expandPlace(page, PLACE);
-    await expect(page.getByText(USERS.leia.displayName)).toBeVisible({ timeout: 15_000 });
+    await expect(activeMainPanel(page).getByText(USERS.leia.displayName)).toBeVisible({
+      timeout: 15_000,
+    });
 
     // —— Phase 5: Admin activity log (human-readable action labels, PC-245) ——
     await goToAdmin(page);
