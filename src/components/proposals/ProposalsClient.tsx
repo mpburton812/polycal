@@ -134,7 +134,12 @@ export function ProposalsClient({
 }: ProposalsClientProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [activeTab, setActiveTab] = useState<TabKey>("draft");
+  const [activeTab, setActiveTab] = useState<TabKey>(() => {
+    // Survive soft-nav remounts so swipe keep-alive still restores the board tab (PC-407).
+    if (typeof window === "undefined") return "draft";
+    const stored = window.sessionStorage.getItem("polycal.proposals.activeTab");
+    return TAB_KEYS.includes(stored as TabKey) ? (stored as TabKey) : "draft";
+  });
   const [createOpen, setCreateOpen] = useState(false);
   const [createProposalType, setCreateProposalType] = useState<"event" | "sleeping">("event");
   const [partnerCreateOpen, setPartnerCreateOpen] = useState(false);
@@ -236,6 +241,10 @@ export function ProposalsClient({
   }
 
   const handledOpenRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    window.sessionStorage.setItem("polycal.proposals.activeTab", activeTab);
+  }, [activeTab]);
 
   useEffect(() => {
     const openId = searchParams.get("open");

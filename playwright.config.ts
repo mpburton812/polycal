@@ -12,6 +12,10 @@ import {
   serialTestIgnore,
 } from "./e2e/parallel";
 
+// Match browser timezoneId + seeded luke account so Node date helpers
+// (minutesFromNowDateTime, dateOffsetIso) agree with MUI fills (PC-408).
+process.env.TZ = "America/New_York";
+
 const parallelWorkers = resolveParallelWorkers();
 const serverCount = resolveServerCount();
 const mobileIndex = mobileDbIndex();
@@ -62,6 +66,10 @@ export default defineConfig({
     ? [["github"], ["list"], ["html", { open: "never" }]]
     : [["list"], ["html", { open: "never" }]],
   use: {
+    // Seeded users (luke) use America/New_York — CI runners default to UTC, which
+    // shifts midnight timed drafts to the previous evening on the schedule (PC-408).
+    timezoneId: "America/New_York",
+    locale: "en-US",
     trace: "on-first-retry",
     screenshot: "only-on-failure",
   },

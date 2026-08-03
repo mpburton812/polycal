@@ -8,6 +8,8 @@
 - `calendar_event_links` keys events by `(user_id, proposal_id, night_key)` (empty `night_key` for single-span events).
 - Admin **Fast sleeping plan add** force-resolves with **awaited** calendar sync (not only `after()`).
 - Success / skip / failure surfaces as inbox notifications: `calendar_google_synced` / `calendar_google_failed`.
+- **Cancel / hard-delete** schedules calendar sync `delete` (Google event removed; ICS users get a **manual delete** inbox notice).
+- **Auto-archive** (past resolved + grace) keeps PolyCal archived rows and **does not** delete Google/ICS copies or notify ICS users (PC-405).
 
 ## Production miss checklist
 

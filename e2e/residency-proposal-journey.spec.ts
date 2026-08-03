@@ -3,10 +3,12 @@ import { expect, test } from "./helpers/test";
 import { expandAdminSection } from "./helpers/admin";
 import { login, loginWithOnboardingIfNeeded, logout } from "./helpers/auth";
 import { USERS } from "./helpers/constants";
+import { dismissBlockingDialogsIfOpen } from "./helpers/motd";
 import { goToAdmin, goToPeoplePlaces, goToProposals, selectProposalTab } from "./helpers/navigation";
 import { expectInAppNotification } from "./helpers/notifications";
 import { addPersonToPlace, expandPlace } from "./helpers/people-places";
 import { proposalCard } from "./helpers/proposals";
+import { activeMainPanel } from "./helpers/tab-swipe";
 
 const PLACE = "Cloud City";
 const RESIDENCY_TITLE = `Residency at ${PLACE}`;
@@ -27,8 +29,10 @@ test.describe("Residency proposal journey", () => {
 
     // —— Phase 2: Han is notified and can edit the place as resident ——
     await loginWithOnboardingIfNeeded(page, USERS.han.username);
+    await dismissBlockingDialogsIfOpen(page);
     await expectInAppNotification(page, new RegExp(PLACE, "i"));
     await goToPeoplePlaces(page);
+    await dismissBlockingDialogsIfOpen(page);
     await expandPlace(page, PLACE);
     await page.getByRole("button", { name: "Edit place" }).click();
     const editDialog = page.getByRole("dialog", { name: "Edit place" });
@@ -36,6 +40,9 @@ test.describe("Residency proposal journey", () => {
     await editDialog.getByLabel("Bedroom 1 name").fill("bedroom happy");
     await editDialog.getByLabel("Bedroom 2 name").fill("bedroom sad");
     await editDialog.getByRole("button", { name: "Save" }).click();
+    await expect(editDialog).toBeHidden({ timeout: 15_000 });
+    // router.refresh remounts collapsible places collapsed — re-expand before asserting.
+    await expandPlace(page, PLACE);
     await expect(page.getByText("bedroom happy")).toBeVisible({ timeout: 15_000 });
     await expect(page.getByText("bedroom sad")).toBeVisible();
     await logout(page);
@@ -69,7 +76,9 @@ test.describe("Residency proposal journey", () => {
 
     await goToPeoplePlaces(page);
     await expandPlace(page, PLACE);
-    await expect(page.getByText(USERS.leia.displayName)).toBeVisible({ timeout: 15_000 });
+    await expect(activeMainPanel(page).getByText(USERS.leia.displayName)).toBeVisible({
+      timeout: 15_000,
+    });
 
     // —— Phase 5: Admin activity log (human-readable action labels, PC-245) ——
     await goToAdmin(page);

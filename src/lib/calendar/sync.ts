@@ -626,7 +626,7 @@ async function syncIcsForUser(
       connection.userId,
       "calendar_ics_pending",
       action === "delete"
-        ? `You have a calendar ics available for the cancelled event : ${proposal.title}.`
+        ? `Please manually delete “${proposal.title}” from your calendar.`
         : `You have a calendar ics available for the event : ${proposal.title}.`,
       {
         proposalId: proposal.id,

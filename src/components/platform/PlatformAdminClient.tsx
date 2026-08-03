@@ -19,12 +19,10 @@ import { useState, type ReactNode } from "react";
 
 import type { PlatformUserRow } from "@/actions/platform-admin";
 import type { PlatformSettings } from "@/types/network";
-import { MotdAdminForm } from "@/components/motd/MotdAdminForm";
 import { ModerationDialog } from "@/components/platform/ModerationDialog";
 import { NetworkDetailDialog } from "@/components/platform/NetworkDetailDialog";
 import { OrganicAvatar } from "@/components/ui/OrganicAvatar";
 import { avatarSrcForKey } from "@/lib/constants/avatars";
-import type { MotdAdminState } from "@/lib/motd/types";
 import type { AccountAccessLevel } from "@/lib/users/role-labels";
 import { brutalPaperSx } from "@/theme/brutalUi";
 import { fontFamilies } from "@/theme/fonts";
@@ -64,7 +62,6 @@ export function PlatformAdminClient({
   initialSettings,
   initialUsers,
   currentUserId,
-  initialMotd = null,
   setNetworkStatusAction,
   updatePlatformSettingsAction,
   pauseUserPlatformAction,
@@ -73,14 +70,11 @@ export function PlatformAdminClient({
   deleteUserPlatformAction,
   inhabitNetworkAdminAction,
   setUserAccessLevelAction,
-  publishPlatformMotdAction,
-  clearPlatformMotdAction,
 }: {
   initialNetworks: NetworkRow[];
   initialSettings: PlatformSettings;
   initialUsers: PlatformUserRow[];
   currentUserId: string;
-  initialMotd?: MotdAdminState | null;
   setNetworkStatusAction: (
     networkId: string,
     status: "active" | "paused",
@@ -108,13 +102,6 @@ export function PlatformAdminClient({
     userId: string;
     accessLevel: AssignableAccessLevel;
   }) => Promise<{ ok: boolean; message: string; accessLevelLabel?: string }>;
-  publishPlatformMotdAction: (input: {
-    body: string;
-    endsAt?: string | null;
-  }) => Promise<{ ok: true; data: MotdAdminState } | { ok: false; message: string }>;
-  clearPlatformMotdAction: () => Promise<
-    { ok: true; data: { cleared: boolean } } | { ok: false; message: string }
-  >;
 }) {
   const router = useRouter();
   const { update } = useSession();
@@ -255,12 +242,10 @@ export function PlatformAdminClient({
       </Paper>
 
       <Paper sx={{ ...brutalPaperSx, p: 2 }}>
-        <MotdAdminForm
-          scopeLabel="Platform"
-          initial={initialMotd}
-          publishAction={publishPlatformMotdAction}
-          clearAction={clearPlatformMotdAction}
-        />
+        <Typography variant="body2" color="text.secondary">
+          Message of the day is managed under Admin → Network → Message of the
+          day. Platform admins can use the All Platform toggle there.
+        </Typography>
       </Paper>
 
       <Box>

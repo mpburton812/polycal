@@ -15,16 +15,12 @@ import {
   resumeUserPlatformAction,
   setUserAccessLevelAction,
 } from "@/actions/platform-admin";
-import {
-  clearPlatformMotdAction,
-  getPlatformMotdAdminStateAction,
-  publishPlatformMotdAction,
-} from "@/actions/motd";
 import { auth } from "@/lib/auth";
 import { PlatformAdminClient } from "@/components/platform/PlatformAdminClient";
 
 /**
  * Platform operator console — caps, network pause, telemetry, user moderation (PC-362).
+ * MOTD publishing lives on Admin → Network with All Platform toggle (PC-406).
  */
 export default async function PlatformAdminPage() {
   const session = await auth();
@@ -32,11 +28,10 @@ export default async function PlatformAdminPage() {
     redirect("/feed");
   }
 
-  const [networks, settings, users, platformMotd] = await Promise.all([
+  const [networks, settings, users] = await Promise.all([
     listAllNetworksAction(),
     getPlatformSettingsAction(),
     listPlatformUsersAction(),
-    getPlatformMotdAdminStateAction().then((r) => (r.ok ? r.data : null)),
   ]);
 
   return (
@@ -45,7 +40,6 @@ export default async function PlatformAdminPage() {
       initialSettings={settings}
       initialUsers={users}
       currentUserId={session.user.id}
-      initialMotd={platformMotd}
       setNetworkStatusAction={setNetworkStatusAction}
       updatePlatformSettingsAction={updatePlatformSettingsAction}
       pauseUserPlatformAction={pauseUserPlatformAction}
@@ -54,8 +48,6 @@ export default async function PlatformAdminPage() {
       deleteUserPlatformAction={deleteUserPlatformAction}
       inhabitNetworkAdminAction={inhabitNetworkAdminAction}
       setUserAccessLevelAction={setUserAccessLevelAction}
-      publishPlatformMotdAction={publishPlatformMotdAction}
-      clearPlatformMotdAction={clearPlatformMotdAction}
     />
   );
 }
