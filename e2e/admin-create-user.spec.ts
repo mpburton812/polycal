@@ -51,7 +51,9 @@ test.describe("Admin user provisioning", () => {
 
     await dialog.getByRole("button", { name: "Close" }).click();
     await expect(dialog).toBeHidden();
-    await expect(page.getByText(displayName)).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: new RegExp(`View ${displayName}`) }),
+    ).toBeVisible({ timeout: 15_000 });
 
     await signOutViaMenu(page);
 

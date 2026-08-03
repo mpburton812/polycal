@@ -12,8 +12,8 @@ test.describe("People & Places", () => {
 
   test("shows people on the people tab", async ({ page }) => {
     await expect(page.getByRole("heading", { name: "People & Places", level: 1 })).toBeVisible();
-    await expect(page.getByText("Luke Skywalker")).toBeVisible();
-    await expect(page.getByText("Leia Organa")).toBeVisible();
+    await expect(page.getByRole("button", { name: "View Luke Skywalker details" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "View Leia Organa details" })).toBeVisible();
   });
 
   test("shows Sleeping Partners tab with partnership map", async ({ page }) => {

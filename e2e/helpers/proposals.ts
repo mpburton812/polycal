@@ -417,11 +417,17 @@ export async function createAndSubmitPoll(
 export async function castAllPollSlotVotes(
   dialog: Locator,
   voteLabel: "Accept" | "Sub-opt" | "Decline",
+  page?: Page,
 ): Promise<void> {
   const rows = dialog.locator("table").first().locator("tbody tr");
+  await expect(rows.first()).toBeVisible({ timeout: 20_000 });
   const count = await rows.count();
+  expect(count).toBeGreaterThan(0);
   for (let index = 0; index < count; index += 1) {
     await castPollSlotVote(dialog, index, voteLabel);
+    if (page) {
+      await expectToast(page, /Slot vote recorded|Vote recorded/i).catch(() => {});
+    }
   }
 }
 

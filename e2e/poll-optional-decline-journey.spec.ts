@@ -2,13 +2,20 @@ import { expect, test } from "./helpers/test";
 
 import { login, logout } from "./helpers/auth";
 import { USERS } from "./helpers/constants";
+import { dismissBlockingDialogsIfOpen } from "./helpers/motd";
 import {
   openProposalFromInbox,
 } from "./helpers/notifications";
-import { goToProposals, openProposalCard, selectProposalTab } from "./helpers/navigation";
+import {
+  goToProposals,
+  openProposalCard,
+  selectProposalTab,
+  waitForProposalDetailReady,
+} from "./helpers/navigation";
 import {
   castAllPollSlotVotes,
   createAndSubmitPoll,
+  expectResolvedProposal,
   proposalCard,
 } from "./helpers/proposals";
 import { dateOffsetIso } from "./helpers/schedule";
@@ -49,9 +56,11 @@ test.describe("Poll optional decline journey", () => {
     // —— Required 1 (Leia): open via notification, accept all slots ——
     await logout(page);
     await login(page, USERS.leia.username);
+    await dismissBlockingDialogsIfOpen(page);
     await openProposalFromInbox(page, pollTitle);
     const leiaDialog = page.getByRole("dialog");
-    await castAllPollSlotVotes(leiaDialog, "Accept");
+    await waitForProposalDetailReady(leiaDialog);
+    await castAllPollSlotVotes(leiaDialog, "Accept", page);
     const leiaClose = leiaDialog.getByRole("button", { name: "Close" });
     if (await leiaClose.isVisible().catch(() => false)) {
       await leiaClose.click();
@@ -61,6 +70,7 @@ test.describe("Poll optional decline journey", () => {
     // —— Optional (Chewie): see in Proposed and decline with a note (before resolve) ——
     await logout(page);
     await login(page, USERS.chewie.username);
+    await dismissBlockingDialogsIfOpen(page);
     await goToProposals(page);
     await selectProposalTab(page, "Proposed");
     await openProposalCard(page, pollTitle);
@@ -68,7 +78,7 @@ test.describe("Poll optional decline journey", () => {
     await chewieDialog.getByPlaceholder("Add a comment…").fill(declineNote);
     await chewieDialog.getByRole("button", { name: "Post" }).click();
     await expect(chewieDialog.getByText(declineNote)).toBeVisible({ timeout: 15_000 });
-    await castAllPollSlotVotes(chewieDialog, "Decline");
+    await castAllPollSlotVotes(chewieDialog, "Decline", page);
     await expect(chewieDialog.getByText("Declined", { exact: true }).first()).toBeVisible({
       timeout: 20_000,
     });
@@ -81,19 +91,34 @@ test.describe("Poll optional decline journey", () => {
     // —— Required 2 (Han): open from Proposed and accept all slots → resolve ——
     await logout(page);
     await login(page, USERS.han.username);
+    await dismissBlockingDialogsIfOpen(page);
     await goToProposals(page);
     await selectProposalTab(page, "Proposed");
     await openProposalCard(page, pollTitle);
     const hanDialog = page.getByRole("dialog");
-    await castAllPollSlotVotes(hanDialog, "Accept");
-    await expect(hanDialog.getByText("RESOLVED", { exact: true }).first()).toBeVisible({
-      timeout: 25_000,
-    });
-    const hanClose = hanDialog.getByRole("button", { name: "Close" });
-    if (await hanClose.isVisible().catch(() => false)) {
-      await hanClose.click();
+    await castAllPollSlotVotes(hanDialog, "Accept", page);
+    const resolvedInDialog = await hanDialog
+      .getByText("RESOLVED", { exact: true })
+      .first()
+      .isVisible()
+      .catch(() => false);
+    if (!resolvedInDialog) {
+      const hanCloseSoft = hanDialog.getByRole("button", { name: "Close" });
+      if (await hanCloseSoft.isVisible().catch(() => false)) {
+        await hanCloseSoft.click();
+      }
+      await expect(hanDialog).toBeHidden({ timeout: 15_000 }).catch(() => {});
+      await expectResolvedProposal(page, pollTitle);
+    } else {
+      await expect(hanDialog.getByText("RESOLVED", { exact: true }).first()).toBeVisible({
+        timeout: 25_000,
+      });
+      const hanClose = hanDialog.getByRole("button", { name: "Close" });
+      if (await hanClose.isVisible().catch(() => false)) {
+        await hanClose.click();
+      }
+      await expect(hanDialog).toBeHidden({ timeout: 25_000 }).catch(() => {});
     }
-    await expect(hanDialog).toBeHidden({ timeout: 25_000 }).catch(() => {});
 
     // —— Proposer sees the decline and the message ——
     await logout(page);

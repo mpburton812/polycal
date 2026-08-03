@@ -19,6 +19,8 @@ const COMMENT = "E2E self-appointment day boundary";
  * Prefer mid-week targets: DAYS_OUT=3 from Thu/Fri lands on Sun, and 11pm→midnight
  * overnight events can fall off the visible week range (flake after local midnight).
  * Use 7 days out so 12am 1h blocks stay inside a full upcoming week on CI.
+ * Playwright timezoneId is America/New_York (matches luke) so 12am drafts land on
+ * the same civil day the schedule asserts (PC-408).
  */
 const DAYS_OUT = 7;
 const WEEKLY_OCCURRENCES = 3;

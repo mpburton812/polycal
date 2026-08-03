@@ -360,3 +360,13 @@
 2026-08-02 | 6c17642 | PC-400 | keep Today-first schedule days chronological for range nav | src/lib/schedule/dates.test.ts
 2026-08-02 | c358800 | PC-400 | scroll Today into view instead of reordering schedule days | src/components/schedule/ScheduleAgendaView.tsx
 2026-08-02 | f4e245e | PC-398 | dismiss calendar sync failure dialog in Playwright helpers | e2e/helpers/auth.ts
+2026-08-03 | 5491d42 | PC-403 | keep-alive tab swipe, MOTD All Platform, calendar archive policy | src/components/admin/AdminNetworkDashboardPanel.tsx
+2026-08-03 | 729df14 | PC-407 | hide inactive keep-alive tab panels from Playwright DOM queries | src/components/layout/MainTabCarousel.tsx
+2026-08-03 | b0b1909 | PC-407 | prevent RSC/pathname skew from caching Schedule under Feed panel | src/components/layout/MainTabCarousel.tsx
+2026-08-03 | bcbecf9 | PC-408 | align Playwright TZ with NY schedule and refresh keep-alive payload | src/components/schedule/ScheduleClient.tsx
+2026-08-03 | 165587d | PC-408 | keep E2E Node date helpers in America/New_York with browser TZ | e2e/helpers/datePickers.ts
+2026-08-03 | 9cc39f2 | PC-407 | tap main tabs via link role and keep cached tab trees on return | src/components/layout/MainTabCarousel.tsx
+2026-08-03 | 843e121 | PC-407 | tap main tabs via link role and harden swipe pointer dispatch | src/components/layout/MainTabCarousel.tsx
+2026-08-03 | 1d0eca5 | PC-407 | persist proposal/people sub-tabs and scope keep-alive e2e locators | src/components/people-places/PeoplePlacesClient.tsx
+2026-08-03 | 2a37baf | PC-407 | keep-alive slot fibers plus session tab restore for swipe return | src/components/layout/MainTabCarousel.tsx
+2026-08-03 | 16be8c5 | PC-407 | render only active main tab to avoid keep-alive locator duplicates | src/components/layout/MainTabCarousel.tsx

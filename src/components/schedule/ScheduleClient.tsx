@@ -263,10 +263,11 @@ export function ScheduleClient({
   }, [viewState]);
 
   useEffect(() => {
-    if (!initialPayloadHydratedRef.current) {
-      setPayload(initialPayload);
-      initialPayloadHydratedRef.current = true;
-    }
+    // Re-apply whenever RSC passes a new payload. Keep-alive can reuse this
+    // fiber across soft navigations; a one-shot hydrate left stale empty weeks
+    // after proposals were created on another tab (PC-407).
+    setPayload(initialPayload);
+    initialPayloadHydratedRef.current = true;
   }, [initialPayload]);
 
   /** Hydrate from URL once (PC-167); fall back to persisted anchors (PC-164). */
