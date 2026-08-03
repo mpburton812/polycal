@@ -8,6 +8,7 @@ import {
 } from "@/actions/networks";
 import {
   getNetworkMotdAdminStateAction,
+  getPlatformMotdAdminStateAction,
 } from "@/actions/motd";
 import { getNetworkSettingsAction } from "@/actions/network-settings";
 import { listAdminUsersAction } from "@/actions/users";
@@ -98,6 +99,7 @@ export default async function AdminPage() {
     logEntries,
     networkDashboard,
     networkMotd,
+    platformMotd,
   ] = await Promise.all([
     isLegacyAdmin ? getNetworkSettingsAction() : Promise.resolve(null),
     isLegacyAdmin ? listAdminUsersAction() : Promise.resolve([]),
@@ -105,6 +107,9 @@ export default async function AdminPage() {
     isNetworkAdmin ? getActiveNetworkDashboardAction() : Promise.resolve(null),
     isNetworkAdmin
       ? getNetworkMotdAdminStateAction().then((r) => (r.ok ? r.data : null))
+      : Promise.resolve(null),
+    isPlatformAdmin
+      ? getPlatformMotdAdminStateAction().then((r) => (r.ok ? r.data : null))
       : Promise.resolve(null),
   ]);
 
@@ -127,6 +132,8 @@ export default async function AdminPage() {
           <AdminNetworkDashboardPanel
             dashboard={networkDashboard}
             initialMotd={networkMotd}
+            isPlatformAdmin={isPlatformAdmin}
+            initialPlatformMotd={platformMotd}
           />
         )}
         {isLegacyAdmin && settings && (

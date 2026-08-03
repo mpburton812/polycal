@@ -28,6 +28,34 @@ import { CHANGELOG_ARCHIVE } from "./entries.archive";
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "2026.08.03a",
+    date: "2026-08-03",
+    summary:
+      "Keep-alive tab swipe, Admin MOTD All Platform, calendar archive policy (PC-403–PC-408).",
+    changes: [
+      {
+        type: "fixed",
+        description:
+          "Hardened poll-optional-decline and residency-proposal E2E waits (PC-404).",
+      },
+      {
+        type: "changed",
+        description:
+          "Auto-archive no longer deletes Google/ICS copies; cancel/hard-delete still sync-delete with ICS manual-delete notice (PC-405).",
+      },
+      {
+        type: "added",
+        description:
+          "Admin MOTD All Platform toggle for platform admins (PC-406).",
+      },
+      {
+        type: "added",
+        description:
+          "Keep-alive MainTabCarousel with swipe + tab swipe keepalive journeys (PC-407, PC-408).",
+      },
+    ],
+  },
+  {
     version: "2026.08.02c",
     date: "2026-08-02",
     summary:
