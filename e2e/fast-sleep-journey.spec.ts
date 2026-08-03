@@ -13,7 +13,6 @@ import { expandAdminSection } from "./helpers/admin";
 import { dateOffsetIso } from "./helpers/schedule";
 import { batchNightSection, openNewProposalFabMenu } from "./helpers/proposals";
 import { activeMainPanel } from "./helpers/tab-swipe";
-import { activeMainPanel } from "./helpers/tab-swipe";
 
 /**
  * FastSleep user journey (PC-381): auto-confirm nights for self + partner

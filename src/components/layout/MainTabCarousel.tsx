@@ -52,15 +52,52 @@ function matchMainTab(
 }
 
 /**
+ * One keep-alive slot per main tab (PC-407). Captures the first live RSC tree and
+ * keeps that fiber mounted under display:none so client sub-tab state survives.
+ */
+function KeepAlivePanel({
+  href,
+  active,
+  children,
+  slideDir,
+}: {
+  href: MainTabHref;
+  active: boolean;
+  children: ReactNode | null;
+  slideDir: "left" | "right" | null;
+}) {
+  const savedRef = useRef<ReactNode>(null);
+  // Seed once from live children; never replace — replacing remounts and drops state.
+  if (children != null && savedRef.current == null) {
+    savedRef.current = children;
+  }
+  if (savedRef.current == null) return null;
+
+  return (
+    <div
+      data-testid={`main-tab-panel-${href.slice(1)}`}
+      data-active={active ? "true" : "false"}
+      aria-hidden={!active}
+      hidden={!active}
+      style={{
+        display: active ? "block" : "none",
+        animation:
+          active && slideDir
+            ? `${slideDir === "left" ? "tabSlideFromRight" : "tabSlideFromLeft"} 220ms ease-out`
+            : undefined,
+      }}
+    >
+      {savedRef.current}
+    </div>
+  );
+}
+
+/**
  * Keep-alive main-tab host (PC-407): once a main tab has been visited, its React
  * tree stays mounted under `display: none` so sub-tab / client state survive.
  *
- * Critical: Next.js can deliver RSC `children` one frame before/after
- * `usePathname()` updates. Only seed/freeze a tab when the browser URL agrees
- * with the active href — otherwise Schedule can be cached under the Feed panel.
- *
- * On revisit, prefer the cached tree over fresh RSC `children` so proposal /
- * people-places sub-tabs are not remounted (PC-407 keep-alive contract).
+ * Only seed a slot when the browser URL agrees with `usePathname()` — otherwise
+ * Schedule can be cached under the Feed panel during RSC/pathname skew.
  */
 export function MainTabCarousel({
   children,
@@ -84,46 +121,25 @@ export function MainTabCarousel({
   const activeHref = matchMainTab(pathname, visibleHrefs);
   const onMainTab = activeHref != null;
 
-  const [cache, setCache] = useState<Partial<Record<MainTabHref, ReactNode>>>({});
+  const [visited, setVisited] = useState<MainTabHref[]>([]);
   const [slideDir, setSlideDir] = useState<"left" | "right" | null>(null);
   const startRef = useRef<{ x: number; y: number; ignore: boolean } | null>(null);
-  /** Last URL-confirmed node for the active tab — used when freezing on leave. */
-  const snapshotRef = useRef<{ href: MainTabHref; node: ReactNode } | null>(null);
+  /** Href whose live children are safe to seed (browser URL agrees with pathname). */
+  const [seedHref, setSeedHref] = useState<MainTabHref | null>(null);
 
   useLayoutEffect(() => {
-    if (!activeHref) return;
-
-    // Skip when the router hook and the real URL disagree (RSC/pathname skew).
-    const browserHref = matchMainTab(window.location.pathname, visibleHrefs);
-    if (browserHref !== activeHref) return;
-
-    const prev = snapshotRef.current;
-    if (prev && prev.href !== activeHref) {
-      setCache((c) => ({ ...c, [prev.href]: prev.node }));
+    if (!activeHref) {
+      setSeedHref(null);
+      return;
     }
-
-    setCache((c) => {
-      const existing = c[activeHref];
-      // Revisit: keep the cached fiber so client sub-tab state survives.
-      const node = existing ?? children;
-      snapshotRef.current = { href: activeHref, node };
-
-      let changed = existing == null;
-      const next: Partial<Record<MainTabHref, ReactNode>> = {
-        ...c,
-        [activeHref]: node,
-      };
-
-      // Drop any other key that incorrectly points at this same element instance.
-      for (const key of Object.keys(next) as MainTabHref[]) {
-        if (key !== activeHref && next[key] === children) {
-          delete next[key];
-          changed = true;
-        }
-      }
-      return changed ? next : c;
-    });
-  }, [activeHref, children, visibleHrefs]);
+    const browserHref = matchMainTab(window.location.pathname, visibleHrefs);
+    if (browserHref !== activeHref) {
+      setSeedHref(null);
+      return;
+    }
+    setSeedHref(activeHref);
+    setVisited((prev) => (prev.includes(activeHref) ? prev : [...prev, activeHref]));
+  }, [activeHref, visibleHrefs]);
 
   const activeIndex = activeHref ? visibleHrefs.indexOf(activeHref) : 0;
 
@@ -141,7 +157,6 @@ export function MainTabCarousel({
 
   const onPointerDown = useCallback((event: PointerEvent<HTMLDivElement>) => {
     if (event.pointerType === "mouse" && event.buttons !== 1) return;
-    // Dialogs/modals portal outside the carousel — still block tab swipes while open.
     const modalOpen = Boolean(
       document.querySelector(".MuiModal-root, .MuiDialog-root, [role='dialog']"),
     );
@@ -177,6 +192,10 @@ export function MainTabCarousel({
     return <>{children}</>;
   }
 
+  const slots = visibleHrefs.filter(
+    (href) => visited.includes(href) || href === activeHref,
+  );
+
   return (
     <div
       onPointerDown={onPointerDown}
@@ -185,28 +204,19 @@ export function MainTabCarousel({
       style={{ minHeight: "inherit", touchAction: "pan-y", overflow: "hidden" }}
       data-testid="main-tab-carousel"
     >
-      {visibleHrefs.map((href) => {
+      {slots.map((href) => {
         const isActive = href === activeHref;
-        // Prefer keep-alive cache on revisit; seed from live RSC children on first visit.
-        const panel = cache[href] ?? (isActive ? children : null);
-        if (!panel) return null;
+        // Only the URL-confirmed active tab may receive live RSC children to seed.
+        const live = isActive && seedHref === href ? children : null;
         return (
-          <div
+          <KeepAlivePanel
             key={href}
-            data-testid={`main-tab-panel-${href.slice(1)}`}
-            data-active={isActive ? "true" : "false"}
-            aria-hidden={!isActive}
-            hidden={!isActive}
-            style={{
-              display: isActive ? "block" : "none",
-              animation:
-                isActive && slideDir
-                  ? `${slideDir === "left" ? "tabSlideFromRight" : "tabSlideFromLeft"} 220ms ease-out`
-                  : undefined,
-            }}
+            href={href}
+            active={isActive}
+            slideDir={slideDir}
           >
-            {panel}
-          </div>
+            {live}
+          </KeepAlivePanel>
         );
       })}
       <style>{`
