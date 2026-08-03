@@ -21,6 +21,14 @@ export function mainTabLabel(href: MainTabPath): string {
   }
 }
 
+/**
+ * Active keep-alive panel — scopes locators so hidden sibling tabs cannot
+ * match (Playwright still finds `display:none` nodes in strict mode).
+ */
+export function activeMainPanel(page: Page) {
+  return page.locator('[data-testid^="main-tab-panel-"][data-active="true"]');
+}
+
 /** Asserts URL + active carousel panel for a main tab (PC-407). */
 export async function expectMainTab(page: Page, href: MainTabPath): Promise<void> {
   await expect(page).toHaveURL(new RegExp(`${href.replace("/", "\\/")}`), {

@@ -4,6 +4,7 @@ import { fillProposalDateRange, selectDraftScheduleMode } from "./datePickers";
 import { dismissBlockingDialogsIfOpen, dismissMotdDialogIfOpen } from "./motd";
 import { goToSchedule } from "./navigation";
 import { openEventProposalDraft, submitProposalDraft } from "./proposals";
+import { activeMainPanel } from "./tab-swipe";
 
 export { dismissMotdDialogIfOpen, dismissBlockingDialogsIfOpen } from "./motd";
 
@@ -44,11 +45,13 @@ function dateInRange(isoDate: string, rangeStart: string, rangeEnd: string): boo
 }
 
 function eventLocator(page: Page, namePattern: RegExp) {
+  // Scope to the active keep-alive panel so hidden tabs cannot steal matches (PC-407).
+  const root = activeMainPanel(page);
   // Week/day blocks use aria-label "Title[, Location][, Tentative]. …"; month chips use title/aria-label.
-  return page
+  return root
     .getByRole("button", { name: namePattern })
-    .or(page.getByTitle(namePattern))
-    .or(page.getByLabel(namePattern))
+    .or(root.getByTitle(namePattern))
+    .or(root.getByLabel(namePattern))
     .first();
 }
 
@@ -209,15 +212,15 @@ async function expectEventVisibleInView(
 /** Waits until schedule data has finished loading for the visible range. */
 export async function waitForScheduleReady(page: Page): Promise<void> {
   await dismissBlockingDialogsIfOpen(page);
-  // Prefer the last marker — soft navigations can briefly leave a stale node in the DOM.
-  await expect(page.getByTestId("schedule-ready").last()).toHaveAttribute("data-ready", "true", {
+  const root = activeMainPanel(page);
+  await expect(root.getByTestId("schedule-ready")).toHaveAttribute("data-ready", "true", {
     timeout: 30_000,
   });
 }
 
 /** Forces week layout so aria-labels and week stepping remain predictable. */
 export async function forceWeekLayout(page: Page): Promise<void> {
-  const layoutWeek = page
+  const layoutWeek = activeMainPanel(page)
     .getByLabel("Calendar period")
     .getByRole("button", { name: "Week", exact: true });
   if (await layoutWeek.isVisible().catch(() => false)) {
@@ -230,9 +233,9 @@ export async function forceWeekLayout(page: Page): Promise<void> {
 }
 
 async function readVisibleRange(page: Page): Promise<{ start: string; end: string }> {
-  // Prefer .last() — soft navigations / remounts can leave a stale range marker in the DOM.
-  const start = await page.getByTestId("schedule-range-start").last().getAttribute("data-value");
-  const end = await page.getByTestId("schedule-range-end").last().getAttribute("data-value");
+  const root = activeMainPanel(page);
+  const start = await root.getByTestId("schedule-range-start").getAttribute("data-value");
+  const end = await root.getByTestId("schedule-range-end").getAttribute("data-value");
   if (!start || !end) {
     throw new Error("Schedule range attributes missing.");
   }
@@ -262,7 +265,7 @@ export async function navigateScheduleUntilDateInRange(
     const rangeStart = new Date(range.start).getTime();
     const goingForward = target > rangeStart;
     const navLabel = goingForward ? "Next period" : "Previous period";
-    const nav = page.getByRole("button", { name: navLabel });
+    const nav = activeMainPanel(page).getByRole("button", { name: navLabel });
     await expect(nav).toBeEnabled({ timeout: 15_000 });
     await nav.click();
   }
