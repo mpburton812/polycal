@@ -1,12 +1,14 @@
 import { type Locator, type Page, expect } from "@playwright/test";
 
 import { dismissBlockingDialogsIfOpen } from "./motd";
+import { expectMainTab, type MainTabPath } from "./tab-swipe";
 
 /**
  * Clicks a bottom-nav link; falls back to direct navigation when the click is
  * blocked or does not change the URL (dev overlay / dialogs / slow transitions).
  */
 async function clickBottomNavLink(page: Page, name: string, path: string): Promise<void> {
+  await dismissBlockingDialogsIfOpen(page);
   const link = page.getByRole("link", { name });
   try {
     await link.click({ timeout: 8_000 });
@@ -23,20 +25,26 @@ async function clickBottomNavLink(page: Page, name: string, path: string): Promi
   }
 }
 
+/** Bottom-nav hop that also waits for the keep-alive panel to become active (PC-407). */
+async function goToMainTab(page: Page, name: string, path: MainTabPath): Promise<void> {
+  await clickBottomNavLink(page, name, path);
+  await expectMainTab(page, path);
+}
+
 export async function goToFeed(page: Page): Promise<void> {
-  await clickBottomNavLink(page, "Feed", "/feed");
+  await goToMainTab(page, "Feed", "/feed");
 }
 
 export async function goToSchedule(page: Page): Promise<void> {
-  await clickBottomNavLink(page, "Schedule", "/schedule");
+  await goToMainTab(page, "Schedule", "/schedule");
 }
 
 export async function goToProposals(page: Page): Promise<void> {
-  await clickBottomNavLink(page, "Proposals", "/proposals");
+  await goToMainTab(page, "Proposals", "/proposals");
 }
 
 export async function goToPeoplePlaces(page: Page): Promise<void> {
-  await clickBottomNavLink(page, "People & Places", "/people-places");
+  await goToMainTab(page, "People & Places", "/people-places");
 }
 
 export async function goToAdmin(page: Page): Promise<void> {
