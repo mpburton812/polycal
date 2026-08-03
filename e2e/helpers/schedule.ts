@@ -9,12 +9,22 @@ export { dismissMotdDialogIfOpen, dismissBlockingDialogsIfOpen } from "./motd";
 
 const SCHEDULE_VIEW_STORAGE_KEY = "polycal.schedule.view";
 
-/** ISO yyyy-MM-dd offset from today. */
+/** ISO yyyy-MM-dd offset from today in America/New_York (matches Playwright TZ, PC-408). */
 export function dateOffsetIso(daysFromToday: number): string {
-  const date = new Date();
-  date.setDate(date.getDate() + daysFromToday);
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/New_York",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date());
+  const get = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((part) => part.type === type)?.value ?? "01";
+  // UTC noon arithmetic keeps civil day math free of host-TZ side effects.
+  const civil = new Date(
+    Date.UTC(Number(get("year")), Number(get("month")) - 1, Number(get("day")) + daysFromToday, 12),
+  );
   const pad = (value: number) => String(value).padStart(2, "0");
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+  return `${civil.getUTCFullYear()}-${pad(civil.getUTCMonth() + 1)}-${pad(civil.getUTCDate())}`;
 }
 
 /** Resets persisted schedule layout/filter state so navigation tests start from week view. */

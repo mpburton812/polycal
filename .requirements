@@ -364,3 +364,4 @@
 2026-08-03 | 729df14 | PC-407 | hide inactive keep-alive tab panels from Playwright DOM queries | src/components/layout/MainTabCarousel.tsx
 2026-08-03 | b0b1909 | PC-407 | prevent RSC/pathname skew from caching Schedule under Feed panel | src/components/layout/MainTabCarousel.tsx
 2026-08-03 | bcbecf9 | PC-408 | align Playwright TZ with NY schedule and refresh keep-alive payload | src/components/schedule/ScheduleClient.tsx
+2026-08-03 | 165587d | PC-408 | keep E2E Node date helpers in America/New_York with browser TZ | e2e/helpers/datePickers.ts

@@ -12,6 +12,10 @@ import {
   serialTestIgnore,
 } from "./e2e/parallel";
 
+// Match browser timezoneId + seeded luke account so Node date helpers
+// (minutesFromNowDateTime, dateOffsetIso) agree with MUI fills (PC-408).
+process.env.TZ = "America/New_York";
+
 const parallelWorkers = resolveParallelWorkers();
 const serverCount = resolveServerCount();
 const mobileIndex = mobileDbIndex();

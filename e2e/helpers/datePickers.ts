@@ -154,16 +154,21 @@ export function currentWeekDateTime(
   return `${y}-${m}-${d}T${h}:${min}`;
 }
 
-/** Returns YYYY-MM-DDTHH:mm relative to now (for event reminder E2E). */
+/** Returns YYYY-MM-DDTHH:mm relative to now in America/New_York (PC-408). */
 export function minutesFromNowDateTime(minutesFromNow: number): string {
-  const slot = new Date();
-  slot.setMinutes(slot.getMinutes() + minutesFromNow);
-  const y = slot.getFullYear();
-  const m = String(slot.getMonth() + 1).padStart(2, "0");
-  const d = String(slot.getDate()).padStart(2, "0");
-  const h = String(slot.getHours()).padStart(2, "0");
-  const min = String(slot.getMinutes()).padStart(2, "0");
-  return `${y}-${m}-${d}T${h}:${min}`;
+  const slot = new Date(Date.now() + minutesFromNow * 60_000);
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/New_York",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(slot);
+  const get = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((part) => part.type === type)?.value ?? "00";
+  return `${get("year")}-${get("month")}-${get("day")}T${get("hour")}:${get("minute")}`;
 }
 
 /** Selects Window / All Day / Poll on the exclusive timing group, or toggles Recurring (PC-170). */
