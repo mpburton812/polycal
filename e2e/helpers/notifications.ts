@@ -1,5 +1,7 @@
 import { type Page, expect } from "@playwright/test";
 
+import { waitForProposalDetailReady } from "./navigation";
+
 /** Opens the header notification bell and waits for the inbox popover. */
 export async function openNotificationInbox(page: Page): Promise<void> {
   await page.getByRole("button", { name: /notifications/i }).click();
@@ -44,7 +46,9 @@ export async function openProposalFromInbox(
     await expect(row).toBeVisible({ timeout: 8_000 });
     await row.getByRole("button", { name: "Open Proposal" }).click();
   }).toPass({ timeout: 60_000 });
-  await expect(page.getByRole("dialog")).toBeVisible({ timeout: 20_000 });
+  const dialog = page.getByRole("dialog");
+  await expect(dialog).toBeVisible({ timeout: 20_000 });
+  await waitForProposalDetailReady(dialog);
 }
 
 /** Clicks Decline on an inbox vote row that contains the given message text. */

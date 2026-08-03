@@ -82,7 +82,7 @@ jobs:
     needs: [decide, build]
     if: needs.decide.outputs.run_e2e == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     name: playwright (${{ matrix.suite }} ${{ matrix.shard }}/${{ matrix.shards }})
     strategy:
       fail-fast: false

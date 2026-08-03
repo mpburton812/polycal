@@ -4,7 +4,7 @@ import { FeedbackFab } from "@/components/feedback/FeedbackFab";
 import { AppHeader } from "@/components/layout/AppHeader";
 import { AppTabs } from "@/components/layout/AppTabs";
 import { DevBar } from "@/components/layout/DevBar";
-import { TabSwipeRegion } from "@/components/layout/TabSwipeRegion";
+import { MainTabCarousel } from "@/components/layout/MainTabCarousel";
 import { MotdPopupHost } from "@/components/motd/MotdPopupHost";
 import { CalendarSyncFailurePopupHost } from "@/components/calendar/CalendarSyncFailurePopupHost";
 import { PushSubscriptionManager } from "@/components/notifications/PushSubscriptionManager";
@@ -78,9 +78,9 @@ export function AppShell({
         maxWidth="md"
         sx={{ py: 2, pb: 10, minHeight: "calc(100vh - 120px)" }}
       >
-        <TabSwipeRegion isAdmin={isAdmin} feedEnabled={feedEnabled}>
+        <MainTabCarousel isAdmin={isAdmin} feedEnabled={feedEnabled}>
           {children}
-        </TabSwipeRegion>
+        </MainTabCarousel>
       </Container>
       <AppTabs isAdmin={isAdmin} feedEnabled={feedEnabled} />
       <FeedbackFab />

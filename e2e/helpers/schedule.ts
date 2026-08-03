@@ -2,19 +2,29 @@ import { type Page, expect } from "@playwright/test";
 
 import { fillProposalDateRange, selectDraftScheduleMode } from "./datePickers";
 import { dismissBlockingDialogsIfOpen, dismissMotdDialogIfOpen } from "./motd";
-import { goToSchedule } from "./navigation";
 import { openEventProposalDraft, submitProposalDraft } from "./proposals";
+import { activeMainPanel } from "./tab-swipe";
 
 export { dismissMotdDialogIfOpen, dismissBlockingDialogsIfOpen } from "./motd";
 
 const SCHEDULE_VIEW_STORAGE_KEY = "polycal.schedule.view";
 
-/** ISO yyyy-MM-dd offset from today. */
+/** ISO yyyy-MM-dd offset from today in America/New_York (matches Playwright TZ, PC-408). */
 export function dateOffsetIso(daysFromToday: number): string {
-  const date = new Date();
-  date.setDate(date.getDate() + daysFromToday);
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/New_York",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date());
+  const get = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((part) => part.type === type)?.value ?? "01";
+  // UTC noon arithmetic keeps civil day math free of host-TZ side effects.
+  const civil = new Date(
+    Date.UTC(Number(get("year")), Number(get("month")) - 1, Number(get("day")) + daysFromToday, 12),
+  );
   const pad = (value: number) => String(value).padStart(2, "0");
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+  return `${civil.getUTCFullYear()}-${pad(civil.getUTCMonth() + 1)}-${pad(civil.getUTCDate())}`;
 }
 
 /** Resets persisted schedule layout/filter state so navigation tests start from week view. */
@@ -44,11 +54,13 @@ function dateInRange(isoDate: string, rangeStart: string, rangeEnd: string): boo
 }
 
 function eventLocator(page: Page, namePattern: RegExp) {
+  // Scope to the active keep-alive panel so hidden tabs cannot steal matches (PC-407).
+  const root = activeMainPanel(page);
   // Week/day blocks use aria-label "Title[, Location][, Tentative]. …"; month chips use title/aria-label.
-  return page
+  return root
     .getByRole("button", { name: namePattern })
-    .or(page.getByTitle(namePattern))
-    .or(page.getByLabel(namePattern))
+    .or(root.getByTitle(namePattern))
+    .or(root.getByLabel(namePattern))
     .first();
 }
 
@@ -209,15 +221,15 @@ async function expectEventVisibleInView(
 /** Waits until schedule data has finished loading for the visible range. */
 export async function waitForScheduleReady(page: Page): Promise<void> {
   await dismissBlockingDialogsIfOpen(page);
-  // Prefer the last marker — soft navigations can briefly leave a stale node in the DOM.
-  await expect(page.getByTestId("schedule-ready").last()).toHaveAttribute("data-ready", "true", {
+  const root = activeMainPanel(page);
+  await expect(root.getByTestId("schedule-ready")).toHaveAttribute("data-ready", "true", {
     timeout: 30_000,
   });
 }
 
 /** Forces week layout so aria-labels and week stepping remain predictable. */
 export async function forceWeekLayout(page: Page): Promise<void> {
-  const layoutWeek = page
+  const layoutWeek = activeMainPanel(page)
     .getByLabel("Calendar period")
     .getByRole("button", { name: "Week", exact: true });
   if (await layoutWeek.isVisible().catch(() => false)) {
@@ -230,9 +242,9 @@ export async function forceWeekLayout(page: Page): Promise<void> {
 }
 
 async function readVisibleRange(page: Page): Promise<{ start: string; end: string }> {
-  // Prefer .last() — soft navigations / remounts can leave a stale range marker in the DOM.
-  const start = await page.getByTestId("schedule-range-start").last().getAttribute("data-value");
-  const end = await page.getByTestId("schedule-range-end").last().getAttribute("data-value");
+  const root = activeMainPanel(page);
+  const start = await root.getByTestId("schedule-range-start").getAttribute("data-value");
+  const end = await root.getByTestId("schedule-range-end").getAttribute("data-value");
   if (!start || !end) {
     throw new Error("Schedule range attributes missing.");
   }
@@ -262,7 +274,7 @@ export async function navigateScheduleUntilDateInRange(
     const rangeStart = new Date(range.start).getTime();
     const goingForward = target > rangeStart;
     const navLabel = goingForward ? "Next period" : "Previous period";
-    const nav = page.getByRole("button", { name: navLabel });
+    const nav = activeMainPanel(page).getByRole("button", { name: navLabel });
     await expect(nav).toBeEnabled({ timeout: 15_000 });
     await nav.click();
   }
@@ -272,7 +284,8 @@ export async function navigateScheduleUntilDateInRange(
 
 /**
  * Advances the week calendar toward `targetDateIso` and waits for a matching block.
- * Reloads once on miss — CI can serve a stale week slice after proposal resolve (PC-326 flake).
+ * Hard-navigates once on miss — CI can serve a stale week slice after proposal resolve (PC-326).
+ * Prefer `goto` over `reload` so a near-timeout does not race a closed page (PC-408).
  */
 export async function advanceScheduleUntilEventVisible(
   page: Page,
@@ -280,7 +293,10 @@ export async function advanceScheduleUntilEventVisible(
   options?: { targetDateIso?: string },
 ): Promise<void> {
   const prepare = async () => {
-    await goToSchedule(page);
+    // Hard navigation so keep-alive cannot reuse a stale ScheduleClient fiber
+    // after creating events on another tab (PC-407).
+    await page.goto("/schedule");
+    await expect(page).toHaveURL(/\/schedule/);
     await clearScheduleViewState(page);
     await dismissBlockingDialogsIfOpen(page);
     await forceWeekLayout(page);
@@ -305,7 +321,7 @@ export async function advanceScheduleUntilEventVisible(
   }
 
   await clearScheduleViewState(page);
-  await page.reload();
+  await page.goto("/schedule");
   await prepare();
   await eventLocator(page, namePattern).scrollIntoViewIfNeeded().catch(() => {});
   await expect(eventLocator(page, namePattern)).toBeVisible({ timeout: 25_000 });

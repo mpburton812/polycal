@@ -12,6 +12,7 @@ import {
 import { expandAdminSection } from "./helpers/admin";
 import { dateOffsetIso } from "./helpers/schedule";
 import { batchNightSection, openNewProposalFabMenu } from "./helpers/proposals";
+import { activeMainPanel } from "./helpers/tab-swipe";
 
 /**
  * FastSleep user journey (PC-381): auto-confirm nights for self + partner
@@ -64,16 +65,20 @@ test.describe("FastSleep journey", () => {
     await expect(dialog).toBeHidden({ timeout: 30_000 });
 
     await selectProposalTab(page, "Resolved");
-    await expect(page.getByText(/Sleeping:/i).first()).toBeVisible({ timeout: 20_000 });
+    await expect(activeMainPanel(page).getByText(/Sleeping:/i).first()).toBeVisible({
+      timeout: 20_000,
+    });
 
     await goToFeed(page);
-    const autoConfirmed = page.getByTestId("feed-milestone-card").filter({
+    const autoConfirmed = activeMainPanel(page).getByTestId("feed-milestone-card").filter({
       hasText: /Auto-confirmed/i,
     });
     await expect(autoConfirmed).toHaveCount(1, { timeout: 20_000 });
 
     await goToSchedule(page);
-    await expect(page.getByText(/Sleeping:/i).first()).toBeVisible({ timeout: 20_000 });
+    await expect(activeMainPanel(page).getByText(/Sleeping:/i).first()).toBeVisible({
+      timeout: 20_000,
+    });
 
     await logout(page);
 

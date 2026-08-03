@@ -10,7 +10,9 @@ import {
 
 import {
   clearNetworkMotdAction,
+  clearPlatformMotdAction,
   publishNetworkMotdAction,
+  publishPlatformMotdAction,
 } from "@/actions/motd";
 import { AdminCollapsibleSection } from "@/components/admin/AdminCollapsibleSection";
 import { MotdAdminForm } from "@/components/motd/MotdAdminForm";
@@ -29,14 +31,19 @@ export type NetworkDashboardData = {
 };
 
 /**
- * Active-network summary for network admins (PC-363) + MOTD (PC-392).
+ * Active-network summary for network admins (PC-363) + MOTD (PC-392 / PC-406).
+ * Platform admins get an All Platform toggle on the shared MOTD form.
  */
 export function AdminNetworkDashboardPanel({
   dashboard,
   initialMotd = null,
+  isPlatformAdmin = false,
+  initialPlatformMotd = null,
 }: {
   dashboard: NetworkDashboardData;
   initialMotd?: MotdAdminState | null;
+  isPlatformAdmin?: boolean;
+  initialPlatformMotd?: MotdAdminState | null;
 }) {
   return (
     <AdminCollapsibleSection title="Network">
@@ -76,6 +83,10 @@ export function AdminNetworkDashboardPanel({
               initial={initialMotd}
               publishAction={publishNetworkMotdAction}
               clearAction={clearNetworkMotdAction}
+              allowAllPlatformToggle={isPlatformAdmin}
+              publishPlatformAction={publishPlatformMotdAction}
+              clearPlatformAction={clearPlatformMotdAction}
+              initialPlatform={initialPlatformMotd}
             />
           </Box>
         </Stack>
