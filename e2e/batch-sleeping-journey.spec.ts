@@ -27,7 +27,9 @@ test.describe("Batch sleeping slice journey", () => {
     expect(nightCount).toBeGreaterThan(0);
 
     await selectProposalTab(page, "Resolved");
-    await expect(page.getByText(/Sleeping: Han Solo(?!, Confirmed)/i).first()).toBeVisible({
+    await expect(
+      page.getByRole("heading", { name: /Sleeping: Han Solo(?!, Confirmed)/i }),
+    ).toBeVisible({
       timeout: 15_000,
     });
 
@@ -38,6 +40,7 @@ test.describe("Batch sleeping slice journey", () => {
     );
 
     await page
+      .getByTestId("main-tab-panel-schedule")
       .getByRole("button", { name: /Sleeping: Han Solo/i })
       .first()
       .click();
