@@ -1,7 +1,7 @@
 import { type Locator, type Page, expect } from "@playwright/test";
 
 import { dismissBlockingDialogsIfOpen } from "./motd";
-import { expectMainTab, type MainTabPath } from "./tab-swipe";
+import { activeMainPanel, expectMainTab, type MainTabPath } from "./tab-swipe";
 
 /**
  * Clicks a bottom-nav link; falls back to direct navigation when the click is
