@@ -62,6 +62,10 @@ export default defineConfig({
     ? [["github"], ["list"], ["html", { open: "never" }]]
     : [["list"], ["html", { open: "never" }]],
   use: {
+    // Seeded users (luke) use America/New_York — CI runners default to UTC, which
+    // shifts midnight timed drafts to the previous evening on the schedule (PC-408).
+    timezoneId: "America/New_York",
+    locale: "en-US",
     trace: "on-first-retry",
     screenshot: "only-on-failure",
   },

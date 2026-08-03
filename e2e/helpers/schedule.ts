@@ -2,7 +2,6 @@ import { type Page, expect } from "@playwright/test";
 
 import { fillProposalDateRange, selectDraftScheduleMode } from "./datePickers";
 import { dismissBlockingDialogsIfOpen, dismissMotdDialogIfOpen } from "./motd";
-import { goToSchedule } from "./navigation";
 import { openEventProposalDraft, submitProposalDraft } from "./proposals";
 import { activeMainPanel } from "./tab-swipe";
 
@@ -275,7 +274,8 @@ export async function navigateScheduleUntilDateInRange(
 
 /**
  * Advances the week calendar toward `targetDateIso` and waits for a matching block.
- * Reloads once on miss — CI can serve a stale week slice after proposal resolve (PC-326 flake).
+ * Hard-navigates once on miss — CI can serve a stale week slice after proposal resolve (PC-326).
+ * Prefer `goto` over `reload` so a near-timeout does not race a closed page (PC-408).
  */
 export async function advanceScheduleUntilEventVisible(
   page: Page,
@@ -283,7 +283,10 @@ export async function advanceScheduleUntilEventVisible(
   options?: { targetDateIso?: string },
 ): Promise<void> {
   const prepare = async () => {
-    await goToSchedule(page);
+    // Hard navigation so keep-alive cannot reuse a stale ScheduleClient fiber
+    // after creating events on another tab (PC-407).
+    await page.goto("/schedule");
+    await expect(page).toHaveURL(/\/schedule/);
     await clearScheduleViewState(page);
     await dismissBlockingDialogsIfOpen(page);
     await forceWeekLayout(page);
@@ -308,7 +311,7 @@ export async function advanceScheduleUntilEventVisible(
   }
 
   await clearScheduleViewState(page);
-  await page.reload();
+  await page.goto("/schedule");
   await prepare();
   await eventLocator(page, namePattern).scrollIntoViewIfNeeded().catch(() => {});
   await expect(eventLocator(page, namePattern)).toBeVisible({ timeout: 25_000 });
