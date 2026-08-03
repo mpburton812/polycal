@@ -2,7 +2,6 @@
 
 import {
   useCallback,
-  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -52,52 +51,12 @@ function matchMainTab(
 }
 
 /**
- * One keep-alive slot per main tab (PC-407). Captures the first live RSC tree and
- * keeps that fiber mounted under display:none so client sub-tab state survives.
- */
-function KeepAlivePanel({
-  href,
-  active,
-  children,
-  slideDir,
-}: {
-  href: MainTabHref;
-  active: boolean;
-  children: ReactNode | null;
-  slideDir: "left" | "right" | null;
-}) {
-  const savedRef = useRef<ReactNode>(null);
-  // Seed once from live children; never replace — replacing remounts and drops state.
-  if (children != null && savedRef.current == null) {
-    savedRef.current = children;
-  }
-  if (savedRef.current == null) return null;
-
-  return (
-    <div
-      data-testid={`main-tab-panel-${href.slice(1)}`}
-      data-active={active ? "true" : "false"}
-      aria-hidden={!active}
-      hidden={!active}
-      style={{
-        display: active ? "block" : "none",
-        animation:
-          active && slideDir
-            ? `${slideDir === "left" ? "tabSlideFromRight" : "tabSlideFromLeft"} 220ms ease-out`
-            : undefined,
-      }}
-    >
-      {savedRef.current}
-    </div>
-  );
-}
-
-/**
- * Keep-alive main-tab host (PC-407): once a main tab has been visited, its React
- * tree stays mounted under `display: none` so sub-tab / client state survive.
+ * Main-tab swipe host (PC-407 / PC-408).
  *
- * Only seed a slot when the browser URL agrees with `usePathname()` — otherwise
- * Schedule can be cached under the Feed panel during RSC/pathname skew.
+ * Renders only the active route’s RSC children — multi-panel DOM keep-alive
+ * duplicated controls across hidden tabs and broke Playwright strict mode.
+ * Proposal / People sub-tab “place” is restored via sessionStorage in those
+ * clients instead.
  */
 export function MainTabCarousel({
   children,
@@ -120,28 +79,10 @@ export function MainTabCarousel({
 
   const activeHref = matchMainTab(pathname, visibleHrefs);
   const onMainTab = activeHref != null;
+  const activeIndex = activeHref ? visibleHrefs.indexOf(activeHref) : 0;
 
-  const [visited, setVisited] = useState<MainTabHref[]>([]);
   const [slideDir, setSlideDir] = useState<"left" | "right" | null>(null);
   const startRef = useRef<{ x: number; y: number; ignore: boolean } | null>(null);
-  /** Href whose live children are safe to seed (browser URL agrees with pathname). */
-  const [seedHref, setSeedHref] = useState<MainTabHref | null>(null);
-
-  useLayoutEffect(() => {
-    if (!activeHref) {
-      setSeedHref(null);
-      return;
-    }
-    const browserHref = matchMainTab(window.location.pathname, visibleHrefs);
-    if (browserHref !== activeHref) {
-      setSeedHref(null);
-      return;
-    }
-    setSeedHref(activeHref);
-    setVisited((prev) => (prev.includes(activeHref) ? prev : [...prev, activeHref]));
-  }, [activeHref, visibleHrefs]);
-
-  const activeIndex = activeHref ? visibleHrefs.indexOf(activeHref) : 0;
 
   const goToIndex = useCallback(
     (nextIndex: number, dir: "left" | "right") => {
@@ -192,9 +133,7 @@ export function MainTabCarousel({
     return <>{children}</>;
   }
 
-  const slots = visibleHrefs.filter(
-    (href) => visited.includes(href) || href === activeHref,
-  );
+  const panelTestId = `main-tab-panel-${activeHref.slice(1)}`;
 
   return (
     <div
@@ -204,21 +143,17 @@ export function MainTabCarousel({
       style={{ minHeight: "inherit", touchAction: "pan-y", overflow: "hidden" }}
       data-testid="main-tab-carousel"
     >
-      {slots.map((href) => {
-        const isActive = href === activeHref;
-        // Only the URL-confirmed active tab may receive live RSC children to seed.
-        const live = isActive && seedHref === href ? children : null;
-        return (
-          <KeepAlivePanel
-            key={href}
-            href={href}
-            active={isActive}
-            slideDir={slideDir}
-          >
-            {live}
-          </KeepAlivePanel>
-        );
-      })}
+      <div
+        data-testid={panelTestId}
+        data-active="true"
+        style={{
+          animation: slideDir
+            ? `${slideDir === "left" ? "tabSlideFromRight" : "tabSlideFromLeft"} 220ms ease-out`
+            : undefined,
+        }}
+      >
+        {children}
+      </div>
       <style>{`
         @keyframes tabSlideFromRight {
           from { transform: translateX(18%); opacity: 0.85; }

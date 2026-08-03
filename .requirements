@@ -369,3 +369,4 @@
 2026-08-03 | 843e121 | PC-407 | tap main tabs via link role and harden swipe pointer dispatch | src/components/layout/MainTabCarousel.tsx
 2026-08-03 | 1d0eca5 | PC-407 | persist proposal/people sub-tabs and scope keep-alive e2e locators | src/components/people-places/PeoplePlacesClient.tsx
 2026-08-03 | 2a37baf | PC-407 | keep-alive slot fibers plus session tab restore for swipe return | src/components/layout/MainTabCarousel.tsx
+2026-08-03 | 16be8c5 | PC-407 | render only active main tab to avoid keep-alive locator duplicates | src/components/layout/MainTabCarousel.tsx
