@@ -141,10 +141,14 @@ export function MainTabCarousel({
 
   const onPointerDown = useCallback((event: PointerEvent<HTMLDivElement>) => {
     if (event.pointerType === "mouse" && event.buttons !== 1) return;
+    // Dialogs/modals portal outside the carousel — still block tab swipes while open.
+    const modalOpen = Boolean(
+      document.querySelector(".MuiModal-root, .MuiDialog-root, [role='dialog']"),
+    );
     startRef.current = {
       x: event.clientX,
       y: event.clientY,
-      ignore: isInteractiveOrHorizontalScroll(event.target),
+      ignore: modalOpen || isInteractiveOrHorizontalScroll(event.target),
     };
   }, []);
 

@@ -65,17 +65,19 @@ test.describe("Tab swipe keepalive journey", () => {
     await dismissBlockingDialogsIfOpen(page);
     await goToProposals(page);
     await selectProposalTab(page, "Resolved");
-    await expect(
-      activeMainPanel(page).getByRole("tab", { name: /Resolved/i }),
-    ).toHaveAttribute("aria-selected", "true");
+    await expect(activeMainPanel(page).getByRole("tab", { name: /Resolved/i })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
 
     await swipeMainTab(page, "left");
     await expectMainTab(page, "/people-places");
     await swipeMainTab(page, "right");
     await expectMainTab(page, "/proposals");
-    await expect(
-      activeMainPanel(page).getByRole("tab", { name: /Resolved/i }),
-    ).toHaveAttribute("aria-selected", "true");
+    await expect(activeMainPanel(page).getByRole("tab", { name: /Resolved/i })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
   });
 
   test("people places Places sub-tab preserved after swipe", async ({ page }) => {
@@ -83,18 +85,21 @@ test.describe("Tab swipe keepalive journey", () => {
     await login(page, USERS.luke.username);
     await dismissBlockingDialogsIfOpen(page);
     await tapMainTab(page, "/people-places");
-    await activeMainPanel(page).getByRole("tab", { name: /^Places$/i }).click();
-    await expect(
-      activeMainPanel(page).getByRole("tab", { name: /^Places$/i }),
-    ).toHaveAttribute("aria-selected", "true");
+    const root = activeMainPanel(page);
+    await root.getByRole("tab", { name: /^Places$/i }).click();
+    await expect(root.getByRole("tab", { name: /^Places$/i })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
 
     await swipeMainTab(page, "right");
     await expectMainTab(page, "/proposals");
     await swipeMainTab(page, "left");
     await expectMainTab(page, "/people-places");
-    await expect(
-      activeMainPanel(page).getByRole("tab", { name: /^Places$/i }),
-    ).toHaveAttribute("aria-selected", "true");
+    await expect(activeMainPanel(page).getByRole("tab", { name: /^Places$/i })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
   });
 
   test("feed swipe away and back stays on feed", async ({ page }) => {
@@ -115,9 +120,12 @@ test.describe("Tab swipe keepalive journey", () => {
     await goToProposals(page);
     await selectProposalTab(page, "Proposed");
 
-    const card = page.locator(".MuiCard-root").filter({
-      has: page.getByRole("heading", { level: 2 }),
-    }).first();
+    const card = activeMainPanel(page)
+      .locator(".MuiCard-root")
+      .filter({
+        has: page.getByRole("heading", { level: 2 }),
+      })
+      .first();
     await expect(card).toBeVisible({ timeout: 30_000 });
     await card.click();
     const dialog = page.getByRole("dialog");
@@ -138,11 +146,25 @@ test.describe("Tab swipe keepalive journey", () => {
     const carousel = page.getByTestId("main-tab-carousel");
     const box = await carousel.boundingBox();
     if (!box) throw new Error("no carousel box");
-    const y = box.y + box.height * 0.35;
-    await page.mouse.move(box.x + box.width * 0.6, y);
-    await page.mouse.down();
-    await page.mouse.move(box.x + box.width * 0.55, y, { steps: 4 });
-    await page.mouse.up();
+    const y = box.y + box.height * 0.2;
+    await carousel.dispatchEvent("pointerdown", {
+      bubbles: true,
+      cancelable: true,
+      clientX: box.x + box.width * 0.6,
+      clientY: y,
+      pointerType: "touch",
+      pointerId: 1,
+      buttons: 1,
+    });
+    await carousel.dispatchEvent("pointerup", {
+      bubbles: true,
+      cancelable: true,
+      clientX: box.x + box.width * 0.55,
+      clientY: y,
+      pointerType: "touch",
+      pointerId: 1,
+      buttons: 0,
+    });
     await expectMainTab(page, "/schedule");
   });
 });
