@@ -360,3 +360,4 @@
 2026-08-02 | 6c17642 | PC-400 | keep Today-first schedule days chronological for range nav | src/lib/schedule/dates.test.ts
 2026-08-02 | c358800 | PC-400 | scroll Today into view instead of reordering schedule days | src/components/schedule/ScheduleAgendaView.tsx
 2026-08-02 | f4e245e | PC-398 | dismiss calendar sync failure dialog in Playwright helpers | e2e/helpers/auth.ts
+2026-08-03 | 5491d42 | PC-403 | keep-alive tab swipe, MOTD All Platform, calendar archive policy | src/components/admin/AdminNetworkDashboardPanel.tsx

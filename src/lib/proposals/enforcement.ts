@@ -345,8 +345,8 @@ async function archivePastResolvedProposals(db: Db, settings: EnforcementSetting
       `Archived ${settings.archiveGraceHours}h after scheduled end.`,
     );
 
-    const { scheduleCalendarSync } = await import("@/lib/calendar/sync");
-    await scheduleCalendarSync(proposal.id, "delete");
+    // Keep Google / ICS calendar copies after auto-archive (PC-405). Calendar
+    // delete + ICS cancel notify only run on explicit cancel or hard-delete.
   }
 }
 
