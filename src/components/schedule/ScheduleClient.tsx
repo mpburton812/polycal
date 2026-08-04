@@ -402,7 +402,12 @@ export function ScheduleClient({
 
     const step = viewState.compact ? 14 : 7;
     const next = addDays(weekStart, delta * step);
-    setViewState((current) => ({ ...current, weekStartIso: next.toISOString() }));
+    // Keep month chrome aligned with the week being browsed (PC-411).
+    setViewState((current) => ({
+      ...current,
+      weekStartIso: next.toISOString(),
+      monthAnchorIso: startOfMonth(next, timeZone).toISOString(),
+    }));
     refreshSchedule(next, { layout: "week", compact: viewState.compact });
   }
 
@@ -442,13 +447,19 @@ export function ScheduleClient({
       refreshSchedule(day, { layout: "day", compact: false });
       return;
     }
-    // Keep current week/month anchors when switching period (PC-411 opens on today at mount only).
+    // Open on today only at mount; while browsing, align month with the active week (PC-411).
+    if (mode === "month") {
+      const fromWeek = startOfMonth(new Date(viewState.weekStartIso), timeZone);
+      const withMonth = { ...next, monthAnchorIso: fromWeek.toISOString() };
+      setViewState(withMonth);
+      refreshSchedule(fromWeek, { layout: "month", compact: false });
+      return;
+    }
     setViewState(next);
-    const anchor =
-      next.calendarLayout === "month"
-        ? new Date(next.monthAnchorIso)
-        : startOfWeekMonday(new Date(next.weekStartIso), timeZone);
-    refreshSchedule(anchor, { layout: next.calendarLayout, compact: next.compact });
+    refreshSchedule(startOfWeekMonday(new Date(next.weekStartIso), timeZone), {
+      layout: next.calendarLayout,
+      compact: next.compact,
+    });
   }
 
   function openDaySheet(day: Date) {
