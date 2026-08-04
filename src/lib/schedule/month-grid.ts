@@ -1,7 +1,9 @@
 import {
   addDays,
   civilDateAtNoonUtc,
+  endOfCivilDayInZone,
   localDateKey,
+  startOfCivilDayInZone,
   startOfWeekMonday,
 } from "./dates";
 import { DEFAULT_VIEWER_TIMEZONE } from "./timezone";
@@ -60,15 +62,21 @@ export function dayIndexInGrid(grid: Date[], iso: string, timeZone: string): num
   return grid.findIndex((day) => localDateKey(day.toISOString(), timeZone) === key);
 }
 
-/** Visible fetch range for the 42-cell month grid (includes leading/trailing padding days). */
+/**
+ * Visible fetch range for the 42-cell month grid (includes leading/trailing padding days).
+ * Uses viewer-TZ midnight→EOD — noon-UTC cell anchors clipped afternoon events on the
+ * last overflow day (e.g. Sept 6 10:00 ET when August’s grid ends that Sunday) (PC-411).
+ */
 export function monthGridRange(
   monthAnchor: Date,
   timeZone: string = DEFAULT_VIEWER_TIMEZONE,
 ): { rangeStart: Date; rangeEnd: Date } {
   const grid = buildMonthGrid(monthAnchor, timeZone);
+  const startKey = localDateKey(grid[0]!.toISOString(), timeZone);
+  const endKey = localDateKey(grid[grid.length - 1]!.toISOString(), timeZone);
   return {
-    rangeStart: new Date(grid[0]!),
-    rangeEnd: new Date(grid[grid.length - 1]!),
+    rangeStart: startOfCivilDayInZone(startKey, timeZone),
+    rangeEnd: endOfCivilDayInZone(endKey, timeZone),
   };
 }
 

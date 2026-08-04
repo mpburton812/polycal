@@ -134,6 +134,7 @@ async function expireAtRiskProposals(db: Db): Promise<void> {
       .update(proposals)
       .set({
         state: "archived",
+        archiveKind: "cancelled",
         atRisk: false,
         atRiskExpiresAt: null,
         updatedAt: now,
@@ -334,7 +335,13 @@ async function archivePastResolvedProposals(db: Db, settings: EnforcementSetting
     const nowIso = now.toISOString();
     await db
       .update(proposals)
-      .set({ state: "archived", atRisk: false, atRiskExpiresAt: null, updatedAt: nowIso })
+      .set({
+        state: "archived",
+        archiveKind: "auto",
+        atRisk: false,
+        atRiskExpiresAt: null,
+        updatedAt: nowIso,
+      })
       .where(eq(proposals.id, proposal.id));
 
     await logProposalTransition(
@@ -457,7 +464,13 @@ async function archiveExpiredRecurrenceSeries(db: Db, settings: EnforcementSetti
     for (const id of idsToArchive) {
       await db
         .update(proposals)
-        .set({ state: "archived", atRisk: false, atRiskExpiresAt: null, updatedAt: nowIso })
+        .set({
+          state: "archived",
+          archiveKind: "auto",
+          atRisk: false,
+          atRiskExpiresAt: null,
+          updatedAt: nowIso,
+        })
         .where(eq(proposals.id, id));
       await logProposalTransition(
         db,
@@ -501,6 +514,7 @@ async function autoCancelUnresolvedAtRiskResolved(db: Db): Promise<void> {
       .update(proposals)
       .set({
         state: "archived",
+        archiveKind: "cancelled",
         atRisk: false,
         atRiskExpiresAt: null,
         scheduledStartAt: null,

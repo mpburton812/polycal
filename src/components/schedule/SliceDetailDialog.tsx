@@ -24,8 +24,9 @@ import {
   getProposalSliceDetailAction,
   type ProposalSliceDetail,
 } from "@/actions/proposals";
-import type { ScheduleSliceKind } from "@/lib/schedule/slice-types";
+import { FeedLinkifiedBody } from "@/components/feed/FeedLinkPreview";
 import { useToast } from "@/components/providers/ToastProvider";
+import type { ScheduleSliceKind } from "@/lib/schedule/slice-types";
 import { formatEventTime } from "@/lib/schedule/dates";
 import { handleCommentEnterKey } from "@/lib/ui/comment-keydown";
 import { LONG_TEXT_MAX } from "@/lib/validation/string-limits";
@@ -201,7 +202,7 @@ export function SliceDetailDialog({
             ) : null}
 
             {detail.description ? (
-              <Typography variant="body2">{detail.description}</Typography>
+              <FeedLinkifiedBody body={detail.description} />
             ) : null}
 
             {detail.canVoteOnParent ? (

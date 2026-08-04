@@ -37,6 +37,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 
 import { DownloadIcsButton } from "@/components/calendar/DownloadIcsButton";
+import { FeedLinkifiedBody } from "@/components/feed/FeedLinkPreview";
 import { retryProposalCalendarSyncAction } from "@/actions/calendar";
 import {
   acknowledgeProposalOverlapAction,
@@ -714,7 +715,7 @@ export function ProposalDetailDialog({
               {!detail.isContentMasked && detail.description && (
                 <Stack direction="row" spacing={0.5} alignItems="flex-start" sx={{ mb: 1 }}>
                   <EventNoteOutlinedIcon sx={{ fontSize: 18, color: "text.secondary", mt: 0.25 }} />
-                  <Typography variant="body2">{detail.description}</Typography>
+                  <FeedLinkifiedBody body={detail.description} />
                 </Stack>
               )}
 
@@ -739,7 +740,7 @@ export function ProposalDetailDialog({
               {detail.notes && (
                 <Stack direction="row" spacing={0.5} alignItems="flex-start" sx={{ mt: 1 }}>
                   <NotesOutlinedIcon sx={{ fontSize: 16, color: "text.secondary", mt: 0.25 }} />
-                  <Typography variant="body2" color="text.secondary">{detail.notes}</Typography>
+                  <FeedLinkifiedBody body={detail.notes} sx={{ color: "text.secondary" }} />
                 </Stack>
               )}
 
@@ -1276,7 +1277,7 @@ function BoxComment({
         {comment.authorName} · {new Date(comment.createdAt).toLocaleString()}
         {comment.sliceTag ? ` · ${comment.sliceTag}` : ""}
       </Typography>
-      <Typography variant="body2">{comment.body}</Typography>
+      <FeedLinkifiedBody body={comment.body} />
     </Stack>
   );
 }

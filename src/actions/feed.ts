@@ -651,6 +651,8 @@ async function loadMilestoneBatch(
       inArray(proposalStateLog.action, allowedActions),
       eq(proposals.networkId, networkId),
       isNull(proposalStateLog.deletedAt),
+      // Opt-in Post to Feed (PC-414); legacy rows backfilled ON in migration.
+      eq(proposals.postToFeed, true),
     ];
     if (cursor) {
       conditions.push(lt(proposalStateLog.createdAt, cursor.createdAt));

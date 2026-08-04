@@ -807,6 +807,7 @@ export async function createDraftProposalAction(
     reminderSentAt: null,
     eventIconKey:
       parsed.data.proposalType === "event" ? (parsed.data.eventIconKey ?? null) : null,
+    postToFeed: Boolean(parsed.data.postToFeed),
     createdAt: now,
     updatedAt: now,
   });
@@ -1031,6 +1032,10 @@ export async function updateDraftProposalAction(
         parsed.data.proposalType === "event"
           ? (parsed.data.eventIconKey ?? null)
           : null,
+      postToFeed:
+        parsed.data.postToFeed !== undefined
+          ? Boolean(parsed.data.postToFeed)
+          : proposal.postToFeed,
       updatedAt: now,
     })
     .where(eq(proposals.id, proposal.id));
@@ -1354,6 +1359,7 @@ export async function getProposalDetailAction(
       batchEntriesJson: proposals.batchEntriesJson,
       reminderOffsetMinutes: proposals.reminderOffsetMinutes,
       eventIconKey: proposals.eventIconKey,
+      postToFeed: proposals.postToFeed,
       networkId: proposals.networkId,
       locationBedroomNames: locations.bedroomNames,
       locationBedroomCount: locations.bedroomCount,
@@ -1717,6 +1723,7 @@ export async function getProposalDetailAction(
       displayState,
       reminderOffsetMinutes: row.reminderOffsetMinutes ?? null,
       eventIconKey: row.proposalType !== "event" ? null : row.eventIconKey ?? null,
+      postToFeed: Boolean(row.postToFeed),
       specialKind: getProposalSpecialKind(row.description) ?? undefined,
       pendingIcsId: (
         await latestIcsPendingIdsByProposal(db, session.user.id, [row.id])
