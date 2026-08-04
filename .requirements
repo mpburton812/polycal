@@ -372,3 +372,4 @@
 2026-08-03 | 16be8c5 | PC-407 | render only active main tab to avoid keep-alive locator duplicates | src/components/layout/MainTabCarousel.tsx
 2026-08-04 | 270e64b | PC-409 | cancelled vs archive, week today, feed toggle, UX batch | src/actions/feed.ts
 2026-08-04 | f9de74f | PC-414 | include postToFeed in detail select | src/actions/proposals/_core.ts
+2026-08-04 | ad4da77 | PC-416 | drop vibrate from NotificationOptions for TS build | src/sw.ts
