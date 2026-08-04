@@ -133,6 +133,9 @@ self.addEventListener("push", (event) => {
 
       icon: "/icons/icon-192.png",
 
+      // Keep OS default notification sound when app is backgrounded (PC-416).
+      silent: false,
+
       requireInteraction: requiresInteraction(payload.notificationType),
 
       ...(actions ? { actions } : {}),

@@ -48,6 +48,8 @@ export const draftProposalSchema = z.object({
   batchEntries: batchSleepingEntriesSchema.optional(),
   reminderOffsetMinutes: z.number().int().min(1).max(525600).nullable().optional(),
   eventIconKey: z.enum(EVENT_ICON_KEYS).nullable().optional(),
+  /** When true, lifecycle milestones post to the network Feed (PC-414). Default false. */
+  postToFeed: z.boolean().optional(),
 });
 
 export const commentSchema = z

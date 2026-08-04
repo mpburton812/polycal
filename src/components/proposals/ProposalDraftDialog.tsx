@@ -152,6 +152,7 @@ export function ProposalDraftDialog({
   const [reminderEnabled, setReminderEnabled] = useState(false);
   const [reminderValue, setReminderValue] = useState(1);
   const [reminderUnit, setReminderUnit] = useState<"days" | "hours" | "minutes">("hours");
+  const [postToFeed, setPostToFeed] = useState(false);
   const [slots, setSlots] = useState<SlotDraft[]>([{ startAt: "", endAt: "", label: "" }]);
   const [inviteeMode, setInviteeMode] = useState<Record<string, InviteeSelection>>({});
   const { showToast } = useToast();
@@ -349,6 +350,7 @@ export function ProposalDraftDialog({
       setReminderEnabled(reminder.enabled);
       setReminderValue(reminder.value);
       setReminderUnit(reminder.unit);
+      setPostToFeed(Boolean(initialDetail.postToFeed));
     } else if (!savedDraftId) {
       setProposalType(lockedProposalType ?? "event");
       setTitle("");
@@ -380,6 +382,7 @@ export function ProposalDraftDialog({
       setReminderEnabled(false);
       setReminderValue(1);
       setReminderUnit("hours");
+      setPostToFeed(false);
     }
   }, [open, initialDetail, lockedProposalType, savedDraftId, initialStartAt]);
 
@@ -565,6 +568,7 @@ export function ProposalDraftDialog({
         proposalType === "event" && reminderEnabled
           ? reminderOffsetToMinutes(reminderValue, reminderUnit)
           : null,
+      postToFeed,
     };
   }
 
@@ -902,6 +906,8 @@ export function ProposalDraftDialog({
             onReminderValueChange={setReminderValue}
             reminderUnit={reminderUnit}
             onReminderUnitChange={setReminderUnit}
+            postToFeed={postToFeed}
+            onPostToFeedChange={setPostToFeed}
           />
         </CardContent>
 

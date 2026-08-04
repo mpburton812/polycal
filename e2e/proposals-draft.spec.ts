@@ -3,7 +3,7 @@ import { expect, test } from "./helpers/test";
 import { login } from "./helpers/auth";
 import { DEMO, USERS } from "./helpers/constants";
 import { goToProposals, selectProposalTab } from "./helpers/navigation";
-import { exitDraftDialog, expandDraftMoreOptions, openEventOrSleepingProposalDraft, proposalCard } from "./helpers/proposals";
+import { exitDraftDialog, expandDraftMoreOptions, expectDraftCardAfterExit, openEventOrSleepingProposalDraft, proposalCard } from "./helpers/proposals";
 
 test.describe("Proposal draft workflows", () => {
   test.beforeEach(async ({ page }) => {
@@ -22,10 +22,8 @@ test.describe("Proposal draft workflows", () => {
 
     await expect(dialog.getByRole("button", { name: "Submit" })).toBeVisible();
     await exitDraftDialog(dialog);
-
-    const card = proposalCard(page, title);
-    await expect(card).toBeVisible();
-    await expect(card.getByText("DRAFT", { exact: true })).toBeVisible();
+    await expectDraftCardAfterExit(page, title);
+    await expect(proposalCard(page, title).getByText("DRAFT", { exact: true })).toBeVisible();
   });
 
   test("edits an existing draft title", async ({ page }) => {
@@ -39,8 +37,7 @@ test.describe("Proposal draft workflows", () => {
     const dialog = page.getByRole("dialog");
     await expect(dialog.getByRole("button", { name: "Submit" })).toBeVisible();
     await exitDraftDialog(dialog);
-
-    await expect(proposalCard(page, updatedTitle)).toBeVisible();
+    await expectDraftCardAfterExit(page, updatedTitle);
   });
 
   test("deletes a draft after confirmation", async ({ page }) => {
@@ -59,7 +56,7 @@ test.describe("Proposal draft workflows", () => {
 
     await expect(dialog.getByRole("button", { name: "Submit" })).toBeVisible();
     await exitDraftDialog(dialog);
-    await expect(proposalCard(page, title)).toBeVisible();
+    await expectDraftCardAfterExit(page, title);
   });
 });
 
