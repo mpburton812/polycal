@@ -136,8 +136,6 @@ self.addEventListener("push", (event) => {
       // Keep OS default notification sound when app is backgrounded (PC-416).
       silent: false,
 
-      vibrate: [120, 60, 120],
-
       requireInteraction: requiresInteraction(payload.notificationType),
 
       ...(actions ? { actions } : {}),
