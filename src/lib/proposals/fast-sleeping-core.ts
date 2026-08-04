@@ -344,6 +344,8 @@ export async function createBatchSleepingDraft(
     reminderOffsetMinutes: null,
     reminderSentAt: null,
     eventIconKey: null,
+    // FastSleep auto-confirmed milestones belong on Feed (PC-414 / PC-380).
+    postToFeed: true,
     createdAt: now,
     updatedAt: now,
   });

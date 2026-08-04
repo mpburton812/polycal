@@ -17,4 +17,12 @@ describe("monthGridRange", () => {
       localDateKey(grid[grid.length - 1]!.toISOString(), "America/New_York"),
     );
   });
+
+  it("includes afternoon events on the last overflow day (PC-411)", () => {
+    // August 2026 grid ends Sunday 2026-09-06; 10:00 ET is after noon-UTC.
+    const anchor = new Date("2026-08-04T12:00:00.000Z");
+    const { rangeEnd } = monthGridRange(anchor, "America/New_York");
+    const eventAt = Date.parse("2026-09-06T14:00:00.000Z"); // 10:00 America/New_York (EDT)
+    expect(eventAt).toBeLessThanOrEqual(rangeEnd.getTime());
+  });
 });

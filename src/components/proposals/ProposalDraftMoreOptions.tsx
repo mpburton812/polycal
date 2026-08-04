@@ -38,6 +38,9 @@ export interface ProposalDraftMoreOptionsProps {
   onReminderValueChange: (value: number) => void;
   reminderUnit: "days" | "hours" | "minutes";
   onReminderUnitChange: (value: "days" | "hours" | "minutes") => void;
+  /** Post lifecycle milestones to Feed (PC-414). Default off. */
+  postToFeed: boolean;
+  onPostToFeedChange: (value: boolean) => void;
 }
 
 /**
@@ -58,6 +61,8 @@ export function ProposalDraftMoreOptions({
   onReminderValueChange,
   reminderUnit,
   onReminderUnitChange,
+  postToFeed,
+  onPostToFeedChange,
 }: ProposalDraftMoreOptionsProps) {
   return (
     <Accordion
@@ -116,6 +121,18 @@ export function ProposalDraftMoreOptions({
               <FormControlLabel
                 control={
                   <Checkbox
+                    checked={postToFeed}
+                    onChange={(event) => onPostToFeedChange(event.target.checked)}
+                  />
+                }
+                label="Post to Feed"
+              />
+              <Typography variant="caption" color="text.secondary">
+                When off (default), this event’s milestones stay off the network Feed.
+              </Typography>
+              <FormControlLabel
+                control={
+                  <Checkbox
                     checked={reminderEnabled}
                     onChange={(event) => onReminderEnabledChange(event.target.checked)}
                   />
@@ -155,6 +172,22 @@ export function ProposalDraftMoreOptions({
                   </Typography>
                 </Stack>
               )}
+            </Stack>
+          )}
+          {proposalType === "sleeping" && (
+            <Stack spacing={0.5}>
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={postToFeed}
+                    onChange={(event) => onPostToFeedChange(event.target.checked)}
+                  />
+                }
+                label="Post to Feed"
+              />
+              <Typography variant="caption" color="text.secondary">
+                When off (default), this event’s milestones stay off the network Feed.
+              </Typography>
             </Stack>
           )}
         </Stack>

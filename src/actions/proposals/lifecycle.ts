@@ -616,6 +616,7 @@ export async function cancelProposalAction(
       .update(proposals)
       .set({
         state: "archived",
+        archiveKind: "cancelled",
         scheduledStartAt: null,
         scheduledEndAt: null,
         // Drop batch night payload so cancelled batch cannot reappear via slots (PC-373).

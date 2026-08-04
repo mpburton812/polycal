@@ -196,6 +196,8 @@ export interface ProposalDetail {
   reminderOffsetMinutes: number | null;
   /** Optional category icon for social events (PC-116). */
   eventIconKey: string | null;
+  /** When true, lifecycle milestones appear on Feed (PC-414). */
+  postToFeed: boolean;
   specialKind?: "residency";
   /**
    * Latest non-dismissed ICS pending id for the current viewer (PC-345).

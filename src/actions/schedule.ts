@@ -1,6 +1,6 @@
 "use server";
 
-import { and, asc, eq, gte, inArray, isNotNull, isNull, lte, or } from "drizzle-orm";
+import { and, asc, eq, gte, inArray, isNotNull, isNull, lte, ne, or } from "drizzle-orm";
 import { z } from "zod";
 
 import { adminAccessFromSessionUser, userHasAdminAccess } from "@/lib/admin-access";
@@ -229,6 +229,8 @@ export async function listScheduleEventsAction(
       and(
         eq(proposals.networkId, networkId),
         inArray(proposals.state, ["proposed", "resolved", "archived"]),
+        // User-cancelled rows leave PolyCal calendar; auto-archived stay (PC-410).
+        or(isNull(proposals.archiveKind), ne(proposals.archiveKind, "cancelled")),
         or(...rangeFilters),
       ),
     )

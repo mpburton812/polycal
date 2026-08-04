@@ -60,8 +60,8 @@ const DEFAULT_STATE = (): ScheduleViewState => {
 };
 
 /**
- * Reads persisted schedule UI preferences from localStorage (PC-42 / PC-164).
- * Anchors are persisted so returning to Schedule restores the last viewed period.
+ * Reads persisted schedule UI preferences from localStorage (PC-42 / PC-164 / PC-411).
+ * Layout + filters restore; week/month anchors are NOT restored so Schedule opens on today.
  */
 export function loadScheduleViewState(): ScheduleViewState {
   const defaults = DEFAULT_STATE();
@@ -81,8 +81,7 @@ export function loadScheduleViewState(): ScheduleViewState {
       calendarLayout,
       filterMode: parsed.filterMode ?? defaults.filterMode,
       filterPersonId: parsed.filterPersonId ?? defaults.filterPersonId,
-      weekStartIso: parsed.weekStartIso ?? defaults.weekStartIso,
-      monthAnchorIso: parsed.monthAnchorIso ?? defaults.monthAnchorIso,
+      // Always use today-based anchors from DEFAULT_STATE (PC-411).
     };
   } catch {
     return defaults;
@@ -90,7 +89,7 @@ export function loadScheduleViewState(): ScheduleViewState {
 }
 
 /**
- * Persists schedule UI preferences including last-viewed anchors (PC-164).
+ * Persists schedule layout + filters. Anchors are written for URL sync but ignored on next load (PC-411).
  */
 export function saveScheduleViewState(state: ScheduleViewState): void {
   if (typeof window === "undefined") return;
