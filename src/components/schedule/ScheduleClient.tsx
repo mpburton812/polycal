@@ -431,32 +431,24 @@ export function ScheduleClient({
   }
 
   function handlePeriodModeChange(mode: SchedulePeriodMode) {
-    const anchors = todayAnchors();
     const next = applyPeriodMode(viewState, mode);
     if (mode === "day") {
-      const day = startOfLocalDayNoon(new Date(), timeZone);
-      const withDay = {
-        ...next,
-        weekStartIso: day.toISOString(),
-        monthAnchorIso: anchors.monthAnchorIso,
-      };
+      const day = startOfLocalDayNoon(
+        viewState.calendarLayout === "month" ? monthAnchor : new Date(viewState.weekStartIso),
+        timeZone,
+      );
+      const withDay = { ...next, weekStartIso: day.toISOString() };
       setViewState(withDay);
       refreshSchedule(day, { layout: "day", compact: false });
       return;
     }
-    if (mode === "month") {
-      const withMonth = { ...next, ...anchors };
-      setViewState(withMonth);
-      refreshSchedule(new Date(anchors.monthAnchorIso), { layout: "month", compact: false });
-      return;
-    }
-    // Week / two-week: open on the week containing today (PC-411).
-    const withWeek = { ...next, ...anchors };
-    setViewState(withWeek);
-    refreshSchedule(new Date(anchors.weekStartIso), {
-      layout: "week",
-      compact: mode === "twoWeek",
-    });
+    // Keep current week/month anchors when switching period (PC-411 opens on today at mount only).
+    setViewState(next);
+    const anchor =
+      next.calendarLayout === "month"
+        ? new Date(next.monthAnchorIso)
+        : startOfWeekMonday(new Date(next.weekStartIso), timeZone);
+    refreshSchedule(anchor, { layout: next.calendarLayout, compact: next.compact });
   }
 
   function openDaySheet(day: Date) {
