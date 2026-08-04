@@ -371,3 +371,4 @@
 2026-08-03 | 2a37baf | PC-407 | keep-alive slot fibers plus session tab restore for swipe return | src/components/layout/MainTabCarousel.tsx
 2026-08-03 | 16be8c5 | PC-407 | render only active main tab to avoid keep-alive locator duplicates | src/components/layout/MainTabCarousel.tsx
 2026-08-04 | 270e64b | PC-409 | cancelled vs archive, week today, feed toggle, UX batch | src/actions/feed.ts
+2026-08-04 | f9de74f | PC-414 | include postToFeed in detail select | src/actions/proposals/_core.ts
