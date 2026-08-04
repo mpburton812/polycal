@@ -1359,6 +1359,7 @@ export async function getProposalDetailAction(
       batchEntriesJson: proposals.batchEntriesJson,
       reminderOffsetMinutes: proposals.reminderOffsetMinutes,
       eventIconKey: proposals.eventIconKey,
+      postToFeed: proposals.postToFeed,
       networkId: proposals.networkId,
       locationBedroomNames: locations.bedroomNames,
       locationBedroomCount: locations.bedroomCount,
