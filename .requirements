@@ -374,3 +374,4 @@
 2026-08-04 | f9de74f | PC-414 | include postToFeed in detail select | src/actions/proposals/_core.ts
 2026-08-04 | ad4da77 | PC-416 | drop vibrate from NotificationOptions for TS build | src/sw.ts
 2026-08-04 | edf2474 | PC-414 | FastSleep posts to feed; harden draft e2e card wait | src/lib/proposals/fast-sleeping-core.ts
+2026-08-04 | 6bb3e0a | PC-411 | keep anchors when switching week/month period modes | src/components/schedule/ScheduleClient.tsx
