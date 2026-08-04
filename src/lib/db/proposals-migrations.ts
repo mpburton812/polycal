@@ -30,6 +30,33 @@ export async function applyProposalsMigrations(sql: Client): Promise<void> {
   await ensureColumn(sql, "proposals", "detached_from_slot_id", "TEXT");
   await ensureColumn(sql, "proposals", "detached_at", "TEXT");
   await ensureColumn(sql, "proposals", "event_icon_key", "TEXT");
+  // PC-410: cancelled vs auto-archive; cancelled rows leave the schedule, auto keep GCal.
+  await ensureColumn(sql, "proposals", "archive_kind", "TEXT");
+  // PC-414: Post to Feed (app default OFF). Existing rows backfilled ON so history stays.
+  await ensureColumn(sql, "proposals", "post_to_feed", "INTEGER NOT NULL DEFAULT 0");
+  if (await hasColumn(sql, "proposals", "post_to_feed")) {
+    await sql.execute(`
+      UPDATE proposals
+      SET post_to_feed = 1
+      WHERE post_to_feed = 0
+        AND created_at < '2026-08-04T00:00:00.000Z'
+    `);
+  }
+  // Infer archive_kind for legacy archived rows (PC-410).
+  await sql.execute(`
+    UPDATE proposals
+    SET archive_kind = 'cancelled'
+    WHERE state = 'archived'
+      AND archive_kind IS NULL
+      AND scheduled_start_at IS NULL
+  `);
+  await sql.execute(`
+    UPDATE proposals
+    SET archive_kind = 'auto'
+    WHERE state = 'archived'
+      AND archive_kind IS NULL
+      AND scheduled_start_at IS NOT NULL
+  `);
   // PC-332: legacy hour columns (recovery_max_hours, proposed_max_hours, at_risk_ttl_hours)
   // are no longer ensured. Existing DBs keep them for the one-time hours→days backfill below,
   // which is now guarded to skip when those columns are absent (fresh DBs).

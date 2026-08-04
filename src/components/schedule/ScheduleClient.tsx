@@ -8,6 +8,7 @@ import TodayIcon from "@mui/icons-material/Today";
 import {
   Box,
   Button,
+  Chip,
   Drawer,
   Fab,
   FormControl,
@@ -125,16 +126,13 @@ export function ScheduleClient({
   const urlHydratedRef = useRef(false);
   const postHydrateFetchDoneRef = useRef(false);
   const [viewState, setViewState] = useState<ScheduleViewState>(() => {
-    // Prefer persisted anchors so re-entering Schedule restores last period (PC-164).
+    // Layout/filters from storage; always open on today’s week/month (PC-411).
     const loaded = loadScheduleViewState();
-    const hasPersistedAnchor =
-      typeof window !== "undefined" &&
-      Boolean(window.localStorage.getItem("polycal.schedule.view"));
-    if (hasPersistedAnchor) return loaded;
+    const anchors = todayAnchors();
     return {
       ...loaded,
-      weekStartIso: initialWeekStartIso,
-      monthAnchorIso: initialWeekStartIso,
+      weekStartIso: anchors.weekStartIso,
+      monthAnchorIso: anchors.monthAnchorIso,
     };
   });
   const [payload, setPayload] = useState<SchedulePayload>(initialPayload);
@@ -433,23 +431,32 @@ export function ScheduleClient({
   }
 
   function handlePeriodModeChange(mode: SchedulePeriodMode) {
+    const anchors = todayAnchors();
     const next = applyPeriodMode(viewState, mode);
     if (mode === "day") {
-      const day = startOfLocalDayNoon(
-        viewState.calendarLayout === "month" ? monthAnchor : new Date(viewState.weekStartIso),
-        timeZone,
-      );
-      const withDay = { ...next, weekStartIso: day.toISOString() };
+      const day = startOfLocalDayNoon(new Date(), timeZone);
+      const withDay = {
+        ...next,
+        weekStartIso: day.toISOString(),
+        monthAnchorIso: anchors.monthAnchorIso,
+      };
       setViewState(withDay);
       refreshSchedule(day, { layout: "day", compact: false });
       return;
     }
-    setViewState(next);
-    const anchor =
-      next.calendarLayout === "month"
-        ? new Date(next.monthAnchorIso)
-        : startOfWeekMonday(new Date(next.weekStartIso), timeZone);
-    refreshSchedule(anchor, { layout: next.calendarLayout, compact: next.compact });
+    if (mode === "month") {
+      const withMonth = { ...next, ...anchors };
+      setViewState(withMonth);
+      refreshSchedule(new Date(anchors.monthAnchorIso), { layout: "month", compact: false });
+      return;
+    }
+    // Week / two-week: open on the week containing today (PC-411).
+    const withWeek = { ...next, ...anchors };
+    setViewState(withWeek);
+    refreshSchedule(new Date(anchors.weekStartIso), {
+      layout: "week",
+      compact: mode === "twoWeek",
+    });
   }
 
   function openDaySheet(day: Date) {
@@ -477,6 +484,17 @@ export function ScheduleClient({
   }
 
   const showAgenda = !isMonthLayout && !isDayLayout && isMobile;
+
+  const filterActive = viewState.filterMode !== "whole";
+  const filterLabel = (() => {
+    if (viewState.filterMode === "solo") return "Solo";
+    if (viewState.filterMode === "sleeping_network") return "Sleeping network";
+    if (viewState.filterMode === "person") {
+      const person = people.find((p) => p.id === viewState.filterPersonId);
+      return person?.displayName ? `Person: ${person.displayName}` : "Person";
+    }
+    return "Whole network";
+  })();
 
   return (
     <Box
@@ -562,13 +580,32 @@ export function ScheduleClient({
             </ToggleButtonGroup>
 
             <IconButton
-              aria-label="View options"
+              aria-label={
+                filterActive ? `View options, filter active: ${filterLabel}` : "View options"
+              }
               aria-expanded={optionsOpen}
               onClick={() => setOptionsOpen(true)}
               size="small"
+              color={filterActive ? "primary" : "default"}
             >
               <FilterListIcon />
             </IconButton>
+            {filterActive && (
+              <Chip
+                size="small"
+                color="primary"
+                variant="outlined"
+                label={filterLabel}
+                onClick={() => setOptionsOpen(true)}
+                onDelete={() =>
+                  setViewState((current) => ({
+                    ...current,
+                    filterMode: "whole",
+                    filterPersonId: "",
+                  }))
+                }
+              />
+            )}
           </Stack>
         </Stack>
       </Box>

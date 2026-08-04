@@ -64,6 +64,13 @@ export const proposals = sqliteTable("proposals", {
   lastNudgeAt: text("last_nudge_at"),
   /** Optional category icon key for social events (PC-116). */
   eventIconKey: text("event_icon_key"),
+  /**
+   * How this row was archived: user cancel vs auto-archive (PC-410).
+   * `cancelled` is excluded from the PolyCal schedule; `auto` stays visible and keeps GCal.
+   */
+  archiveKind: text("archive_kind", { enum: ["cancelled", "auto"] }),
+  /** When true, lifecycle milestones appear on the network Feed (PC-414). Default off for new drafts. */
+  postToFeed: integer("post_to_feed", { mode: "boolean" }).notNull().default(false),
   /** Parent proposal when this row was detached from a batch night or span day slice. */
   detachedFromParentId: text("detached_from_parent_id"),
   detachedFromSlotId: text("detached_from_slot_id"),
