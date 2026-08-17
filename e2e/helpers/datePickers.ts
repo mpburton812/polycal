@@ -37,10 +37,11 @@ export async function fillProposalDateTimeField(
   value: string,
 ): Promise<void> {
   const dialog = field.page().getByRole("dialog");
+  const pollBtn = dialog.getByRole("button", { name: "Poll", exact: true });
+  // Poll is omitted in Schedule posting and when the network gate is off (PC-423).
   const pollPressed =
-    (await dialog.getByRole("button", { name: "Poll", exact: true }).getAttribute("aria-pressed").catch(
-      () => null,
-    )) === "true";
+    (await pollBtn.count()) > 0 &&
+    (await pollBtn.getAttribute("aria-pressed")) === "true";
   // Recurring is disabled until Window/All Day; do not steal Poll drafts back to Window (PC-422).
   const windowBtn = dialog.getByRole("button", { name: "Window", exact: true });
   if (
