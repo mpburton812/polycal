@@ -143,7 +143,16 @@ export async function setInviteeOptional(dialog: Locator, displayName: string) {
 
 /** Marks every visible person as a required invitee via Required toggles (PC-126). */
 export async function setAllInviteesRequired(dialog: Locator): Promise<void> {
+  const withInvitees = dialog.getByRole("button", { name: "With invitees", exact: true });
+  if (
+    (await withInvitees.count()) > 0 &&
+    (await withInvitees.getAttribute("aria-pressed")) !== "true"
+  ) {
+    await withInvitees.click();
+  }
   const requiredButtons = dialog.getByRole("button", { name: / required$/i });
+  // Window/Recurring just revealed the roster — wait before counting chips (PC-421).
+  await expect(requiredButtons.first()).toBeVisible({ timeout: 15_000 });
   const count = await requiredButtons.count();
   for (let index = 0; index < count; index += 1) {
     const button = requiredButtons.nth(index);
