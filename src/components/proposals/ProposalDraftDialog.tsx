@@ -636,7 +636,10 @@ export function ProposalDraftDialog({
       intentionalSolo: batchMode ? false : isSoloProposal,
       isPoll: proposalType === "event" ? isPoll : false,
       isAllDay: proposalType === "event" ? allDay : false,
-      postingKind: effectivePostingKind === "schedule" ? "schedule" : "proposal",
+      postingKind:
+        effectivePostingKind === "schedule"
+          ? ("schedule" as const)
+          : ("proposal" as const),
       onBehalfOfUserId:
         effectivePostingKind === "schedule" && onBehalfOfUserId
           ? onBehalfOfUserId

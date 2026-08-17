@@ -44,6 +44,12 @@ const PROXY_SCOPE_LABELS: Record<string, string> = {
   sleeping_partners: "Sleeping partners only",
 };
 
+const MAP_VISIBILITY_LABELS: Record<string, string> = {
+  all: "Everyone",
+  admins: "Admins only",
+  none: "Hidden",
+};
+
 /**
  * Network settings editor for the Admin tab (PC-30).
  */
