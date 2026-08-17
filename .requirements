@@ -381,3 +381,4 @@
 2026-08-17 | f12087a | PC-417 | restore map visibility labels and postingKind types | src/components/admin/AdminNetworkSettingsPanel.tsx
 2026-08-17 | baf8d33 | PC-418 | raise create FAB above tab chrome so Playwright can click it | src/components/proposals/ProposalCreateHost.tsx
 2026-08-17 | bb36a4a | PC-417 | Recurring after Window, pass user id from layout, keep settings toast | src/components/admin/AdminNetworkSettingsPanel.tsx
+2026-08-17 | 19ace77 | PC-421 | wait for invitee roster after Window before marking required | e2e/helpers/proposals.ts
