@@ -11,6 +11,7 @@ import {
   goToSchedule,
   openProfileMenu,
 } from "./helpers/navigation";
+import { openNewProposalFabMenu } from "./helpers/proposals";
 
 test.describe("App navigation (admin)", () => {
   test.beforeEach(async ({ page }) => {
@@ -43,11 +44,13 @@ test.describe("App navigation (admin)", () => {
     await expect(page.getByRole("heading", { name: "Feed" })).toBeVisible();
   });
 
-  test("profile menu opens settings, admin, and logout entries", async ({ page }) => {
+  test("profile menu opens settings, admin, feedback, and logout entries", async ({ page }) => {
     await openProfileMenu(page);
     await expect(page.getByRole("menuitem", { name: "Settings" })).toBeVisible();
     await expect(page.getByRole("menuitem", { name: "Admin", exact: true })).toBeVisible();
+    await expect(page.getByRole("menuitem", { name: "Feedback" })).toBeVisible();
     await expect(page.getByRole("menuitem", { name: "Logout" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Give feedback" })).toHaveCount(0);
   });
 
   test("navigates to all primary tabs", async ({ page }) => {
@@ -68,6 +71,18 @@ test.describe("App navigation (admin)", () => {
 
     await goToProfile(page);
     await expect(page.getByRole("heading", { name: "Profile", level: 1 })).toBeVisible();
+  });
+
+  test("sage create FAB is on Feed, Schedule, and People & Places", async ({ page }) => {
+    for (const go of [goToFeed, goToSchedule, goToPeoplePlaces]) {
+      await go(page);
+      await openNewProposalFabMenu(page);
+      await expect(page.getByRole("menuitem", { name: "Event proposal" })).toBeVisible();
+      await expect(page.getByRole("menuitem", { name: "Sleeping proposal" })).toBeVisible();
+      await expect(page.getByRole("menuitem", { name: "Sleeping partner proposal" })).toBeVisible();
+      await expect(page.getByRole("menuitem", { name: "Residency Proposal" })).toBeVisible();
+      await page.keyboard.press("Escape");
+    }
   });
 });
 

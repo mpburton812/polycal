@@ -11,8 +11,10 @@ import { latestIcsPendingIdsByProposal } from "@/lib/calendar/pending-ics";
 import { getDb } from "@/lib/db/client";
 import { ensureDbReady } from "@/lib/db/ensure-ready";
 import { requireNetworkSession } from "@/lib/networks/context";
+import { listNetworkPickerPlaces } from "@/lib/places/list-network-picker-places";
 import {
   locations,
+  networkMembers,
   proposalComments,
   proposalInvitees,
   proposalSlotVotes,
@@ -80,6 +82,7 @@ import {
 } from "@/lib/proposals/access";
 import { isSleepingLikeType } from "@/lib/proposals/sleeping-like";
 import { loadNetworkSettings } from "@/lib/networks/settings";
+import { assertComposerPostingRules } from "@/lib/proposals/composer-posting-rules";
 import { buildPartnershipProposalCopy } from "@/lib/partnerships/copy";
 import type { UserRole } from "@/types/user";
 
@@ -301,33 +304,23 @@ export async function listSleepingLocationOptionsAction(
   inviteeUserIds: string[],
 ): Promise<ProposalPlaceOption[]> {
   await ensureDbReady();
-  const session = await auth();
-  if (!session?.user) return [];
+  const networkSession = await requireNetworkSession();
+  if (!networkSession.ok) return [];
 
   const db = getDb();
-  const isAdmin = await userHasAdminAccess(adminAccessFromSessionUser(session.user));
-  const placeSelect = {
-    id: locations.id,
-    name: locations.name,
-    bedroomCount: locations.bedroomCount,
-    bedroomNames: locations.bedroomNames,
-  };
+  const networkId = networkSession.user.activeNetworkId;
+  const isAdmin = await userHasAdminAccess(adminAccessFromSessionUser(networkSession.user));
+  const userIds = [networkSession.user.id, ...inviteeUserIds];
+  const eligibleIds = isAdmin
+    ? null
+    : await loadEligibleLocationIdsForUsers(db, userIds, networkId);
+  if (!isAdmin && eligibleIds && eligibleIds.length === 0) return [];
 
-  if (isAdmin) {
-    const all = await db.select(placeSelect).from(locations).orderBy(asc(locations.name));
-    return all.map(mapPlaceOption);
-  }
-
-  const userIds = [session.user.id, ...inviteeUserIds];
-  const locationIds = await loadEligibleLocationIdsForUsers(db, userIds);
-  if (locationIds.length === 0) return [];
-
-  const placeRows = await db
-    .select(placeSelect)
-    .from(locations)
-    .where(inArray(locations.id, locationIds))
-    .orderBy(asc(locations.name));
-
+  const placeRows = await listNetworkPickerPlaces(db, {
+    networkId,
+    viewerId: networkSession.user.id,
+    restrictToLocationIds: eligibleIds,
+  });
   return placeRows.map(mapPlaceOption);
 }
 
@@ -344,33 +337,22 @@ async function persistBatchSleepingDraft(
  */
 export async function listProposalPlaceOptionsAction(): Promise<ProposalPlaceOption[]> {
   await ensureDbReady();
-  const session = await auth();
-  if (!session?.user) return [];
+  const networkSession = await requireNetworkSession();
+  if (!networkSession.ok) return [];
 
   const db = getDb();
-  const isAdmin = await userHasAdminAccess(adminAccessFromSessionUser(session.user));
+  const networkId = networkSession.user.activeNetworkId;
+  const isAdmin = await userHasAdminAccess(adminAccessFromSessionUser(networkSession.user));
+  const eligibleIds = isAdmin
+    ? null
+    : await loadEligibleLocationIdsForUser(db, networkSession.user.id, networkId);
+  if (!isAdmin && eligibleIds && eligibleIds.length === 0) return [];
 
-  const placeSelect = {
-    id: locations.id,
-    name: locations.name,
-    bedroomCount: locations.bedroomCount,
-    bedroomNames: locations.bedroomNames,
-  };
-
-  if (isAdmin) {
-    const all = await db.select(placeSelect).from(locations).orderBy(asc(locations.name));
-    return enrichPlaceOptionsWithMembers(db, all.map(mapPlaceOption));
-  }
-
-  const locationIds = await loadEligibleLocationIdsForUser(db, session.user.id);
-  if (locationIds.length === 0) return [];
-
-  const placeRows = await db
-    .select(placeSelect)
-    .from(locations)
-    .where(inArray(locations.id, locationIds))
-    .orderBy(asc(locations.name));
-
+  const placeRows = await listNetworkPickerPlaces(db, {
+    networkId,
+    viewerId: networkSession.user.id,
+    restrictToLocationIds: eligibleIds,
+  });
   return enrichPlaceOptionsWithMembers(db, placeRows.map(mapPlaceOption));
 }
 
@@ -379,8 +361,8 @@ export async function listProposalPlaceOptionsAction(): Promise<ProposalPlaceOpt
  */
 export async function listResidencyPlaceOptionsAction(): Promise<ProposalPlaceOption[]> {
   await ensureDbReady();
-  const session = await auth();
-  if (!session?.user) return [];
+  const networkSession = await requireNetworkSession();
+  if (!networkSession.ok) return [];
 
   const db = getDb();
   const placeRows = await db
@@ -391,6 +373,7 @@ export async function listResidencyPlaceOptionsAction(): Promise<ProposalPlaceOp
       bedroomNames: locations.bedroomNames,
     })
     .from(locations)
+    .where(eq(locations.networkId, networkSession.user.activeNetworkId))
     .orderBy(asc(locations.name));
 
   return enrichPlaceOptionsWithMembers(db, placeRows.map(mapPlaceOption));
@@ -670,6 +653,57 @@ export async function adminForceResolveProposalAction(
 /**
  * Creates a new draft proposal for the signed-in user (PC-40).
  */
+async function loadAllowedProxyUserIds(
+  db: ReturnType<typeof getDb>,
+  actorId: string,
+  networkId: string,
+  scope: "anyone" | "sleeping_partners",
+): Promise<Set<string>> {
+  if (scope === "sleeping_partners") {
+    return loadAcceptedSleepingPartnerIds(db, actorId, networkId);
+  }
+  const rows = await db
+    .select({ userId: networkMembers.userId })
+    .from(networkMembers)
+    .where(and(eq(networkMembers.networkId, networkId), eq(networkMembers.status, "active")));
+  return new Set(rows.map((row) => row.userId).filter((id) => id !== actorId));
+}
+
+async function validateComposerPosting(
+  db: ReturnType<typeof getDb>,
+  networkId: string,
+  actorId: string,
+  input: {
+    isPoll: boolean;
+    postingKind: "proposal" | "schedule";
+    onBehalfOfUserId?: string | null;
+  },
+  isExistingPollDraft: boolean,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const settings = await loadNetworkSettings(networkId, db);
+  const allowedProxyUserIds = await loadAllowedProxyUserIds(
+    db,
+    actorId,
+    networkId,
+    settings?.proxySchedulingScope ?? "sleeping_partners",
+  );
+  return assertComposerPostingRules({
+    pollEnabled: settings?.pollEnabled !== false,
+    schedulingPosting: settings?.schedulingPosting ?? "proposals_only",
+    proxySchedulingEnabled: Boolean(settings?.proxySchedulingEnabled),
+    proxySchedulingScope: settings?.proxySchedulingScope ?? "sleeping_partners",
+    isPoll: input.isPoll,
+    isExistingPollDraft,
+    postingKind: input.postingKind,
+    onBehalfOfUserId: input.onBehalfOfUserId,
+    actorUserId: actorId,
+    allowedProxyUserIds,
+  });
+}
+
+/**
+ * Creates a draft proposal owned by the signed-in user (PC-40).
+ */
 export async function createDraftProposalAction(
   input: z.infer<typeof draftProposalSchema>,
 ): Promise<{ ok: boolean; message: string; proposalId?: string }> {
@@ -747,10 +781,29 @@ export async function createDraftProposalAction(
     return { ok: false, message: inviteeCheck.error };
   }
 
+  const postingKind = parsed.data.postingKind === "schedule" ? "schedule" : "proposal";
+  const isPoll =
+    postingKind === "schedule"
+      ? false
+      : Boolean(parsed.data.isPoll) || (parsed.data.timeSlots?.length ?? 0) > 1;
+  const composerCheck = await validateComposerPosting(
+    db,
+    networkId,
+    session.user.id,
+    {
+      isPoll,
+      postingKind,
+      onBehalfOfUserId: parsed.data.onBehalfOfUserId,
+    },
+    false,
+  );
+  if (!composerCheck.ok) {
+    return { ok: false, message: composerCheck.error };
+  }
+
   const now = new Date().toISOString();
   const proposalId = `prop-${randomUUID()}`;
   const intentionalSolo = Boolean(parsed.data.intentionalSolo);
-  const isPoll = Boolean(parsed.data.isPoll) || (parsed.data.timeSlots?.length ?? 0) > 1;
   // All-day only applies to timed event proposals (sleeping is already date-only).
   const isAllDay =
     parsed.data.proposalType === "event" && Boolean(parsed.data.isAllDay);
@@ -808,6 +861,11 @@ export async function createDraftProposalAction(
     eventIconKey:
       parsed.data.proposalType === "event" ? (parsed.data.eventIconKey ?? null) : null,
     postToFeed: Boolean(parsed.data.postToFeed),
+    postingKind,
+    onBehalfOfUserId:
+      postingKind === "schedule" && parsed.data.onBehalfOfUserId
+        ? parsed.data.onBehalfOfUserId
+        : null,
     createdAt: now,
     updatedAt: now,
   });
@@ -945,10 +1003,27 @@ export async function updateDraftProposalAction(
   }
 
   const now = new Date().toISOString();
+  const postingKind = parsed.data.postingKind === "schedule" ? "schedule" : "proposal";
   const isPoll =
-    parsed.data.isPoll !== undefined
-      ? parsed.data.isPoll
-      : (parsed.data.timeSlots?.length ?? 0) > 1;
+    postingKind === "schedule"
+      ? false
+      : parsed.data.isPoll !== undefined
+        ? parsed.data.isPoll
+        : (parsed.data.timeSlots?.length ?? 0) > 1;
+  const composerCheck = await validateComposerPosting(
+    db,
+    networkId,
+    session.user.id,
+    {
+      isPoll,
+      postingKind,
+      onBehalfOfUserId: parsed.data.onBehalfOfUserId,
+    },
+    Boolean(proposal.isPoll),
+  );
+  if (!composerCheck.ok) {
+    return { ok: false, message: composerCheck.error };
+  }
   const isRecurring = Boolean(parsed.data.isRecurring && parsed.data.recurrenceRule);
   const recurrenceJson = isRecurring
     ? serializeRecurrenceRule(parsed.data.recurrenceRule)
@@ -1036,6 +1111,11 @@ export async function updateDraftProposalAction(
         parsed.data.postToFeed !== undefined
           ? Boolean(parsed.data.postToFeed)
           : proposal.postToFeed,
+      postingKind,
+      onBehalfOfUserId:
+        postingKind === "schedule" && parsed.data.onBehalfOfUserId
+          ? parsed.data.onBehalfOfUserId
+          : null,
       updatedAt: now,
     })
     .where(eq(proposals.id, proposal.id));
@@ -1065,7 +1145,9 @@ function shouldAutoResolveOnSubmit(
   _proposalType: ProposalType,
   intentionalSolo: boolean,
   requiredInviteeCount: number,
+  postingKind?: string,
 ): boolean {
+  if (postingKind === "schedule") return true;
   if (intentionalSolo) return true;
   if (requiredInviteeCount === 0) return false;
   return false;
@@ -1135,7 +1217,12 @@ export async function submitProposalAction(
     intentionalSolo = batchEntries.every((entry) => entry.intentionalSolo);
   }
 
-  if (requiredCount === 0 && !intentionalSolo && optionalCount === 0) {
+  if (
+    proposal.postingKind !== "schedule" &&
+    requiredCount === 0 &&
+    !intentionalSolo &&
+    optionalCount === 0
+  ) {
     return {
       ok: false,
       message: "Add at least one invitee or enable solo before submitting.",
@@ -1146,6 +1233,7 @@ export async function submitProposalAction(
     proposal.proposalType,
     intentionalSolo,
     requiredCount,
+    proposal.postingKind,
   );
 
   if (residencyMeta) {
@@ -1198,6 +1286,13 @@ export async function submitProposalAction(
 
   if (proposal.atRisk) {
     await wipeProposalVotes(db, proposalId);
+  }
+
+  if (proposal.postingKind === "schedule" && invitees.length > 0) {
+    await db
+      .update(proposalInvitees)
+      .set({ voteStatus: "accept", respondedAt: now })
+      .where(eq(proposalInvitees.proposalId, proposalId));
   }
 
   await db
@@ -1360,6 +1455,8 @@ export async function getProposalDetailAction(
       reminderOffsetMinutes: proposals.reminderOffsetMinutes,
       eventIconKey: proposals.eventIconKey,
       postToFeed: proposals.postToFeed,
+      postingKind: proposals.postingKind,
+      onBehalfOfUserId: proposals.onBehalfOfUserId,
       networkId: proposals.networkId,
       locationBedroomNames: locations.bedroomNames,
       locationBedroomCount: locations.bedroomCount,
@@ -1724,6 +1821,8 @@ export async function getProposalDetailAction(
       reminderOffsetMinutes: row.reminderOffsetMinutes ?? null,
       eventIconKey: row.proposalType !== "event" ? null : row.eventIconKey ?? null,
       postToFeed: Boolean(row.postToFeed),
+      postingKind: row.postingKind === "schedule" ? "schedule" : "proposal",
+      onBehalfOfUserId: row.onBehalfOfUserId ?? null,
       specialKind: getProposalSpecialKind(row.description) ?? undefined,
       pendingIcsId: (
         await latestIcsPendingIdsByProposal(db, session.user.id, [row.id])

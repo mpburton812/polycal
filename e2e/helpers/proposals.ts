@@ -109,6 +109,13 @@ function inclusiveNightDates(rangeStart: string, rangeEnd: string): string[] {
 
 /** Cycles an invitee chip to required (none → required). */
 export async function setInviteeRequired(dialog: Locator, displayName: string) {
+  const withInvitees = dialog.getByRole("button", { name: "With invitees", exact: true });
+  if (
+    (await withInvitees.count()) > 0 &&
+    (await withInvitees.getAttribute("aria-pressed")) !== "true"
+  ) {
+    await withInvitees.click();
+  }
   const button = dialog.getByRole("button", {
     name: new RegExp(`^${escapeRegex(displayName)} required$`, "i"),
   });
@@ -118,6 +125,13 @@ export async function setInviteeRequired(dialog: Locator, displayName: string) {
 
 /** Selects optional invitee role via explicit Optional control (PC-126). */
 export async function setInviteeOptional(dialog: Locator, displayName: string) {
+  const withInvitees = dialog.getByRole("button", { name: "With invitees", exact: true });
+  if (
+    (await withInvitees.count()) > 0 &&
+    (await withInvitees.getAttribute("aria-pressed")) !== "true"
+  ) {
+    await withInvitees.click();
+  }
   const button = dialog.getByRole("button", {
     name: new RegExp(`^${escapeRegex(displayName)} optional$`, "i"),
   });
@@ -189,8 +203,9 @@ export async function selectEventIcon(dialog: Locator, a11yLabel: string): Promi
 
 /** Submits a draft, confirming through schedule-conflict dialog when present. */
 export async function submitProposalDraft(page: Page, dialog: Locator) {
-  await expect(dialog.getByRole("button", { name: "Submit" })).toBeVisible({ timeout: 15_000 });
-  await dialog.getByRole("button", { name: "Submit" }).click();
+  const primary = dialog.getByRole("button", { name: /^(Submit|Add to calendar)$/ });
+  await expect(primary).toBeVisible({ timeout: 15_000 });
+  await primary.click();
 
   const conflictDialog = page.getByRole("dialog", { name: "Schedule conflicts detected" });
   const hasConflict = await conflictDialog

@@ -1,6 +1,6 @@
 import { Box, Container } from "@mui/material";
 
-import { FeedbackFab } from "@/components/feedback/FeedbackFab";
+import { ProposalCreateHost } from "@/components/proposals/ProposalCreateHost";
 import { AppHeader } from "@/components/layout/AppHeader";
 import { AppTabs } from "@/components/layout/AppTabs";
 import { DevBar } from "@/components/layout/DevBar";
@@ -49,7 +49,7 @@ export function AppShell({
   const e2eTestMode = process.env.E2E_TEST_MODE === "1";
 
   return (
-    <>
+    <ProposalCreateHost>
       <PushSubscriptionManager
         vapidPublicKey={vapidPublicKey}
         pushEnabled={notificationPrefs.channels.push}
@@ -83,10 +83,9 @@ export function AppShell({
         </MainTabCarousel>
       </Container>
       <AppTabs isAdmin={isAdmin} feedEnabled={feedEnabled} />
-      <FeedbackFab />
       <MotdPopupHost />
       <CalendarSyncFailurePopupHost disabled={e2eTestMode} />
       <Box sx={{ height: 56 }} aria-hidden />
-    </>
+    </ProposalCreateHost>
   );
 }

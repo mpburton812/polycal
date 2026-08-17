@@ -7,6 +7,8 @@ import {
   DEFAULT_ONBOARDING_WELCOME_MESSAGE,
   type AuditLogVisibility,
   type PlacesMapVisibility,
+  type ProxySchedulingScope,
+  type SchedulingPostingMode,
 } from "@/types/network-settings";
 
 export type NetworkSettings = {
@@ -19,6 +21,10 @@ export type NetworkSettings = {
   seePartnersSleepingArrangements: boolean;
   fastSleepEnabled: boolean;
   feedEnabled: boolean;
+  pollEnabled: boolean;
+  schedulingPosting: SchedulingPostingMode;
+  proxySchedulingEnabled: boolean;
+  proxySchedulingScope: ProxySchedulingScope;
   placesMapVisibility: PlacesMapVisibility;
   logTailLength: number;
   onboardingWelcomeMessage: string;
@@ -39,6 +45,10 @@ type NetworkSettingsRow = {
   seePartnersSleepingArrangements: boolean;
   fastSleepEnabled: boolean | null;
   feedEnabled: boolean | null;
+  pollEnabled: boolean | null;
+  schedulingPosting: string | null;
+  proxySchedulingEnabled: boolean | null;
+  proxySchedulingScope: string | null;
   placesMapVisibility: string;
   logTailLength: number;
   onboardingWelcomeMessage: string | null;
@@ -60,6 +70,14 @@ function mapNetworkRow(row: NetworkSettingsRow): NetworkSettings {
     seePartnersSleepingArrangements: row.seePartnersSleepingArrangements,
     fastSleepEnabled: row.fastSleepEnabled ?? true,
     feedEnabled: row.feedEnabled ?? true,
+    pollEnabled: row.pollEnabled ?? true,
+    schedulingPosting:
+      row.schedulingPosting === "proposals_and_schedule"
+        ? "proposals_and_schedule"
+        : "proposals_only",
+    proxySchedulingEnabled: row.proxySchedulingEnabled ?? false,
+    proxySchedulingScope:
+      row.proxySchedulingScope === "anyone" ? "anyone" : "sleeping_partners",
     placesMapVisibility: row.placesMapVisibility as PlacesMapVisibility,
     logTailLength: row.logTailLength,
     onboardingWelcomeMessage:
@@ -89,6 +107,10 @@ const loadNetworkSettingsMemo = cache(async (networkId: string): Promise<Network
       seePartnersSleepingArrangements: networks.seePartnersSleepingArrangements,
       fastSleepEnabled: networks.fastSleepEnabled,
       feedEnabled: networks.feedEnabled,
+      pollEnabled: networks.pollEnabled,
+      schedulingPosting: networks.schedulingPosting,
+      proxySchedulingEnabled: networks.proxySchedulingEnabled,
+      proxySchedulingScope: networks.proxySchedulingScope,
       placesMapVisibility: networks.placesMapVisibility,
       logTailLength: networks.logTailLength,
       onboardingWelcomeMessage: networks.onboardingWelcomeMessage,
@@ -127,6 +149,10 @@ export async function loadNetworkSettings(
       seePartnersSleepingArrangements: networks.seePartnersSleepingArrangements,
       fastSleepEnabled: networks.fastSleepEnabled,
       feedEnabled: networks.feedEnabled,
+      pollEnabled: networks.pollEnabled,
+      schedulingPosting: networks.schedulingPosting,
+      proxySchedulingEnabled: networks.proxySchedulingEnabled,
+      proxySchedulingScope: networks.proxySchedulingScope,
       placesMapVisibility: networks.placesMapVisibility,
       logTailLength: networks.logTailLength,
       onboardingWelcomeMessage: networks.onboardingWelcomeMessage,

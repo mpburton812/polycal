@@ -101,6 +101,16 @@ export const polyGroup = sqliteTable("poly_group", {
   feedEnabled: integer("feed_enabled", { mode: "boolean" })
     .notNull()
     .default(true),
+  pollEnabled: integer("poll_enabled", { mode: "boolean" })
+    .notNull()
+    .default(true),
+  schedulingPosting: text("scheduling_posting").notNull().default("proposals_only"),
+  proxySchedulingEnabled: integer("proxy_scheduling_enabled", { mode: "boolean" })
+    .notNull()
+    .default(false),
+  proxySchedulingScope: text("proxy_scheduling_scope")
+    .notNull()
+    .default("sleeping_partners"),
   placesMapVisibility: text("places_map_visibility").notNull().default("all"),
   logTailLength: integer("log_tail_length").notNull().default(100),
   onboardingWelcomeMessage: text("onboarding_welcome_message"),

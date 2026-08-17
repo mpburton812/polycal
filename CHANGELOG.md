@@ -20,6 +20,9 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+- PC-417–PC-425: shared sage create FAB on every authenticated screen; Feedback in the profile menu; network-scoped place pickers; unset Window / With invitees fly-outs; composer header chrome stripped; admin Enable Poll, Just Proposals vs Proposals and Schedule, and Proxy Scheduling (SCHEMA_VERSION 49).
+
 ### Changed
 - Schema refactor phase 3: split Drizzle schema into domain modules under `src/lib/db/schema/`. Change control: `2026.08.01c`.
 - Schema refactor phase 2: network-aware admin authorization; sync `users.role` from network memberships. Change control: `2026.08.01b`.

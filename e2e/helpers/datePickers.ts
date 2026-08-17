@@ -36,6 +36,11 @@ export async function fillProposalDateTimeField(
   field: Locator,
   value: string,
 ): Promise<void> {
+  const dialog = field.page().getByRole("dialog");
+  const windowBtn = dialog.getByRole("button", { name: "Window", exact: true });
+  if ((await windowBtn.count()) > 0 && !(await field.isVisible().catch(() => false))) {
+    await selectDraftScheduleMode(dialog, "Window");
+  }
   await field.click();
   await field.fill(toMuiDateTimeDisplay(value));
   await field.press("Tab");

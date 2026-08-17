@@ -9,6 +9,15 @@ export type AuditLogVisibility = (typeof auditLogVisibilityLevels)[number];
 export const placesMapVisibilityLevels = ["all", "admins", "none"] as const;
 export type PlacesMapVisibility = (typeof placesMapVisibilityLevels)[number];
 
+export const schedulingPostingModes = ["proposals_only", "proposals_and_schedule"] as const;
+export type SchedulingPostingMode = (typeof schedulingPostingModes)[number];
+
+export const proxySchedulingScopes = ["anyone", "sleeping_partners"] as const;
+export type ProxySchedulingScope = (typeof proxySchedulingScopes)[number];
+
+export const postingKinds = ["proposal", "schedule"] as const;
+export type PostingKind = (typeof postingKinds)[number];
+
 export interface NetworkSettings {
   name: string;
   /** When false, admins only see proposals they proposed or are invited to (PC-274). */
@@ -25,6 +34,17 @@ export interface NetworkSettings {
   fastSleepEnabled: boolean;
   /** When false, Feed tab and feed actions are disabled (PC-385). Default true. */
   feedEnabled: boolean;
+  /** When false, Poll is hidden on new event drafts (PC-423). Default true. */
+  pollEnabled: boolean;
+  /**
+   * Just Proposals vs Proposals and Schedule (PC-424). Default proposals_only.
+   * Dual mode adds a Proposal/Schedule choice on the draft card.
+   */
+  schedulingPosting: SchedulingPostingMode;
+  /** When true (and dual posting is on), Schedule mode can pick a subject (PC-425). */
+  proxySchedulingEnabled: boolean;
+  /** Who may appear in the on-behalf-of pulldown (PC-425). */
+  proxySchedulingScope: ProxySchedulingScope;
   placesMapVisibility: PlacesMapVisibility;
   logTailLength: number;
   onboardingWelcomeMessage: string;

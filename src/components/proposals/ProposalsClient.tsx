@@ -1,11 +1,7 @@
 "use client";
 
-import AddIcon from "@mui/icons-material/Add";
 import {
   Box,
-  Fab,
-  Menu,
-  MenuItem,
   Tab,
   Tabs,
   Typography,
@@ -42,25 +38,6 @@ const ProposalDetailDialog = dynamic(
 const ProposalDraftDialog = dynamic(
   () =>
     import("./ProposalDraftDialog").then((mod) => ({ default: mod.ProposalDraftDialog })),
-  { ssr: false },
-);
-const ResidencyCreateDialog = dynamic(
-  () =>
-    import("./ResidencyCreateDialog").then((mod) => ({ default: mod.ResidencyCreateDialog })),
-  { ssr: false },
-);
-const SleepingPartnerCreateDialog = dynamic(
-  () =>
-    import("./SleepingPartnerCreateDialog").then((mod) => ({
-      default: mod.SleepingPartnerCreateDialog,
-    })),
-  { ssr: false },
-);
-const FastSleepDialog = dynamic(
-  () =>
-    import("./FastSleepDialog").then((mod) => ({
-      default: mod.FastSleepDialog,
-    })),
   { ssr: false },
 );
 
@@ -111,13 +88,9 @@ interface ProposalsClientProps {
   board: ProposalBoard;
   people: PersonSummary[];
   places: ProposalPlaceOption[];
-  /** All places with member names for residency self-join (PC-190). */
-  residencyPlaces?: ProposalPlaceOption[];
   currentUserId: string;
   /** App admin — enables oversight chrome on others' cards (PC-196). */
   isAdmin?: boolean;
-  /** Network toggle for FastSleep entry (PC-378). */
-  fastSleepEnabled?: boolean;
 }
 
 /**
@@ -127,10 +100,8 @@ export function ProposalsClient({
   board,
   people,
   places,
-  residencyPlaces,
   currentUserId,
   isAdmin = false,
-  fastSleepEnabled = true,
 }: ProposalsClientProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -141,11 +112,6 @@ export function ProposalsClient({
     return TAB_KEYS.includes(stored as TabKey) ? (stored as TabKey) : "draft";
   });
   const [createOpen, setCreateOpen] = useState(false);
-  const [createProposalType, setCreateProposalType] = useState<"event" | "sleeping">("event");
-  const [partnerCreateOpen, setPartnerCreateOpen] = useState(false);
-  const [fastSleepOpen, setFastSleepOpen] = useState(false);
-  const [residencyCreateOpen, setResidencyCreateOpen] = useState(false);
-  const [fabMenuAnchor, setFabMenuAnchor] = useState<null | HTMLElement>(null);
   const [editDetail, setEditDetail] = useState<ProposalDetail | null>(null);
   const [selectedProposalId, setSelectedProposalId] = useState<string | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
@@ -339,83 +305,6 @@ export function ProposalsClient({
         </Box>
       )}
 
-      <Fab
-        color="primary"
-        aria-label="New proposal"
-        onClick={(event) => setFabMenuAnchor(event.currentTarget)}
-        sx={{
-          position: "fixed",
-          bottom: 88,
-          right: 24,
-          bgcolor: GARDEN_TOKENS.sage,
-          color: GARDEN_TOKENS.surface,
-          border: `3px solid ${GARDEN_TOKENS.ink}`,
-          boxShadow: "none",
-          "&:hover": {
-            bgcolor: "#557A5C",
-            boxShadow: "none",
-          },
-        }}
-      >
-        <AddIcon />
-      </Fab>
-
-      <Menu
-        anchorEl={fabMenuAnchor}
-        open={Boolean(fabMenuAnchor)}
-        onClose={() => setFabMenuAnchor(null)}
-        anchorOrigin={{ vertical: "top", horizontal: "center" }}
-        transformOrigin={{ vertical: "bottom", horizontal: "center" }}
-      >
-        <MenuItem
-          onClick={() => {
-            setFabMenuAnchor(null);
-            setEditDetail(null);
-            setCreateProposalType("event");
-            setCreateOpen(true);
-          }}
-        >
-          Event proposal
-        </MenuItem>
-        <MenuItem
-          onClick={() => {
-            setFabMenuAnchor(null);
-            setEditDetail(null);
-            setCreateProposalType("sleeping");
-            setCreateOpen(true);
-          }}
-        >
-          Sleeping proposal
-        </MenuItem>
-        {fastSleepEnabled ? (
-          <MenuItem
-            onClick={() => {
-              setFabMenuAnchor(null);
-              setFastSleepOpen(true);
-            }}
-            data-testid="fab-fast-sleep"
-          >
-            FastSleep Proposal
-          </MenuItem>
-        ) : null}
-        <MenuItem
-          onClick={() => {
-            setFabMenuAnchor(null);
-            setPartnerCreateOpen(true);
-          }}
-        >
-          Sleeping partner proposal
-        </MenuItem>
-        <MenuItem
-          onClick={() => {
-            setFabMenuAnchor(null);
-            setResidencyCreateOpen(true);
-          }}
-        >
-          Residency Proposal
-        </MenuItem>
-      </Menu>
-
       <ProposalDraftDialog
         open={createOpen}
         onClose={handleDraftDialogClose}
@@ -423,26 +312,6 @@ export function ProposalsClient({
         places={places}
         currentUserId={currentUserId}
         initialDetail={editDetail}
-        lockedProposalType={editDetail ? undefined : createProposalType}
-      />
-      <SleepingPartnerCreateDialog
-        open={partnerCreateOpen}
-        onClose={() => setPartnerCreateOpen(false)}
-        people={people}
-        currentUserId={currentUserId}
-      />
-      <FastSleepDialog
-        open={fastSleepOpen}
-        onClose={() => setFastSleepOpen(false)}
-        places={places}
-        currentUserId={currentUserId}
-      />
-      <ResidencyCreateDialog
-        open={residencyCreateOpen}
-        onClose={() => setResidencyCreateOpen(false)}
-        people={people}
-        places={residencyPlaces ?? places}
-        currentUserId={currentUserId}
       />
       <ProposalDetailDialog
         proposalId={selectedProposalId}
