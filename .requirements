@@ -387,3 +387,4 @@
 2026-08-17 | 22d6d2f | PC-423 | do not wait for hidden Poll before filling Window times | e2e/helpers/datePickers.ts
 2026-08-17 | c5292d7 | PC-417 | pass explicit journey file paths on Windows | scripts/e2e-run-journeys.ts
 2026-08-17 | ec79bec | PC-417 | run journey suite without pulling unfiltered serial specs | playwright.config.ts
+2026-08-17 | 8ed3a50 | PC-421 | open With partners before required chips; assert FastSleep save | e2e/fast-sleep-journey.spec.ts
