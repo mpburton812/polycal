@@ -65,6 +65,7 @@ async function AppLayoutReady({ children }: { children: React.ReactNode }) {
       <Suspense
         fallback={
           <AppShell
+            currentUserId={session.user.id}
             displayName={session.user.displayName}
             groupName="…"
             isAdmin={showAdminTab}
@@ -146,6 +147,7 @@ async function AppShellWithData({
 
   return (
     <AppShell
+      currentUserId={userId}
       displayName={displayName}
       groupName={groupName}
       isAdmin={isAdmin}

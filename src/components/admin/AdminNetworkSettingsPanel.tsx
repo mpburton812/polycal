@@ -18,6 +18,7 @@ import { useState, useTransition } from "react";
 
 import { updateNetworkSettingsAction } from "@/actions/network-settings";
 import { AdminCollapsibleSection } from "@/components/admin/AdminCollapsibleSection";
+import { useToast } from "@/components/providers/ToastProvider";
 import { LONG_TEXT_MAX } from "@/lib/validation/string-limits";
 import type { NetworkSettings } from "@/types/network-settings";
 import {
@@ -59,6 +60,7 @@ export function AdminNetworkSettingsPanel({
   initialSettings: NetworkSettings;
 }) {
   const router = useRouter();
+  const { showToast } = useToast();
   const [settings, setSettings] = useState(initialSettings);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -71,9 +73,11 @@ export function AdminNetworkSettingsPanel({
       const result = await updateNetworkSettingsAction(settings);
       if (!result.ok) {
         setError(result.message);
+        showToast(result.message, "error");
         return;
       }
       setMessage(result.message);
+      showToast(result.message, "success");
       router.refresh();
     });
   }

@@ -2,7 +2,6 @@
 
 import AddIcon from "@mui/icons-material/Add";
 import { Fab, Menu, MenuItem } from "@mui/material";
-import { useSession } from "next-auth/react";
 import dynamic from "next/dynamic";
 import { useCallback, useMemo, useState } from "react";
 
@@ -51,10 +50,16 @@ const FastSleepDialog = dynamic(
 
 /**
  * Shared sage + create host mounted in AppShell so every screen has the full menu (PC-418).
+ * `currentUserId` comes from the server layout — client `useSession()` can still be empty
+ * when the FAB opens, which would submit residency/FastSleep as an invalid blank user.
  */
-export function ProposalCreateHost({ children }: { children: React.ReactNode }) {
-  const { data: session } = useSession();
-  const currentUserId = session?.user?.id ?? "";
+export function ProposalCreateHost({
+  children,
+  currentUserId,
+}: {
+  children: React.ReactNode;
+  currentUserId: string;
+}) {
   const [fabMenuAnchor, setFabMenuAnchor] = useState<null | HTMLElement>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [createProposalType, setCreateProposalType] = useState<"event" | "sleeping">("event");
@@ -103,8 +108,9 @@ export function ProposalCreateHost({ children }: { children: React.ReactNode }) 
   const contextValue = useMemo(() => ({ openCreate }), [openCreate]);
 
   async function handleFabClick(event: React.MouseEvent<HTMLElement>) {
-    setFabMenuAnchor(event.currentTarget);
+    const anchor = event.currentTarget;
     await loadCreateData();
+    setFabMenuAnchor(anchor);
   }
 
   return (

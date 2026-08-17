@@ -19,6 +19,7 @@ import type { NotificationPrefs } from "@/types/notification-prefs";
  */
 export function AppShell({
   children,
+  currentUserId,
   displayName,
   groupName,
   isAdmin,
@@ -30,6 +31,7 @@ export function AppShell({
   feedEnabled = true,
 }: {
   children: React.ReactNode;
+  currentUserId: string;
   displayName: string;
   groupName: string;
   isAdmin: boolean;
@@ -49,7 +51,7 @@ export function AppShell({
   const e2eTestMode = process.env.E2E_TEST_MODE === "1";
 
   return (
-    <ProposalCreateHost>
+    <ProposalCreateHost currentUserId={currentUserId}>
       <PushSubscriptionManager
         vapidPublicKey={vapidPublicKey}
         pushEnabled={notificationPrefs.channels.push}

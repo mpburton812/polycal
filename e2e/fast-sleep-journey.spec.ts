@@ -62,6 +62,10 @@ test.describe("FastSleep journey", () => {
     }
 
     await dialog.getByTestId("fast-sleep-submit").click();
+    // Conflict warnings keep the dialog open until a second confirm (PC-379).
+    if (await dialog.getByText(/Submit again/i).isVisible().catch(() => false)) {
+      await dialog.getByTestId("fast-sleep-submit").click();
+    }
     await expect(dialog).toBeHidden({ timeout: 30_000 });
 
     await selectProposalTab(page, "Resolved");
