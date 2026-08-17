@@ -75,7 +75,6 @@ export function ProposalDraftSleepingFields({
   people,
   locationOptions,
   pending,
-  intentionalSolo,
   onIntentionalSoloChange,
   isSoloProposal,
   inviteeChoice,

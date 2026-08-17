@@ -125,7 +125,6 @@ export function ProposalDraftDialog({
   const router = useRouter();
   const [savedDraftId, setSavedDraftId] = useState<string | null>(null);
   const isEdit = Boolean(initialDetail || savedDraftId);
-  const activeProposalId = initialDetail?.id ?? savedDraftId ?? null;
   const proposerName =
     people.find((p) => p.id === currentUserId)?.displayName ?? "You";
 
