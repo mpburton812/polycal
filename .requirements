@@ -379,3 +379,4 @@
 2026-08-17 | d402a74 | PC-417 | unify create FAB, Feedback menu, and posting gates | src/actions/network-settings.ts
 2026-08-17 | 057f12c | PC-417 | add 2026.08.17a change log and audit fixes | src/components/feedback/FeedbackDialog.tsx
 2026-08-17 | f12087a | PC-417 | restore map visibility labels and postingKind types | src/components/admin/AdminNetworkSettingsPanel.tsx
+2026-08-17 | baf8d33 | PC-418 | raise create FAB above tab chrome so Playwright can click it | src/components/proposals/ProposalCreateHost.tsx
