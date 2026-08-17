@@ -118,6 +118,7 @@ export function ProposalCreateHost({ children }: { children: React.ReactNode }) 
           position: "fixed",
           bottom: 88,
           right: 24,
+          zIndex: 1200,
           bgcolor: GARDEN_TOKENS.sage,
           color: GARDEN_TOKENS.surface,
           border: `3px solid ${GARDEN_TOKENS.ink}`,

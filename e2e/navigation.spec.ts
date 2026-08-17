@@ -82,6 +82,7 @@ test.describe("App navigation (admin)", () => {
       await expect(page.getByRole("menuitem", { name: "Sleeping partner proposal" })).toBeVisible();
       await expect(page.getByRole("menuitem", { name: "Residency Proposal" })).toBeVisible();
       await page.keyboard.press("Escape");
+      await expect(page.getByRole("menuitem", { name: "Event proposal" })).toBeHidden();
     }
   });
 });

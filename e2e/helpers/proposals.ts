@@ -46,7 +46,9 @@ export function sleepingProposalCardsFor(
 
 /** Opens the FAB menu for creating proposals. */
 export async function openNewProposalFabMenu(page: Page): Promise<void> {
-  await page.getByRole("button", { name: "New proposal" }).click();
+  const fab = page.getByRole("button", { name: "New proposal" });
+  await expect(fab).toBeVisible({ timeout: 15_000 });
+  await fab.click();
 }
 
 /** Opens the event proposal draft dialog from the FAB menu. */
