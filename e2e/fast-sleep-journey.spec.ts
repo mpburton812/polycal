@@ -10,6 +10,7 @@ import {
   selectProposalTab,
 } from "./helpers/navigation";
 import { expandAdminSection } from "./helpers/admin";
+import { expectToast } from "./helpers/toast";
 import { dateOffsetIso } from "./helpers/schedule";
 import { batchNightSection, openNewProposalFabMenu } from "./helpers/proposals";
 import { activeMainPanel } from "./helpers/tab-swipe";
@@ -62,6 +63,10 @@ test.describe("FastSleep journey", () => {
     }
 
     await dialog.getByTestId("fast-sleep-submit").click();
+    // Conflict warnings keep the dialog open until a second confirm (PC-379).
+    if (await dialog.getByText(/Submit again/i).isVisible().catch(() => false)) {
+      await dialog.getByTestId("fast-sleep-submit").click();
+    }
     await expect(dialog).toBeHidden({ timeout: 30_000 });
 
     await selectProposalTab(page, "Resolved");
@@ -91,7 +96,8 @@ test.describe("FastSleep journey", () => {
       await toggle.click();
     }
     await page.getByRole("button", { name: /Save settings/i }).click();
-    await expect(page.getByText(/saved|updated/i).first()).toBeVisible({ timeout: 15_000 });
+    await expectToast(page, /Network settings saved/i);
+    await expect(page.getByLabel("Enable FastSleep Proposal")).not.toBeChecked();
 
     await logout(page);
     await loginWithOnboardingIfNeeded(page, USERS.han.username);

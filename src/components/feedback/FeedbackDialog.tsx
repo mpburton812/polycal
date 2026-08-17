@@ -4,12 +4,10 @@ import FeedbackIcon from "@mui/icons-material/Feedback";
 import {
   Box,
   Button,
-  CircularProgress,
   Dialog,
   DialogActions,
   DialogContent,
   DialogTitle,
-  Fab,
   FormControl,
   FormControlLabel,
   FormLabel,
@@ -35,9 +33,9 @@ import { GARDEN_TOKENS } from "@/theme/tokens";
 type FeedbackKind = "bug" | "feature";
 
 /**
- * Floating feedback control — captures a screenshot then opens the submit dialog (PC-120).
+ * Screenshot + submit dialog for alpha feedback (PC-419). Opened from the profile menu.
  */
-export function FeedbackFab() {
+export function useFeedbackDialog() {
   const pathname = usePathname();
   const { showToast } = useToast();
   const [open, setOpen] = useState(false);
@@ -65,7 +63,7 @@ export function FeedbackFab() {
     setPreviewUrl(url);
   }, [screenshotBase64, screenshotMimeType]);
 
-  async function handleOpen() {
+  async function openDialog() {
     setCapturing(true);
     setKind("bug");
     setTitle("");
@@ -112,34 +110,10 @@ export function FeedbackFab() {
     });
   }
 
-  return (
-    <>
-      <Fab
-        color="secondary"
-        aria-label="Give feedback"
-        onClick={() => void handleOpen()}
-        disabled={capturing}
-        sx={{
-          position: "fixed",
-          bottom: 138,
-          left: 24,
-          // Above MUI Dialogs/cards so feedback works while a card is open (PC-249).
-          zIndex: (theme) => theme.zIndex.modal + 1,
-          // Hide while our own dialog is open so we stay under the feedback form.
-          visibility: open ? "hidden" : "visible",
-          bgcolor: GARDEN_TOKENS.terracotta,
-          color: GARDEN_TOKENS.surface,
-          border: `3px solid ${GARDEN_TOKENS.ink}`,
-          boxShadow: "none",
-          "&:hover": {
-            bgcolor: "#A04A32",
-            boxShadow: "none",
-          },
-        }}
-      >
-        {capturing ? <CircularProgress size={22} color="inherit" /> : <FeedbackIcon />}
-      </Fab>
-
+  return {
+    capturing,
+    openDialog,
+    dialog: (
       <Dialog
         open={open}
         onClose={handleClose}
@@ -153,7 +127,6 @@ export function FeedbackFab() {
             Report a bug or suggest a feature. A screenshot and diagnostics are attached
             automatically.
           </Typography>
-
           <FormControl component="fieldset" sx={{ mb: 2 }}>
             <FormLabel component="legend">Type</FormLabel>
             <RadioGroup
@@ -165,7 +138,6 @@ export function FeedbackFab() {
               <FormControlLabel value="feature" control={<Radio />} label="Feature" />
             </RadioGroup>
           </FormControl>
-
           <TextField
             label="Title"
             value={title}
@@ -186,7 +158,6 @@ export function FeedbackFab() {
             minRows={4}
             inputProps={{ maxLength: LONG_TEXT_MAX }}
           />
-
           {previewUrl ? (
             <Box
               component="img"
@@ -220,6 +191,8 @@ export function FeedbackFab() {
           </Button>
         </DialogActions>
       </Dialog>
-    </>
-  );
+    ),
+  };
 }
+
+export { FeedbackIcon };

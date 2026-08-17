@@ -36,6 +36,21 @@ export async function fillProposalDateTimeField(
   field: Locator,
   value: string,
 ): Promise<void> {
+  const dialog = field.page().getByRole("dialog");
+  const pollBtn = dialog.getByRole("button", { name: "Poll", exact: true });
+  // Poll is omitted in Schedule posting and when the network gate is off (PC-423).
+  const pollPressed =
+    (await pollBtn.count()) > 0 &&
+    (await pollBtn.getAttribute("aria-pressed")) === "true";
+  // Recurring is disabled until Window/All Day; do not steal Poll drafts back to Window (PC-422).
+  const windowBtn = dialog.getByRole("button", { name: "Window", exact: true });
+  if (
+    !pollPressed &&
+    (await windowBtn.count()) > 0 &&
+    !(await field.isVisible().catch(() => false))
+  ) {
+    await selectDraftScheduleMode(dialog, "Window");
+  }
   await field.click();
   await field.fill(toMuiDateTimeDisplay(value));
   await field.press("Tab");
@@ -98,6 +113,15 @@ export async function fillProposalDateRange(
   startIso: string,
   endIso?: string,
 ): Promise<void> {
+  const allDayBtn = dialog.getByRole("button", { name: "All Day", exact: true });
+  const startProbe = dialog.getByTestId("date-range-start").first();
+  if (
+    (await allDayBtn.count()) > 0 &&
+    !(await startProbe.isVisible().catch(() => false)) &&
+    (await allDayBtn.getAttribute("aria-pressed")) !== "true"
+  ) {
+    await selectDraftScheduleMode(dialog, "All Day");
+  }
   const startField = dialog.getByTestId("date-range-start").first();
   const endField = dialog.getByTestId("date-range-end").first();
   if (await startField.isVisible().catch(() => false)) {
@@ -176,6 +200,26 @@ export async function selectDraftScheduleMode(
   dialog: Locator,
   mode: "Window" | "All Day" | "Poll" | "Recurring",
 ): Promise<void> {
+  if (mode === "Recurring") {
+    const recurring = dialog.getByRole("button", { name: "Recurring", exact: true });
+    // Recurring stays disabled until Window or All Day is chosen (PC-422).
+    if (await recurring.isDisabled()) {
+      const allDayOn =
+        (await dialog.getByRole("button", { name: "All Day", exact: true }).getAttribute(
+          "aria-pressed",
+        )) === "true";
+      if (!allDayOn) {
+        await dialog.getByRole("button", { name: "Window", exact: true }).click();
+        await expect(dialog.getByRole("button", { name: "Window", exact: true })).toHaveAttribute(
+          "aria-pressed",
+          "true",
+        );
+      }
+    }
+    await recurring.click();
+    await expect(recurring).toHaveAttribute("aria-pressed", "true");
+    return;
+  }
   await dialog.getByRole("button", { name: mode, exact: true }).click();
   await expect(dialog.getByRole("button", { name: mode, exact: true })).toHaveAttribute(
     "aria-pressed",

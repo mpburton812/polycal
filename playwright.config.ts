@@ -22,6 +22,8 @@ const mobileIndex = mobileDbIndex();
 const authDir = path.join(__dirname, "e2e", ".auth");
 /** Explicit opt-in — default off so local runs never attach to a stale wrong-env process (PC-214). */
 const reuseExistingServer = process.env.E2E_REUSE_SERVER === "1";
+/** Journey runner: do not pull the unfiltered serial suite in as a safe dependency (PC-417). */
+const safeIndependent = process.env.E2E_SAFE_INDEPENDENT === "1";
 
 function lukeStorage(dbIndex: number): string {
   return path.join(authDir, `luke-w${dbIndex}.json`);
@@ -52,7 +54,9 @@ function webServers() {
 }
 
 const safeDependencies =
-  parallelWorkers <= 1 ? (["chromium-serial"] as const) : (["setup"] as const);
+  safeIndependent || parallelWorkers > 1
+    ? (["setup"] as const)
+    : (["chromium-serial"] as const);
 
 export default defineConfig({
   testDir: "./e2e",

@@ -44,6 +44,9 @@ export interface ProposalDraftSleepingFieldsProps {
   intentionalSolo: boolean;
   onIntentionalSoloChange: (solo: boolean) => void;
   isSoloProposal: boolean;
+  inviteeChoice: "unset" | "solo" | "network";
+  onInviteeChoiceChange: (choice: "solo" | "network") => void;
+  hideInviteeRoles?: boolean;
   candidates: PersonSummary[];
   inviteeMode: Record<string, InviteeSelection>;
   setInviteeRole: (personId: string, role: InviteeSelection) => void;
@@ -72,9 +75,11 @@ export function ProposalDraftSleepingFields({
   people,
   locationOptions,
   pending,
-  intentionalSolo,
   onIntentionalSoloChange,
   isSoloProposal,
+  inviteeChoice,
+  onInviteeChoiceChange,
+  hideInviteeRoles = false,
   candidates,
   inviteeMode,
   setInviteeRole,
@@ -148,13 +153,18 @@ export function ProposalDraftSleepingFields({
           <ProposalDraftSectionHeader
             icon={<GroupsOutlinedIcon fontSize="small" />}
             title="Who"
-            subtitle="Accepted sleeping partners only — Solo or With"
+            subtitle={
+              hideInviteeRoles
+                ? "Add sleeping partners who will be on this calendar item — no approvals"
+                : "Accepted sleeping partners only — Solo or With"
+            }
           />
           <ToggleButtonGroup
             exclusive
-            value={intentionalSolo ? "solo" : "network"}
+            value={inviteeChoice === "unset" ? null : inviteeChoice}
             onChange={(_, value) => {
               if (!value) return;
+              onInviteeChoiceChange(value as "solo" | "network");
               onIntentionalSoloChange(value === "solo");
             }}
             size="small"
@@ -170,7 +180,7 @@ export function ProposalDraftSleepingFields({
             <ToggleButton value="solo">Solo</ToggleButton>
             <ToggleButton value="network">With partners</ToggleButton>
           </ToggleButtonGroup>
-          {!isSoloProposal && (
+          {!isSoloProposal && inviteeChoice === "network" && (
             <Stack spacing={1}>
               {candidates.length === 0 ? (
                 <Typography variant="body2" color="text.secondary">
@@ -192,6 +202,26 @@ export function ProposalDraftSleepingFields({
                       <Typography variant="body2" sx={{ minWidth: 96 }}>
                         {person.displayName}
                       </Typography>
+                      {hideInviteeRoles ? (
+                        <ToggleButton
+                          value="optional"
+                          selected={mode !== "none"}
+                          aria-label={`${person.displayName} include`}
+                          onClick={() =>
+                            setInviteeRole(person.id, mode === "none" ? "optional" : "none")
+                          }
+                          size="small"
+                          sx={{
+                            "&.Mui-selected": {
+                              bgcolor: POLY_GREEN,
+                              color: "#fff",
+                              "&:hover": { bgcolor: POLY_GREEN_HOVER },
+                            },
+                          }}
+                        >
+                          Include
+                        </ToggleButton>
+                      ) : (
                       <ToggleButtonGroup
                         exclusive
                         size="small"
@@ -220,6 +250,7 @@ export function ProposalDraftSleepingFields({
                           Required
                         </ToggleButton>
                       </ToggleButtonGroup>
+                      )}
                     </Stack>
                   );
                 })

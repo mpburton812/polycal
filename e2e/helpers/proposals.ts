@@ -46,7 +46,9 @@ export function sleepingProposalCardsFor(
 
 /** Opens the FAB menu for creating proposals. */
 export async function openNewProposalFabMenu(page: Page): Promise<void> {
-  await page.getByRole("button", { name: "New proposal" }).click();
+  const fab = page.getByRole("button", { name: "New proposal" });
+  await expect(fab).toBeVisible({ timeout: 15_000 });
+  await fab.click();
 }
 
 /** Opens the event proposal draft dialog from the FAB menu. */
@@ -107,27 +109,52 @@ function inclusiveNightDates(rangeStart: string, rangeEnd: string): string[] {
   return dates;
 }
 
+/**
+ * New drafts leave invitees unset until With invitees / With partners (PC-421).
+ */
+async function revealInviteeRoster(dialog: Locator): Promise<void> {
+  const withInvitees = dialog.getByRole("button", { name: "With invitees", exact: true });
+  const withPartners = dialog.getByRole("button", { name: "With partners", exact: true });
+  const opener =
+    (await withInvitees.count()) > 0
+      ? withInvitees
+      : (await withPartners.count()) > 0
+        ? withPartners
+        : null;
+  if (!opener) return;
+  if ((await opener.getAttribute("aria-pressed")) !== "true") {
+    await opener.click();
+  }
+}
+
 /** Cycles an invitee chip to required (none → required). */
 export async function setInviteeRequired(dialog: Locator, displayName: string) {
+  await revealInviteeRoster(dialog);
   const button = dialog.getByRole("button", {
     name: new RegExp(`^${escapeRegex(displayName)} required$`, "i"),
   });
+  await expect(button).toBeVisible({ timeout: 15_000 });
   await button.click();
   await expect(button).toHaveAttribute("aria-pressed", "true");
 }
 
 /** Selects optional invitee role via explicit Optional control (PC-126). */
 export async function setInviteeOptional(dialog: Locator, displayName: string) {
+  await revealInviteeRoster(dialog);
   const button = dialog.getByRole("button", {
     name: new RegExp(`^${escapeRegex(displayName)} optional$`, "i"),
   });
+  await expect(button).toBeVisible({ timeout: 15_000 });
   await button.click();
   await expect(button).toHaveAttribute("aria-pressed", "true");
 }
 
 /** Marks every visible person as a required invitee via Required toggles (PC-126). */
 export async function setAllInviteesRequired(dialog: Locator): Promise<void> {
+  await revealInviteeRoster(dialog);
   const requiredButtons = dialog.getByRole("button", { name: / required$/i });
+  // Window/Recurring just revealed the roster — wait before counting chips (PC-421).
+  await expect(requiredButtons.first()).toBeVisible({ timeout: 15_000 });
   const count = await requiredButtons.count();
   for (let index = 0; index < count; index += 1) {
     const button = requiredButtons.nth(index);
@@ -189,8 +216,9 @@ export async function selectEventIcon(dialog: Locator, a11yLabel: string): Promi
 
 /** Submits a draft, confirming through schedule-conflict dialog when present. */
 export async function submitProposalDraft(page: Page, dialog: Locator) {
-  await expect(dialog.getByRole("button", { name: "Submit" })).toBeVisible({ timeout: 15_000 });
-  await dialog.getByRole("button", { name: "Submit" }).click();
+  const primary = dialog.getByRole("button", { name: /^(Submit|Add to calendar)$/ });
+  await expect(primary).toBeVisible({ timeout: 15_000 });
+  await primary.click();
 
   const conflictDialog = page.getByRole("dialog", { name: "Schedule conflicts detected" });
   const hasConflict = await conflictDialog

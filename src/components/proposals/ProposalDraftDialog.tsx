@@ -16,6 +16,8 @@ import {
   MenuItem,
   Select,
   Stack,
+  ToggleButton,
+  ToggleButtonGroup,
   Typography,
 } from "@mui/material";
 import { useRouter } from "next/navigation";
@@ -34,6 +36,10 @@ import {
   type ProposalDetail,
   type ProposalPlaceOption,
 } from "@/actions/proposals";
+import {
+  getDraftComposerSettingsAction,
+  type DraftComposerSettings,
+} from "@/actions/network-settings";
 import type { PersonSummary } from "@/actions/users";
 import { useToast } from "@/components/providers/ToastProvider";
 import {
@@ -63,8 +69,6 @@ import {
   outlinedButtonSx,
   primaryButtonSx,
   proposalCardSx,
-  typeBadgeLabel,
-  typeChipSxForProposal,
   PAST_SCHEDULE_BG,
   PAST_SCHEDULE_ICON,
   PAST_SCHEDULE_TEXT,
@@ -100,6 +104,8 @@ interface ProposalDraftDialogProps {
   lockedProposalType?: "event" | "sleeping";
   /** Prefills the first slot start when creating from the calendar (PC-165). */
   initialStartAt?: string | null;
+  /** Network composer flags; loaded on open when omitted (PC-423–425). */
+  composerSettings?: DraftComposerSettings;
 }
 
 /**
@@ -114,11 +120,11 @@ export function ProposalDraftDialog({
   initialDetail,
   lockedProposalType,
   initialStartAt = null,
+  composerSettings,
 }: ProposalDraftDialogProps) {
   const router = useRouter();
   const [savedDraftId, setSavedDraftId] = useState<string | null>(null);
   const isEdit = Boolean(initialDetail || savedDraftId);
-  const activeProposalId = initialDetail?.id ?? savedDraftId ?? null;
   const proposerName =
     people.find((p) => p.id === currentUserId)?.displayName ?? "You";
 
@@ -134,6 +140,20 @@ export function ProposalDraftDialog({
   const [bedroomIndex, setBedroomIndex] = useState<number | "">("");
   const [intentionalSolo, setIntentionalSolo] = useState(false);
   const [soloEvent, setSoloEvent] = useState(false);
+  const [inviteeChoice, setInviteeChoice] = useState<"unset" | "group" | "solo" | "network">(
+    "unset",
+  );
+  const [timingMode, setTimingMode] = useState<"window" | "allDay" | "poll" | null>(null);
+  const [postingKind, setPostingKind] = useState<"proposal" | "schedule" | null>(null);
+  const [onBehalfOfUserId, setOnBehalfOfUserId] = useState("");
+  const [composer, setComposer] = useState<DraftComposerSettings>(
+    composerSettings ?? {
+      pollEnabled: true,
+      schedulingPosting: "proposals_only",
+      proxySchedulingEnabled: false,
+      proxySchedulingScope: "sleeping_partners",
+    },
+  );
   const [isPoll, setIsPoll] = useState(false);
   const [allDay, setAllDay] = useState(false);
   const [batchMode, setBatchMode] = useState(false);
@@ -181,7 +201,29 @@ export function ProposalDraftDialog({
   const candidates = proposalType === "sleeping" ? sleepingCandidates : eventCandidates;
 
   const isSoloProposal =
-    proposalType === "sleeping" ? intentionalSolo : soloEvent;
+    inviteeChoice === "solo" ||
+    (proposalType === "sleeping" ? intentionalSolo : soloEvent);
+
+  const dualPosting = composer.schedulingPosting === "proposals_and_schedule";
+  const effectivePostingKind =
+    dualPosting ? postingKind : "proposal";
+  const hidePoll = !composer.pollEnabled || effectivePostingKind === "schedule";
+  const showPostingChoice = dualPosting;
+  const showScheduleType =
+    proposalType === "event" && (!dualPosting || postingKind !== null);
+  const showProxySelect =
+    dualPosting &&
+    composer.proxySchedulingEnabled &&
+    postingKind === "schedule";
+  const proxyPeople = useMemo(() => {
+    const others = people.filter(
+      (person) => person.id !== currentUserId && person.status === "active",
+    );
+    if (composer.proxySchedulingScope === "sleeping_partners") {
+      return others.filter((person) => acceptedPartnerIds.includes(person.id));
+    }
+    return others;
+  }, [people, currentUserId, composer.proxySchedulingScope, acceptedPartnerIds]);
 
   const locationOptions =
     proposalType === "sleeping" && batchMode
@@ -246,7 +288,12 @@ export function ProposalDraftDialog({
   useEffect(() => {
     if (!open) return;
     void listAcceptedSleepingPartnerIdsAction().then(setAcceptedPartnerIds);
-  }, [open]);
+    if (composerSettings) {
+      setComposer(composerSettings);
+      return;
+    }
+    void getDraftComposerSettingsAction().then(setComposer);
+  }, [open, composerSettings]);
 
   useEffect(() => {
     if (!open || proposalType !== "sleeping" || batchMode) {
@@ -312,8 +359,25 @@ export function ProposalDraftDialog({
         initialDetail.proposalType === "sleeping" ? initialDetail.intentionalSolo : false,
       );
       setSoloEvent(initialDetail.proposalType === "event" && initialDetail.intentionalSolo);
+      setInviteeChoice(
+        initialDetail.intentionalSolo
+          ? "solo"
+          : initialDetail.proposalType === "sleeping"
+            ? "network"
+            : "group",
+      );
       setIsPoll(initialDetail.isPoll);
       setAllDay(initialDetail.proposalType === "event" && initialDetail.isAllDay);
+      setTimingMode(
+        initialDetail.proposalType === "event"
+          ? timingModeFromFlags({
+              allDay: initialDetail.isAllDay,
+              isPoll: initialDetail.isPoll,
+            })
+          : null,
+      );
+      setPostingKind(initialDetail.postingKind === "schedule" ? "schedule" : "proposal");
+      setOnBehalfOfUserId(initialDetail.onBehalfOfUserId ?? "");
       setEventIconKey(
         isEventIconKey(initialDetail.eventIconKey) ? initialDetail.eventIconKey : null,
       );
@@ -361,9 +425,12 @@ export function ProposalDraftDialog({
       setBedroomIndex("");
       setIntentionalSolo(false);
       setSoloEvent(false);
+      setInviteeChoice("unset");
       setSavedDraftId(null);
       setIsPoll(false);
       setAllDay(false);
+      setPostingKind(null);
+      setOnBehalfOfUserId("");
       setBatchMode(false);
       setFastPlanRows(buildEmptyGridRows());
       setBatchLocationOptions([]);
@@ -377,6 +444,8 @@ export function ProposalDraftDialog({
             ? toLocalDateInput(initialStartAt)
             : toLocalInput(initialStartAt)
           : "";
+      // Day-sheet create already chose a day — show When with Window so the prefill is visible (PC-418).
+      setTimingMode(type === "event" && startInput ? "window" : null);
       setSlots([{ startAt: startInput, endAt: "", label: "" }]);
       setInviteeMode({});
       setReminderEnabled(false);
@@ -413,8 +482,22 @@ export function ProposalDraftDialog({
     );
     setIntentionalSolo(detail.proposalType === "sleeping" ? detail.intentionalSolo : false);
     setSoloEvent(detail.proposalType === "event" && detail.intentionalSolo);
+    setInviteeChoice(
+      detail.intentionalSolo
+        ? "solo"
+        : detail.proposalType === "sleeping"
+          ? "network"
+          : "group",
+    );
     setIsPoll(detail.isPoll);
     setAllDay(detail.proposalType === "event" && detail.isAllDay);
+    setTimingMode(
+      detail.proposalType === "event"
+        ? timingModeFromFlags({ allDay: detail.isAllDay, isPoll: detail.isPoll })
+        : null,
+    );
+    setPostingKind(detail.postingKind === "schedule" ? "schedule" : "proposal");
+    setOnBehalfOfUserId(detail.onBehalfOfUserId ?? "");
     setEventIconKey(isEventIconKey(detail.eventIconKey) ? detail.eventIconKey : null);
     setIsRecurring(detail.isRecurrenceParent);
     if (detail.recurrenceRule) {
@@ -553,6 +636,14 @@ export function ProposalDraftDialog({
       intentionalSolo: batchMode ? false : isSoloProposal,
       isPoll: proposalType === "event" ? isPoll : false,
       isAllDay: proposalType === "event" ? allDay : false,
+      postingKind:
+        effectivePostingKind === "schedule"
+          ? ("schedule" as const)
+          : ("proposal" as const),
+      onBehalfOfUserId:
+        effectivePostingKind === "schedule" && onBehalfOfUserId
+          ? onBehalfOfUserId
+          : null,
       eventIconKey: proposalType === "event" ? eventIconKey : null,
       isRecurring: !batchMode && isRecurring,
       recurrenceRule:
@@ -684,16 +775,6 @@ export function ProposalDraftDialog({
                 {isEdit ? "Edit draft" : "New proposal"}
               </Typography>
               <Stack direction="row" spacing={0.75} alignItems="center" flexWrap="wrap" sx={{ mt: 0.5 }}>
-                <Chip
-                  label={typeBadgeLabel(proposalType)}
-                  size="small"
-                  sx={{
-                    ...typeChipSxForProposal(proposalType),
-                    height: 20,
-                    fontSize: "0.6rem",
-                  }}
-                />
-                <Chip label="DRAFT" size="small" variant="outlined" sx={{ fontWeight: 600, fontSize: "0.65rem" }} />
                 {batchMode && <Chip label="Batch" size="small" variant="outlined" />}
                 {isPoll && (
                   <Chip
@@ -703,9 +784,9 @@ export function ProposalDraftDialog({
                     variant="outlined"
                   />
                 )}
-                <Typography variant="caption" color="text.secondary">
-                  by {proposerName}
-                </Typography>
+                {effectivePostingKind === "schedule" && (
+                  <Chip label="Schedule" size="small" variant="outlined" />
+                )}
               </Stack>
             </Box>
           </Stack>
@@ -792,12 +873,63 @@ export function ProposalDraftDialog({
             </FormControl>
           )}
 
-          {proposalType === "event" && (
+          {showPostingChoice ? (
+            <Box sx={{ mb: 2 }}>
+              <Typography variant="subtitle2" sx={{ fontWeight: 600, color: POLY_GREEN, mb: 1 }}>
+                Posting
+              </Typography>
+              <ToggleButtonGroup
+                exclusive
+                value={postingKind}
+                onChange={(_, value) => {
+                  if (!value) return;
+                  setPostingKind(value as "proposal" | "schedule");
+                  if (value === "schedule") {
+                    setIsPoll(false);
+                    if (timingMode === "poll") setTimingMode(null);
+                  }
+                }}
+                size="small"
+                sx={{
+                  "& .MuiToggleButton-root.Mui-selected": {
+                    bgcolor: POLY_GREEN,
+                    color: "#fff",
+                  },
+                }}
+              >
+                <ToggleButton value="proposal">Proposal</ToggleButton>
+                <ToggleButton value="schedule">Schedule</ToggleButton>
+              </ToggleButtonGroup>
+            </Box>
+          ) : null}
+
+          {showProxySelect ? (
+            <FormControl fullWidth size="small" sx={{ mb: 2 }}>
+              <InputLabel id="proxy-on-behalf-label">Schedule on behalf of</InputLabel>
+              <Select
+                labelId="proxy-on-behalf-label"
+                label="Schedule on behalf of"
+                value={onBehalfOfUserId}
+                onChange={(event) => setOnBehalfOfUserId(String(event.target.value))}
+              >
+                <MenuItem value="">Myself</MenuItem>
+                {proxyPeople.map((person) => (
+                  <MenuItem key={person.id} value={person.id}>
+                    {person.displayName}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          ) : null}
+
+          {showScheduleType && (
             <ProposalDraftScheduleModeGrid
-              timingMode={timingModeFromFlags({ allDay, isPoll })}
+              timingMode={timingMode}
               isRecurring={isRecurring}
+              hidePoll={hidePoll}
               disableRecurring={false}
               onTimingModeChange={(mode) => {
+                setTimingMode(mode);
                 const flags = flagsFromTimingMode(mode);
                 setAllDay(flags.allDay);
                 setIsPoll(flags.isPoll);
@@ -836,12 +968,15 @@ export function ProposalDraftDialog({
               isPoll={isPoll}
               applyEventStartChange={applyEventStartChange}
               isSoloProposal={isSoloProposal}
-              soloEvent={soloEvent}
-              onSoloEventChange={(nextSolo) => {
-                setSoloEvent(nextSolo);
+              inviteeChoice={inviteeChoice === "network" ? "unset" : inviteeChoice}
+              onInviteeChoiceChange={(choice) => {
+                setInviteeChoice(choice);
+                setSoloEvent(choice === "solo");
                 setIntentionalSolo(false);
-                if (nextSolo) setInviteeMode({});
+                if (choice === "solo") setInviteeMode({});
               }}
+              hideInviteeRoles={effectivePostingKind === "schedule"}
+              showWhenFields={timingMode !== null}
               candidates={candidates}
               inviteeMode={inviteeMode}
               setInviteeRole={setInviteeRole}
@@ -877,6 +1012,13 @@ export function ProposalDraftDialog({
                 if (solo) setInviteeMode({});
               }}
               isSoloProposal={isSoloProposal}
+              inviteeChoice={inviteeChoice === "group" ? "unset" : inviteeChoice}
+              onInviteeChoiceChange={(choice) => {
+                setInviteeChoice(choice);
+                setIntentionalSolo(choice === "solo");
+                if (choice === "solo") setInviteeMode({});
+              }}
+              hideInviteeRoles={effectivePostingKind === "schedule"}
               candidates={candidates}
               inviteeMode={inviteeMode}
               setInviteeRole={setInviteeRole}
@@ -940,7 +1082,7 @@ export function ProposalDraftDialog({
             onClick={() => handleSubmit()}
             sx={primaryButtonSx}
           >
-            Submit
+            {effectivePostingKind === "schedule" ? "Add to calendar" : "Submit"}
           </Button>
         </CardActions>
       </Card>

@@ -5,7 +5,8 @@
 import { spawn } from "node:child_process";
 
 process.env.E2E_INCLUDE_MOBILE = "0";
-process.env.E2E_PARALLEL_WORKERS ??= "2";
+process.env.E2E_SAFE_INDEPENDENT = "1";
+process.env.E2E_PARALLEL_WORKERS ??= process.platform === "win32" ? "1" : "2";
 
 const isWin = process.platform === "win32";
 const npx = isWin ? "npx.cmd" : "npx";
@@ -28,11 +29,11 @@ function run(command: string, args: string[]): Promise<void> {
 
 async function main(): Promise<void> {
   await run(npx, ["tsx", "scripts/e2e-prepare.ts"]);
-  // Regex (not shell glob) so Windows does not drop the filter as a literal path.
+  // Single token — cmd.exe on Windows eats slash/regex filters (PC-417).
   await run(npx, [
     "playwright",
     "test",
-    "e2e/.*journey.*\\.spec\\.ts",
+    "journey",
     "--project=chromium-serial",
     "--project=chromium-safe",
   ]);
