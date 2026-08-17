@@ -384,3 +384,4 @@
 2026-08-17 | 19ace77 | PC-421 | wait for invitee roster after Window before marking required | e2e/helpers/proposals.ts
 2026-08-17 | 954f32d | PC-424 | wire Select labelId so Proposal posting is findable | src/components/admin/AdminNetworkSettingsPanel.tsx
 2026-08-17 | 88f76ac | PC-424 | pick Window before invitees in schedule posting journey | e2e/direct-schedule-proxy-journey.spec.ts
+2026-08-17 | 22d6d2f | PC-423 | do not wait for hidden Poll before filling Window times | e2e/helpers/datePickers.ts
