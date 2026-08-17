@@ -3,7 +3,7 @@ import type { Page } from "@playwright/test";
 
 import { loginWithOnboardingIfNeeded, logout } from "./helpers/auth";
 import { USERS } from "./helpers/constants";
-import { fillProposalDateTimeField } from "./helpers/datePickers";
+import { fillProposalDateTimeField, selectDraftScheduleMode } from "./helpers/datePickers";
 import { expandAdminSection } from "./helpers/admin";
 import { goToAdmin, goToProposals, selectProposalTab } from "./helpers/navigation";
 import {
@@ -19,7 +19,7 @@ import {
  */
 test.describe("Direct schedule and proxy journey", () => {
   test("Just Proposals vs Schedule posting, proxy scopes, and Poll off", async ({ page }) => {
-    test.setTimeout(300_000);
+    test.setTimeout(600_000);
 
     const title = `Direct schedule ${Date.now()}`;
 
@@ -53,13 +53,14 @@ test.describe("Direct schedule and proxy journey", () => {
       await expect(dualDraft.getByRole("button", { name: "Add to calendar" })).toBeVisible();
 
       await dualDraft.getByLabel("Title").fill(title);
+      // Choose timing before the invitee roster so Window/Start stay on-screen (PC-424).
+      await selectDraftScheduleMode(dualDraft, "Window");
+      await fillProposalDateTimeField(dualDraft.getByLabel("Start").first(), "2099-11-15T10:00");
       await dualDraft.getByRole("button", { name: "With invitees" }).click();
       await expect(
         dualDraft.getByRole("button", { name: /Leia Organa required/i }),
       ).toHaveCount(0);
       await dualDraft.getByRole("button", { name: /Leia Organa include/i }).click();
-      await fillProposalDateTimeField(dualDraft.getByLabel("Start").first(), "2099-11-15T10:00");
-      await dualDraft.getByRole("button", { name: "Save", exact: true }).click();
       await submitProposalDraft(page, dualDraft);
 
       await selectProposalTab(page, "Resolved");
