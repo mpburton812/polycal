@@ -377,3 +377,4 @@
 2026-08-04 | 6bb3e0a | PC-411 | keep anchors when switching week/month period modes | src/components/schedule/ScheduleClient.tsx
 2026-08-04 | dc75c10 | PC-411 | include full last day in month fetch range | src/components/schedule/ScheduleClient.tsx
 2026-08-17 | d402a74 | PC-417 | unify create FAB, Feedback menu, and posting gates | src/actions/network-settings.ts
+2026-08-17 | 057f12c | PC-417 | add 2026.08.17a change log and audit fixes | src/components/feedback/FeedbackDialog.tsx
