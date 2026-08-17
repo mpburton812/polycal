@@ -22,11 +22,13 @@ export { flagsFromTimingMode, timingModeFromFlags };
 export type DraftScheduleMode = DraftTimingMode | "recurring";
 
 export interface ProposalDraftScheduleModeGridProps {
-  timingMode: DraftTimingMode;
+  timingMode: DraftTimingMode | null;
   isRecurring: boolean;
   onTimingModeChange: (mode: DraftTimingMode) => void;
   onRecurringChange: (recurring: boolean) => void;
   disableRecurring?: boolean;
+  /** When true, omit Poll (network setting or Schedule posting) (PC-423). */
+  hidePoll?: boolean;
 }
 
 const TIMING_MODES: { id: DraftTimingMode; label: string; icon: React.ReactNode }[] = [
@@ -45,8 +47,12 @@ export function ProposalDraftScheduleModeGrid({
   onTimingModeChange,
   onRecurringChange,
   disableRecurring = false,
+  hidePoll = false,
 }: ProposalDraftScheduleModeGridProps) {
-  const recurringDisabled = timingMode === "poll" || disableRecurring;
+  const recurringDisabled = timingMode === "poll" || disableRecurring || !timingMode;
+  const visibleModes = hidePoll
+    ? TIMING_MODES.filter((item) => item.id !== "poll")
+    : TIMING_MODES;
 
   return (
     <Box sx={{ mb: 2 }}>
@@ -81,7 +87,7 @@ export function ProposalDraftScheduleModeGrid({
             },
           }}
         >
-          {TIMING_MODES.map((item) => (
+          {visibleModes.map((item) => (
             <ToggleButton
               key={item.id}
               value={item.id}

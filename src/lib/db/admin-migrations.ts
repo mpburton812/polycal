@@ -27,6 +27,25 @@ export async function applyAdminMigrations(sql: Client): Promise<void> {
     "feed_enabled",
     "INTEGER NOT NULL DEFAULT 1",
   );
+  await ensureColumn(sql, "poly_group", "poll_enabled", "INTEGER NOT NULL DEFAULT 1");
+  await ensureColumn(
+    sql,
+    "poly_group",
+    "scheduling_posting",
+    "TEXT NOT NULL DEFAULT 'proposals_only'",
+  );
+  await ensureColumn(
+    sql,
+    "poly_group",
+    "proxy_scheduling_enabled",
+    "INTEGER NOT NULL DEFAULT 0",
+  );
+  await ensureColumn(
+    sql,
+    "poly_group",
+    "proxy_scheduling_scope",
+    "TEXT NOT NULL DEFAULT 'sleeping_partners'",
+  );
   await ensureColumn(sql, "poly_group", "places_map_visibility", "TEXT NOT NULL DEFAULT 'all'");
 
   await sql.execute(`

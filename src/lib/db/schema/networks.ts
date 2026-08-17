@@ -56,6 +56,25 @@ export const networks = sqliteTable("networks", {
   feedEnabled: integer("feed_enabled", { mode: "boolean" })
     .notNull()
     .default(true),
+  /** When false, Poll is omitted from new event drafts (PC-423). Default ON. */
+  pollEnabled: integer("poll_enabled", { mode: "boolean" })
+    .notNull()
+    .default(true),
+  /**
+   * `proposals_only` hides Proposal vs Schedule on the card.
+   * `proposals_and_schedule` allows direct calendar posting (PC-424).
+   */
+  schedulingPosting: text("scheduling_posting")
+    .notNull()
+    .default("proposals_only"),
+  /** Proxy Scheduling nested under Proposals and Schedule (PC-425). Default OFF. */
+  proxySchedulingEnabled: integer("proxy_scheduling_enabled", { mode: "boolean" })
+    .notNull()
+    .default(false),
+  /** `anyone` or `sleeping_partners` (PC-425). */
+  proxySchedulingScope: text("proxy_scheduling_scope")
+    .notNull()
+    .default("sleeping_partners"),
   placesMapVisibility: text("places_map_visibility").notNull().default("all"),
   logTailLength: integer("log_tail_length").notNull().default(100),
   onboardingWelcomeMessage: text("onboarding_welcome_message"),

@@ -28,6 +28,54 @@ import { CHANGELOG_ARCHIVE } from "./entries.archive";
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "2026.08.17a",
+    date: "2026-08-17",
+    summary:
+      "Proposal UX: shared create FAB, profile Feedback, Poll/Schedule/Proxy admin gates (PC-417–PC-425).",
+    changes: [
+      {
+        type: "added",
+        description:
+          "Sage create FAB with the full Event/Sleeping/FastSleep/partner/residency menu on every authenticated screen (PC-418).",
+      },
+      {
+        type: "changed",
+        description:
+          "Feedback lives in the profile menu after Admin (and Platform admin), before Logout; terracotta FAB removed (PC-419).",
+      },
+      {
+        type: "fixed",
+        description:
+          "Location pickers are network-scoped and omit orphan places with no accepted residents who are members (PC-420).",
+      },
+      {
+        type: "changed",
+        description:
+          "New drafts start with Window and With invitees unset; When fields and people lists fly out after a choice (PC-421).",
+      },
+      {
+        type: "changed",
+        description:
+          "Composer header keeps heading plus Batch/Poll/Schedule chips; EVENT/SLEEPING PROPOSAL, DRAFT, and by-user chips removed (PC-422).",
+      },
+      {
+        type: "added",
+        description:
+          "Admin Enable Poll (default on); Poll is hidden on new event drafts when off (PC-423).",
+      },
+      {
+        type: "added",
+        description:
+          "Just Proposals vs Proposals and Schedule; Schedule skips approval votes, uses Add to calendar, and auto-resolves (PC-424).",
+      },
+      {
+        type: "added",
+        description:
+          "Proxy Scheduling with Schedule on behalf of when dual posting is on (PC-425). SCHEMA_VERSION 49.",
+      },
+    ],
+  },
+  {
     version: "2026.08.03a",
     date: "2026-08-03",
     summary:

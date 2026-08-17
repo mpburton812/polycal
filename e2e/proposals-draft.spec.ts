@@ -72,6 +72,7 @@ test.describe("Proposal submit and conflict warnings", () => {
     await dialog.getByLabel("Title").fill(title);
     await expandDraftMoreOptions(dialog);
     await dialog.getByLabel(/Description/i).fill("Needs invitee vote.");
+    await dialog.getByRole("button", { name: "With invitees" }).click();
     await dialog.getByRole("button", { name: /Leia Organa required/i }).click();
     await dialog.getByRole("button", { name: "Save", exact: true }).click();
 

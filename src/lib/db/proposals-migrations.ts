@@ -34,6 +34,8 @@ export async function applyProposalsMigrations(sql: Client): Promise<void> {
   await ensureColumn(sql, "proposals", "archive_kind", "TEXT");
   // PC-414: Post to Feed (app default OFF). Existing rows backfilled ON so history stays.
   await ensureColumn(sql, "proposals", "post_to_feed", "INTEGER NOT NULL DEFAULT 0");
+  await ensureColumn(sql, "proposals", "posting_kind", "TEXT NOT NULL DEFAULT 'proposal'");
+  await ensureColumn(sql, "proposals", "on_behalf_of_user_id", "TEXT");
   if (await hasColumn(sql, "proposals", "post_to_feed")) {
     await sql.execute(`
       UPDATE proposals

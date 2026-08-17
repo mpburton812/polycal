@@ -376,3 +376,15 @@
 2026-08-04 | edf2474 | PC-414 | FastSleep posts to feed; harden draft e2e card wait | src/lib/proposals/fast-sleeping-core.ts
 2026-08-04 | 6bb3e0a | PC-411 | keep anchors when switching week/month period modes | src/components/schedule/ScheduleClient.tsx
 2026-08-04 | dc75c10 | PC-411 | include full last day in month fetch range | src/components/schedule/ScheduleClient.tsx
+2026-08-17 | d402a74 | PC-417 | unify create FAB, Feedback menu, and posting gates | src/actions/network-settings.ts
+2026-08-17 | 057f12c | PC-417 | add 2026.08.17a change log and audit fixes | src/components/feedback/FeedbackDialog.tsx
+2026-08-17 | f12087a | PC-417 | restore map visibility labels and postingKind types | src/components/admin/AdminNetworkSettingsPanel.tsx
+2026-08-17 | baf8d33 | PC-418 | raise create FAB above tab chrome so Playwright can click it | src/components/proposals/ProposalCreateHost.tsx
+2026-08-17 | bb36a4a | PC-417 | Recurring after Window, pass user id from layout, keep settings toast | src/components/admin/AdminNetworkSettingsPanel.tsx
+2026-08-17 | 19ace77 | PC-421 | wait for invitee roster after Window before marking required | e2e/helpers/proposals.ts
+2026-08-17 | 954f32d | PC-424 | wire Select labelId so Proposal posting is findable | src/components/admin/AdminNetworkSettingsPanel.tsx
+2026-08-17 | 88f76ac | PC-424 | pick Window before invitees in schedule posting journey | e2e/direct-schedule-proxy-journey.spec.ts
+2026-08-17 | 22d6d2f | PC-423 | do not wait for hidden Poll before filling Window times | e2e/helpers/datePickers.ts
+2026-08-17 | c5292d7 | PC-417 | pass explicit journey file paths on Windows | scripts/e2e-run-journeys.ts
+2026-08-17 | ec79bec | PC-417 | run journey suite without pulling unfiltered serial specs | playwright.config.ts
+2026-08-17 | 8ed3a50 | PC-421 | open With partners before required chips; assert FastSleep save | e2e/fast-sleep-journey.spec.ts

@@ -18,15 +18,31 @@ import { useState, useTransition } from "react";
 
 import { updateNetworkSettingsAction } from "@/actions/network-settings";
 import { AdminCollapsibleSection } from "@/components/admin/AdminCollapsibleSection";
+import { useToast } from "@/components/providers/ToastProvider";
 import { LONG_TEXT_MAX } from "@/lib/validation/string-limits";
 import type { NetworkSettings } from "@/types/network-settings";
-import { auditLogVisibilityLevels, placesMapVisibilityLevels } from "@/types/network-settings";
+import {
+  auditLogVisibilityLevels,
+  placesMapVisibilityLevels,
+  proxySchedulingScopes,
+  schedulingPostingModes,
+} from "@/types/network-settings";
 
 const AUDIT_LABELS: Record<string, string> = {
   everyone: "Everyone",
   invitees_proposer_admin: "Invitees + proposer + admin",
   proposer_admin: "Proposer + admin",
   admin_only: "Admin only",
+};
+
+const POSTING_LABELS: Record<string, string> = {
+  proposals_only: "Just Proposals",
+  proposals_and_schedule: "Proposals and Schedule",
+};
+
+const PROXY_SCOPE_LABELS: Record<string, string> = {
+  anyone: "Anyone on this network",
+  sleeping_partners: "Sleeping partners only",
 };
 
 const MAP_VISIBILITY_LABELS: Record<string, string> = {
@@ -44,6 +60,7 @@ export function AdminNetworkSettingsPanel({
   initialSettings: NetworkSettings;
 }) {
   const router = useRouter();
+  const { showToast } = useToast();
   const [settings, setSettings] = useState(initialSettings);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -56,9 +73,11 @@ export function AdminNetworkSettingsPanel({
       const result = await updateNetworkSettingsAction(settings);
       if (!result.ok) {
         setError(result.message);
+        showToast(result.message, "error");
         return;
       }
       setMessage(result.message);
+      showToast(result.message, "success");
       router.refresh();
     });
   }
@@ -87,8 +106,12 @@ export function AdminNetworkSettingsPanel({
           label="Admins can see proposals they are not involved in"
         />
         <FormControl fullWidth>
-          <InputLabel>Proposal audit log visibility</InputLabel>
+          <InputLabel id="proposal-audit-log-visibility-label">
+            Proposal audit log visibility
+          </InputLabel>
           <Select
+            labelId="proposal-audit-log-visibility-label"
+            id="proposal-audit-log-visibility"
             label="Proposal audit log visibility"
             value={settings.auditLogVisibility}
             onChange={(e) =>
@@ -181,9 +204,105 @@ export function AdminNetworkSettingsPanel({
         <Typography variant="caption" color="text.secondary" sx={{ mt: -1, display: "block" }}>
           When off, the Feed tab is hidden and members are redirected to Schedule (PC-385).
         </Typography>
+        <FormControlLabel
+          control={
+            <Switch
+              checked={settings.pollEnabled}
+              onChange={(e) =>
+                setSettings({
+                  ...settings,
+                  pollEnabled: e.target.checked,
+                })
+              }
+            />
+          }
+          label="Enable Poll"
+        />
+        <Typography variant="caption" color="text.secondary" sx={{ mt: -1, display: "block" }}>
+          When off, Poll is hidden on new event proposals. Existing poll drafts are unchanged
+          (PC-423).
+        </Typography>
+        {/* labelId so the combobox exposes "Proposal posting" to getByRole / getByLabel (PC-424). */}
         <FormControl fullWidth>
-          <InputLabel>Sleeping Partners tab visibility</InputLabel>
+          <InputLabel id="proposal-posting-label">Proposal posting</InputLabel>
           <Select
+            labelId="proposal-posting-label"
+            id="proposal-posting"
+            label="Proposal posting"
+            value={settings.schedulingPosting}
+            onChange={(e) =>
+              setSettings({
+                ...settings,
+                schedulingPosting: e.target.value as NetworkSettings["schedulingPosting"],
+                ...(e.target.value === "proposals_only"
+                  ? { proxySchedulingEnabled: false }
+                  : {}),
+              })
+            }
+          >
+            {schedulingPostingModes.map((mode) => (
+              <MenuItem key={mode} value={mode}>
+                {POSTING_LABELS[mode] ?? mode}
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+        <Typography variant="caption" color="text.secondary" sx={{ mt: -1, display: "block" }}>
+          Proposals and Schedule adds a Proposal vs Schedule choice on the draft card. A
+          schedule goes on the calendar with no approval votes (PC-424).
+        </Typography>
+        {settings.schedulingPosting === "proposals_and_schedule" ? (
+          <>
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={settings.proxySchedulingEnabled}
+                  onChange={(e) =>
+                    setSettings({
+                      ...settings,
+                      proxySchedulingEnabled: e.target.checked,
+                    })
+                  }
+                />
+              }
+              label="Proxy Scheduling"
+            />
+            <Typography variant="caption" color="text.secondary" sx={{ mt: -1, display: "block" }}>
+              When on, Schedule mode can pick a person to schedule on behalf of (PC-425).
+            </Typography>
+            {settings.proxySchedulingEnabled ? (
+              <FormControl fullWidth>
+                <InputLabel id="proxy-for-label">Proxy for</InputLabel>
+                <Select
+                  labelId="proxy-for-label"
+                  id="proxy-for"
+                  label="Proxy for"
+                  value={settings.proxySchedulingScope}
+                  onChange={(e) =>
+                    setSettings({
+                      ...settings,
+                      proxySchedulingScope: e.target
+                        .value as NetworkSettings["proxySchedulingScope"],
+                    })
+                  }
+                >
+                  {proxySchedulingScopes.map((scope) => (
+                    <MenuItem key={scope} value={scope}>
+                      {PROXY_SCOPE_LABELS[scope] ?? scope}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            ) : null}
+          </>
+        ) : null}
+        <FormControl fullWidth>
+          <InputLabel id="places-map-visibility-label">
+            Sleeping Partners tab visibility
+          </InputLabel>
+          <Select
+            labelId="places-map-visibility-label"
+            id="places-map-visibility"
             label="Sleeping Partners tab visibility"
             value={settings.placesMapVisibility}
             onChange={(e) =>
