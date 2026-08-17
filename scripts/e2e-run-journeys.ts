@@ -2,12 +2,11 @@
  * Local / promotion journey runner: skip unused mobile server, keep SAFE parallel (PC-214).
  * Usage: `npm run test:e2e:journeys`
  */
-import { readdirSync } from "node:fs";
-import path from "node:path";
 import { spawn } from "node:child_process";
 
 process.env.E2E_INCLUDE_MOBILE = "0";
-process.env.E2E_PARALLEL_WORKERS ??= "2";
+process.env.E2E_SAFE_INDEPENDENT = "1";
+process.env.E2E_PARALLEL_WORKERS ??= process.platform === "win32" ? "1" : "2";
 
 const isWin = process.platform === "win32";
 const npx = isWin ? "npx.cmd" : "npx";
@@ -30,17 +29,11 @@ function run(command: string, args: string[]): Promise<void> {
 
 async function main(): Promise<void> {
   await run(npx, ["tsx", "scripts/e2e-prepare.ts"]);
-  // Explicit files — cmd.exe on Windows strips regex filters like e2e/.*journey.* (PC-417).
-  const journeyFiles = readdirSync("e2e")
-    .filter((name) => name.includes("journey") && name.endsWith(".spec.ts"))
-    .map((name) => path.join("e2e", name));
-  if (journeyFiles.length === 0) {
-    throw new Error("No e2e/*journey*.spec.ts files found");
-  }
+  // Single token — cmd.exe on Windows eats slash/regex filters (PC-417).
   await run(npx, [
     "playwright",
     "test",
-    ...journeyFiles,
+    "journey",
     "--project=chromium-serial",
     "--project=chromium-safe",
   ]);
