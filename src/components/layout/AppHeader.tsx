@@ -2,11 +2,13 @@
 
 import CalendarMonthIcon from "@mui/icons-material/CalendarMonth";
 import AdminPanelSettingsIcon from "@mui/icons-material/AdminPanelSettings";
+import FeedbackIcon from "@mui/icons-material/Feedback";
 import LogoutIcon from "@mui/icons-material/Logout";
 import SettingsIcon from "@mui/icons-material/Settings";
 import {
   AppBar,
   Box,
+  CircularProgress,
   FormControl,
   IconButton,
   ListItemIcon,
@@ -23,6 +25,7 @@ import { useEffect, useState, type MouseEvent } from "react";
 
 import type { NotificationItem } from "@/actions/notifications";
 import { listMyNetworksAction } from "@/actions/networks";
+import { useFeedbackDialog } from "@/components/feedback/FeedbackDialog";
 import { NotificationInbox } from "@/components/layout/NotificationInbox";
 import { OrganicAvatar } from "@/components/ui/OrganicAvatar";
 import { fontFamilies } from "@/theme/fonts";
@@ -57,6 +60,7 @@ export function AppHeader({
   const [networks, setNetworks] = useState<
     { networkId: string; name: string; role: string; status: string }[]
   >([]);
+  const { capturing, openDialog: openFeedback, dialog: feedbackDialog } = useFeedbackDialog();
 
   useEffect(() => {
     void listMyNetworksAction().then(setNetworks);
@@ -109,6 +113,7 @@ export function AppHeader({
     session?.user?.activeNetworkId ?? networks[0]?.networkId ?? "";
 
   return (
+    <>
     <AppBar
       position="static"
       elevation={0}
@@ -228,6 +233,22 @@ export function AppHeader({
               <ListItemText>Admin</ListItemText>
             </MenuItem>
           )}
+          <MenuItem
+            onClick={() => {
+              closeProfileMenu();
+              void openFeedback();
+            }}
+            disabled={capturing}
+          >
+            <ListItemIcon>
+              {capturing ? (
+                <CircularProgress size={18} />
+              ) : (
+                <FeedbackIcon fontSize="small" />
+              )}
+            </ListItemIcon>
+            <ListItemText>Feedback</ListItemText>
+          </MenuItem>
           <MenuItem onClick={logout}>
             <ListItemIcon>
               <LogoutIcon fontSize="small" />
@@ -237,5 +258,7 @@ export function AppHeader({
         </Menu>
       </Toolbar>
     </AppBar>
+    {feedbackDialog}
+    </>
   );
 }

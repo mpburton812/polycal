@@ -50,6 +50,8 @@ export const draftProposalSchema = z.object({
   eventIconKey: z.enum(EVENT_ICON_KEYS).nullable().optional(),
   /** When true, lifecycle milestones post to the network Feed (PC-414). Default false. */
   postToFeed: z.boolean().optional(),
+  postingKind: z.enum(["proposal", "schedule"]).optional(),
+  onBehalfOfUserId: z.string().min(1).nullable().optional(),
 });
 
 export const commentSchema = z

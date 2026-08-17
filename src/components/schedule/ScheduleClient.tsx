@@ -1,6 +1,5 @@
 "use client";
 
-import AddIcon from "@mui/icons-material/Add";
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import FilterListIcon from "@mui/icons-material/FilterList";
@@ -10,11 +9,9 @@ import {
   Button,
   Chip,
   Drawer,
-  Fab,
   FormControl,
   IconButton,
   InputLabel,
-  Menu,
   MenuItem,
   Select,
   Stack,
@@ -35,6 +32,7 @@ import {
   type SchedulePayload,
 } from "@/actions/schedule";
 import type { PersonSummary } from "@/actions/users";
+import { useProposalCreate } from "@/components/proposals/ProposalCreateContext";
 import { ScheduleAgendaView } from "@/components/schedule/ScheduleAgendaView";
 import { ScheduleDaySheet } from "@/components/schedule/ScheduleDaySheet";
 import { ScheduleDayView } from "@/components/schedule/ScheduleDayView";
@@ -140,7 +138,7 @@ export function ScheduleClient({
   const [pending, setPending] = useState(false);
   const [optionsOpen, setOptionsOpen] = useState(false);
   const [daySheetDay, setDaySheetDay] = useState<Date | null>(null);
-  const [fabAnchor, setFabAnchor] = useState<null | HTMLElement>(null);
+  const { openCreate } = useProposalCreate();
   const {
     state: dialogState,
     openScheduleEvent,
@@ -151,7 +149,6 @@ export function ScheduleClient({
     handleEditFromDetail,
     openRelatedProposal,
     openDetachedProposal,
-    openCreateDraft,
     openProposal,
   } = useScheduleTapRouter();
 
@@ -483,7 +480,7 @@ export function ScheduleClient({
     const start = new Date(day);
     start.setHours(lockedType === "event" ? 10 : 0, 0, 0, 0);
     setDaySheetDay(null);
-    openCreateDraft({ lockedType, initialStartAt: start.toISOString() });
+    openCreate({ lockedType, initialStartAt: start.toISOString() });
   }
 
   const showAgenda = !isMonthLayout && !isDayLayout && isMobile;
@@ -728,42 +725,6 @@ export function ScheduleClient({
           />
         )}
       </Box>
-
-      <Fab
-        color="primary"
-        aria-label="Create on schedule"
-        onClick={(event) => setFabAnchor(event.currentTarget)}
-        sx={{
-          position: "fixed",
-          right: 16,
-          bottom: 88,
-          bgcolor: GARDEN_TOKENS.sage,
-          color: GARDEN_TOKENS.surface,
-          border: `2px solid ${GARDEN_TOKENS.ink}`,
-          boxShadow: "none",
-          "&:hover": { bgcolor: "#557A5C" },
-        }}
-      >
-        <AddIcon />
-      </Fab>
-      <Menu anchorEl={fabAnchor} open={Boolean(fabAnchor)} onClose={() => setFabAnchor(null)}>
-        <MenuItem
-          onClick={() => {
-            setFabAnchor(null);
-            createForDay(new Date(), "event");
-          }}
-        >
-          New event
-        </MenuItem>
-        <MenuItem
-          onClick={() => {
-            setFabAnchor(null);
-            createForDay(new Date(), "sleeping");
-          }}
-        >
-          New sleeping
-        </MenuItem>
-      </Menu>
 
       <ScheduleDaySheet
         open={Boolean(daySheetDay)}

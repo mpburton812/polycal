@@ -198,6 +198,10 @@ export interface ProposalDetail {
   eventIconKey: string | null;
   /** When true, lifecycle milestones appear on Feed (PC-414). */
   postToFeed: boolean;
+  /** Proposal vs direct calendar schedule (PC-424). */
+  postingKind?: "proposal" | "schedule";
+  /** Proxy subject when scheduling on behalf of someone else (PC-425). */
+  onBehalfOfUserId?: string | null;
   specialKind?: "residency";
   /**
    * Latest non-dismissed ICS pending id for the current viewer (PC-345).

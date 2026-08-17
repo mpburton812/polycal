@@ -71,6 +71,12 @@ export const proposals = sqliteTable("proposals", {
   archiveKind: text("archive_kind", { enum: ["cancelled", "auto"] }),
   /** When true, lifecycle milestones appear on the network Feed (PC-414). Default off for new drafts. */
   postToFeed: integer("post_to_feed", { mode: "boolean" }).notNull().default(false),
+  /**
+   * Proposal uses the vote workflow; schedule auto-resolves onto the calendar (PC-424).
+   */
+  postingKind: text("posting_kind").notNull().default("proposal"),
+  /** Subject when Proxy Scheduling posts on behalf of someone else (PC-425). */
+  onBehalfOfUserId: text("on_behalf_of_user_id").references(() => users.id),
   /** Parent proposal when this row was detached from a batch night or span day slice. */
   detachedFromParentId: text("detached_from_parent_id"),
   detachedFromSlotId: text("detached_from_slot_id"),

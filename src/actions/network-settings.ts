@@ -13,9 +13,13 @@ import { loadNetworkSettings, resolveNetworkSettings } from "@/lib/networks/sett
 import {
   auditLogVisibilityLevels,
   placesMapVisibilityLevels,
+  proxySchedulingScopes,
+  schedulingPostingModes,
   type AuditLogVisibility,
   type NetworkSettings,
   type PlacesMapVisibility,
+  type ProxySchedulingScope,
+  type SchedulingPostingMode,
 } from "@/types/network-settings";
 import {
   LONG_TEXT_MAX,
@@ -39,6 +43,10 @@ const settingsSchema = z.object({
   seePartnersSleepingArrangements: z.boolean(),
   fastSleepEnabled: z.boolean(),
   feedEnabled: z.boolean(),
+  pollEnabled: z.boolean(),
+  schedulingPosting: z.enum(schedulingPostingModes),
+  proxySchedulingEnabled: z.boolean(),
+  proxySchedulingScope: z.enum(proxySchedulingScopes),
   placesMapVisibility: z.enum(placesMapVisibilityLevels),
   logTailLength: z.number().int().min(0).max(1000),
   onboardingWelcomeMessage: z
@@ -62,6 +70,10 @@ function toNetworkSettings(row: {
   seePartnersSleepingArrangements: boolean;
   fastSleepEnabled: boolean;
   feedEnabled: boolean;
+  pollEnabled: boolean;
+  schedulingPosting: SchedulingPostingMode;
+  proxySchedulingEnabled: boolean;
+  proxySchedulingScope: ProxySchedulingScope;
   placesMapVisibility: PlacesMapVisibility;
   logTailLength: number;
   onboardingWelcomeMessage: string;
@@ -80,6 +92,10 @@ function toNetworkSettings(row: {
     seePartnersSleepingArrangements: row.seePartnersSleepingArrangements,
     fastSleepEnabled: row.fastSleepEnabled,
     feedEnabled: row.feedEnabled,
+    pollEnabled: row.pollEnabled,
+    schedulingPosting: row.schedulingPosting,
+    proxySchedulingEnabled: row.proxySchedulingEnabled,
+    proxySchedulingScope: row.proxySchedulingScope,
     placesMapVisibility: row.placesMapVisibility,
     logTailLength: row.logTailLength,
     onboardingWelcomeMessage: row.onboardingWelcomeMessage,
@@ -165,6 +181,10 @@ export async function updateNetworkSettingsAction(
       seePartnersSleepingArrangements: parsed.data.seePartnersSleepingArrangements,
       fastSleepEnabled: parsed.data.fastSleepEnabled,
       feedEnabled: parsed.data.feedEnabled,
+      pollEnabled: parsed.data.pollEnabled,
+      schedulingPosting: parsed.data.schedulingPosting,
+      proxySchedulingEnabled: parsed.data.proxySchedulingEnabled,
+      proxySchedulingScope: parsed.data.proxySchedulingScope,
       placesMapVisibility: parsed.data.placesMapVisibility,
       logTailLength: parsed.data.logTailLength,
       onboardingWelcomeMessage: parsed.data.onboardingWelcomeMessage,
@@ -202,4 +222,33 @@ export async function getPlacesMapVisibilityAction(): Promise<PlacesMapVisibilit
   await ensureDbReady();
   const settings = await loadNetworkSettings(networkSession.user.activeNetworkId);
   return settings?.placesMapVisibility ?? "all";
+}
+
+export interface DraftComposerSettings {
+  pollEnabled: boolean;
+  schedulingPosting: SchedulingPostingMode;
+  proxySchedulingEnabled: boolean;
+  proxySchedulingScope: ProxySchedulingScope;
+}
+
+/**
+ * Member-readable composer flags for new drafts (PC-423–425).
+ */
+export async function getDraftComposerSettingsAction(): Promise<DraftComposerSettings> {
+  const defaults: DraftComposerSettings = {
+    pollEnabled: true,
+    schedulingPosting: "proposals_only",
+    proxySchedulingEnabled: false,
+    proxySchedulingScope: "sleeping_partners",
+  };
+  const networkSession = await requireNetworkSession();
+  if (!networkSession.ok) return defaults;
+  await ensureDbReady();
+  const settings = await loadNetworkSettings(networkSession.user.activeNetworkId);
+  return {
+    pollEnabled: settings?.pollEnabled !== false,
+    schedulingPosting: settings?.schedulingPosting ?? "proposals_only",
+    proxySchedulingEnabled: Boolean(settings?.proxySchedulingEnabled),
+    proxySchedulingScope: settings?.proxySchedulingScope ?? "sleeping_partners",
+  };
 }

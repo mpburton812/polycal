@@ -13,7 +13,7 @@ import { applyNetworksMigrations } from "./networks-migrations";
 import { applyMotdMigrations } from "./motd-migrations";
 
 /** Bump whenever bootstrap DDL or *-migrations.ts modules change (PC-143). */
-export const SCHEMA_VERSION = "48";
+export const SCHEMA_VERSION = "49";
 
 /**
  * True when the stored schema version already matches the app target — skip

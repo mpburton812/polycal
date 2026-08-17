@@ -36,8 +36,12 @@ export interface ProposalDraftEventFieldsProps {
   isPoll: boolean;
   applyEventStartChange: (index: number, nextStart: string) => void;
   isSoloProposal: boolean;
-  soloEvent: boolean;
-  onSoloEventChange: (solo: boolean) => void;
+  /** When false, hide When date fields until a schedule type is chosen (PC-421). */
+  showWhenFields?: boolean;
+  inviteeChoice: "unset" | "group" | "solo";
+  onInviteeChoiceChange: (choice: "group" | "solo") => void;
+  /** Schedule posting: people are attendees, no Required/Optional (PC-424). */
+  hideInviteeRoles?: boolean;
   candidates: PersonSummary[];
   inviteeMode: Record<string, InviteeSelection>;
   setInviteeRole: (personId: string, role: InviteeSelection) => void;
@@ -67,8 +71,10 @@ export function ProposalDraftEventFields({
   isPoll,
   applyEventStartChange,
   isSoloProposal,
-  soloEvent,
-  onSoloEventChange,
+  inviteeChoice,
+  onInviteeChoiceChange,
+  hideInviteeRoles = false,
+  showWhenFields = true,
   candidates,
   inviteeMode,
   setInviteeRole,
@@ -97,6 +103,8 @@ export function ProposalDraftEventFields({
         inputProps={{ maxLength: LONG_TEXT_MAX }}
       />
 
+      {showWhenFields ? (
+        <>
       <ProposalDraftSectionHeader
         icon={<AccessTimeIcon fontSize="small" />}
         title="When"
@@ -213,22 +221,26 @@ export function ProposalDraftEventFields({
           />
         </Stack>
       ) : null}
+        </>
+      ) : null}
 
       <ProposalDraftSectionHeader
         icon={<GroupsOutlinedIcon fontSize="small" />}
         title="Invitees"
         subtitle={
-          isSoloProposal
+          hideInviteeRoles
+            ? "Add people who will be on this calendar item — no approvals"
+            : isSoloProposal
             ? "Solo proposals do not include invitees"
             : "Choose Required or Optional for each person"
         }
       />
       <ToggleButtonGroup
         exclusive
-        value={soloEvent ? "solo" : "group"}
+        value={inviteeChoice === "unset" ? null : inviteeChoice}
         onChange={(_, value) => {
           if (!value) return;
-          onSoloEventChange(value === "solo");
+          onInviteeChoiceChange(value as "group" | "solo");
         }}
         size="small"
         sx={{
@@ -243,7 +255,7 @@ export function ProposalDraftEventFields({
         <ToggleButton value="group">With invitees</ToggleButton>
         <ToggleButton value="solo">Solo event (just me)</ToggleButton>
       </ToggleButtonGroup>
-      {!isSoloProposal && (
+      {!isSoloProposal && inviteeChoice === "group" && (
         <Stack spacing={1}>
           {candidates.map((person) => {
             const mode = inviteeMode[person.id] ?? "none";
@@ -259,6 +271,26 @@ export function ProposalDraftEventFields({
                 <Typography variant="body2" sx={{ minWidth: 96 }}>
                   {person.displayName}
                 </Typography>
+                {hideInviteeRoles ? (
+                  <ToggleButton
+                    value="optional"
+                    selected={mode !== "none"}
+                    aria-label={`${person.displayName} include`}
+                    onClick={() =>
+                      setInviteeRole(person.id, mode === "none" ? "optional" : "none")
+                    }
+                    size="small"
+                    sx={{
+                      "&.Mui-selected": {
+                        bgcolor: POLY_GREEN,
+                        color: "#fff",
+                        "&:hover": { bgcolor: POLY_GREEN_HOVER },
+                      },
+                    }}
+                  >
+                    Include
+                  </ToggleButton>
+                ) : (
                 <ToggleButtonGroup
                   exclusive
                   size="small"
@@ -281,6 +313,7 @@ export function ProposalDraftEventFields({
                     Optional
                   </ToggleButton>
                 </ToggleButtonGroup>
+                )}
               </Stack>
             );
           })}
