@@ -106,8 +106,12 @@ export function AdminNetworkSettingsPanel({
           label="Admins can see proposals they are not involved in"
         />
         <FormControl fullWidth>
-          <InputLabel>Proposal audit log visibility</InputLabel>
+          <InputLabel id="proposal-audit-log-visibility-label">
+            Proposal audit log visibility
+          </InputLabel>
           <Select
+            labelId="proposal-audit-log-visibility-label"
+            id="proposal-audit-log-visibility"
             label="Proposal audit log visibility"
             value={settings.auditLogVisibility}
             onChange={(e) =>
@@ -218,9 +222,12 @@ export function AdminNetworkSettingsPanel({
           When off, Poll is hidden on new event proposals. Existing poll drafts are unchanged
           (PC-423).
         </Typography>
+        {/* labelId so the combobox exposes "Proposal posting" to getByRole / getByLabel (PC-424). */}
         <FormControl fullWidth>
-          <InputLabel>Proposal posting</InputLabel>
+          <InputLabel id="proposal-posting-label">Proposal posting</InputLabel>
           <Select
+            labelId="proposal-posting-label"
+            id="proposal-posting"
             label="Proposal posting"
             value={settings.schedulingPosting}
             onChange={(e) =>
@@ -265,8 +272,10 @@ export function AdminNetworkSettingsPanel({
             </Typography>
             {settings.proxySchedulingEnabled ? (
               <FormControl fullWidth>
-                <InputLabel>Proxy for</InputLabel>
+                <InputLabel id="proxy-for-label">Proxy for</InputLabel>
                 <Select
+                  labelId="proxy-for-label"
+                  id="proxy-for"
                   label="Proxy for"
                   value={settings.proxySchedulingScope}
                   onChange={(e) =>
@@ -288,8 +297,12 @@ export function AdminNetworkSettingsPanel({
           </>
         ) : null}
         <FormControl fullWidth>
-          <InputLabel>Sleeping Partners tab visibility</InputLabel>
+          <InputLabel id="places-map-visibility-label">
+            Sleeping Partners tab visibility
+          </InputLabel>
           <Select
+            labelId="places-map-visibility-label"
+            id="places-map-visibility"
             label="Sleeping Partners tab visibility"
             value={settings.placesMapVisibility}
             onChange={(e) =>

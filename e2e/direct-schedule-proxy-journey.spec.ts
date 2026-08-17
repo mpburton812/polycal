@@ -126,14 +126,24 @@ async function saveNetworkSettings(page: Page): Promise<void> {
   });
 }
 
+async function selectLabeledCombobox(
+  page: Page,
+  label: string,
+  option: string,
+): Promise<void> {
+  const combo = page.getByRole("combobox", { name: label });
+  await expect(combo).toBeVisible({ timeout: 15_000 });
+  await combo.click();
+  await page.getByRole("option", { name: option }).click();
+}
+
 async function setPostingMode(
   page: Page,
   mode: "Just Proposals" | "Proposals and Schedule",
 ): Promise<void> {
   await loginWithOnboardingIfNeeded(page, USERS.luke.username);
   await openNetworkSettings(page);
-  await page.getByLabel("Proposal posting").click();
-  await page.getByRole("option", { name: mode }).click();
+  await selectLabeledCombobox(page, "Proposal posting", mode);
   await saveNetworkSettings(page);
 }
 
@@ -151,8 +161,7 @@ async function setProxyScheduling(
     await toggle.click();
   }
   if (enabled && scope) {
-    await page.getByLabel("Proxy for").click();
-    await page.getByRole("option", { name: scope }).click();
+    await selectLabeledCombobox(page, "Proxy for", scope);
   }
   await saveNetworkSettings(page);
 }
@@ -176,8 +185,7 @@ async function restoreDefaultComposerSettings(page: Page): Promise<void> {
     if (!(await poll.isChecked())) {
       await poll.click();
     }
-    await page.getByLabel("Proposal posting").click();
-    await page.getByRole("option", { name: "Just Proposals" }).click();
+    await selectLabeledCombobox(page, "Proposal posting", "Just Proposals");
     await saveNetworkSettings(page);
   } catch {
     // Best-effort restore so later serial specs keep default Poll-on / Just Proposals.
