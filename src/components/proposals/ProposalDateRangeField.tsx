@@ -5,7 +5,7 @@ import { PickersDay, type PickersDayProps } from "@mui/x-date-pickers/PickersDay
 import dayjs, { type Dayjs } from "dayjs";
 import customParseFormat from "dayjs/plugin/customParseFormat";
 import { Box, Stack, TextField, Typography } from "@mui/material";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 
 import { GARDEN_TOKENS } from "@/theme/tokens";
 
@@ -31,9 +31,8 @@ function parseDate(value: string): Dayjs | null {
 }
 
 /**
- * Single calendar that accepts two day clicks for a start/end range (PC-153 / PC-209).
- * Earliest click becomes start; latest becomes end. A third click starts a new range.
- * Compact ISO text fields stay in sync for accessibility and reliable E2E fills.
+ * Calendar: tap once for a single day; tap-and-drag (or a second click) for a range (PC-434).
+ * ISO text fields stay in sync for accessibility and E2E fills.
  */
 export function ProposalDateRangeField({
   startLabel,
@@ -47,6 +46,8 @@ export function ProposalDateRangeField({
   const start = parseDate(startValue);
   const end = parseDate(endValue);
   const [anchor, setAnchor] = useState<Dayjs | null>(null);
+  const dragRef = useRef<{ origin: string } | null>(null);
+  const skipClickRef = useRef(false);
 
   const rangeStart = useMemo(() => {
     if (start && end) return start.isBefore(end) ? start : end;
@@ -54,32 +55,34 @@ export function ProposalDateRangeField({
   }, [start, end]);
   const rangeEnd = useMemo(() => {
     if (start && end) return start.isAfter(end) ? start : end;
-    return null;
+    return start && end ? end : null;
   }, [start, end]);
 
   function applyOrderedRange(a: string, b: string) {
     const next = orderDateRangeInputs(a, b);
+    // Keep incomplete End day text ("" / "2") instead of coalescing to start (PC-209).
     onRangeChange(next.start, next.end);
   }
 
   function handleDaySelect(day: Dayjs | null) {
     if (!day || !day.isValid() || disabled) return;
-    const iso = day.format("YYYY-MM-DD");
-
-    if (!anchor) {
-      // First click — set provisional start; clear end until second click.
-      setAnchor(day);
-      onRangeChange(iso, "");
+    if (skipClickRef.current) {
+      skipClickRef.current = false;
       return;
     }
-
-    const a = anchor.format("YYYY-MM-DD");
-    applyOrderedRange(a, iso);
+    const iso = day.format("YYYY-MM-DD");
+    if (!anchor) {
+      setAnchor(day);
+      onRangeChange(iso, iso);
+      return;
+    }
+    applyOrderedRange(anchor.format("YYYY-MM-DD"), iso);
     setAnchor(null);
   }
 
   function DayButton(props: PickersDayProps<Dayjs>) {
     const { day, outsideCurrentMonth, ...other } = props;
+    const iso = day.format("YYYY-MM-DD");
     const inRange =
       !outsideCurrentMonth &&
       rangeStart &&
@@ -98,6 +101,21 @@ export function ProposalDateRangeField({
         day={day}
         outsideCurrentMonth={outsideCurrentMonth}
         selected={Boolean(isEdge)}
+        onPointerDown={(event) => {
+          if (disabled || outsideCurrentMonth) return;
+          skipClickRef.current = true;
+          dragRef.current = { origin: iso };
+          onRangeChange(iso, iso);
+          setAnchor(day);
+          (event.currentTarget as HTMLElement).setPointerCapture?.(event.pointerId);
+        }}
+        onPointerEnter={() => {
+          if (!dragRef.current || disabled) return;
+          applyOrderedRange(dragRef.current.origin, iso);
+        }}
+        onPointerUp={() => {
+          dragRef.current = null;
+        }}
         sx={{
           ...(inRange
             ? {
@@ -121,8 +139,8 @@ export function ProposalDateRangeField({
     start && end && !start.isSame(end, "day")
       ? `${start.format("MMM D, YYYY")} → ${end.format("MMM D, YYYY")}`
       : start
-        ? `${start.format("MMM D, YYYY")} (click a second day for end)`
-        : "Click a start day, then an end day";
+        ? `${start.format("MMM D, YYYY")} (all day — drag or tap another day for a range)`
+        : "Tap a day, or drag across days";
 
   return (
     <Stack spacing={1}>
@@ -139,7 +157,7 @@ export function ProposalDateRangeField({
           value={startValue}
           onChange={(event) => {
             setAnchor(null);
-            applyOrderedRange(event.target.value.trim(), endValue);
+            applyOrderedRange(event.target.value.trim(), endValue || event.target.value.trim());
           }}
           placeholder="YYYY-MM-DD"
           helperText="ISO date"

@@ -29,6 +29,7 @@ export {
   createDraftProposalAction,
   getProposalDetailAction,
   listAcceptedSleepingPartnerIdsAction,
+  listComposerPeopleRankAction,
   listProposalPlaceOptionsAction,
   listResidencyPlaceOptionsAction,
   listSleepingLocationOptionsAction,

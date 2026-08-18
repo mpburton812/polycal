@@ -66,7 +66,7 @@ export function slotStartInput(
     : toLocalInput(iso);
 }
 
-export type InviteeSelection = "none" | "required" | "optional";
+export type InviteeSelection = "none" | "required" | "optional" | "booked";
 
 export interface SlotDraft {
   startAt: string;

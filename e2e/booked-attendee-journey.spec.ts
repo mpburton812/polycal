@@ -30,7 +30,6 @@ test.describe("Booked attendee and Post to Feed journeys", () => {
       await dialog.getByRole("button", { name: "Booking", exact: true }).click();
       await dialog.getByLabel("Title").fill(title);
       await fillProposalDateTimeField(dialog.getByLabel("Start").first(), "2099-12-10T11:00");
-      await dialog.getByRole("button", { name: "Solo (just me)", exact: true }).click();
       await submitProposalDraft(page, dialog);
 
       await selectProposalTab(page, "Resolved");
@@ -88,7 +87,6 @@ test.describe("Booked attendee and Post to Feed journeys", () => {
     const dialog = await openEventProposalDraft(page);
     await dialog.getByLabel("Title").fill(title);
     await fillProposalDateTimeField(dialog.getByLabel("Start").first(), "2099-12-11T12:00");
-    await dialog.getByRole("button", { name: "Solo (just me)", exact: true }).click();
     await submitProposalDraft(page, dialog);
 
     await selectProposalTab(page, "Resolved");
@@ -110,7 +108,7 @@ test.describe("Booked attendee and Post to Feed journeys", () => {
 
 async function openNetworkSettings(page: Page): Promise<void> {
   await goToAdmin(page);
-  await expandAdminSection(page, "Network settings");
+  await expandAdminSection(page, "Network Configuration");
 }
 
 async function setPostingMode(

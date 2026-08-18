@@ -59,7 +59,7 @@ test.describe("Poll proposal draft", () => {
     await fillProposalDateTimeField(startInputs.nth(1), "2099-08-02T10:00");
     await setInviteeRequired(dialog, USERS.leia.displayName);
     await expandDraftMoreOptions(dialog);
-    await dialog.getByLabel(/Description/i).fill("Poll with two options.");
+    await dialog.getByLabel(/Details/i).fill("Poll with two options.");
     await submitProposalDraft(page, dialog);
 
     await selectProposalTab(page, "Proposed");
@@ -80,9 +80,8 @@ test.describe("Recurring event draft", () => {
     await selectDraftScheduleMode(dialog, "Recurring");
     await dialog.getByLabel("Occurrences").fill("4");
     await fillProposalDateTimeField(dialog.getByLabel("Start").first(), "2099-09-01T09:00");
-    await dialog.getByRole("button", { name: "Solo (just me)", exact: true }).click();
     await expandDraftMoreOptions(dialog);
-    await dialog.getByLabel(/Description/i).fill("Weekly council meetings.");
+    await dialog.getByLabel(/Details/i).fill("Weekly council meetings.");
     await submitProposalDraft(page, dialog);
     await selectProposalTab(page, "Resolved");
     await expect(proposalCardsWithPrefix(page, title)).toHaveCount(4, { timeout: 20_000 });
