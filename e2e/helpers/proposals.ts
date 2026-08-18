@@ -389,10 +389,10 @@ export async function createAndSubmitRecurringEventForEveryone(
 ): Promise<void> {
   const dialog = await openEventOrSleepingProposalDraft(page);
   await dialog.getByLabel("Title").fill(options.title);
-  await selectDraftScheduleMode(dialog, "Recurring");
-  await dialog.getByLabel("Occurrences").fill(String(options.occurrenceCount ?? 4));
   await fillProposalDateTimeField(dialog.getByLabel("Start").first(), options.start);
   await fillProposalDateTimeField(dialog.getByLabel("End (optional)").first(), options.end);
+  await selectDraftScheduleMode(dialog, "Recurring");
+  await dialog.getByLabel("Occurrences").fill(String(options.occurrenceCount ?? 4));
   await setAllInviteesRequired(dialog);
   await submitProposalDraft(page, dialog);
 }
@@ -676,10 +676,10 @@ export async function createAndSubmitSoloRecurringTimedEvent(
 ): Promise<void> {
   const dialog = await openEventProposalDraft(page);
   await dialog.getByLabel("Title").fill(options.title);
-  await selectDraftScheduleMode(dialog, "Recurring");
-  await dialog.getByLabel("Occurrences").fill(String(options.occurrenceCount ?? 4));
   await fillProposalDateTimeField(dialog.getByLabel("Start").first(), options.start);
   await fillProposalDateTimeField(dialog.getByLabel("End (optional)").first(), options.end);
+  await selectDraftScheduleMode(dialog, "Recurring");
+  await dialog.getByLabel("Occurrences").fill(String(options.occurrenceCount ?? 4));
   await expandDraftMoreOptions(dialog);
     await dialog.getByLabel(/Details/i).fill(options.comment);
   await submitProposalDraft(page, dialog);
@@ -698,10 +698,10 @@ export async function createAndSubmitSoloRecurringAllDayEvent(
   const dialog = await openEventProposalDraft(page);
   await dialog.getByLabel("Title").fill(options.title);
   await selectDraftScheduleMode(dialog, "All Day");
-  await selectDraftScheduleMode(dialog, "Recurring");
-  await dialog.getByLabel("Occurrences").fill(String(options.occurrenceCount ?? 4));
   const day = options.day.slice(0, 10);
   await fillProposalDateRange(dialog, day, day);
+  await selectDraftScheduleMode(dialog, "Recurring");
+  await dialog.getByLabel("Occurrences").fill(String(options.occurrenceCount ?? 4));
   await expandDraftMoreOptions(dialog);
     await dialog.getByLabel(/Details/i).fill(options.comment);
   await submitProposalDraft(page, dialog);

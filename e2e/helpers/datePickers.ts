@@ -193,6 +193,19 @@ export function minutesFromNowDateTime(minutesFromNow: number): string {
 /** Expands More options so Poll / Recurring controls are reachable (PC-434). */
 async function ensureMoreOptionsExpanded(dialog: Locator): Promise<void> {
   const summary = dialog.getByRole("button", { name: /More options/i });
+  if (!(await summary.isVisible().catch(() => false))) {
+    const social = dialog.getByRole("button", { name: "Social", exact: true });
+    if (
+      (await social.count()) > 0 &&
+      (await social.getAttribute("aria-pressed")) !== "true"
+    ) {
+      await social.click();
+    }
+    const startField = dialog.getByTestId("date-range-start").first();
+    if (await startField.isVisible().catch(() => false)) {
+      await fillProposalDateRange(dialog, "2099-10-01");
+    }
+  }
   await expect(summary).toBeVisible({ timeout: 15_000 });
   if ((await summary.getAttribute("aria-expanded")) !== "true") {
     await summary.click();
