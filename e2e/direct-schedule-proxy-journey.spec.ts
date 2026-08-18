@@ -121,9 +121,17 @@ test.describe("Direct booking and Booking for journey", () => {
       await expandDraftMoreOptions(noPollDraft);
       await expect(noPollDraft.getByRole("button", { name: "Poll", exact: true })).toHaveCount(0);
       await exitDraftDialog(noPollDraft);
+    } finally {
+      await restoreDefaultComposerSettings(page);
+    }
+  });
 
-      await logout(page);
-      await loginWithOnboardingIfNeeded(page, USERS.luke.username);
+  test("Just Bookings forces New Event bookings, disables Poll, and keeps partner proposals", async ({
+    page,
+  }) => {
+    test.setTimeout(180_000);
+
+    try {
       await setPostingMode(page, "Just Bookings");
       await openNetworkSettings(page);
       await expect(page.getByLabel("Enable Poll")).toBeDisabled();
@@ -146,6 +154,7 @@ test.describe("Direct booking and Booking for journey", () => {
       await exitDraftDialog(bookingsOnlyDraft);
       await openNewProposalFabMenu(page);
       await expect(page.getByRole("menuitem", { name: "Sleeping partner proposal" })).toBeVisible();
+      await expect(page.getByRole("menuitem", { name: "Residency Proposal" })).toBeVisible();
       await page.keyboard.press("Escape");
     } finally {
       await restoreDefaultComposerSettings(page);
@@ -212,11 +221,13 @@ async function restoreDefaultComposerSettings(page: Page): Promise<void> {
   try {
     await loginWithOnboardingIfNeeded(page, USERS.luke.username);
     await openNetworkSettings(page);
+    // Just Bookings disables Enable Poll; switch Event Types first so the toggle is clickable.
+    await selectLabeledCombobox(page, "Event Types", "Just Proposals");
     const poll = page.getByLabel("Enable Poll");
+    await expect(poll).toBeEnabled({ timeout: 15_000 });
     if (!(await poll.isChecked())) {
       await poll.click();
     }
-    await selectLabeledCombobox(page, "Event Types", "Just Proposals");
     await saveNetworkSettings(page);
   } catch {
     // Best-effort restore so later serial specs keep default Poll-on / Just Proposals.
