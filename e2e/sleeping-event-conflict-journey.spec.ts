@@ -27,7 +27,6 @@ test.describe("Sleeping vs events — no false conflicts", () => {
     const sleepingDialog = await openSleepingProposalDraft(page);
     await sleepingDialog.getByLabel("Title").fill(`E2E sleeping ${Date.now()}`);
     await fillProposalDateRange(sleepingDialog, nightDate);
-    await sleepingDialog.getByRole("button", { name: "Solo (just me)", exact: true }).click();
     await submitProposalDraft(page, sleepingDialog);
 
     const eventDialog = await openEventProposalDraft(page);
@@ -55,7 +54,6 @@ test.describe("Sleeping vs events — no false conflicts", () => {
     const first = await openSleepingProposalDraft(page);
     await first.getByLabel("Title").fill(`E2E sleeping cancel ${Date.now()}`);
     await fillProposalDateRange(first, nightDate);
-    await first.getByRole("button", { name: "Solo (just me)", exact: true }).click();
     await submitProposalDraft(page, first);
 
     await selectProposalTab(page, "Resolved");
@@ -77,7 +75,6 @@ test.describe("Sleeping vs events — no false conflicts", () => {
     const second = await openSleepingProposalDraft(page);
     await second.getByLabel("Title").fill(`E2E sleeping resubmit ${Date.now()}`);
     await fillProposalDateRange(second, nightDate);
-    await second.getByRole("button", { name: "Solo (just me)", exact: true }).click();
     await second.getByRole("button", { name: "Submit" }).click();
 
     const conflictDialog = page.getByRole("dialog", { name: "Schedule conflicts detected" });

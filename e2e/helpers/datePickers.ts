@@ -37,19 +37,12 @@ export async function fillProposalDateTimeField(
   value: string,
 ): Promise<void> {
   const dialog = field.page().getByRole("dialog");
-  const pollBtn = dialog.getByRole("button", { name: "Poll", exact: true });
-  // Poll is omitted in Schedule posting and when the network gate is off (PC-423).
-  const pollPressed =
-    (await pollBtn.count()) > 0 &&
-    (await pollBtn.getAttribute("aria-pressed")) === "true";
-  // Recurring is disabled until Window/All Day; do not steal Poll drafts back to Window (PC-422).
-  const windowBtn = dialog.getByRole("button", { name: "Window", exact: true });
+  const addTimes = dialog.getByRole("button", { name: "Add times", exact: true });
   if (
-    !pollPressed &&
-    (await windowBtn.count()) > 0 &&
-    !(await field.isVisible().catch(() => false))
+    !(await field.isVisible().catch(() => false)) &&
+    (await addTimes.isVisible().catch(() => false))
   ) {
-    await selectDraftScheduleMode(dialog, "Window");
+    await addTimes.click();
   }
   await field.click();
   await field.fill(toMuiDateTimeDisplay(value));
@@ -113,13 +106,8 @@ export async function fillProposalDateRange(
   startIso: string,
   endIso?: string,
 ): Promise<void> {
-  const allDayBtn = dialog.getByRole("button", { name: "All Day", exact: true });
   const startProbe = dialog.getByTestId("date-range-start").first();
-  if (
-    (await allDayBtn.count()) > 0 &&
-    !(await startProbe.isVisible().catch(() => false)) &&
-    (await allDayBtn.getAttribute("aria-pressed")) !== "true"
-  ) {
+  if (!(await startProbe.isVisible().catch(() => false))) {
     await selectDraftScheduleMode(dialog, "All Day");
   }
   const startField = dialog.getByTestId("date-range-start").first();
@@ -195,36 +183,78 @@ export function minutesFromNowDateTime(minutesFromNow: number): string {
   return `${get("year")}-${get("month")}-${get("day")}T${get("hour")}:${get("minute")}`;
 }
 
-/** Selects Window / All Day / Poll on the exclusive timing group, or toggles Recurring (PC-170). */
+/** Expands More options so Poll / Recurring controls are reachable (PC-434). */
+async function ensureMoreOptionsExpanded(dialog: Locator): Promise<void> {
+  const summary = dialog.getByRole("button", { name: /More options/i });
+  await expect(summary).toBeVisible({ timeout: 15_000 });
+  if ((await summary.getAttribute("aria-expanded")) !== "true") {
+    await summary.click();
+  }
+}
+
+/** Selects timed / all-day / poll / recurring. Poll and Recurring live under More options (PC-434). */
 export async function selectDraftScheduleMode(
   dialog: Locator,
   mode: "Window" | "All Day" | "Poll" | "Recurring",
 ): Promise<void> {
+  if (mode === "Poll" || mode === "Recurring") {
+    await ensureMoreOptionsExpanded(dialog);
+  }
+
+  if (mode === "Poll") {
+    const poll = dialog.getByRole("button", { name: "Poll", exact: true });
+    await expect(poll).toBeVisible({ timeout: 15_000 });
+    if ((await poll.getAttribute("aria-pressed")) !== "true") {
+      await poll.click();
+    }
+    await expect(poll).toHaveAttribute("aria-pressed", "true");
+    return;
+  }
+
   if (mode === "Recurring") {
     const recurring = dialog.getByRole("button", { name: "Recurring", exact: true });
-    // Recurring stays disabled until Window or All Day is chosen (PC-422).
+    await expect(recurring).toBeVisible({ timeout: 15_000 });
     if (await recurring.isDisabled()) {
-      const allDayOn =
-        (await dialog.getByRole("button", { name: "All Day", exact: true }).getAttribute(
-          "aria-pressed",
-        )) === "true";
-      if (!allDayOn) {
-        await dialog.getByRole("button", { name: "Window", exact: true }).click();
-        await expect(dialog.getByRole("button", { name: "Window", exact: true })).toHaveAttribute(
-          "aria-pressed",
-          "true",
-        );
+      const poll = dialog.getByRole("button", { name: "Poll", exact: true });
+      if (
+        (await poll.isVisible().catch(() => false)) &&
+        (await poll.getAttribute("aria-pressed")) === "true"
+      ) {
+        await poll.click();
       }
     }
-    await recurring.click();
+    if ((await recurring.getAttribute("aria-pressed")) !== "true") {
+      await recurring.click();
+    }
     await expect(recurring).toHaveAttribute("aria-pressed", "true");
     return;
   }
-  await dialog.getByRole("button", { name: mode, exact: true }).click();
-  await expect(dialog.getByRole("button", { name: mode, exact: true })).toHaveAttribute(
-    "aria-pressed",
-    "true",
-  );
+
+  const poll = dialog.getByRole("button", { name: "Poll", exact: true });
+  if (
+    (await poll.isVisible().catch(() => false)) &&
+    (await poll.getAttribute("aria-pressed")) === "true"
+  ) {
+    await poll.click();
+  }
+
+  const addTimes = dialog.getByRole("button", { name: "Add times", exact: true });
+  const allDayOff = dialog.getByRole("button", { name: "All day", exact: true });
+
+  if (mode === "Window") {
+    if (await addTimes.isVisible().catch(() => false)) {
+      await addTimes.click();
+    }
+    await expect(dialog.getByLabel("Start").first()).toBeVisible({ timeout: 15_000 });
+    return;
+  }
+
+  if (await allDayOff.isVisible().catch(() => false)) {
+    await allDayOff.click();
+  }
+  await expect(dialog.getByRole("button", { name: "Add times", exact: true })).toBeVisible({
+    timeout: 15_000,
+  });
 }
 
 /** Page-scoped alias for schedule mode selection. */

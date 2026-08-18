@@ -12,6 +12,7 @@ export interface PickerPlaceRow {
   bedroomCount: number;
   bedroomNames: string | null;
   createdById: string | null;
+  residentUserIds: string[];
 }
 
 /**
@@ -78,12 +79,17 @@ export async function listNetworkPickerPlaces(
     residentsByPlace.set(row.locationId, list);
   }
 
-  return candidates.filter((place) =>
-    placeQualifiesForProposalPicker({
-      createdById: place.createdById,
-      viewerId: input.viewerId,
-      acceptedResidentIds: residentsByPlace.get(place.id) ?? [],
-      activeMemberIds,
-    }),
-  );
+  return candidates
+    .filter((place) =>
+      placeQualifiesForProposalPicker({
+        createdById: place.createdById,
+        viewerId: input.viewerId,
+        acceptedResidentIds: residentsByPlace.get(place.id) ?? [],
+        activeMemberIds,
+      }),
+    )
+    .map((place) => ({
+      ...place,
+      residentUserIds: residentsByPlace.get(place.id) ?? [],
+    }));
 }

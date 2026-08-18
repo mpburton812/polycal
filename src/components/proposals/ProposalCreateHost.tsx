@@ -11,12 +11,14 @@ import {
   type DraftComposerSettings,
 } from "@/actions/network-settings";
 import {
+  listComposerPeopleRankAction,
   listProposalPlaceOptionsAction,
   listResidencyPlaceOptionsAction,
   type ProposalDetail,
   type ProposalPlaceOption,
 } from "@/actions/proposals";
 import { listPeopleAction, type PersonSummary } from "@/actions/users";
+import type { PersonRankStat } from "@/lib/proposals/composer-people-rank";
 import {
   ProposalCreateContext,
   type ProposalCreateRequest,
@@ -73,21 +75,25 @@ export function ProposalCreateHost({
   const [residencyPlaces, setResidencyPlaces] = useState<ProposalPlaceOption[]>([]);
   const [fastSleepEnabled, setFastSleepEnabled] = useState(true);
   const [composerSettings, setComposerSettings] = useState<DraftComposerSettings | null>(null);
+  const [peopleRank, setPeopleRank] = useState<PersonRankStat[]>([]);
   const [editDetail, setEditDetail] = useState<ProposalDetail | null>(null);
 
   const loadCreateData = useCallback(async () => {
-    const [nextPeople, nextPlaces, nextResidency, nextFastSleep, nextComposer] = await Promise.all([
-      listPeopleAction(),
-      listProposalPlaceOptionsAction(),
-      listResidencyPlaceOptionsAction(),
-      getFastSleepEnabledAction(),
-      getDraftComposerSettingsAction(),
-    ]);
+    const [nextPeople, nextPlaces, nextResidency, nextFastSleep, nextComposer, nextRank] =
+      await Promise.all([
+        listPeopleAction(),
+        listProposalPlaceOptionsAction(),
+        listResidencyPlaceOptionsAction(),
+        getFastSleepEnabledAction(),
+        getDraftComposerSettingsAction(),
+        listComposerPeopleRankAction(),
+      ]);
     setPeople(nextPeople);
     setPlaces(nextPlaces);
     setResidencyPlaces(nextResidency);
     setFastSleepEnabled(nextFastSleep);
     setComposerSettings(nextComposer);
+    setPeopleRank(nextRank);
   }, []);
 
   const openCreate = useCallback(
@@ -200,6 +206,7 @@ export function ProposalCreateHost({
         lockedProposalType={editDetail ? undefined : lockCreateType ? createProposalType : undefined}
         initialStartAt={createInitialStartAt}
         composerSettings={composerSettings ?? undefined}
+        peopleRank={peopleRank}
       />
       <SleepingPartnerCreateDialog
         open={partnerCreateOpen}

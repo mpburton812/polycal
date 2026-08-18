@@ -89,15 +89,15 @@ test.describe("FastSleep journey", () => {
 
     await loginWithOnboardingIfNeeded(page, USERS.luke.username);
     await goToAdmin(page);
-    await expandAdminSection(page, "Network settings");
-    const toggle = page.getByLabel("Enable Bulk Sleep Booking");
+    await expandAdminSection(page, "Network Configuration");
+    const toggle = page.getByLabel("Enable Bulk Sleeping Booking");
     await expect(toggle).toBeVisible({ timeout: 15_000 });
     if (await toggle.isChecked()) {
       await toggle.click();
     }
     await page.getByRole("button", { name: /Save settings/i }).click();
     await expectToast(page, /Network settings saved/i);
-    await expect(page.getByLabel("Enable Bulk Sleep Booking")).not.toBeChecked();
+    await expect(page.getByLabel("Enable Bulk Sleeping Booking")).not.toBeChecked();
 
     await logout(page);
     await loginWithOnboardingIfNeeded(page, USERS.han.username);

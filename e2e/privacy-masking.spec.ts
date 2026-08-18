@@ -38,7 +38,6 @@ test.describe("Privacy removal (PC-280)", () => {
       dialog.getByLabel("End (optional)").first(),
       "2099-09-02T21:00",
     );
-    await dialog.getByRole("button", { name: "Solo (just me)", exact: true }).click();
     await submitProposalDraft(page, dialog);
     await logout(page);
 
