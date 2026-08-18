@@ -31,22 +31,29 @@ export async function fillProposalDateField(field: Locator, value: string): Prom
   await field.press("Tab");
 }
 
-/** Fills a MUI X DateTimePicker text field in a proposal draft dialog. */
+/**
+ * Fills a timed start. Poll drafts still use a Start datetime field; Social
+ * drafts use the calendar + Add times path, so Who can wait on dates (PC-440).
+ */
 export async function fillProposalDateTimeField(
   field: Locator,
   value: string,
 ): Promise<void> {
   const dialog = field.page().getByRole("dialog");
-  const addTimes = dialog.getByRole("button", { name: "Add times", exact: true });
-  if (
-    !(await field.isVisible().catch(() => false)) &&
-    (await addTimes.isVisible().catch(() => false))
-  ) {
-    await addTimes.click();
+  if (await field.isVisible().catch(() => false)) {
+    await field.click();
+    await field.fill(toMuiDateTimeDisplay(value));
+    await field.press("Tab");
+    return;
   }
-  await field.click();
-  await field.fill(toMuiDateTimeDisplay(value));
-  await field.press("Tab");
+  const date = value.slice(0, 10);
+  await fillProposalDateRange(dialog, date, date);
+  if (value.includes("T")) {
+    const addTimes = dialog.getByRole("button", { name: "Add times", exact: true });
+    if (await addTimes.isVisible().catch(() => false)) {
+      await addTimes.click();
+    }
+  }
 }
 
 /**

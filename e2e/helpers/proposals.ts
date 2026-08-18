@@ -59,9 +59,22 @@ export async function openNewProposalFabMenu(page: Page): Promise<void> {
 /** Opens the New Event composer without locking Social or Sleeping (PC-429). */
 export async function openNewEventComposer(page: Page): Promise<Locator> {
   await openNewProposalFabMenu(page);
-  await page.getByRole("menuitem", { name: "New Event" }).click();
+  await page.getByRole("menuitem", { name: "New Event", exact: true }).click();
   const dialog = page.getByRole("dialog");
-  await expect(dialog.getByRole("heading", { name: "New Event" })).toBeVisible({
+  await expect(dialog.getByRole("heading", { name: "New Event", exact: true })).toBeVisible({
+    timeout: 15_000,
+  });
+  return dialog;
+}
+
+/** Opens the Description-first NLP composer (PC-439). */
+export async function openNlpEventComposer(page: Page): Promise<Locator> {
+  await openNewProposalFabMenu(page);
+  await page.getByRole("menuitem", { name: "New Event (NLP Input)", exact: true }).click();
+  const dialog = page.getByRole("dialog");
+  await expect(
+    dialog.getByRole("heading", { name: "New Event (NLP Input)", exact: true }),
+  ).toBeVisible({
     timeout: 15_000,
   });
   return dialog;
@@ -77,9 +90,9 @@ export async function openEventProposalDraft(page: Page): Promise<Locator> {
 /** Opens the sleeping proposal draft dialog from the FAB menu. */
 export async function openSleepingProposalDraft(page: Page): Promise<Locator> {
   await openNewProposalFabMenu(page);
-  await page.getByRole("menuitem", { name: "New Event" }).click();
+  await page.getByRole("menuitem", { name: "New Event", exact: true }).click();
   const dialog = page.getByRole("dialog");
-  await expect(dialog.getByRole("heading", { name: "New Event" })).toBeVisible({
+  await expect(dialog.getByRole("heading", { name: "New Event", exact: true })).toBeVisible({
     timeout: 15_000,
   });
   await dialog.getByRole("button", { name: "Sleeping", exact: true }).click();
@@ -141,6 +154,13 @@ async function revealInviteeRoster(dialog: Locator): Promise<void> {
     const proposalOn = (await proposalBtn.getAttribute("aria-pressed")) === "true";
     if (!bookingOn && !proposalOn) {
       await proposalBtn.click();
+    }
+  }
+
+  if (!(await dialog.getByText("Who:", { exact: true }).isVisible().catch(() => false))) {
+    const startField = dialog.getByTestId("date-range-start").first();
+    if (await startField.isVisible().catch(() => false)) {
+      await fillProposalDateRange(dialog, "2099-10-01");
     }
   }
 
@@ -211,6 +231,9 @@ export async function setAllInviteesRequired(dialog: Locator): Promise<void> {
 
 /** Expands the draft dialog More options accordion when collapsed (PC-126). */
 export async function expandDraftMoreOptions(dialog: Locator): Promise<void> {
+  if (!(await dialog.getByRole("button", { name: /More options/i }).isVisible().catch(() => false))) {
+    await revealInviteeRoster(dialog);
+  }
   const summary = dialog.getByRole("button", { name: /More options/i });
   await expect(summary).toBeVisible();
   const expanded = await summary.getAttribute("aria-expanded");

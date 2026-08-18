@@ -77,13 +77,16 @@ test.describe("App navigation (admin)", () => {
     for (const go of [goToFeed, goToSchedule, goToPeoplePlaces]) {
       await go(page);
       await openNewProposalFabMenu(page);
-      await expect(page.getByRole("menuitem", { name: "New Event" })).toBeVisible();
+      await expect(page.getByRole("menuitem", { name: "New Event", exact: true })).toBeVisible();
+      await expect(
+        page.getByRole("menuitem", { name: "New Event (NLP Input)", exact: true }),
+      ).toBeVisible();
       await expect(page.getByRole("menuitem", { name: "Sleeping proposal" })).toHaveCount(0);
       await expect(page.getByRole("menuitem", { name: "Bulk Sleep Booking" })).toBeVisible();
       await expect(page.getByRole("menuitem", { name: "Sleeping partner proposal" })).toBeVisible();
       await expect(page.getByRole("menuitem", { name: "Residency Proposal" })).toBeVisible();
       await page.keyboard.press("Escape");
-      await expect(page.getByRole("menuitem", { name: "New Event" })).toBeHidden();
+      await expect(page.getByRole("menuitem", { name: "New Event", exact: true })).toBeHidden();
     }
   });
 });
