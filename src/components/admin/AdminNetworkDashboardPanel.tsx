@@ -46,7 +46,7 @@ export function AdminNetworkDashboardPanel({
   initialPlatformMotd?: MotdAdminState | null;
 }) {
   return (
-    <AdminCollapsibleSection title="Network">
+    <AdminCollapsibleSection title="Network Summary & MOTD">
       <Paper sx={{ ...brutalPaperSx, p: 2 }}>
         <Stack spacing={1.5}>
           <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">

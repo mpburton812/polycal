@@ -27,7 +27,6 @@ test.describe("Event category icons (PC-116)", () => {
     await dialog.getByLabel("Title").fill(title);
     await fillProposalDateTimeField(dialog.getByLabel("Start").first(), start);
     await fillProposalDateTimeField(dialog.getByLabel("End (optional)").first(), end);
-    await dialog.getByRole("button", { name: "Solo (just me)", exact: true }).click();
     await selectEventIcon(dialog, "Food and pizza event");
     await submitProposalDraft(page, dialog);
 
@@ -47,7 +46,6 @@ test.describe("Event category icons (PC-116)", () => {
     await dialog.getByLabel("Title").fill(title);
     await fillProposalDateTimeField(dialog.getByLabel("Start").first(), start);
     await fillProposalDateTimeField(dialog.getByLabel("End (optional)").first(), end);
-    await dialog.getByRole("button", { name: "Solo (just me)", exact: true }).click();
     await selectEventIcon(dialog, "Gaming event");
     await submitProposalDraft(page, dialog);
 

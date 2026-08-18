@@ -59,7 +59,6 @@ import { ProposalDraftEventFields } from "./ProposalDraftEventFields";
 import { ProposalDraftMoreOptions } from "./ProposalDraftMoreOptions";
 import {
   flagsFromTimingMode,
-  ProposalDraftScheduleModeGrid,
   timingModeFromFlags,
 } from "./ProposalDraftScheduleModeGrid";
 import { ProposalDraftSleepingFields } from "./ProposalDraftSleepingFields";
@@ -77,6 +76,10 @@ import {
 import { GARDEN_TOKENS } from "@/theme/tokens";
 import { sleepingDateToStartIso } from "@/lib/proposals/sleeping-schedule";
 import { formatSleepingDisplayTitle } from "@/lib/proposals/sleeping-display";
+import { parseEventIntent, type EventIntentChip } from "@/lib/proposals/event-intent-parse";
+import { inviteeIsSelected } from "@/lib/proposals/invitee-tap-cycle";
+import { bookingsEnabled } from "@/types/network-settings";
+import { rankPeople, type PersonRankStat } from "@/lib/proposals/composer-people-rank";
 import {
   minutesToReminderDisplay,
   reminderOffsetToMinutes,
@@ -93,6 +96,25 @@ import {
   type SlotDraft,
 } from "./proposalDraftDateUtils";
 
+/** Sage fill for the chosen chip; outlined sage for the other so it does not look disabled (PC-444). */
+const COMPOSER_TOGGLE_SX = {
+  "& .MuiToggleButton-root": {
+    color: POLY_GREEN,
+    borderColor: POLY_GREEN,
+    bgcolor: "transparent",
+    "&:hover": {
+      bgcolor: "rgba(90, 125, 96, 0.08)",
+    },
+    "&.Mui-selected": {
+      bgcolor: POLY_GREEN,
+      color: "#fff",
+      "&:hover": {
+        bgcolor: POLY_GREEN,
+      },
+    },
+  },
+};
+
 interface ProposalDraftDialogProps {
   open: boolean;
   onClose: () => void;
@@ -107,6 +129,9 @@ interface ProposalDraftDialogProps {
   initialStartAt?: string | null;
   /** Network composer flags; loaded on open when omitted (PC-423–425). */
   composerSettings?: DraftComposerSettings;
+  peopleRank?: PersonRankStat[];
+  /** Manual Title-first composer vs Description-first NLP (PC-439). */
+  composerMode?: "manual" | "nlp";
 }
 
 /**
@@ -122,6 +147,8 @@ export function ProposalDraftDialog({
   lockedProposalType,
   initialStartAt = null,
   composerSettings,
+  peopleRank = [],
+  composerMode = "manual",
 }: ProposalDraftDialogProps) {
   const router = useRouter();
   const [savedDraftId, setSavedDraftId] = useState<string | null>(null);
@@ -134,6 +161,11 @@ export function ProposalDraftDialog({
 
   const [proposalType, setProposalType] = useState<"event" | "sleeping">("event");
   const [title, setTitle] = useState("");
+  const [nlpText, setNlpText] = useState("");
+  const nlpTouchedRef = useRef<Set<string>>(new Set());
+  const nlpBlockedToastRef = useRef(false);
+  const [nlpChips, setNlpChips] = useState<EventIntentChip[]>([]);
+  const [nlpBookingBlocked, setNlpBookingBlocked] = useState(false);
   const [description, setDescription] = useState("");
   const [notes, setNotes] = useState("");
   const [locationId, setLocationId] = useState("");
@@ -147,6 +179,7 @@ export function ProposalDraftDialog({
   const [timingMode, setTimingMode] = useState<"window" | "allDay" | "poll" | null>(null);
   const [postingKind, setPostingKind] = useState<"proposal" | "booking" | null>(null);
   const [typePicked, setTypePicked] = useState(false);
+  const [typeEverChosen, setTypeEverChosen] = useState(false);
   const typeSnapshotRef = useRef<{
     event?: { postingKind: "proposal" | "booking" | null; timingMode: "window" | "allDay" | "poll" | null; inviteeChoice: "unset" | "group" | "solo" | "network"; slots: SlotDraft[]; locationId: string; locationCustom: string };
     sleeping?: { postingKind: "proposal" | "booking" | null; inviteeChoice: "unset" | "group" | "solo" | "network"; slots: SlotDraft[]; locationId: string; locationCustom: string; batchMode: boolean };
@@ -188,42 +221,44 @@ export function ProposalDraftDialog({
   const [pending, startTransition] = useTransition();
   const contentRef = useRef<HTMLDivElement>(null);
 
-  const sleepingCandidates = useMemo(
-    () =>
-      people.filter(
-        (person) =>
-          person.id !== currentUserId &&
-          person.status === "active" &&
-          acceptedPartnerIds.includes(person.id),
-      ),
-    [people, currentUserId, acceptedPartnerIds],
-  );
+  const eventCandidates = useMemo(() => {
+    const raw = people.filter(
+      (person) => person.id !== currentUserId && person.status === "active",
+    );
+    return rankPeople(raw, peopleRank);
+  }, [people, currentUserId, peopleRank]);
 
-  const eventCandidates = useMemo(
-    () => people.filter((person) => person.id !== currentUserId && person.status === "active"),
-    [people, currentUserId],
-  );
+  const sleepingCandidates = useMemo(() => {
+    const raw = people.filter(
+      (person) =>
+        person.id !== currentUserId &&
+        person.status === "active" &&
+        acceptedPartnerIds.includes(person.id),
+    );
+    return rankPeople(raw, peopleRank, { partnerIds: acceptedPartnerIds });
+  }, [people, currentUserId, acceptedPartnerIds, peopleRank]);
 
   const candidates = proposalType === "sleeping" ? sleepingCandidates : eventCandidates;
 
-  const isSoloProposal =
-    inviteeChoice === "solo" ||
-    (proposalType === "sleeping" ? intentionalSolo : soloEvent);
+  const hasSelectedInvitees = Object.values(inviteeMode).some(inviteeIsSelected);
+  const isSoloProposal = !hasSelectedInvitees;
 
   const dualPosting = composer.schedulingPosting === "proposals_and_bookings";
-  const effectivePostingKind =
-    dualPosting ? postingKind : "proposal";
-  const hidePoll = !composer.pollEnabled || effectivePostingKind === "booking";
+  const bookingsOnly = composer.schedulingPosting === "bookings_only";
+  const bookingsOn = bookingsEnabled(composer.schedulingPosting);
+  const effectivePostingKind = bookingsOnly
+    ? "booking"
+    : dualPosting
+      ? postingKind
+      : "proposal";
+  const hidePoll =
+    !composer.pollEnabled || bookingsOnly || effectivePostingKind === "booking";
   const showPostingChoice = typePicked && dualPosting;
-  const postingChosen = !dualPosting || postingKind !== null;
-  const showScheduleType =
-    typePicked &&
-    postingChosen &&
-    proposalType === "event";
+  const postingChosen = bookingsOnly || !dualPosting || postingKind !== null;
   const showProxySelect =
     typePicked &&
-    dualPosting &&
-    postingKind === "booking";
+    bookingsOn &&
+    effectivePostingKind === "booking";
   const showTypeBody = typePicked && postingChosen;
   const proxyPeople = useMemo(() => {
     const others = people.filter(
@@ -312,7 +347,7 @@ export function ProposalDraftDialog({
     const inviteeIds = isSoloProposal
       ? []
       : Object.entries(inviteeMode)
-          .filter(([, role]) => role === "required" || role === "optional")
+          .filter(([, role]) => inviteeIsSelected(role))
           .map(([userId]) => userId);
     void listSleepingLocationOptionsAction(inviteeIds).then(setSleepingLocationOptions);
   }, [open, proposalType, batchMode, isSoloProposal, inviteeMode]);
@@ -334,6 +369,130 @@ export function ProposalDraftDialog({
     setFastPlanRows((current) => (current.length === FAST_SLEEPING_GRID_DAYS ? current : buildEmptyGridRows()));
   }, [batchMode]);
 
+  useEffect(() => {
+    setSoloEvent(proposalType === "event" && isSoloProposal);
+    setIntentionalSolo(proposalType === "sleeping" && isSoloProposal);
+    setInviteeChoice(
+      isSoloProposal ? "solo" : proposalType === "sleeping" ? "network" : "group",
+    );
+  }, [isSoloProposal, proposalType]);
+
+  useEffect(() => {
+    if (showTypeBody && proposalType === "event" && timingMode === null && !isPoll) {
+      setTimingMode("allDay");
+      setAllDay(true);
+    }
+  }, [showTypeBody, proposalType, timingMode, isPoll]);
+
+  useEffect(() => {
+    if (bookingsOnly) {
+      setPostingKind("booking");
+      setIsPoll(false);
+    }
+  }, [bookingsOnly]);
+
+  useEffect(() => {
+    if (composerMode !== "nlp") return;
+    const handle = window.setTimeout(() => {
+      if (!nlpText.trim()) {
+        setNlpChips([]);
+        setNlpBookingBlocked(false);
+        nlpBlockedToastRef.current = false;
+        return;
+      }
+      const parsed = parseEventIntent({
+        text: nlpText,
+        people: people.map((person) => ({ id: person.id, displayName: person.displayName })),
+        places: places.map((place) => ({
+          id: place.id,
+          name: place.name,
+          residentUserIds: place.residentUserIds,
+        })),
+        viewerId: currentUserId,
+      });
+      setNlpChips(parsed.chips);
+      const touched = nlpTouchedRef.current;
+
+      if (parsed.needsBookingFor) {
+        const allowed =
+          bookingsOn &&
+          Boolean(parsed.sleeperUserId) &&
+          proxyPeople.some((person) => person.id === parsed.sleeperUserId);
+        if (!allowed) {
+          setNlpBookingBlocked(true);
+          if (!nlpBlockedToastRef.current) {
+            nlpBlockedToastRef.current = true;
+            showToast("Booking for others is not enabled.", "error");
+          }
+        } else {
+          setNlpBookingBlocked(false);
+          nlpBlockedToastRef.current = false;
+          if (!touched.has("posting")) {
+            setPostingKind("booking");
+            setOnBehalfOfUserId(parsed.sleeperUserId ?? "");
+          }
+        }
+      } else {
+        setNlpBookingBlocked(false);
+        nlpBlockedToastRef.current = false;
+      }
+
+      if (!touched.has("title") && parsed.title) setTitle(parsed.title);
+      if (!touched.has("type") && parsed.proposalType) {
+        setProposalType(parsed.proposalType);
+        setTypePicked(true);
+        setTypeEverChosen(true);
+      }
+      if (!touched.has("when") && parsed.startDate) {
+        const start = parsed.allDay
+          ? parsed.startDate
+          : `${parsed.startDate}T${parsed.startTime ?? "19:00"}`;
+        const endDate = parsed.endDate ?? parsed.startDate;
+        const end = parsed.allDay
+          ? endDate
+          : `${endDate}T${parsed.endTime ?? parsed.startTime ?? "21:00"}`;
+        setSlots([{ startAt: start, endAt: end, label: "" }]);
+        setAllDay(parsed.allDay);
+        setTimingMode(parsed.allDay ? "allDay" : "window");
+        setIsPoll(false);
+      }
+      if (!touched.has("who")) {
+        if (parsed.intentionalSolo) {
+          setInviteeMode({});
+        } else if (parsed.personIds.length > 0) {
+          const next: Record<string, InviteeSelection> = {};
+          const role: InviteeSelection =
+            bookingsOn && parsed.needsBookingFor ? "booked" : "required";
+          for (const id of parsed.personIds) {
+            if (id === currentUserId) continue;
+            if (id === parsed.sleeperUserId) continue;
+            next[id] = role;
+          }
+          setInviteeMode(next);
+        }
+      }
+      if (!touched.has("where")) {
+        if (parsed.locationId) {
+          setLocationId(parsed.locationId);
+          setLocationCustom("");
+        } else if (parsed.locationText) {
+          setLocationCustom(parsed.locationText);
+          setLocationId("");
+        }
+      }
+    }, 250);
+    return () => window.clearTimeout(handle);
+  }, [
+    composerMode,
+    nlpText,
+    people,
+    places,
+    currentUserId,
+    bookingsOn,
+    proxyPeople,
+    showToast,
+  ]);
+
   const timePreview = formatTimeRange(
     previewStartIso ?? null,
     previewEndIso ?? null,
@@ -354,6 +513,7 @@ export function ProposalDraftDialog({
       );
       setProposalType(toDraftableType(initialDetail.proposalType));
       setTypePicked(true);
+      setTypeEverChosen(true);
       setTitle(initialDetail.title);
       setDescription(initialDetail.description ?? "");
       setNotes(initialDetail.notes ?? "");
@@ -418,7 +578,7 @@ export function ProposalDraftDialog({
       );
     const modes: Record<string, InviteeSelection> = {};
     for (const invitee of initialDetail.invitees) {
-      if (invitee.role === "required" || invitee.role === "optional") {
+      if (invitee.role === "required" || invitee.role === "optional" || invitee.role === "booked") {
         modes[invitee.userId] = invitee.role;
       }
     }
@@ -431,8 +591,14 @@ export function ProposalDraftDialog({
     } else if (!savedDraftId) {
       setProposalType(lockedProposalType ?? "event");
       setTypePicked(Boolean(lockedProposalType));
+      setTypeEverChosen(Boolean(lockedProposalType));
       typeSnapshotRef.current = {};
       setTitle("");
+      setNlpText("");
+      setNlpChips([]);
+      nlpTouchedRef.current = new Set();
+      nlpBlockedToastRef.current = false;
+      setNlpBookingBlocked(false);
       setDescription("");
       setNotes("");
       setLocationId("");
@@ -460,7 +626,12 @@ export function ProposalDraftDialog({
             : toLocalInput(initialStartAt)
           : "";
       // Day-sheet create already chose a day — show When with Window so the prefill is visible (PC-418).
-      setTimingMode(type === "event" && startInput ? "window" : null);
+      setTimingMode(type === "event" && startInput ? "window" : type === "event" ? "allDay" : null);
+      if (type === "event" && startInput) {
+        setAllDay(false);
+      } else if (type === "event") {
+        setAllDay(true);
+      }
       setSlots([{ startAt: startInput, endAt: "", label: "" }]);
       setInviteeMode({});
       setReminderEnabled(false);
@@ -484,6 +655,7 @@ export function ProposalDraftDialog({
     );
     setProposalType(toDraftableType(detail.proposalType));
     setTypePicked(true);
+    setTypeEverChosen(true);
     setTitle(detail.title);
     setDescription(detail.description ?? "");
     setNotes(detail.notes ?? "");
@@ -533,7 +705,7 @@ export function ProposalDraftDialog({
     );
     const modes: Record<string, InviteeSelection> = {};
     for (const invitee of detail.invitees) {
-      if (invitee.role === "required" || invitee.role === "optional") {
+      if (invitee.role === "required" || invitee.role === "optional" || invitee.role === "booked") {
         modes[invitee.userId] = invitee.role;
       }
     }
@@ -572,8 +744,11 @@ export function ProposalDraftDialog({
     const invitees = isSoloProposal
       ? []
       : Object.entries(inviteeMode)
-          .filter(([, role]) => role === "required" || role === "optional")
-          .map(([userId, role]) => ({ userId, role: role as "required" | "optional" }));
+          .filter(([, role]) => inviteeIsSelected(role))
+          .map(([userId, role]) => ({
+            userId,
+            role: role as "required" | "optional" | "booked",
+          }));
 
     const timeSlots = batchMode
       ? []
@@ -744,19 +919,22 @@ export function ProposalDraftDialog({
       ? batchMode
         ? configuredBatchEntries.length > 0
         : Boolean(slots[0]?.startAt)
-      : timingMode !== null && Boolean(slots[0]?.startAt);
-  const inviteesReady =
-    batchMode ||
-    inviteeChoice === "solo" ||
-    inviteeChoice === "network" ||
-    (inviteeChoice === "group" &&
-      Object.values(inviteeMode).some((role) => role === "required" || role === "optional"));
+      : Boolean(slots[0]?.startAt);
+  const isNlp = composerMode === "nlp";
+  const nlpStarted = !isNlp || nlpText.trim().length > 0;
+  const showTitleRow = !isNlp || (nlpStarted && typePicked && proposalType === "event");
+  const showTypeRow = !isNlp || nlpStarted;
+  const showWhenFields = showTypeBody;
+  const showInvitees = showTypeBody && datesReady;
+  const showLocation = showInvitees;
+  const titleReady =
+    isNlp && proposalType === "sleeping" ? true : Boolean(title.trim());
   const submitReady =
-    Boolean(title.trim()) &&
+    titleReady &&
     typePicked &&
     postingChosen &&
     datesReady &&
-    inviteesReady;
+    !nlpBookingBlocked;
 
   function handleSubmit(confirm = false) {
     startTransition(async () => {
@@ -801,7 +979,11 @@ export function ProposalDraftDialog({
           <Stack direction="row" spacing={1} alignItems="flex-start" sx={{ mb: 1.5 }}>
             <Box sx={{ flex: 1, minWidth: 0 }}>
               <Typography variant="h6" component="h2" sx={{ fontSize: "1.1rem", fontWeight: 600 }}>
-                {isEdit ? "Edit draft" : "New Event"}
+                {isEdit
+                  ? "Edit draft"
+                  : isNlp
+                    ? "New Event (NLP Input)"
+                    : "New Event"}
               </Typography>
               <Stack direction="row" spacing={0.75} alignItems="center" flexWrap="wrap" sx={{ mt: 0.5 }}>
                 {batchMode && <Chip label="Batch" size="small" variant="outlined" />}
@@ -877,26 +1059,85 @@ export function ProposalDraftDialog({
             </Alert>
           )}
 
+          {isNlp ? (
+            <>
+          <TextField
+            label="Description"
+            value={nlpText}
+            onChange={(event) => setNlpText(event.target.value)}
+            fullWidth
+            size="small"
+            placeholder="Morgan sleeps at Katie's tonight"
+            sx={{ mb: 1 }}
+            inputProps={{ "aria-label": "Description" }}
+          />
+          {nlpChips.length > 0 ? (
+            <Stack direction="row" spacing={0.75} useFlexGap flexWrap="wrap" sx={{ mb: 1.5 }}>
+              {nlpChips.map((chip) => (
+                <Chip
+                  key={`${chip.kind}-${chip.label}`}
+                  size="small"
+                  label={`${chip.kind}: ${chip.label}`}
+                  onDelete={() => {
+                    nlpTouchedRef.current.add(
+                      chip.kind === "date" || chip.kind === "time" ? "when" : chip.kind,
+                    );
+                    setNlpChips((current) => current.filter((item) => item.kind !== chip.kind));
+                    if (chip.kind === "title") setTitle("");
+                    if (chip.kind === "location") {
+                      setLocationId("");
+                      setLocationCustom("");
+                    }
+                    if (chip.kind === "date" || chip.kind === "time") {
+                      setSlots([{ startAt: "", endAt: "", label: "" }]);
+                    }
+                  }}
+                  sx={{
+                    bgcolor:
+                      chip.kind === "title"
+                        ? "rgba(107, 143, 113, 0.2)"
+                        : chip.kind === "date"
+                          ? "rgba(139, 122, 184, 0.2)"
+                          : chip.kind === "time"
+                            ? "rgba(201, 110, 90, 0.18)"
+                            : "rgba(212, 160, 23, 0.25)",
+                  }}
+                />
+              ))}
+            </Stack>
+          ) : null}
+            </>
+          ) : null}
+          {showTitleRow ? (
           <TextField
             label="Title"
             value={title}
-            onChange={(event) => setTitle(event.target.value)}
+            onChange={(event) => {
+              nlpTouchedRef.current.add("title");
+              setTitle(event.target.value);
+            }}
             required
             fullWidth
             size="small"
             placeholder="Untitled event"
             sx={{ mb: 2 }}
           />
+          ) : null}
 
+          {showTypeRow ? (
           <Box sx={{ mb: 2 }}>
             <Typography variant="subtitle2" sx={{ fontWeight: 600, color: POLY_GREEN, mb: 1 }}>
               Social or Sleeping
             </Typography>
             <ToggleButtonGroup
               exclusive
-              value={typePicked ? proposalType : null}
+              value={typeEverChosen ? proposalType : null}
               onChange={(_, value) => {
                 if (!value) {
+                  if (!typePicked) {
+                    setTypePicked(true);
+                    return;
+                  }
                   if (proposalType === "event") {
                     typeSnapshotRef.current.event = {
                       postingKind,
@@ -953,8 +1194,8 @@ export function ProposalDraftDialog({
                     if (nextType === "event" && "timingMode" in snap) {
                       setTimingMode(snap.timingMode);
                     }
-                    if (nextType === "sleeping" && "batchMode" in snap) {
-                      setBatchMode(snap.batchMode);
+                    if (nextType === "sleeping") {
+                      setBatchMode(Boolean(initialDetail?.isBatchSleeping));
                     }
                   } else {
                     setPostingKind(null);
@@ -987,13 +1228,15 @@ export function ProposalDraftDialog({
                         setIsPoll(flags.isPoll);
                       }
                     }
-                    if (nextType === "sleeping" && "batchMode" in snap) {
-                      setBatchMode(snap.batchMode);
+                    if (nextType === "sleeping") {
+                      setBatchMode(Boolean(initialDetail?.isBatchSleeping));
                     }
                   }
                 }
                 setProposalType(nextType);
                 setTypePicked(true);
+                setTypeEverChosen(true);
+                nlpTouchedRef.current.add("type");
                 if (nextType === "event") {
                   setIntentionalSolo(false);
                 } else {
@@ -1002,29 +1245,27 @@ export function ProposalDraftDialog({
                 }
               }}
               size="small"
-              sx={{
-                "& .MuiToggleButton-root.Mui-selected": {
-                  bgcolor: POLY_GREEN,
-                  color: "#fff",
-                },
-              }}
+              sx={COMPOSER_TOGGLE_SX}
             >
               <ToggleButton value="event">Social</ToggleButton>
               <ToggleButton value="sleeping">Sleeping</ToggleButton>
             </ToggleButtonGroup>
           </Box>
+          ) : null}
 
           {showPostingChoice ? (
             <Box sx={{ mb: 2 }}>
               <Typography variant="subtitle2" sx={{ fontWeight: 600, color: POLY_GREEN, mb: 1 }}>
-                Posting
+                Proposal or Booking
+              </Typography>
+              <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 1 }}>
+                (Proposals are voted, bookings are auto-accepted)
               </Typography>
               <ToggleButtonGroup
                 exclusive
                 value={postingKind}
                 onChange={(_, value) => {
                   if (!value) {
-                    setPostingKind(null);
                     return;
                   }
                   const next = value as "proposal" | "booking";
@@ -1038,18 +1279,14 @@ export function ProposalDraftDialog({
                     setIsPoll(false);
                     setAllDay(false);
                   }
+                  nlpTouchedRef.current.add("posting");
                   setPostingKind(next);
                   if (next === "booking") {
                     setIsPoll(false);
                   }
                 }}
                 size="small"
-                sx={{
-                  "& .MuiToggleButton-root.Mui-selected": {
-                    bgcolor: POLY_GREEN,
-                    color: "#fff",
-                  },
-                }}
+                sx={COMPOSER_TOGGLE_SX}
               >
                 <ToggleButton value="proposal">Proposal</ToggleButton>
                 <ToggleButton value="booking">Booking</ToggleButton>
@@ -1076,140 +1313,97 @@ export function ProposalDraftDialog({
             </FormControl>
           ) : null}
 
-          {showScheduleType && (
-            <ProposalDraftScheduleModeGrid
-              timingMode={timingMode}
-              isRecurring={isRecurring}
-              hidePoll={hidePoll}
-              disableRecurring={false}
-              onTimingModeChange={(mode) => {
-                setTimingMode(mode);
-                const flags = flagsFromTimingMode(mode);
-                setAllDay(flags.allDay);
-                setIsPoll(flags.isPoll);
-                if (flags.isPoll) setIsRecurring(false);
-                setSlots((current) =>
-                  current.map((slot) => ({
-                    ...slot,
-                    startAt: slot.startAt
-                      ? flags.allDay
-                        ? slot.startAt.slice(0, 10)
-                        : slot.startAt.includes("T")
-                          ? slot.startAt
-                          : `${slot.startAt.slice(0, 10)}T09:00`
-                      : "",
-                    endAt: slot.endAt
-                      ? flags.allDay
-                        ? slot.endAt.slice(0, 10)
-                        : slot.endAt.includes("T")
-                          ? slot.endAt
-                          : `${slot.endAt.slice(0, 10)}T10:00`
-                      : "",
-                  })),
-                );
-              }}
-              onRecurringChange={setIsRecurring}
-            />
-          )}
-
           {showTypeBody && proposalType === "event" && (
             <ProposalDraftEventFields
               title={title}
-              onTitleChange={setTitle}
+              onTitleChange={(value) => {
+                nlpTouchedRef.current.add("title");
+                setTitle(value);
+              }}
               allDay={allDay}
+              onAllDayChange={(value) => {
+                nlpTouchedRef.current.add("when");
+                setAllDay(value);
+                setTimingMode(value ? "allDay" : "window");
+                setIsPoll(false);
+              }}
               slots={slots}
-              onSlotsChange={setSlots}
+              onSlotsChange={(next) => {
+                nlpTouchedRef.current.add("when");
+                setSlots(next);
+              }}
               isPoll={isPoll}
               applyEventStartChange={applyEventStartChange}
-              isSoloProposal={isSoloProposal}
-              inviteeChoice={inviteeChoice === "network" ? "unset" : inviteeChoice}
-              onInviteeChoiceChange={(choice) => {
-                setInviteeChoice(choice);
-                setSoloEvent(choice === "solo");
-                setIntentionalSolo(false);
-                if (choice === "solo") setInviteeMode({});
-              }}
-              hideInviteeRoles={effectivePostingKind === "booking"}
               hideTitle
-              showWhenFields={timingMode !== null}
-              showInvitees={timingMode !== null}
-              showLocation={
-                inviteeChoice === "solo" ||
-                (inviteeChoice === "group" &&
-                  Object.values(inviteeMode).some((role) => role === "required" || role === "optional"))
-              }
+              showWhenFields={showWhenFields}
+              showInvitees={showInvitees}
+              showLocation={showLocation}
+              postingKind={effectivePostingKind === "booking" ? "booking" : "proposal"}
               candidates={candidates}
+              people={people}
+              viewerId={currentUserId}
+              onBehalfOfUserId={onBehalfOfUserId}
               inviteeMode={inviteeMode}
-              setInviteeRole={setInviteeRole}
+              setInviteeRole={(id, role) => {
+                nlpTouchedRef.current.add("who");
+                setInviteeRole(id, role);
+              }}
               locationId={locationId}
               locationCustom={locationCustom}
               locationOptions={locationOptions}
-              onLocationIdChange={setLocationId}
-              onLocationCustomChange={setLocationCustom}
+              onLocationIdChange={(value) => {
+                nlpTouchedRef.current.add("where");
+                setLocationId(value);
+              }}
+              onLocationCustomChange={(value) => {
+                nlpTouchedRef.current.add("where");
+                setLocationCustom(value);
+              }}
               onClearBedroom={() => setBedroomIndex("")}
-              isRecurring={!batchMode && isRecurring}
-              recurrencePattern={recurrencePattern}
-              onRecurrencePatternChange={setRecurrencePattern}
-              recurrenceCount={recurrenceCount}
-              onRecurrenceCountChange={setRecurrenceCount}
             />
           )}
 
           {showTypeBody && proposalType === "sleeping" && (
             <ProposalDraftSleepingFields
               batchMode={batchMode}
-              onBatchModeChange={setBatchMode}
               fastPlanRows={fastPlanRows}
               onFastPlanRowsChange={setFastPlanRows}
               sleepingCandidates={sleepingCandidates}
               batchLocationOptions={batchLocationOptions}
               configuredBatchEntries={configuredBatchEntries}
               people={people}
+              viewerId={currentUserId}
+              onBehalfOfUserId={onBehalfOfUserId}
               locationOptions={locationOptions}
               pending={pending}
-              intentionalSolo={intentionalSolo}
-              onIntentionalSoloChange={(solo) => {
-                setIntentionalSolo(solo);
-                if (solo) setInviteeMode({});
-              }}
-              isSoloProposal={isSoloProposal}
-              inviteeChoice={inviteeChoice === "group" ? "unset" : inviteeChoice}
-              onInviteeChoiceChange={(choice) => {
-                setInviteeChoice(choice);
-                setIntentionalSolo(choice === "solo");
-                if (choice === "solo" || choice === "unset") setInviteeMode({});
-              }}
-              hideInviteeRoles={effectivePostingKind === "booking"}
-              showLocation={
-                inviteeChoice === "solo" ||
-                (inviteeChoice === "network" &&
-                  Object.values(inviteeMode).some(
-                    (role) => role === "required" || role === "optional",
-                  ))
-              }
+              postingKind={effectivePostingKind === "booking" ? "booking" : "proposal"}
+              showInvitees={showInvitees}
+              showLocation={showLocation}
               candidates={candidates}
               inviteeMode={inviteeMode}
-              setInviteeRole={setInviteeRole}
+              setInviteeRole={(id, role) => {
+                nlpTouchedRef.current.add("who");
+                setInviteeRole(id, role);
+              }}
               slots={slots}
               onSlotsChange={setSlots}
               locationId={locationId}
               locationCustom={locationCustom}
               bedroomIndex={bedroomIndex}
               bedroomOptions={bedroomOptions}
-              onLocationIdChange={setLocationId}
-              onLocationCustomChange={setLocationCustom}
+              onLocationIdChange={(value) => {
+                nlpTouchedRef.current.add("where");
+                setLocationId(value);
+              }}
+              onLocationCustomChange={(value) => {
+                nlpTouchedRef.current.add("where");
+                setLocationCustom(value);
+              }}
               onBedroomIndexChange={setBedroomIndex}
             />
           )}
 
-          {showTypeBody &&
-          (batchMode ||
-            inviteeChoice === "solo" ||
-            (inviteeChoice === "group" &&
-              Object.values(inviteeMode).some(
-                (role) => role === "required" || role === "optional",
-              )) ||
-            inviteeChoice === "network") ? (
+          {showInvitees ? (
           <ProposalDraftMoreOptions
             proposalType={proposalType}
             description={description}
@@ -1226,6 +1420,24 @@ export function ProposalDraftDialog({
             onReminderUnitChange={setReminderUnit}
             postToFeed={postToFeed}
             onPostToFeedChange={setPostToFeed}
+            isPoll={isPoll}
+            hidePoll={hidePoll}
+            onPollChange={(value) => {
+              setIsPoll(value);
+              if (value) {
+                setTimingMode("poll");
+                setAllDay(false);
+                setIsRecurring(false);
+              } else {
+                setTimingMode(allDay ? "allDay" : "window");
+              }
+            }}
+            isRecurring={isRecurring}
+            onRecurringChange={setIsRecurring}
+            recurrencePattern={recurrencePattern}
+            onRecurrencePatternChange={setRecurrencePattern}
+            recurrenceCount={recurrenceCount}
+            onRecurrenceCountChange={setRecurrenceCount}
           />
           ) : null}
         </CardContent>

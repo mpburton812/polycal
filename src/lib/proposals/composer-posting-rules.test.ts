@@ -85,4 +85,34 @@ describe("assertComposerPostingRules (PC-427–PC-428)", () => {
     });
     expect(result.ok).toBe(false);
   });
+
+  it("allows booking and Booking for under Just Bookings", () => {
+    expect(
+      assertComposerPostingRules({
+        ...base,
+        schedulingPosting: "bookings_only",
+        postingKind: "booking",
+        onBehalfOfUserId: "leia",
+      }),
+    ).toEqual({ ok: true });
+  });
+
+  it("rejects a scheduling proposal under Just Bookings", () => {
+    const result = assertComposerPostingRules({
+      ...base,
+      schedulingPosting: "bookings_only",
+      postingKind: "proposal",
+    });
+    expect(result.ok).toBe(false);
+  });
+
+  it("rejects a new poll under Just Bookings", () => {
+    const result = assertComposerPostingRules({
+      ...base,
+      schedulingPosting: "bookings_only",
+      postingKind: "booking",
+      isPoll: true,
+    });
+    expect(result.ok).toBe(false);
+  });
 });

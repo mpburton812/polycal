@@ -3,6 +3,7 @@
 import AddIcon from "@mui/icons-material/Add";
 import { Fab, Menu, MenuItem } from "@mui/material";
 import dynamic from "next/dynamic";
+import { usePathname } from "next/navigation";
 import { useCallback, useMemo, useState } from "react";
 
 import { getFastSleepEnabledAction } from "@/actions/fast-sleep";
@@ -11,12 +12,14 @@ import {
   type DraftComposerSettings,
 } from "@/actions/network-settings";
 import {
+  listComposerPeopleRankAction,
   listProposalPlaceOptionsAction,
   listResidencyPlaceOptionsAction,
   type ProposalDetail,
   type ProposalPlaceOption,
 } from "@/actions/proposals";
 import { listPeopleAction, type PersonSummary } from "@/actions/users";
+import type { PersonRankStat } from "@/lib/proposals/composer-people-rank";
 import {
   ProposalCreateContext,
   type ProposalCreateRequest,
@@ -73,21 +76,28 @@ export function ProposalCreateHost({
   const [residencyPlaces, setResidencyPlaces] = useState<ProposalPlaceOption[]>([]);
   const [fastSleepEnabled, setFastSleepEnabled] = useState(true);
   const [composerSettings, setComposerSettings] = useState<DraftComposerSettings | null>(null);
+  const [peopleRank, setPeopleRank] = useState<PersonRankStat[]>([]);
   const [editDetail, setEditDetail] = useState<ProposalDetail | null>(null);
+  const [composerMode, setComposerMode] = useState<"manual" | "nlp">("manual");
+  const pathname = usePathname();
+  const hideFab = pathname === "/feed" || pathname === "/people-places";
 
   const loadCreateData = useCallback(async () => {
-    const [nextPeople, nextPlaces, nextResidency, nextFastSleep, nextComposer] = await Promise.all([
-      listPeopleAction(),
-      listProposalPlaceOptionsAction(),
-      listResidencyPlaceOptionsAction(),
-      getFastSleepEnabledAction(),
-      getDraftComposerSettingsAction(),
-    ]);
+    const [nextPeople, nextPlaces, nextResidency, nextFastSleep, nextComposer, nextRank] =
+      await Promise.all([
+        listPeopleAction(),
+        listProposalPlaceOptionsAction(),
+        listResidencyPlaceOptionsAction(),
+        getFastSleepEnabledAction(),
+        getDraftComposerSettingsAction(),
+        listComposerPeopleRankAction(),
+      ]);
     setPeople(nextPeople);
     setPlaces(nextPlaces);
     setResidencyPlaces(nextResidency);
     setFastSleepEnabled(nextFastSleep);
     setComposerSettings(nextComposer);
+    setPeopleRank(nextRank);
   }, []);
 
   const openCreate = useCallback(
@@ -98,6 +108,7 @@ export function ProposalCreateHost({
           setCreateProposalType(request.lockedType);
           setLockCreateType(true);
           setCreateInitialStartAt(request.initialStartAt ?? null);
+          setComposerMode("manual");
           setCreateOpen(true);
           return;
         }
@@ -107,7 +118,20 @@ export function ProposalCreateHost({
     [loadCreateData],
   );
 
-  const contextValue = useMemo(() => ({ openCreate }), [openCreate]);
+  const openEdit = useCallback(
+    (detail: ProposalDetail) => {
+      void loadCreateData().then(() => {
+        setEditDetail(detail);
+        setLockCreateType(false);
+        setCreateInitialStartAt(null);
+        setComposerMode("manual");
+        setCreateOpen(true);
+      });
+    },
+    [loadCreateData],
+  );
+
+  const contextValue = useMemo(() => ({ openCreate, openEdit }), [openCreate, openEdit]);
 
   async function handleFabClick(event: React.MouseEvent<HTMLElement>) {
     const anchor = event.currentTarget;
@@ -118,6 +142,8 @@ export function ProposalCreateHost({
   return (
     <ProposalCreateContext.Provider value={contextValue}>
       {children}
+      {hideFab ? null : (
+        <>
       <Fab
         color="primary"
         aria-label="New proposal"
@@ -153,10 +179,24 @@ export function ProposalCreateHost({
             setCreateProposalType("event");
             setLockCreateType(false);
             setCreateInitialStartAt(null);
+            setComposerMode("manual");
             setCreateOpen(true);
           }}
         >
           New Event
+        </MenuItem>
+        <MenuItem
+          onClick={() => {
+            setFabMenuAnchor(null);
+            setEditDetail(null);
+            setCreateProposalType("event");
+            setLockCreateType(false);
+            setCreateInitialStartAt(null);
+            setComposerMode("nlp");
+            setCreateOpen(true);
+          }}
+        >
+          New Event (NLP Input)
         </MenuItem>
         {fastSleepEnabled ? (
           <MenuItem
@@ -186,6 +226,8 @@ export function ProposalCreateHost({
           Residency Proposal
         </MenuItem>
       </Menu>
+        </>
+      )}
       <ProposalDraftDialog
         open={createOpen}
         onClose={() => {
@@ -200,6 +242,8 @@ export function ProposalCreateHost({
         lockedProposalType={editDetail ? undefined : lockCreateType ? createProposalType : undefined}
         initialStartAt={createInitialStartAt}
         composerSettings={composerSettings ?? undefined}
+        peopleRank={peopleRank}
+        composerMode={editDetail ? "manual" : composerMode}
       />
       <SleepingPartnerCreateDialog
         open={partnerCreateOpen}

@@ -4,6 +4,24 @@ All notable changes to PolyCal are documented here.
 
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [2026.08.18c] - 2026-08-18
+
+### Changed
+
+- PC-443–PC-447: New Event chips stay sage-green; posting is Proposal or Booking (voted vs auto-accepted); Batch nights removed from New Event sleeping. Proposed detail: Cancel Event, Back to Draft, no Delete proposal or Reschedule. FAB hidden on Feed and People & Places. Admin Event Types adds Just Bookings (forces booking, disables Poll; partner/residency proposals remain). Change control: `2026.08.18c`.
+
+## [2026.08.18b] - 2026-08-18
+
+### Changed
+
+- PC-438–PC-442: Split FAB New Event vs New Event (NLP Input). Manual Title-first disclosure (Who/Where after dates). NLP Description-first with Booking-for from a named sleeper, or toast when bookings are off. Sleeping parser covers host vs sleeper, alone, their place, and Fri–Sat weekend nights. Change control: `2026.08.18b`.
+
+## [2026.08.18a] - 2026-08-18
+
+### Changed
+
+- PC-432–PC-437: New Event composer — NLP Description + chips, calendar tap/drag + Social time slider, Who chips, Where home buttons; Poll/Recurring in More options; Admin Network Summary & MOTD and Network Configuration regroup. Change control: `2026.08.18a`.
+
 ## [2026.07.09] - 2026-07-09
 
 ### Added

@@ -20,7 +20,7 @@ test.describe("Proposal invitee journey", () => {
     await fillProposalDateTimeField(draftDialog.getByLabel("Start").first(), "2099-07-10T18:00");
     await setInviteeRequired(draftDialog, USERS.leia.displayName);
     await expandDraftMoreOptions(draftDialog);
-    await draftDialog.getByLabel(/Description/i).fill("Single invitee then attendee add.");
+    await draftDialog.getByLabel(/Details/i).fill("Single invitee then attendee add.");
     await submitProposalDraft(page, draftDialog);
 
     await logout(page);

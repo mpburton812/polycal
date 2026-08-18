@@ -8,7 +8,9 @@ import { expandAdminSection } from "./helpers/admin";
 import { goToAdmin, goToProposals, selectProposalTab } from "./helpers/navigation";
 import {
   exitDraftDialog,
+  expandDraftMoreOptions,
   openEventProposalDraft,
+  openNewProposalFabMenu,
   proposalCard,
   submitProposalDraft,
 } from "./helpers/proposals";
@@ -31,6 +33,7 @@ test.describe("Direct booking and Booking for journey", () => {
       await expect(defaultDraft.getByRole("button", { name: "Proposal", exact: true })).toHaveCount(
         0,
       );
+      await expandDraftMoreOptions(defaultDraft);
       await expect(defaultDraft.getByRole("button", { name: "Poll", exact: true })).toBeVisible();
       await expect(defaultDraft.getByLabel("Booking for")).toHaveCount(0);
       await exitDraftDialog(defaultDraft);
@@ -42,25 +45,33 @@ test.describe("Direct booking and Booking for journey", () => {
       await goToProposals(page);
 
       const dualDraft = await openEventProposalDraft(page);
+      await expect(dualDraft.getByText("Proposal or Booking")).toBeVisible();
+      await expect(
+        dualDraft.getByText("(Proposals are voted, bookings are auto-accepted)"),
+      ).toBeVisible();
       await expect(dualDraft.getByRole("button", { name: "Proposal", exact: true })).toBeVisible();
       await expect(dualDraft.getByRole("button", { name: "Booking", exact: true })).toBeVisible();
       await expect(dualDraft.getByRole("button", { name: "Window", exact: true })).toHaveCount(0);
       await expect(dualDraft.getByLabel("Booking for")).toHaveCount(0);
 
       await dualDraft.getByRole("button", { name: "Booking", exact: true }).click();
+      await expandDraftMoreOptions(dualDraft);
       await expect(dualDraft.getByRole("button", { name: "Poll", exact: true })).toHaveCount(0);
-      await expect(dualDraft.getByRole("button", { name: "Window", exact: true })).toBeVisible();
+      await expect(dualDraft.getByRole("button", { name: "Add times", exact: true })).toBeVisible();
+      await expect(dualDraft.getByRole("button", { name: "Window", exact: true })).toHaveCount(0);
       await expect(dualDraft.getByRole("button", { name: "Add to calendar" })).toBeVisible();
       await expect(dualDraft.getByLabel("Booking for")).toBeVisible();
 
       await dualDraft.getByLabel("Title").fill(title);
       await selectDraftScheduleMode(dualDraft, "Window");
       await fillProposalDateTimeField(dualDraft.getByLabel("Start").first(), "2099-11-15T10:00");
-      await dualDraft.getByRole("button", { name: "With Others", exact: true }).click();
       await expect(
         dualDraft.getByRole("button", { name: /Leia Organa required/i }),
       ).toHaveCount(0);
-      await dualDraft.getByRole("button", { name: /Leia Organa include/i }).click();
+      await dualDraft.getByRole("button", { name: /Leia Organa not selected/i }).click();
+      await expect(
+        dualDraft.getByRole("button", { name: /Leia Organa booked/i }),
+      ).toHaveAttribute("aria-pressed", "true");
       await submitProposalDraft(page, dualDraft);
 
       await selectProposalTab(page, "Resolved");
@@ -107,8 +118,44 @@ test.describe("Direct booking and Booking for journey", () => {
       await goToProposals(page);
       const noPollDraft = await openEventProposalDraft(page);
       await noPollDraft.getByRole("button", { name: "Proposal", exact: true }).click();
+      await expandDraftMoreOptions(noPollDraft);
       await expect(noPollDraft.getByRole("button", { name: "Poll", exact: true })).toHaveCount(0);
       await exitDraftDialog(noPollDraft);
+    } finally {
+      await restoreDefaultComposerSettings(page);
+    }
+  });
+
+  test("Just Bookings forces New Event bookings, disables Poll, and keeps partner proposals", async ({
+    page,
+  }) => {
+    test.setTimeout(180_000);
+
+    try {
+      await setPostingMode(page, "Just Bookings");
+      await openNetworkSettings(page);
+      await expect(page.getByLabel("Enable Poll")).toBeDisabled();
+      await expect(page.getByLabel("Enable Poll")).not.toBeChecked();
+
+      await logout(page);
+      await loginWithOnboardingIfNeeded(page, USERS.han.username);
+      await goToProposals(page);
+      const bookingsOnlyDraft = await openEventProposalDraft(page);
+      await expect(bookingsOnlyDraft.getByRole("button", { name: "Proposal", exact: true })).toHaveCount(
+        0,
+      );
+      await expect(bookingsOnlyDraft.getByRole("button", { name: "Booking", exact: true })).toHaveCount(
+        0,
+      );
+      await expect(bookingsOnlyDraft.getByRole("button", { name: "Add to calendar" })).toBeVisible();
+      await expect(bookingsOnlyDraft.getByLabel("Booking for")).toBeVisible();
+      await expandDraftMoreOptions(bookingsOnlyDraft);
+      await expect(bookingsOnlyDraft.getByRole("button", { name: "Poll", exact: true })).toHaveCount(0);
+      await exitDraftDialog(bookingsOnlyDraft);
+      await openNewProposalFabMenu(page);
+      await expect(page.getByRole("menuitem", { name: "Sleeping partner proposal" })).toBeVisible();
+      await expect(page.getByRole("menuitem", { name: "Residency Proposal" })).toBeVisible();
+      await page.keyboard.press("Escape");
     } finally {
       await restoreDefaultComposerSettings(page);
     }
@@ -117,7 +164,7 @@ test.describe("Direct booking and Booking for journey", () => {
 
 async function openNetworkSettings(page: Page): Promise<void> {
   await goToAdmin(page);
-  await expandAdminSection(page, "Network settings");
+  await expandAdminSection(page, "Network Configuration");
 }
 
 async function saveNetworkSettings(page: Page): Promise<void> {
@@ -140,11 +187,11 @@ async function selectLabeledCombobox(
 
 async function setPostingMode(
   page: Page,
-  mode: "Just Proposals" | "Proposals and Bookings",
+  mode: "Just Proposals" | "Proposals and Bookings" | "Just Bookings",
 ): Promise<void> {
   await loginWithOnboardingIfNeeded(page, USERS.luke.username);
   await openNetworkSettings(page);
-  await selectLabeledCombobox(page, "Proposal posting", mode);
+  await selectLabeledCombobox(page, "Event Types", mode);
   await saveNetworkSettings(page);
 }
 
@@ -174,11 +221,13 @@ async function restoreDefaultComposerSettings(page: Page): Promise<void> {
   try {
     await loginWithOnboardingIfNeeded(page, USERS.luke.username);
     await openNetworkSettings(page);
+    // Just Bookings disables Enable Poll; switch Event Types first so the toggle is clickable.
+    await selectLabeledCombobox(page, "Event Types", "Just Proposals");
     const poll = page.getByLabel("Enable Poll");
+    await expect(poll).toBeEnabled({ timeout: 15_000 });
     if (!(await poll.isChecked())) {
       await poll.click();
     }
-    await selectLabeledCombobox(page, "Proposal posting", "Just Proposals");
     await saveNetworkSettings(page);
   } catch {
     // Best-effort restore so later serial specs keep default Poll-on / Just Proposals.

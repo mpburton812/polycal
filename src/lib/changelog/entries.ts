@@ -28,6 +28,95 @@ import { CHANGELOG_ARCHIVE } from "./entries.archive";
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "2026.08.18c",
+    date: "2026-08-18",
+    summary:
+      "New Event selection styling, proposed Cancel Event / Back to Draft, FAB off Feed and People & Places, Admin Event Types Just Bookings (PC-443–PC-447).",
+    changes: [
+      {
+        type: "changed",
+        description:
+          "New Event keeps Social/Sleeping and Proposal/Booking chips sage-green; posting is labeled Proposal or Booking with a voted vs auto-accepted caption; Batch nights is removed from new sleeping drafts (PC-444).",
+      },
+      {
+        type: "changed",
+        description:
+          "Proposed detail always shows Cancel Event, drops Delete proposal and Reschedule, and adds Back to Draft to reopen the composer (PC-445).",
+      },
+      {
+        type: "changed",
+        description:
+          "Sage create FAB is hidden on Feed and People & Places; it remains on Schedule and Proposals (PC-446).",
+      },
+      {
+        type: "added",
+        description:
+          "Admin Event Types includes Just Bookings, which forces calendar bookings on New Event, turns Poll off, and leaves sleeping-partner and residency proposals unchanged (PC-447).",
+      },
+    ],
+  },
+  {
+    version: "2026.08.18b",
+    date: "2026-08-18",
+    summary:
+      "Split New Event vs NLP composer; sleeping NLP books for a named sleeper (PC-438–PC-442).",
+    changes: [
+      {
+        type: "changed",
+        description:
+          "FAB lists New Event then New Event (NLP Input); calendar create stays on the manual composer (PC-439).",
+      },
+      {
+        type: "changed",
+        description:
+          "Manual composer is Title-first: type, posting, calendar, then Who and Where after dates (PC-440).",
+      },
+      {
+        type: "changed",
+        description:
+          "NLP composer is Description-first; a named sleeper becomes Booking-for, or toasts when bookings are off (PC-441).",
+      },
+      {
+        type: "changed",
+        description:
+          "Sleeping NLP parses sleeps/staying/spending the night, host vs sleeper, alone, their place, and Fri–Sat weekend nights (PC-442).",
+      },
+    ],
+  },
+  {
+    version: "2026.08.18a",
+    date: "2026-08-18",
+    summary:
+      "New Event composer: NLP Description, calendar tap/drag, Who chips, Where homes; Admin Network Configuration (PC-432–PC-437).",
+    changes: [
+      {
+        type: "changed",
+        description:
+          "New Event Description parses title, dates, times, people, and places; chips visualize Title/Date/Time/Location (PC-433).",
+      },
+      {
+        type: "changed",
+        description:
+          "Calendar tap/drag replaces Window vs All Day; Social Add times slider; Poll and Recurring move to More options (PC-434).",
+      },
+      {
+        type: "changed",
+        description:
+          "Who avatar chips tap-cycle required/optional/booked with ranking; empty Who is Solo (PC-435).",
+      },
+      {
+        type: "changed",
+        description:
+          "Where shows homes of selected people (My Place first, or Booking-for); custom location unchanged (PC-436).",
+      },
+      {
+        type: "changed",
+        description:
+          "Admin Network → Network Summary & MOTD; Network settings → Network Configuration with regrouped subsections (PC-437).",
+      },
+    ],
+  },
+  {
     version: "2026.08.17b",
     date: "2026-08-17",
     summary:

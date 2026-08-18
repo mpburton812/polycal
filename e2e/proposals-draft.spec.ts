@@ -68,7 +68,7 @@ test.describe("Proposal submit and conflict warnings", () => {
     await fillProposalDateTimeField(dialog.getByLabel("Start").first(), "2099-08-01T10:00");
     await setInviteeRequired(dialog, USERS.leia.displayName);
     await expandDraftMoreOptions(dialog);
-    await dialog.getByLabel(/Description/i).fill("Needs invitee vote.");
+    await dialog.getByLabel(/Details/i).fill("Needs invitee vote.");
     await submitProposalDraft(page, dialog);
 
     await selectProposalTab(page, "Proposed");

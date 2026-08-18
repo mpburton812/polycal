@@ -14,6 +14,7 @@ import {
   Select,
   Stack,
   TextField,
+  ToggleButton,
   Typography,
 } from "@mui/material";
 
@@ -41,11 +42,20 @@ export interface ProposalDraftMoreOptionsProps {
   /** Post lifecycle milestones to Feed (PC-414). Default off. */
   postToFeed: boolean;
   onPostToFeedChange: (value: boolean) => void;
+  isPoll?: boolean;
+  onPollChange?: (value: boolean) => void;
+  hidePoll?: boolean;
+  isRecurring?: boolean;
+  onRecurringChange?: (value: boolean) => void;
+  recurrencePattern?: "daily" | "weekly" | "monthly" | "yearly";
+  onRecurrencePatternChange?: (value: "daily" | "weekly" | "monthly" | "yearly") => void;
+  recurrenceCount?: number;
+  onRecurrenceCountChange?: (value: number) => void;
 }
 
 /**
  * Collapsed “More options” accordion for draft proposals (PC-132).
- * Recurrence lives under date fields when Recurring is selected (PC-171).
+ * Poll and Recurring live here so the primary path stays calendar → Who → Where (PC-434).
  */
 export function ProposalDraftMoreOptions({
   proposalType,
@@ -63,6 +73,15 @@ export function ProposalDraftMoreOptions({
   onReminderUnitChange,
   postToFeed,
   onPostToFeedChange,
+  isPoll = false,
+  onPollChange,
+  hidePoll = false,
+  isRecurring = false,
+  onRecurringChange,
+  recurrencePattern = "weekly",
+  onRecurrencePatternChange,
+  recurrenceCount = 4,
+  onRecurrenceCountChange,
 }: ProposalDraftMoreOptionsProps) {
   return (
     <Accordion
@@ -82,20 +101,84 @@ export function ProposalDraftMoreOptions({
       </AccordionSummary>
       <AccordionDetails>
         <Stack spacing={2}>
+          {proposalType === "event" && onPollChange && !hidePoll ? (
+            <ToggleButton
+              value="poll"
+              selected={isPoll}
+              onClick={() => {
+                const next = !isPoll;
+                onPollChange(next);
+                if (next) onRecurringChange?.(false);
+              }}
+              size="small"
+              sx={{ alignSelf: "flex-start" }}
+            >
+              Poll
+            </ToggleButton>
+          ) : null}
+          {proposalType === "event" && onRecurringChange ? (
+            <>
+              <ToggleButton
+                value="recurring"
+                selected={isRecurring}
+                disabled={isPoll}
+                onClick={() => onRecurringChange(!isRecurring)}
+                size="small"
+                sx={{ alignSelf: "flex-start" }}
+              >
+                Recurring
+              </ToggleButton>
+              {isRecurring && onRecurrencePatternChange && onRecurrenceCountChange ? (
+                <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
+                  <FormControl fullWidth size="small">
+                    <InputLabel id="recurrence-pattern-label">Pattern</InputLabel>
+                    <Select
+                      labelId="recurrence-pattern-label"
+                      label="Pattern"
+                      value={recurrencePattern}
+                      onChange={(event) =>
+                        onRecurrencePatternChange(
+                          event.target.value as "daily" | "weekly" | "monthly" | "yearly",
+                        )
+                      }
+                    >
+                      <MenuItem value="daily">Daily</MenuItem>
+                      <MenuItem value="weekly">Weekly</MenuItem>
+                      <MenuItem value="monthly">Monthly</MenuItem>
+                      <MenuItem value="yearly">Yearly</MenuItem>
+                    </Select>
+                  </FormControl>
+                  <TextField
+                    label="Occurrences"
+                    type="number"
+                    size="small"
+                    value={recurrenceCount}
+                    onChange={(event) =>
+                      onRecurrenceCountChange(
+                        Math.min(52, Math.max(2, Number(event.target.value) || 2)),
+                      )
+                    }
+                    inputProps={{ min: 2, max: 52 }}
+                    sx={{ width: { xs: "100%", sm: 140 } }}
+                  />
+                </Stack>
+              ) : null}
+            </>
+          ) : null}
           {proposalType === "sleeping" && (
             <Typography variant="caption" color="text.secondary">
               Sleeping titles are auto-generated from people, place, and status.
             </Typography>
           )}
           <TextField
-            label="Description (optional)"
+            label="Details (optional)"
             value={description}
             onChange={(event) => onDescriptionChange(event.target.value)}
             fullWidth
             multiline
             minRows={2}
             size="small"
-            inputProps={{ maxLength: LONG_TEXT_MAX }}
+            inputProps={{ maxLength: LONG_TEXT_MAX, "aria-label": "Details" }}
           />
           <TextField
             label="Notes (optional)"

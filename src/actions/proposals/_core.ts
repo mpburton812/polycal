@@ -83,6 +83,7 @@ import {
 import { isSleepingLikeType } from "@/lib/proposals/sleeping-like";
 import { loadNetworkSettings } from "@/lib/networks/settings";
 import { assertComposerPostingRules } from "@/lib/proposals/composer-posting-rules";
+import { bookingsEnabled } from "@/types/network-settings";
 import { buildPartnershipProposalCopy } from "@/lib/partnerships/copy";
 import type { UserRole } from "@/types/user";
 
@@ -228,6 +229,7 @@ function mapPlaceOption(row: {
   bedroomNames: string | null;
   owners?: string[];
   residents?: string[];
+  residentUserIds?: string[];
 }): ProposalPlaceOption {
   const names = parseBedroomNames(row.bedroomNames);
   return {
@@ -240,6 +242,7 @@ function mapPlaceOption(row: {
         : Array.from({ length: row.bedroomCount }, (_, index) => `Bedroom ${index + 1}`),
     owners: row.owners ?? [],
     residents: row.residents ?? [],
+    residentUserIds: row.residentUserIds ?? [],
   };
 }
 
@@ -295,6 +298,45 @@ export async function listAcceptedSleepingPartnerIdsAction(): Promise<string[]> 
   if (!session?.user) return [];
   const db = getDb();
   return [...(await loadAcceptedSleepingPartnerIds(db, session.user.id))];
+}
+
+/**
+ * Interaction frequency/recency for composer Who-chip sort (PC-435).
+ */
+export async function listComposerPeopleRankAction(): Promise<
+  Array<{ userId: string; inviteCount: number; lastAt: string | null }>
+> {
+  await ensureDbReady();
+  const networkSession = await requireNetworkSession();
+  if (!networkSession.ok) return [];
+  const db = getDb();
+  const networkId = networkSession.user.activeNetworkId;
+  const viewerId = networkSession.user.id;
+  const rows = await db
+    .select({
+      userId: proposalInvitees.userId,
+      createdAt: proposalInvitees.createdAt,
+      proposerId: proposals.proposerId,
+    })
+    .from(proposalInvitees)
+    .innerJoin(proposals, eq(proposalInvitees.proposalId, proposals.id))
+    .where(eq(proposals.networkId, networkId));
+
+  const stats = new Map<string, { inviteCount: number; lastAt: string | null }>();
+  for (const row of rows) {
+    const otherId =
+      row.proposerId === viewerId
+        ? row.userId
+        : row.userId === viewerId
+          ? row.proposerId
+          : null;
+    if (!otherId || otherId === viewerId) continue;
+    const current = stats.get(otherId) ?? { inviteCount: 0, lastAt: null };
+    current.inviteCount += 1;
+    if (!current.lastAt || row.createdAt > current.lastAt) current.lastAt = row.createdAt;
+    stats.set(otherId, current);
+  }
+  return [...stats.entries()].map(([userId, value]) => ({ userId, ...value }));
 }
 
 /**
@@ -1810,7 +1852,7 @@ export async function getProposalDetailAction(
         (row.proposalType === "sleeping"
           ? canManageSleepingAttendees(isProposer, isAdmin)
           : isProposer || isAdmin || isInvitee) &&
-        networkSettings?.schedulingPosting === "proposals_and_bookings",
+        bookingsEnabled(networkSettings?.schedulingPosting ?? "proposals_only"),
       canPostToFeed:
         row.state === "resolved" &&
         (isProposer || isAdmin) &&

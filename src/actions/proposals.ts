@@ -29,6 +29,7 @@ export {
   createDraftProposalAction,
   getProposalDetailAction,
   listAcceptedSleepingPartnerIdsAction,
+  listComposerPeopleRankAction,
   listProposalPlaceOptionsAction,
   listResidencyPlaceOptionsAction,
   listSleepingLocationOptionsAction,
@@ -50,6 +51,7 @@ export {
   redraftProposalAction,
   rescheduleProposalAction,
   respondAttendeeUpdateAction,
+  returnProposedToDraftAction,
   revokeResolvedAcceptanceAction,
   updateResolvedAttendeesAction,
 } from "./proposals/lifecycle";
