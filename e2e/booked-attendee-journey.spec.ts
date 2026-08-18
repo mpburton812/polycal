@@ -43,7 +43,7 @@ test.describe("Booked attendee and Post to Feed journeys", () => {
       await page.getByRole("option", { name: "Booked" }).click();
       await detail.getByRole("button", { name: "Add", exact: true }).click();
       await expect(detail.getByText(USERS.han.displayName)).toBeVisible({ timeout: 15_000 });
-      await expect(detail.getByText("booked", { exact: true })).toBeVisible();
+      await expect(detail.locator(".MuiChip-root").filter({ hasText: /^Booked$/ })).toBeVisible();
       await detail.getByRole("button", { name: "Close" }).click();
 
       await logout(page);

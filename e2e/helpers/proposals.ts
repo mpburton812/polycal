@@ -7,7 +7,12 @@ import { expectToast } from "./toast";
 /** Locates a proposal Kanban card by exact title heading. */
 export function proposalCard(page: Page, title: string | RegExp) {
   return page.locator(".MuiCard-root").filter({
-    has: page.getByRole("heading", { name: title, level: 2 }),
+    has: page.getByRole("heading", {
+      name: title,
+      level: 2,
+      // String titles must not substring-match recurring children (`Title — Tue, Sep 8`).
+      exact: typeof title === "string",
+    }),
   });
 }
 

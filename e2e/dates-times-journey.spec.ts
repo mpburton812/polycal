@@ -12,6 +12,7 @@ import { dismissMotdDialogIfOpen } from "./helpers/motd";
 import {
   openEventProposalDraft,
   proposalCard,
+  proposalCardsWithPrefix,
   setInviteeRequired,
   submitProposalDraft,
 } from "./helpers/proposals";
@@ -165,9 +166,11 @@ test.describe("Proposal When dates and times journey", () => {
     await selectDraftScheduleMode(dialog, "All Day");
     await selectDraftScheduleMode(dialog, "Recurring");
     await fillProposalDateRange(dialog, "2099-09-01", "2099-09-01");
+    await dialog.getByLabel("Occurrences").fill("4");
     await dialog.getByRole("button", { name: "Solo (just me)", exact: true }).click();
     await submitProposalDraft(page, dialog);
     await selectProposalTab(page, "Resolved");
-    await expect(proposalCard(page, title)).toBeVisible();
+    // Parent keeps the exact title; children use `Title — weekday, month day`.
+    await expect(proposalCardsWithPrefix(page, title)).toHaveCount(4, { timeout: 20_000 });
   });
 });

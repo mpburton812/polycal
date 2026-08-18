@@ -29,7 +29,7 @@ test.describe("New Event composer journey", () => {
     await expect(dialog.getByRole("button", { name: "Sleeping", exact: true })).toBeVisible();
     await expect(dialog.getByRole("button", { name: "Window", exact: true })).toHaveCount(0);
     await expect(dialog.getByRole("button", { name: "With Others", exact: true })).toHaveCount(0);
-    await expect(dialog.getByLabel("Location (optional)")).toHaveCount(0);
+    await expect(dialog.getByRole("combobox", { name: "Location (optional)" })).toHaveCount(0);
     await expect(dialog.getByRole("button", { name: /More options/i })).toHaveCount(0);
     await expect(dialog.getByRole("button", { name: "Proposal", exact: true })).toHaveCount(0);
     await expect(dialog.getByRole("button", { name: "Booking", exact: true })).toHaveCount(0);
@@ -43,7 +43,7 @@ test.describe("New Event composer journey", () => {
     await selectDraftScheduleMode(dialog, "Window");
     await expect(dialog.getByLabel("Start").first()).toBeVisible();
     await expect(dialog.getByRole("button", { name: "With Others", exact: true })).toBeVisible();
-    await expect(dialog.getByLabel("Location (optional)")).toHaveCount(0);
+    await expect(dialog.getByRole("combobox", { name: "Location (optional)" })).toHaveCount(0);
     await expect(dialog.getByRole("button", { name: /More options/i })).toHaveCount(0);
 
     await fillProposalDateTimeField(dialog.getByLabel("Start").first(), "2099-10-01T10:00");
@@ -52,7 +52,7 @@ test.describe("New Event composer journey", () => {
     await expect(dialog.getByRole("button", { name: /More options/i })).toHaveCount(0);
 
     await dialog.getByRole("button", { name: `${USERS.leia.displayName} required` }).click();
-    await expect(dialog.getByLabel("Location (optional)")).toBeVisible();
+    await expect(dialog.getByRole("combobox", { name: "Location (optional)" })).toBeVisible();
     await expect(dialog.getByRole("button", { name: /More options/i })).toBeVisible();
     await expect(dialog.getByRole("button", { name: "Submit" })).toBeEnabled();
 
@@ -81,7 +81,7 @@ test.describe("New Event composer journey", () => {
       "aria-pressed",
       "false",
     );
-    await expect(dialog.getByLabel("Location (optional)")).toHaveCount(0);
+    await expect(dialog.getByRole("combobox", { name: "Location (optional)" })).toHaveCount(0);
     await expect(dialog.getByRole("button", { name: "Submit" })).toBeDisabled();
 
     await exitDraftDialog(dialog);
