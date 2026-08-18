@@ -28,6 +28,34 @@ import { CHANGELOG_ARCHIVE } from "./entries.archive";
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "2026.08.18b",
+    date: "2026-08-18",
+    summary:
+      "Split New Event vs NLP composer; sleeping NLP books for a named sleeper (PC-438–PC-442).",
+    changes: [
+      {
+        type: "changed",
+        description:
+          "FAB lists New Event then New Event (NLP Input); calendar create stays on the manual composer (PC-439).",
+      },
+      {
+        type: "changed",
+        description:
+          "Manual composer is Title-first: type, posting, calendar, then Who and Where after dates (PC-440).",
+      },
+      {
+        type: "changed",
+        description:
+          "NLP composer is Description-first; a named sleeper becomes Booking-for, or toasts when bookings are off (PC-441).",
+      },
+      {
+        type: "changed",
+        description:
+          "Sleeping NLP parses sleeps/staying/spending the night, host vs sleeper, alone, their place, and Fri–Sat weekend nights (PC-442).",
+      },
+    ],
+  },
+  {
     version: "2026.08.18a",
     date: "2026-08-18",
     summary:

@@ -110,6 +110,8 @@ interface ProposalDraftDialogProps {
   /** Network composer flags; loaded on open when omitted (PC-423–425). */
   composerSettings?: DraftComposerSettings;
   peopleRank?: PersonRankStat[];
+  /** Manual Title-first composer vs Description-first NLP (PC-439). */
+  composerMode?: "manual" | "nlp";
 }
 
 /**
@@ -126,6 +128,7 @@ export function ProposalDraftDialog({
   initialStartAt = null,
   composerSettings,
   peopleRank = [],
+  composerMode = "manual",
 }: ProposalDraftDialogProps) {
   const router = useRouter();
   const [savedDraftId, setSavedDraftId] = useState<string | null>(null);
@@ -140,7 +143,9 @@ export function ProposalDraftDialog({
   const [title, setTitle] = useState("");
   const [nlpText, setNlpText] = useState("");
   const nlpTouchedRef = useRef<Set<string>>(new Set());
+  const nlpBlockedToastRef = useRef(false);
   const [nlpChips, setNlpChips] = useState<EventIntentChip[]>([]);
+  const [nlpBookingBlocked, setNlpBookingBlocked] = useState(false);
   const [description, setDescription] = useState("");
   const [notes, setNotes] = useState("");
   const [locationId, setLocationId] = useState("");
@@ -353,15 +358,18 @@ export function ProposalDraftDialog({
   }, [showTypeBody, proposalType, timingMode, isPoll]);
 
   useEffect(() => {
+    if (composerMode !== "nlp") return;
     const handle = window.setTimeout(() => {
       if (!nlpText.trim()) {
         setNlpChips([]);
+        setNlpBookingBlocked(false);
+        nlpBlockedToastRef.current = false;
         return;
       }
       const parsed = parseEventIntent({
         text: nlpText,
         people: people.map((person) => ({ id: person.id, displayName: person.displayName })),
-        places: locationOptions.map((place) => ({
+        places: places.map((place) => ({
           id: place.id,
           name: place.name,
           residentUserIds: place.residentUserIds,
@@ -370,6 +378,31 @@ export function ProposalDraftDialog({
       });
       setNlpChips(parsed.chips);
       const touched = nlpTouchedRef.current;
+
+      if (parsed.needsBookingFor) {
+        const allowed =
+          dualPosting &&
+          Boolean(parsed.sleeperUserId) &&
+          proxyPeople.some((person) => person.id === parsed.sleeperUserId);
+        if (!allowed) {
+          setNlpBookingBlocked(true);
+          if (!nlpBlockedToastRef.current) {
+            nlpBlockedToastRef.current = true;
+            showToast("Booking for others is not enabled.", "error");
+          }
+        } else {
+          setNlpBookingBlocked(false);
+          nlpBlockedToastRef.current = false;
+          if (!touched.has("posting")) {
+            setPostingKind("booking");
+            setOnBehalfOfUserId(parsed.sleeperUserId ?? "");
+          }
+        }
+      } else {
+        setNlpBookingBlocked(false);
+        nlpBlockedToastRef.current = false;
+      }
+
       if (!touched.has("title") && parsed.title) setTitle(parsed.title);
       if (!touched.has("type") && parsed.proposalType) {
         setProposalType(parsed.proposalType);
@@ -388,13 +421,20 @@ export function ProposalDraftDialog({
         setTimingMode(parsed.allDay ? "allDay" : "window");
         setIsPoll(false);
       }
-      if (!touched.has("who") && parsed.personIds.length > 0) {
-        const next: Record<string, InviteeSelection> = {};
-        for (const id of parsed.personIds) {
-          if (id === currentUserId) continue;
-          next[id] = effectivePostingKind === "booking" ? "booked" : "required";
+      if (!touched.has("who")) {
+        if (parsed.intentionalSolo) {
+          setInviteeMode({});
+        } else if (parsed.personIds.length > 0) {
+          const next: Record<string, InviteeSelection> = {};
+          const role: InviteeSelection =
+            dualPosting && parsed.needsBookingFor ? "booked" : "required";
+          for (const id of parsed.personIds) {
+            if (id === currentUserId) continue;
+            if (id === parsed.sleeperUserId) continue;
+            next[id] = role;
+          }
+          setInviteeMode(next);
         }
-        setInviteeMode(next);
       }
       if (!touched.has("where")) {
         if (parsed.locationId) {
@@ -408,11 +448,14 @@ export function ProposalDraftDialog({
     }, 250);
     return () => window.clearTimeout(handle);
   }, [
+    composerMode,
     nlpText,
     people,
-    locationOptions,
+    places,
     currentUserId,
-    effectivePostingKind,
+    dualPosting,
+    proxyPeople,
+    showToast,
   ]);
 
   const timePreview = formatTimeRange(
@@ -517,6 +560,8 @@ export function ProposalDraftDialog({
       setNlpText("");
       setNlpChips([]);
       nlpTouchedRef.current = new Set();
+      nlpBlockedToastRef.current = false;
+      setNlpBookingBlocked(false);
       setDescription("");
       setNotes("");
       setLocationId("");
@@ -837,11 +882,21 @@ export function ProposalDraftDialog({
         ? configuredBatchEntries.length > 0
         : Boolean(slots[0]?.startAt)
       : Boolean(slots[0]?.startAt);
+  const isNlp = composerMode === "nlp";
+  const nlpStarted = !isNlp || nlpText.trim().length > 0;
+  const showTitleRow = !isNlp || (nlpStarted && typePicked && proposalType === "event");
+  const showTypeRow = !isNlp || nlpStarted;
+  const showWhenFields = showTypeBody;
+  const showInvitees = showTypeBody && datesReady;
+  const showLocation = showInvitees;
+  const titleReady =
+    isNlp && proposalType === "sleeping" ? true : Boolean(title.trim());
   const submitReady =
-    Boolean(title.trim()) &&
+    titleReady &&
     typePicked &&
     postingChosen &&
-    datesReady;
+    datesReady &&
+    !nlpBookingBlocked;
 
   function handleSubmit(confirm = false) {
     startTransition(async () => {
@@ -886,7 +941,11 @@ export function ProposalDraftDialog({
           <Stack direction="row" spacing={1} alignItems="flex-start" sx={{ mb: 1.5 }}>
             <Box sx={{ flex: 1, minWidth: 0 }}>
               <Typography variant="h6" component="h2" sx={{ fontSize: "1.1rem", fontWeight: 600 }}>
-                {isEdit ? "Edit draft" : "New Event"}
+                {isEdit
+                  ? "Edit draft"
+                  : isNlp
+                    ? "New Event (NLP Input)"
+                    : "New Event"}
               </Typography>
               <Stack direction="row" spacing={0.75} alignItems="center" flexWrap="wrap" sx={{ mt: 0.5 }}>
                 {batchMode && <Chip label="Batch" size="small" variant="outlined" />}
@@ -962,13 +1021,15 @@ export function ProposalDraftDialog({
             </Alert>
           )}
 
+          {isNlp ? (
+            <>
           <TextField
             label="Description"
             value={nlpText}
             onChange={(event) => setNlpText(event.target.value)}
             fullWidth
             size="small"
-            placeholder="Overnight at my place with Alex Friday to Sunday"
+            placeholder="Morgan sleeps at Katie's tonight"
             sx={{ mb: 1 }}
             inputProps={{ "aria-label": "Description" }}
           />
@@ -1007,9 +1068,9 @@ export function ProposalDraftDialog({
               ))}
             </Stack>
           ) : null}
-          <Typography variant="body2" sx={{ textAlign: "center", color: "text.secondary", mb: 1 }}>
-            or
-          </Typography>
+            </>
+          ) : null}
+          {showTitleRow ? (
           <TextField
             label="Title"
             value={title}
@@ -1023,7 +1084,9 @@ export function ProposalDraftDialog({
             placeholder="Untitled event"
             sx={{ mb: 2 }}
           />
+          ) : null}
 
+          {showTypeRow ? (
           <Box sx={{ mb: 2 }}>
             <Typography variant="subtitle2" sx={{ fontWeight: 600, color: POLY_GREEN, mb: 1 }}>
               Social or Sleeping
@@ -1150,6 +1213,7 @@ export function ProposalDraftDialog({
               <ToggleButton value="sleeping">Sleeping</ToggleButton>
             </ToggleButtonGroup>
           </Box>
+          ) : null}
 
           {showPostingChoice ? (
             <Box sx={{ mb: 2 }}>
@@ -1175,6 +1239,7 @@ export function ProposalDraftDialog({
                     setIsPoll(false);
                     setAllDay(false);
                   }
+                  nlpTouchedRef.current.add("posting");
                   setPostingKind(next);
                   if (next === "booking") {
                     setIsPoll(false);
@@ -1235,9 +1300,9 @@ export function ProposalDraftDialog({
               isPoll={isPoll}
               applyEventStartChange={applyEventStartChange}
               hideTitle
-              showWhenFields
-              showInvitees
-              showLocation
+              showWhenFields={showWhenFields}
+              showInvitees={showInvitees}
+              showLocation={showLocation}
               postingKind={effectivePostingKind === "booking" ? "booking" : "proposal"}
               candidates={candidates}
               people={people}
@@ -1278,7 +1343,8 @@ export function ProposalDraftDialog({
               locationOptions={locationOptions}
               pending={pending}
               postingKind={effectivePostingKind === "booking" ? "booking" : "proposal"}
-              showLocation
+              showInvitees={showInvitees}
+              showLocation={showLocation}
               candidates={candidates}
               inviteeMode={inviteeMode}
               setInviteeRole={(id, role) => {
@@ -1303,7 +1369,7 @@ export function ProposalDraftDialog({
             />
           )}
 
-          {showTypeBody ? (
+          {showInvitees ? (
           <ProposalDraftMoreOptions
             proposalType={proposalType}
             description={description}

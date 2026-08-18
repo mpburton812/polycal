@@ -77,6 +77,7 @@ export function ProposalCreateHost({
   const [composerSettings, setComposerSettings] = useState<DraftComposerSettings | null>(null);
   const [peopleRank, setPeopleRank] = useState<PersonRankStat[]>([]);
   const [editDetail, setEditDetail] = useState<ProposalDetail | null>(null);
+  const [composerMode, setComposerMode] = useState<"manual" | "nlp">("manual");
 
   const loadCreateData = useCallback(async () => {
     const [nextPeople, nextPlaces, nextResidency, nextFastSleep, nextComposer, nextRank] =
@@ -104,6 +105,7 @@ export function ProposalCreateHost({
           setCreateProposalType(request.lockedType);
           setLockCreateType(true);
           setCreateInitialStartAt(request.initialStartAt ?? null);
+          setComposerMode("manual");
           setCreateOpen(true);
           return;
         }
@@ -159,10 +161,24 @@ export function ProposalCreateHost({
             setCreateProposalType("event");
             setLockCreateType(false);
             setCreateInitialStartAt(null);
+            setComposerMode("manual");
             setCreateOpen(true);
           }}
         >
           New Event
+        </MenuItem>
+        <MenuItem
+          onClick={() => {
+            setFabMenuAnchor(null);
+            setEditDetail(null);
+            setCreateProposalType("event");
+            setLockCreateType(false);
+            setCreateInitialStartAt(null);
+            setComposerMode("nlp");
+            setCreateOpen(true);
+          }}
+        >
+          New Event (NLP Input)
         </MenuItem>
         {fastSleepEnabled ? (
           <MenuItem
@@ -207,6 +223,7 @@ export function ProposalCreateHost({
         initialStartAt={createInitialStartAt}
         composerSettings={composerSettings ?? undefined}
         peopleRank={peopleRank}
+        composerMode={editDetail ? "manual" : composerMode}
       />
       <SleepingPartnerCreateDialog
         open={partnerCreateOpen}

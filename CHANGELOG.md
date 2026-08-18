@@ -4,6 +4,12 @@ All notable changes to PolyCal are documented here.
 
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [2026.08.18b] - 2026-08-18
+
+### Changed
+
+- PC-438–PC-442: Split FAB New Event vs New Event (NLP Input). Manual Title-first disclosure (Who/Where after dates). NLP Description-first with Booking-for from a named sleeper, or toast when bookings are off. Sleeping parser covers host vs sleeper, alone, their place, and Fri–Sat weekend nights. Change control: `2026.08.18b`.
+
 ## [2026.08.18a] - 2026-08-18
 
 ### Changed

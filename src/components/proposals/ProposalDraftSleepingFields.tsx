@@ -42,6 +42,7 @@ export interface ProposalDraftSleepingFieldsProps {
   pending: boolean;
   postingKind: "proposal" | "booking";
   showLocation?: boolean;
+  showInvitees?: boolean;
   candidates: PersonSummary[];
   inviteeMode: Record<string, InviteeSelection>;
   setInviteeRole: (personId: string, role: InviteeSelection) => void;
@@ -74,6 +75,7 @@ export function ProposalDraftSleepingFields({
   pending,
   postingKind,
   showLocation = true,
+  showInvitees = true,
   candidates,
   inviteeMode,
   setInviteeRole,
@@ -169,12 +171,14 @@ export function ProposalDraftSleepingFields({
             />
           ))}
 
-          <ProposalDraftWhoRow
-            candidates={candidates}
-            inviteeMode={inviteeMode}
-            setInviteeRole={setInviteeRole}
-            postingKind={postingKind}
-          />
+          {showInvitees ? (
+            <ProposalDraftWhoRow
+              candidates={candidates}
+              inviteeMode={inviteeMode}
+              setInviteeRole={setInviteeRole}
+              postingKind={postingKind}
+            />
+          ) : null}
 
           {showLocation ? (
             <>
