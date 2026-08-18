@@ -390,3 +390,4 @@
 2026-08-17 | 8ed3a50 | PC-421 | open With partners before required chips; assert FastSleep save | e2e/fast-sleep-journey.spec.ts
 2026-08-17 | 866dc4d | PC-427 | ship Proposals and Bookings composer and resolved events | src/actions/network-settings.ts
 2026-08-17 | a9aefd1 | PC-431 | assert recurring series cards and ignore loading tab shells | e2e/booked-attendee-journey.spec.ts
+2026-08-17 | 4a4d5be | PC-431 | disambiguate Post vs Post to Feed and restore New Event fill order | e2e/batch-sleeping-partners-journey.spec.ts
