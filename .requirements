@@ -398,3 +398,4 @@
 2026-08-18 | d5fbdb4 | PC-433 | do not switch Sleeping drafts to Social when setting invitees | e2e/helpers/proposals.ts
 2026-08-18 | 23a4dd3 | PC-439 | split New Event and NLP composers | src/components/proposals/ProposalCreateHost.tsx
 2026-08-18 | ce0f916 | PC-439 | fill dates before More options Poll/Recurring | e2e/helpers/datePickers.ts
+2026-08-18 | 40c336f | PC-439 | allow 15 minutes for Playwright Chromium install | .github/workflows/e2e.yml
