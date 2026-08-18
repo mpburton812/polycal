@@ -1,8 +1,6 @@
 "use client";
 
 import AccessTimeIcon from "@mui/icons-material/AccessTime";
-import GroupsOutlinedIcon from "@mui/icons-material/GroupsOutlined";
-import LocationOnOutlinedIcon from "@mui/icons-material/LocationOnOutlined";
 import {
   Box,
   Checkbox,
@@ -12,24 +10,21 @@ import {
   MenuItem,
   Select,
   Stack,
-  TextField,
-  ToggleButton,
-  ToggleButtonGroup,
   Typography,
 } from "@mui/material";
 
 import type { ProposalPlaceOption } from "@/actions/proposals";
 import type { PersonSummary } from "@/actions/users";
-import { OrganicAvatar } from "@/components/ui/OrganicAvatar";
 import type { BatchSleepingEntry } from "@/lib/proposals/batch-sleeping";
-import { avatarSrcForKey } from "@/lib/constants/avatars";
+import { inviteeIsSelected } from "@/lib/proposals/invitee-tap-cycle";
 import type { FastSleepingRow } from "@/lib/proposals/fast-sleeping-plan";
-import { SHORT_TEXT_MAX } from "@/lib/validation/string-limits";
 
 import { FastSleepingPlanGrid } from "./FastSleepingPlanGrid";
 import { ProposalDateRangeField } from "./ProposalDateRangeField";
 import { ProposalDraftSectionHeader } from "./ProposalDraftSectionHeader";
-import { POLY_GREEN, POLY_GREEN_HOVER, POLY_GREEN_LIGHT } from "./proposalCardTheme";
+import { ProposalDraftWhereButtons } from "./ProposalDraftWhereButtons";
+import { ProposalDraftWhoRow } from "./ProposalDraftWhoRow";
+import { POLY_GREEN, POLY_GREEN_LIGHT } from "./proposalCardTheme";
 import type { InviteeSelection, SlotDraft } from "./proposalDraftDateUtils";
 
 export interface ProposalDraftSleepingFieldsProps {
@@ -41,15 +36,11 @@ export interface ProposalDraftSleepingFieldsProps {
   batchLocationOptions: ProposalPlaceOption[];
   configuredBatchEntries: BatchSleepingEntry[];
   people: PersonSummary[];
+  viewerId: string;
+  onBehalfOfUserId?: string;
   locationOptions: ProposalPlaceOption[];
   pending: boolean;
-  intentionalSolo: boolean;
-  onIntentionalSoloChange: (solo: boolean) => void;
-  isSoloProposal: boolean;
-  inviteeChoice: "unset" | "solo" | "network";
-  onInviteeChoiceChange: (choice: "unset" | "solo" | "network") => void;
-  hideInviteeRoles?: boolean;
-  /** When false, hide location until invitees are chosen (PC-429). */
+  postingKind: "proposal" | "booking";
   showLocation?: boolean;
   candidates: PersonSummary[];
   inviteeMode: Record<string, InviteeSelection>;
@@ -77,13 +68,11 @@ export function ProposalDraftSleepingFields({
   batchLocationOptions,
   configuredBatchEntries,
   people,
+  viewerId,
+  onBehalfOfUserId,
   locationOptions,
   pending,
-  onIntentionalSoloChange,
-  isSoloProposal,
-  inviteeChoice,
-  onInviteeChoiceChange,
-  hideInviteeRoles = false,
+  postingKind,
   showLocation = true,
   candidates,
   inviteeMode,
@@ -158,7 +147,7 @@ export function ProposalDraftSleepingFields({
           <ProposalDraftSectionHeader
             icon={<AccessTimeIcon fontSize="small" />}
             title="Night"
-            subtitle="Click two days for a night range — earliest is start, latest is end"
+            subtitle="Tap a night or drag a range — earliest is start, latest is end"
           />
           {slots.map((slot, index) => (
             <ProposalDateRangeField
@@ -180,190 +169,50 @@ export function ProposalDraftSleepingFields({
             />
           ))}
 
-          <ProposalDraftSectionHeader
-            icon={<GroupsOutlinedIcon fontSize="small" />}
-            title="Who"
-            subtitle={
-              hideInviteeRoles
-                ? "Add sleeping partners who will be on this calendar item — no approvals"
-                : "Accepted sleeping partners only — Solo or With"
-            }
+          <ProposalDraftWhoRow
+            candidates={candidates}
+            inviteeMode={inviteeMode}
+            setInviteeRole={setInviteeRole}
+            postingKind={postingKind}
           />
-          <ToggleButtonGroup
-            exclusive
-            value={inviteeChoice === "unset" ? null : inviteeChoice}
-            onChange={(_, value) => {
-              if (!value) {
-                onInviteeChoiceChange("unset");
-                onIntentionalSoloChange(false);
-                return;
-              }
-              onInviteeChoiceChange(value as "solo" | "network");
-              onIntentionalSoloChange(value === "solo");
-            }}
-            size="small"
-            sx={{
-              mb: 1,
-              "& .MuiToggleButton-root.Mui-selected": {
-                bgcolor: POLY_GREEN,
-                color: "#fff",
-                "&:hover": { bgcolor: POLY_GREEN_HOVER },
-              },
-            }}
-          >
-            <ToggleButton value="solo">Solo (just me)</ToggleButton>
-            <ToggleButton value="network">With Others</ToggleButton>
-          </ToggleButtonGroup>
-          {!isSoloProposal && inviteeChoice === "network" && (
-            <Stack spacing={1}>
-              {candidates.length === 0 ? (
-                <Typography variant="body2" color="text.secondary">
-                  No accepted sleeping partners yet. Propose a partnership from People &amp;
-                  Places, or choose Solo.
-                </Typography>
-              ) : (
-                candidates.map((person) => {
-                  const mode = inviteeMode[person.id] ?? "none";
-                  return (
-                    <Stack
-                      key={person.id}
-                      direction="row"
-                      spacing={1}
-                      alignItems="center"
-                      justifyContent="space-between"
-                      flexWrap="wrap"
-                    >
-                      <Stack alignItems="center" spacing={0.5} sx={{ minWidth: 72 }}>
-                        <OrganicAvatar
-                          src={avatarSrcForKey(person.avatarKey)}
-                          alt=""
-                          label={person.displayName}
-                          size={36}
-                        />
-                        <Typography variant="caption" sx={{ textAlign: "center" }}>
-                          {person.displayName}
-                        </Typography>
-                      </Stack>
-                      {hideInviteeRoles ? (
-                        <ToggleButton
-                          value="optional"
-                          selected={mode !== "none"}
-                          aria-label={`${person.displayName} include`}
-                          onClick={() =>
-                            setInviteeRole(person.id, mode === "none" ? "optional" : "none")
-                          }
-                          size="small"
-                          sx={{
-                            "&.Mui-selected": {
-                              bgcolor: POLY_GREEN,
-                              color: "#fff",
-                              "&:hover": { bgcolor: POLY_GREEN_HOVER },
-                            },
-                          }}
-                        >
-                          Include
-                        </ToggleButton>
-                      ) : (
-                      <ToggleButtonGroup
-                        exclusive
-                        size="small"
-                        value={mode === "none" ? null : mode}
-                        onChange={(_, value) => {
-                          setInviteeRole(person.id, (value as InviteeSelection | null) ?? "none");
-                        }}
-                        sx={{
-                          "& .MuiToggleButton-root.Mui-selected": {
-                            bgcolor: POLY_GREEN,
-                            color: "#fff",
-                            "&:hover": { bgcolor: POLY_GREEN_HOVER },
-                          },
-                        }}
-                      >
-                        <ToggleButton
-                          value="optional"
-                          aria-label={`${person.displayName} optional`}
-                        >
-                          Optional
-                        </ToggleButton>
-                        <ToggleButton
-                          value="required"
-                          aria-label={`${person.displayName} required`}
-                        >
-                          Required
-                        </ToggleButton>
-                      </ToggleButtonGroup>
-                      )}
-                    </Stack>
-                  );
-                })
-              )}
-            </Stack>
-          )}
 
           {showLocation ? (
             <>
-          <ProposalDraftSectionHeader
-            icon={<LocationOnOutlinedIcon fontSize="small" />}
-            title="Where"
-            subtitle="Place, custom text, and optional bedroom"
-          />
-          <FormControl fullWidth size="small">
-            <InputLabel id="sleeping-location-label">Location (optional)</InputLabel>
-            <Select
-              labelId="sleeping-location-label"
-              label="Location (optional)"
-              value={locationId}
-              onChange={(event) => {
-                const value = event.target.value;
-                onLocationIdChange(value);
-                if (value) onLocationCustomChange("");
-                if (!value) onBedroomIndexChange("");
-              }}
-            >
-              <MenuItem value="">None</MenuItem>
-              {locationOptions.map((place) => (
-                <MenuItem key={place.id} value={place.id}>
-                  {place.name}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-          <TextField
-            label="Custom location (optional)"
-            value={locationCustom}
-            onChange={(event) => {
-              onLocationCustomChange(event.target.value);
-              if (event.target.value) {
-                onLocationIdChange("");
-                onBedroomIndexChange("");
-              }
-            }}
-            fullWidth
-            size="small"
-            placeholder="Type a location not in the list"
-            inputProps={{ maxLength: SHORT_TEXT_MAX }}
-          />
-          {bedroomOptions.length > 0 && (
-            <FormControl fullWidth size="small">
-              <InputLabel id="proposal-bedroom-label">Bedroom</InputLabel>
-              <Select
-                labelId="proposal-bedroom-label"
-                label="Bedroom"
-                value={bedroomIndex === "" ? "" : String(bedroomIndex)}
-                onChange={(event) => {
-                  const value = event.target.value;
-                  onBedroomIndexChange(value === "" ? "" : Number(value));
-                }}
-              >
-                <MenuItem value="">Any / whole place</MenuItem>
-                {bedroomOptions.map((bedroom) => (
-                  <MenuItem key={bedroom.index} value={String(bedroom.index)}>
-                    {bedroom.label}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          )}
+              <ProposalDraftWhereButtons
+                places={locationOptions}
+                people={people}
+                viewerId={viewerId}
+                selectedUserIds={Object.entries(inviteeMode)
+                  .filter(([, role]) => inviteeIsSelected(role))
+                  .map(([id]) => id)}
+                onBehalfOfUserId={onBehalfOfUserId}
+                locationId={locationId}
+                locationCustom={locationCustom}
+                onLocationIdChange={onLocationIdChange}
+                onLocationCustomChange={onLocationCustomChange}
+                onClearBedroom={() => onBedroomIndexChange("")}
+              />
+              {bedroomOptions.length > 0 && (
+                <FormControl fullWidth size="small">
+                  <InputLabel id="proposal-bedroom-label">Bedroom</InputLabel>
+                  <Select
+                    labelId="proposal-bedroom-label"
+                    label="Bedroom"
+                    value={bedroomIndex === "" ? "" : String(bedroomIndex)}
+                    onChange={(event) => {
+                      const value = event.target.value;
+                      onBedroomIndexChange(value === "" ? "" : Number(value));
+                    }}
+                  >
+                    <MenuItem value="">Any / whole place</MenuItem>
+                    {bedroomOptions.map((bedroom) => (
+                      <MenuItem key={bedroom.index} value={String(bedroom.index)}>
+                        {bedroom.label}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              )}
             </>
           ) : null}
         </>

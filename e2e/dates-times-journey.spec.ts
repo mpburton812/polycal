@@ -95,7 +95,6 @@ test.describe("Proposal When dates and times journey", () => {
     await dialog.getByLabel("Title").fill(title);
     await selectDraftScheduleMode(dialog, "All Day");
     await fillProposalDateRange(dialog, "2099-07-13", "2099-07-15");
-    await dialog.getByRole("button", { name: "Solo (just me)", exact: true }).click();
     await submitProposalDraft(page, dialog);
     await selectProposalTab(page, "Resolved");
     await expect(proposalCard(page, title)).toBeVisible();
@@ -108,7 +107,6 @@ test.describe("Proposal When dates and times journey", () => {
     await selectDraftScheduleMode(dialog, "Window");
     await fillProposalDateTimeField(dialog.getByLabel("Start").first(), "2099-08-01T10:00");
     await fillProposalDateTimeField(dialog.getByLabel("End").first(), "2099-08-01T12:00");
-    await dialog.getByRole("button", { name: "Solo (just me)", exact: true }).click();
     await submitProposalDraft(page, dialog);
     await selectProposalTab(page, "Resolved");
     await expect(proposalCard(page, title)).toBeVisible();
@@ -124,7 +122,6 @@ test.describe("Proposal When dates and times journey", () => {
     const endValue = await dialog.getByLabel("End").first().inputValue();
     // Expected MUI display for 15:00 after +1h bump from 14:00.
     expect(endValue).toMatch(/03:00\s*PM|15:00|3:00/i);
-    await dialog.getByRole("button", { name: "Solo (just me)", exact: true }).click();
     await expect(dialog.getByRole("button", { name: "Submit" })).toBeEnabled();
   });
 
@@ -155,7 +152,6 @@ test.describe("Proposal When dates and times journey", () => {
     await selectDraftScheduleMode(dialog, "Recurring");
     await fillProposalDateTimeField(dialog.getByLabel("Start").first(), "2099-09-01T10:00");
     await fillProposalDateTimeField(dialog.getByLabel("End").first(), "2099-09-01T11:00");
-    await dialog.getByRole("button", { name: "Solo (just me)", exact: true }).click();
     await expect(dialog.getByRole("button", { name: "Submit" })).toBeEnabled();
   });
 
@@ -167,7 +163,6 @@ test.describe("Proposal When dates and times journey", () => {
     await selectDraftScheduleMode(dialog, "Recurring");
     await fillProposalDateRange(dialog, "2099-09-01", "2099-09-01");
     await dialog.getByLabel("Occurrences").fill("4");
-    await dialog.getByRole("button", { name: "Solo (just me)", exact: true }).click();
     await submitProposalDraft(page, dialog);
     await selectProposalTab(page, "Resolved");
     // Parent keeps the exact title; children use `Title — weekday, month day`.

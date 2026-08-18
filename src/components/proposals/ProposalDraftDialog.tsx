@@ -59,7 +59,6 @@ import { ProposalDraftEventFields } from "./ProposalDraftEventFields";
 import { ProposalDraftMoreOptions } from "./ProposalDraftMoreOptions";
 import {
   flagsFromTimingMode,
-  ProposalDraftScheduleModeGrid,
   timingModeFromFlags,
 } from "./ProposalDraftScheduleModeGrid";
 import { ProposalDraftSleepingFields } from "./ProposalDraftSleepingFields";
@@ -77,6 +76,9 @@ import {
 import { GARDEN_TOKENS } from "@/theme/tokens";
 import { sleepingDateToStartIso } from "@/lib/proposals/sleeping-schedule";
 import { formatSleepingDisplayTitle } from "@/lib/proposals/sleeping-display";
+import { parseEventIntent, type EventIntentChip } from "@/lib/proposals/event-intent-parse";
+import { inviteeIsSelected } from "@/lib/proposals/invitee-tap-cycle";
+import { rankPeople, type PersonRankStat } from "@/lib/proposals/composer-people-rank";
 import {
   minutesToReminderDisplay,
   reminderOffsetToMinutes,
@@ -107,6 +109,7 @@ interface ProposalDraftDialogProps {
   initialStartAt?: string | null;
   /** Network composer flags; loaded on open when omitted (PC-423–425). */
   composerSettings?: DraftComposerSettings;
+  peopleRank?: PersonRankStat[];
 }
 
 /**
@@ -122,6 +125,7 @@ export function ProposalDraftDialog({
   lockedProposalType,
   initialStartAt = null,
   composerSettings,
+  peopleRank = [],
 }: ProposalDraftDialogProps) {
   const router = useRouter();
   const [savedDraftId, setSavedDraftId] = useState<string | null>(null);
@@ -134,6 +138,9 @@ export function ProposalDraftDialog({
 
   const [proposalType, setProposalType] = useState<"event" | "sleeping">("event");
   const [title, setTitle] = useState("");
+  const [nlpText, setNlpText] = useState("");
+  const nlpTouchedRef = useRef<Set<string>>(new Set());
+  const [nlpChips, setNlpChips] = useState<EventIntentChip[]>([]);
   const [description, setDescription] = useState("");
   const [notes, setNotes] = useState("");
   const [locationId, setLocationId] = useState("");
@@ -188,27 +195,27 @@ export function ProposalDraftDialog({
   const [pending, startTransition] = useTransition();
   const contentRef = useRef<HTMLDivElement>(null);
 
-  const sleepingCandidates = useMemo(
-    () =>
-      people.filter(
-        (person) =>
-          person.id !== currentUserId &&
-          person.status === "active" &&
-          acceptedPartnerIds.includes(person.id),
-      ),
-    [people, currentUserId, acceptedPartnerIds],
-  );
+  const eventCandidates = useMemo(() => {
+    const raw = people.filter(
+      (person) => person.id !== currentUserId && person.status === "active",
+    );
+    return rankPeople(raw, peopleRank);
+  }, [people, currentUserId, peopleRank]);
 
-  const eventCandidates = useMemo(
-    () => people.filter((person) => person.id !== currentUserId && person.status === "active"),
-    [people, currentUserId],
-  );
+  const sleepingCandidates = useMemo(() => {
+    const raw = people.filter(
+      (person) =>
+        person.id !== currentUserId &&
+        person.status === "active" &&
+        acceptedPartnerIds.includes(person.id),
+    );
+    return rankPeople(raw, peopleRank, { partnerIds: acceptedPartnerIds });
+  }, [people, currentUserId, acceptedPartnerIds, peopleRank]);
 
   const candidates = proposalType === "sleeping" ? sleepingCandidates : eventCandidates;
 
-  const isSoloProposal =
-    inviteeChoice === "solo" ||
-    (proposalType === "sleeping" ? intentionalSolo : soloEvent);
+  const hasSelectedInvitees = Object.values(inviteeMode).some(inviteeIsSelected);
+  const isSoloProposal = !hasSelectedInvitees;
 
   const dualPosting = composer.schedulingPosting === "proposals_and_bookings";
   const effectivePostingKind =
@@ -216,10 +223,6 @@ export function ProposalDraftDialog({
   const hidePoll = !composer.pollEnabled || effectivePostingKind === "booking";
   const showPostingChoice = typePicked && dualPosting;
   const postingChosen = !dualPosting || postingKind !== null;
-  const showScheduleType =
-    typePicked &&
-    postingChosen &&
-    proposalType === "event";
   const showProxySelect =
     typePicked &&
     dualPosting &&
@@ -312,7 +315,7 @@ export function ProposalDraftDialog({
     const inviteeIds = isSoloProposal
       ? []
       : Object.entries(inviteeMode)
-          .filter(([, role]) => role === "required" || role === "optional")
+          .filter(([, role]) => inviteeIsSelected(role))
           .map(([userId]) => userId);
     void listSleepingLocationOptionsAction(inviteeIds).then(setSleepingLocationOptions);
   }, [open, proposalType, batchMode, isSoloProposal, inviteeMode]);
@@ -333,6 +336,84 @@ export function ProposalDraftDialog({
     if (!batchMode) return;
     setFastPlanRows((current) => (current.length === FAST_SLEEPING_GRID_DAYS ? current : buildEmptyGridRows()));
   }, [batchMode]);
+
+  useEffect(() => {
+    setSoloEvent(proposalType === "event" && isSoloProposal);
+    setIntentionalSolo(proposalType === "sleeping" && isSoloProposal);
+    setInviteeChoice(
+      isSoloProposal ? "solo" : proposalType === "sleeping" ? "network" : "group",
+    );
+  }, [isSoloProposal, proposalType]);
+
+  useEffect(() => {
+    if (showTypeBody && proposalType === "event" && timingMode === null && !isPoll) {
+      setTimingMode("allDay");
+      setAllDay(true);
+    }
+  }, [showTypeBody, proposalType, timingMode, isPoll]);
+
+  useEffect(() => {
+    const handle = window.setTimeout(() => {
+      if (!nlpText.trim()) {
+        setNlpChips([]);
+        return;
+      }
+      const parsed = parseEventIntent({
+        text: nlpText,
+        people: people.map((person) => ({ id: person.id, displayName: person.displayName })),
+        places: locationOptions.map((place) => ({
+          id: place.id,
+          name: place.name,
+          residentUserIds: place.residentUserIds,
+        })),
+        viewerId: currentUserId,
+      });
+      setNlpChips(parsed.chips);
+      const touched = nlpTouchedRef.current;
+      if (!touched.has("title") && parsed.title) setTitle(parsed.title);
+      if (!touched.has("type") && parsed.proposalType) {
+        setProposalType(parsed.proposalType);
+        setTypePicked(true);
+      }
+      if (!touched.has("when") && parsed.startDate) {
+        const start = parsed.allDay
+          ? parsed.startDate
+          : `${parsed.startDate}T${parsed.startTime ?? "19:00"}`;
+        const endDate = parsed.endDate ?? parsed.startDate;
+        const end = parsed.allDay
+          ? endDate
+          : `${endDate}T${parsed.endTime ?? parsed.startTime ?? "21:00"}`;
+        setSlots([{ startAt: start, endAt: end, label: "" }]);
+        setAllDay(parsed.allDay);
+        setTimingMode(parsed.allDay ? "allDay" : "window");
+        setIsPoll(false);
+      }
+      if (!touched.has("who") && parsed.personIds.length > 0) {
+        const next: Record<string, InviteeSelection> = {};
+        for (const id of parsed.personIds) {
+          if (id === currentUserId) continue;
+          next[id] = effectivePostingKind === "booking" ? "booked" : "required";
+        }
+        setInviteeMode(next);
+      }
+      if (!touched.has("where")) {
+        if (parsed.locationId) {
+          setLocationId(parsed.locationId);
+          setLocationCustom("");
+        } else if (parsed.locationText) {
+          setLocationCustom(parsed.locationText);
+          setLocationId("");
+        }
+      }
+    }, 250);
+    return () => window.clearTimeout(handle);
+  }, [
+    nlpText,
+    people,
+    locationOptions,
+    currentUserId,
+    effectivePostingKind,
+  ]);
 
   const timePreview = formatTimeRange(
     previewStartIso ?? null,
@@ -418,7 +499,7 @@ export function ProposalDraftDialog({
       );
     const modes: Record<string, InviteeSelection> = {};
     for (const invitee of initialDetail.invitees) {
-      if (invitee.role === "required" || invitee.role === "optional") {
+      if (invitee.role === "required" || invitee.role === "optional" || invitee.role === "booked") {
         modes[invitee.userId] = invitee.role;
       }
     }
@@ -433,6 +514,9 @@ export function ProposalDraftDialog({
       setTypePicked(Boolean(lockedProposalType));
       typeSnapshotRef.current = {};
       setTitle("");
+      setNlpText("");
+      setNlpChips([]);
+      nlpTouchedRef.current = new Set();
       setDescription("");
       setNotes("");
       setLocationId("");
@@ -460,7 +544,12 @@ export function ProposalDraftDialog({
             : toLocalInput(initialStartAt)
           : "";
       // Day-sheet create already chose a day — show When with Window so the prefill is visible (PC-418).
-      setTimingMode(type === "event" && startInput ? "window" : null);
+      setTimingMode(type === "event" && startInput ? "window" : type === "event" ? "allDay" : null);
+      if (type === "event" && startInput) {
+        setAllDay(false);
+      } else if (type === "event") {
+        setAllDay(true);
+      }
       setSlots([{ startAt: startInput, endAt: "", label: "" }]);
       setInviteeMode({});
       setReminderEnabled(false);
@@ -533,7 +622,7 @@ export function ProposalDraftDialog({
     );
     const modes: Record<string, InviteeSelection> = {};
     for (const invitee of detail.invitees) {
-      if (invitee.role === "required" || invitee.role === "optional") {
+      if (invitee.role === "required" || invitee.role === "optional" || invitee.role === "booked") {
         modes[invitee.userId] = invitee.role;
       }
     }
@@ -572,8 +661,11 @@ export function ProposalDraftDialog({
     const invitees = isSoloProposal
       ? []
       : Object.entries(inviteeMode)
-          .filter(([, role]) => role === "required" || role === "optional")
-          .map(([userId, role]) => ({ userId, role: role as "required" | "optional" }));
+          .filter(([, role]) => inviteeIsSelected(role))
+          .map(([userId, role]) => ({
+            userId,
+            role: role as "required" | "optional" | "booked",
+          }));
 
     const timeSlots = batchMode
       ? []
@@ -744,19 +836,12 @@ export function ProposalDraftDialog({
       ? batchMode
         ? configuredBatchEntries.length > 0
         : Boolean(slots[0]?.startAt)
-      : timingMode !== null && Boolean(slots[0]?.startAt);
-  const inviteesReady =
-    batchMode ||
-    inviteeChoice === "solo" ||
-    inviteeChoice === "network" ||
-    (inviteeChoice === "group" &&
-      Object.values(inviteeMode).some((role) => role === "required" || role === "optional"));
+      : Boolean(slots[0]?.startAt);
   const submitReady =
     Boolean(title.trim()) &&
     typePicked &&
     postingChosen &&
-    datesReady &&
-    inviteesReady;
+    datesReady;
 
   function handleSubmit(confirm = false) {
     startTransition(async () => {
@@ -878,9 +963,60 @@ export function ProposalDraftDialog({
           )}
 
           <TextField
+            label="Description"
+            value={nlpText}
+            onChange={(event) => setNlpText(event.target.value)}
+            fullWidth
+            size="small"
+            placeholder="Overnight at my place with Alex Friday to Sunday"
+            sx={{ mb: 1 }}
+            inputProps={{ "aria-label": "Description" }}
+          />
+          {nlpChips.length > 0 ? (
+            <Stack direction="row" spacing={0.75} useFlexGap flexWrap="wrap" sx={{ mb: 1.5 }}>
+              {nlpChips.map((chip) => (
+                <Chip
+                  key={`${chip.kind}-${chip.label}`}
+                  size="small"
+                  label={`${chip.kind}: ${chip.label}`}
+                  onDelete={() => {
+                    nlpTouchedRef.current.add(
+                      chip.kind === "date" || chip.kind === "time" ? "when" : chip.kind,
+                    );
+                    setNlpChips((current) => current.filter((item) => item.kind !== chip.kind));
+                    if (chip.kind === "title") setTitle("");
+                    if (chip.kind === "location") {
+                      setLocationId("");
+                      setLocationCustom("");
+                    }
+                    if (chip.kind === "date" || chip.kind === "time") {
+                      setSlots([{ startAt: "", endAt: "", label: "" }]);
+                    }
+                  }}
+                  sx={{
+                    bgcolor:
+                      chip.kind === "title"
+                        ? "rgba(107, 143, 113, 0.2)"
+                        : chip.kind === "date"
+                          ? "rgba(139, 122, 184, 0.2)"
+                          : chip.kind === "time"
+                            ? "rgba(201, 110, 90, 0.18)"
+                            : "rgba(212, 160, 23, 0.25)",
+                  }}
+                />
+              ))}
+            </Stack>
+          ) : null}
+          <Typography variant="body2" sx={{ textAlign: "center", color: "text.secondary", mb: 1 }}>
+            or
+          </Typography>
+          <TextField
             label="Title"
             value={title}
-            onChange={(event) => setTitle(event.target.value)}
+            onChange={(event) => {
+              nlpTouchedRef.current.add("title");
+              setTitle(event.target.value);
+            }}
             required
             fullWidth
             size="small"
@@ -994,6 +1130,7 @@ export function ProposalDraftDialog({
                 }
                 setProposalType(nextType);
                 setTypePicked(true);
+                nlpTouchedRef.current.add("type");
                 if (nextType === "event") {
                   setIntentionalSolo(false);
                 } else {
@@ -1076,82 +1213,53 @@ export function ProposalDraftDialog({
             </FormControl>
           ) : null}
 
-          {showScheduleType && (
-            <ProposalDraftScheduleModeGrid
-              timingMode={timingMode}
-              isRecurring={isRecurring}
-              hidePoll={hidePoll}
-              disableRecurring={false}
-              onTimingModeChange={(mode) => {
-                setTimingMode(mode);
-                const flags = flagsFromTimingMode(mode);
-                setAllDay(flags.allDay);
-                setIsPoll(flags.isPoll);
-                if (flags.isPoll) setIsRecurring(false);
-                setSlots((current) =>
-                  current.map((slot) => ({
-                    ...slot,
-                    startAt: slot.startAt
-                      ? flags.allDay
-                        ? slot.startAt.slice(0, 10)
-                        : slot.startAt.includes("T")
-                          ? slot.startAt
-                          : `${slot.startAt.slice(0, 10)}T09:00`
-                      : "",
-                    endAt: slot.endAt
-                      ? flags.allDay
-                        ? slot.endAt.slice(0, 10)
-                        : slot.endAt.includes("T")
-                          ? slot.endAt
-                          : `${slot.endAt.slice(0, 10)}T10:00`
-                      : "",
-                  })),
-                );
-              }}
-              onRecurringChange={setIsRecurring}
-            />
-          )}
-
           {showTypeBody && proposalType === "event" && (
             <ProposalDraftEventFields
               title={title}
-              onTitleChange={setTitle}
+              onTitleChange={(value) => {
+                nlpTouchedRef.current.add("title");
+                setTitle(value);
+              }}
               allDay={allDay}
+              onAllDayChange={(value) => {
+                nlpTouchedRef.current.add("when");
+                setAllDay(value);
+                setTimingMode(value ? "allDay" : "window");
+                setIsPoll(false);
+              }}
               slots={slots}
-              onSlotsChange={setSlots}
+              onSlotsChange={(next) => {
+                nlpTouchedRef.current.add("when");
+                setSlots(next);
+              }}
               isPoll={isPoll}
               applyEventStartChange={applyEventStartChange}
-              isSoloProposal={isSoloProposal}
-              inviteeChoice={inviteeChoice === "network" ? "unset" : inviteeChoice}
-              onInviteeChoiceChange={(choice) => {
-                setInviteeChoice(choice);
-                setSoloEvent(choice === "solo");
-                setIntentionalSolo(false);
-                if (choice === "solo") setInviteeMode({});
-              }}
-              hideInviteeRoles={effectivePostingKind === "booking"}
               hideTitle
-              showWhenFields={timingMode !== null}
-              showInvitees={timingMode !== null}
-              showLocation={
-                inviteeChoice === "solo" ||
-                (inviteeChoice === "group" &&
-                  Object.values(inviteeMode).some((role) => role === "required" || role === "optional"))
-              }
+              showWhenFields
+              showInvitees
+              showLocation
+              postingKind={effectivePostingKind === "booking" ? "booking" : "proposal"}
               candidates={candidates}
+              people={people}
+              viewerId={currentUserId}
+              onBehalfOfUserId={onBehalfOfUserId}
               inviteeMode={inviteeMode}
-              setInviteeRole={setInviteeRole}
+              setInviteeRole={(id, role) => {
+                nlpTouchedRef.current.add("who");
+                setInviteeRole(id, role);
+              }}
               locationId={locationId}
               locationCustom={locationCustom}
               locationOptions={locationOptions}
-              onLocationIdChange={setLocationId}
-              onLocationCustomChange={setLocationCustom}
+              onLocationIdChange={(value) => {
+                nlpTouchedRef.current.add("where");
+                setLocationId(value);
+              }}
+              onLocationCustomChange={(value) => {
+                nlpTouchedRef.current.add("where");
+                setLocationCustom(value);
+              }}
               onClearBedroom={() => setBedroomIndex("")}
-              isRecurring={!batchMode && isRecurring}
-              recurrencePattern={recurrencePattern}
-              onRecurrencePatternChange={setRecurrencePattern}
-              recurrenceCount={recurrenceCount}
-              onRecurrenceCountChange={setRecurrenceCount}
             />
           )}
 
@@ -1165,51 +1273,37 @@ export function ProposalDraftDialog({
               batchLocationOptions={batchLocationOptions}
               configuredBatchEntries={configuredBatchEntries}
               people={people}
+              viewerId={currentUserId}
+              onBehalfOfUserId={onBehalfOfUserId}
               locationOptions={locationOptions}
               pending={pending}
-              intentionalSolo={intentionalSolo}
-              onIntentionalSoloChange={(solo) => {
-                setIntentionalSolo(solo);
-                if (solo) setInviteeMode({});
-              }}
-              isSoloProposal={isSoloProposal}
-              inviteeChoice={inviteeChoice === "group" ? "unset" : inviteeChoice}
-              onInviteeChoiceChange={(choice) => {
-                setInviteeChoice(choice);
-                setIntentionalSolo(choice === "solo");
-                if (choice === "solo" || choice === "unset") setInviteeMode({});
-              }}
-              hideInviteeRoles={effectivePostingKind === "booking"}
-              showLocation={
-                inviteeChoice === "solo" ||
-                (inviteeChoice === "network" &&
-                  Object.values(inviteeMode).some(
-                    (role) => role === "required" || role === "optional",
-                  ))
-              }
+              postingKind={effectivePostingKind === "booking" ? "booking" : "proposal"}
+              showLocation
               candidates={candidates}
               inviteeMode={inviteeMode}
-              setInviteeRole={setInviteeRole}
+              setInviteeRole={(id, role) => {
+                nlpTouchedRef.current.add("who");
+                setInviteeRole(id, role);
+              }}
               slots={slots}
               onSlotsChange={setSlots}
               locationId={locationId}
               locationCustom={locationCustom}
               bedroomIndex={bedroomIndex}
               bedroomOptions={bedroomOptions}
-              onLocationIdChange={setLocationId}
-              onLocationCustomChange={setLocationCustom}
+              onLocationIdChange={(value) => {
+                nlpTouchedRef.current.add("where");
+                setLocationId(value);
+              }}
+              onLocationCustomChange={(value) => {
+                nlpTouchedRef.current.add("where");
+                setLocationCustom(value);
+              }}
               onBedroomIndexChange={setBedroomIndex}
             />
           )}
 
-          {showTypeBody &&
-          (batchMode ||
-            inviteeChoice === "solo" ||
-            (inviteeChoice === "group" &&
-              Object.values(inviteeMode).some(
-                (role) => role === "required" || role === "optional",
-              )) ||
-            inviteeChoice === "network") ? (
+          {showTypeBody ? (
           <ProposalDraftMoreOptions
             proposalType={proposalType}
             description={description}
@@ -1226,6 +1320,24 @@ export function ProposalDraftDialog({
             onReminderUnitChange={setReminderUnit}
             postToFeed={postToFeed}
             onPostToFeedChange={setPostToFeed}
+            isPoll={isPoll}
+            hidePoll={hidePoll}
+            onPollChange={(value) => {
+              setIsPoll(value);
+              if (value) {
+                setTimingMode("poll");
+                setAllDay(false);
+                setIsRecurring(false);
+              } else {
+                setTimingMode(allDay ? "allDay" : "window");
+              }
+            }}
+            isRecurring={isRecurring}
+            onRecurringChange={setIsRecurring}
+            recurrencePattern={recurrencePattern}
+            onRecurrencePatternChange={setRecurrencePattern}
+            recurrenceCount={recurrenceCount}
+            onRecurrenceCountChange={setRecurrenceCount}
           />
           ) : null}
         </CardContent>

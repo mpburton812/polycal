@@ -93,6 +93,8 @@ export interface ProposalPlaceOption {
   owners?: string[];
   /** Accepted resident (non-owner) display names. */
   residents?: string[];
+  /** Accepted resident user ids for home quick-buttons (PC-436). */
+  residentUserIds?: string[];
 }
 
 export interface ProposalInviteeView {

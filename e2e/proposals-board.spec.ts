@@ -45,19 +45,10 @@ test.describe("Proposals board", () => {
     await expect(dialog.getByLabel("Title")).toBeVisible();
     await expect(dialog.getByText("EVENT PROPOSAL")).toHaveCount(0);
     await expect(dialog.getByText("DRAFT", { exact: true })).toHaveCount(0);
-    await expect(dialog.getByRole("button", { name: "Window", exact: true })).toHaveAttribute(
-      "aria-pressed",
-      "false",
-    );
-    await expect(dialog.getByRole("button", { name: "Poll", exact: true })).toBeVisible();
-    await expect(dialog.getByRole("button", { name: "Proposal", exact: true })).toHaveCount(0);
+    await expect(dialog.getByRole("button", { name: "Add times", exact: true })).toBeVisible();
+    await expect(dialog.getByText("Who:", { exact: true })).toBeVisible();
+    await expect(dialog.getByRole("button", { name: "Window", exact: true })).toHaveCount(0);
     await expect(dialog.getByRole("button", { name: "With Others", exact: true })).toHaveCount(0);
-    await dialog.getByRole("button", { name: "Window", exact: true }).click();
-    await expect(dialog.getByRole("button", { name: "With Others", exact: true })).toBeVisible();
-    await expect(dialog.getByRole("button", { name: "With Others", exact: true })).toHaveAttribute(
-      "aria-pressed",
-      "false",
-    );
     await expect(dialog.getByRole("button", { name: "Submit" })).toBeDisabled();
   });
 

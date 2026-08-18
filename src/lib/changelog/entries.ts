@@ -28,6 +28,39 @@ import { CHANGELOG_ARCHIVE } from "./entries.archive";
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "2026.08.18a",
+    date: "2026-08-18",
+    summary:
+      "New Event composer: NLP Description, calendar tap/drag, Who chips, Where homes; Admin Network Configuration (PC-432–PC-437).",
+    changes: [
+      {
+        type: "changed",
+        description:
+          "New Event Description parses title, dates, times, people, and places; chips visualize Title/Date/Time/Location (PC-433).",
+      },
+      {
+        type: "changed",
+        description:
+          "Calendar tap/drag replaces Window vs All Day; Social Add times slider; Poll and Recurring move to More options (PC-434).",
+      },
+      {
+        type: "changed",
+        description:
+          "Who avatar chips tap-cycle required/optional/booked with ranking; empty Who is Solo (PC-435).",
+      },
+      {
+        type: "changed",
+        description:
+          "Where shows homes of selected people (My Place first, or Booking-for); custom location unchanged (PC-436).",
+      },
+      {
+        type: "changed",
+        description:
+          "Admin Network → Network Summary & MOTD; Network settings → Network Configuration with regrouped subsections (PC-437).",
+      },
+    ],
+  },
+  {
     version: "2026.08.17b",
     date: "2026-08-17",
     summary:
