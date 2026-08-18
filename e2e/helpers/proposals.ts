@@ -562,8 +562,11 @@ export async function configureBatchNight(
       const chip = section.getByRole("button", { name: displayName, exact: true });
       await chip.click();
       await expect(chip).toHaveClass(/MuiChip-colorPrimary|MuiChip-filled/);
-      // Partners default to optional (PC-374) — mark required when the journey needs votes.
-      await section.getByRole("button", { name: `${displayName} required` }).click();
+      // Proposal batch grids expose required/optional; Fast Sleep only has the partner chip.
+      const requiredBtn = section.getByRole("button", { name: `${displayName} required` });
+      if (await requiredBtn.isVisible().catch(() => false)) {
+        await requiredBtn.click();
+      }
     }
     for (const displayName of config.optionalInvitees ?? []) {
       const chip = section.getByRole("button", { name: displayName, exact: true });

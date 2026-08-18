@@ -441,6 +441,7 @@ export function ProposalDraftDialog({
       if (!touched.has("type") && parsed.proposalType) {
         setProposalType(parsed.proposalType);
         setTypePicked(true);
+        setTypeEverChosen(true);
       }
       if (!touched.has("when") && parsed.startDate) {
         const start = parsed.allDay

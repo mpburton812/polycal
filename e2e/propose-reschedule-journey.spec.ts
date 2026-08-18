@@ -3,7 +3,7 @@ import { expect, test } from "./helpers/test";
 import { login, logout } from "./helpers/auth";
 import { USERS } from "./helpers/constants";
 import { goToProposals, openProposalCard, selectProposalTab } from "./helpers/navigation";
-import { createAndSubmitTimedEventWithInvitee } from "./helpers/proposals";
+import { createAndSubmitTimedEventWithInvitee, exitDraftDialog } from "./helpers/proposals";
 
 /**
  * A proposes a required timed event to B; B must not see Reschedule / Re-draft (PC-415).
@@ -66,7 +66,7 @@ test.describe("Propose then invitee cannot reschedule journey", () => {
       timeout: 15_000,
     });
     await expect(composer.getByLabel("Title")).toHaveValue(title);
-    await composer.getByRole("button", { name: "Close" }).click();
+    await exitDraftDialog(composer);
 
     await selectProposalTab(page, "Drafts");
     await expect(page.getByRole("heading", { name: title, level: 2 })).toBeVisible({
