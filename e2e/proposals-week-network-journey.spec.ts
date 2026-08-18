@@ -114,7 +114,7 @@ test.describe("Week schedule poly-family journey", () => {
       hanDialog.getByText(/approved by all required attendees and scheduled/i),
     ).toBeVisible();
     await hanDialog.getByPlaceholder("Add a comment…").fill(declineNote);
-    await hanDialog.getByRole("button", { name: "Post" }).click();
+    await hanDialog.getByRole("button", { name: "Post", exact: true }).click();
     await expect(hanDialog.getByText(declineNote)).toBeVisible({ timeout: 15_000 });
     await hanDialog.getByRole("button", { name: "Decline" }).click();
     await expectToast(page, /Vote recorded/i);

@@ -4,7 +4,15 @@ import { login } from "./helpers/auth";
 import { fillProposalDateTimeField, selectDraftScheduleMode } from "./helpers/datePickers";
 import { DEMO, USERS } from "./helpers/constants";
 import { goToProposals, openProposalCard, selectProposalTab } from "./helpers/navigation";
-import { exitDraftDialog, expandDraftMoreOptions, openEventOrSleepingProposalDraft, proposalCard, setInviteeRequired, submitProposalDraft } from "./helpers/proposals";
+import {
+  exitDraftDialog,
+  expandDraftMoreOptions,
+  openEventOrSleepingProposalDraft,
+  proposalCard,
+  proposalCardsWithPrefix,
+  setInviteeRequired,
+  submitProposalDraft,
+} from "./helpers/proposals";
 
 test.describe("Resolved proposal actions", () => {
   test.beforeEach(async ({ page }) => {
@@ -77,6 +85,6 @@ test.describe("Recurring event draft", () => {
     await dialog.getByLabel(/Description/i).fill("Weekly council meetings.");
     await submitProposalDraft(page, dialog);
     await selectProposalTab(page, "Resolved");
-    await expect(proposalCard(page, title)).toBeVisible();
+    await expect(proposalCardsWithPrefix(page, title)).toHaveCount(4, { timeout: 20_000 });
   });
 });

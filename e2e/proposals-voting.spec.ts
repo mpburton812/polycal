@@ -61,7 +61,7 @@ test.describe("Proposal comments", () => {
     await openProposalCard(page, DEMO.proposedDeathStar);
     const dialog = page.getByRole("dialog");
     await dialog.getByPlaceholder("Add a comment…").fill(comment);
-    await dialog.getByRole("button", { name: "Post" }).click();
+    await dialog.getByRole("button", { name: "Post", exact: true }).click();
     await expect(dialog.getByText(comment)).toBeVisible({ timeout: 15_000 });
   });
 });

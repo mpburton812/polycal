@@ -76,7 +76,7 @@ test.describe("Poll optional decline journey", () => {
     await openProposalCard(page, pollTitle);
     const chewieDialog = page.getByRole("dialog");
     await chewieDialog.getByPlaceholder("Add a comment…").fill(declineNote);
-    await chewieDialog.getByRole("button", { name: "Post" }).click();
+    await chewieDialog.getByRole("button", { name: "Post", exact: true }).click();
     await expect(chewieDialog.getByText(declineNote)).toBeVisible({ timeout: 15_000 });
     await castAllPollSlotVotes(chewieDialog, "Decline", page);
     await expect(chewieDialog.getByText("Declined", { exact: true }).first()).toBeVisible({

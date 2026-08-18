@@ -37,7 +37,7 @@ test.describe("Solo open event network comment journey", () => {
     await expect(dialog.getByRole("heading", { name: title })).toBeVisible();
     await expect(dialog.getByPlaceholder("Add a comment…")).toBeVisible();
     await dialog.getByPlaceholder("Add a comment…").fill(comment);
-    await dialog.getByRole("button", { name: "Post" }).click();
+    await dialog.getByRole("button", { name: "Post", exact: true }).click();
     await expect(dialog.getByText(comment)).toBeVisible({ timeout: 15_000 });
   });
 });

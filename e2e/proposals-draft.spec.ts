@@ -39,6 +39,8 @@ test.describe("Proposal draft workflows", () => {
     await expect(dialog.getByRole("heading", { name: "Edit draft" })).toBeVisible();
     await page.getByLabel("Title").fill(updatedTitle);
     await expect(dialog.getByRole("button", { name: "Save", exact: true })).toHaveCount(0);
+    await fillProposalDateTimeField(dialog.getByLabel("Start").first(), "2099-08-01T10:00");
+    await setInviteeRequired(dialog, USERS.leia.displayName);
     await submitProposalDraft(page, dialog);
 
     await selectProposalTab(page, "Proposed");
