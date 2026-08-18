@@ -127,7 +127,10 @@ function inclusiveNightDates(rangeStart: string, rangeEnd: string): string[] {
  */
 async function revealInviteeRoster(dialog: Locator): Promise<void> {
   const social = dialog.getByRole("button", { name: "Social", exact: true });
-  if ((await social.count()) > 0 && (await social.getAttribute("aria-pressed")) !== "true") {
+  const sleeping = dialog.getByRole("button", { name: "Sleeping", exact: true });
+  const sleepingOn = (await sleeping.getAttribute("aria-pressed")) === "true";
+  const socialOn = (await social.getAttribute("aria-pressed")) === "true";
+  if (!sleepingOn && !socialOn && (await social.count()) > 0) {
     await social.click();
   }
 
