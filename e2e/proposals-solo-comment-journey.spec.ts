@@ -3,7 +3,7 @@ import { expect, test } from "./helpers/test";
 import { login, logout } from "./helpers/auth";
 import { USERS } from "./helpers/constants";
 import { goToProposals, openProposalCard, selectProposalTab } from "./helpers/navigation";
-import { createAndSubmitSoloEvent, proposalCard } from "./helpers/proposals";
+import { clickCommentPost, createAndSubmitSoloEvent, proposalCard } from "./helpers/proposals";
 
 test.describe("Solo open event network comment journey", () => {
   test("network member without sleeping tie can comment on resolved solo event", async ({ page }) => {
@@ -37,7 +37,7 @@ test.describe("Solo open event network comment journey", () => {
     await expect(dialog.getByRole("heading", { name: title })).toBeVisible();
     await expect(dialog.getByPlaceholder("Add a comment…")).toBeVisible();
     await dialog.getByPlaceholder("Add a comment…").fill(comment);
-    await dialog.getByRole("button", { name: "Post", exact: true }).click();
+    await clickCommentPost(dialog);
     await expect(dialog.getByText(comment)).toBeVisible({ timeout: 15_000 });
   });
 });

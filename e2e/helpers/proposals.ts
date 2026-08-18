@@ -124,20 +124,38 @@ function inclusiveNightDates(rangeStart: string, rangeEnd: string): string[] {
 
 /**
  * New drafts leave invitees unset until Solo (just me) / With Others (PC-421 / PC-429).
- * With Others is hidden until Social + a schedule mode (Window) is chosen.
+ * With Others is hidden until Social, posting kind (dual mode), and a schedule mode are chosen.
  */
 async function revealInviteeRoster(dialog: Locator): Promise<void> {
   const withOthers = dialog.getByRole("button", { name: "With Others", exact: true });
-  if ((await withOthers.count()) === 0) {
-    const social = dialog.getByRole("button", { name: "Social", exact: true });
-    if ((await social.count()) > 0 && (await social.getAttribute("aria-pressed")) !== "true") {
-      await social.click();
+  if (await withOthers.isVisible().catch(() => false)) {
+    if ((await withOthers.getAttribute("aria-pressed")) !== "true") {
+      await withOthers.click();
     }
-    const windowBtn = dialog.getByRole("button", { name: "Window", exact: true });
-    if ((await windowBtn.count()) > 0) {
-      await selectDraftScheduleMode(dialog, "Window");
+    return;
+  }
+
+  const social = dialog.getByRole("button", { name: "Social", exact: true });
+  if ((await social.count()) > 0 && (await social.getAttribute("aria-pressed")) !== "true") {
+    await social.click();
+  }
+
+  const proposalBtn = dialog.getByRole("button", { name: "Proposal", exact: true });
+  const bookingBtn = dialog.getByRole("button", { name: "Booking", exact: true });
+  if (await proposalBtn.isVisible().catch(() => false)) {
+    const bookingOn = (await bookingBtn.getAttribute("aria-pressed")) === "true";
+    const proposalOn = (await proposalBtn.getAttribute("aria-pressed")) === "true";
+    if (!bookingOn && !proposalOn) {
+      await proposalBtn.click();
     }
   }
+
+  const windowBtn = dialog.getByRole("button", { name: "Window", exact: true });
+  await expect(windowBtn).toBeVisible({ timeout: 15_000 });
+  if ((await windowBtn.getAttribute("aria-pressed")) !== "true") {
+    await selectDraftScheduleMode(dialog, "Window");
+  }
+
   await expect(withOthers).toBeVisible({ timeout: 15_000 });
   if ((await withOthers.getAttribute("aria-pressed")) !== "true") {
     await withOthers.click();
@@ -541,6 +559,14 @@ export async function configureBatchNight(
   }
 }
 
+/**
+ * Clicks the comment-thread Post control.
+ * Anchored name is required: `exact: true` still substring-matches "Post to Feed" (PC-431).
+ */
+export async function clickCommentPost(dialog: Locator): Promise<void> {
+  await dialog.getByRole("button", { name: /^Post$/ }).click();
+}
+
 /** Opens a proposed card and accepts with an optional comment (partnership or event). */
 export async function acceptProposalWithComment(page: Page, comment: string): Promise<void> {
   const dialog = page.getByRole("dialog");
@@ -551,7 +577,7 @@ export async function acceptProposalWithComment(page: Page, comment: string): Pr
     await optionalComment.fill(comment);
   } else if (await threadComment.isVisible().catch(() => false)) {
     await threadComment.fill(comment);
-    await dialog.getByRole("button", { name: "Post", exact: true }).click();
+    await clickCommentPost(dialog);
     await expect(dialog.getByText(comment)).toBeVisible({ timeout: 15_000 });
   }
 

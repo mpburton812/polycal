@@ -6,6 +6,7 @@ import { goToProposals, openProposalCard, selectProposalTab } from "./helpers/na
 import { expectInAppNotification } from "./helpers/notifications";
 import { dateOffsetIso } from "./helpers/schedule";
 import {
+  clickCommentPost,
   configureBatchNight,
   openDraftForEdit,
   openSleepingProposalDraft,
@@ -87,7 +88,7 @@ test.describe("Batch sleeping partners journey", () => {
     await expect(michaelDialog.getByText(/Night 1:.*Katie's Place/)).toBeVisible();
 
     await michaelDialog.getByPlaceholder("Add a comment…").fill(declineComment);
-    await michaelDialog.getByRole("button", { name: "Post", exact: true }).click();
+    await clickCommentPost(michaelDialog);
     await expect(michaelDialog.getByText(declineComment)).toBeVisible({ timeout: 15_000 });
     await michaelDialog.getByRole("button", { name: "Decline" }).click();
     await michaelDialog.getByRole("button", { name: "Close" }).click({ timeout: 25_000 });
