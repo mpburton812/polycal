@@ -61,13 +61,13 @@ export const networks = sqliteTable("networks", {
     .notNull()
     .default(true),
   /**
-   * `proposals_only` hides Proposal vs Schedule on the card.
-   * `proposals_and_schedule` allows direct calendar posting (PC-424).
+   * `proposals_only` hides Proposal vs Booking on the card.
+   * `proposals_and_bookings` allows direct calendar posting (PC-428).
    */
   schedulingPosting: text("scheduling_posting")
     .notNull()
     .default("proposals_only"),
-  /** Proxy Scheduling nested under Proposals and Schedule (PC-425). Default OFF. */
+  /** Booking-for is always on under Proposals and Bookings (PC-428). Column kept. */
   proxySchedulingEnabled: integer("proxy_scheduling_enabled", { mode: "boolean" })
     .notNull()
     .default(false),

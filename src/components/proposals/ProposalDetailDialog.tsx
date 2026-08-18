@@ -48,6 +48,7 @@ import {
   castSlotVoteAction,
   deleteDraftProposalAction,
   getProposalDetailAction,
+  postProposalToFeedAction,
   redraftProposalAction,
   rescheduleProposalAction,
   revokeResolvedAcceptanceAction,
@@ -166,7 +167,9 @@ export function ProposalDetailDialog({
   const [conflictWarnings, setConflictWarnings] = useState<ProposalConflictWarning[]>([]);
   const [showConflictConfirm, setShowConflictConfirm] = useState(false);
   const [addAttendeeId, setAddAttendeeId] = useState("");
-  const [addAttendeeRole, setAddAttendeeRole] = useState<"required" | "optional">("required");
+  const [addAttendeeRole, setAddAttendeeRole] = useState<"required" | "optional" | "booked">(
+    "required",
+  );
   const [cancelScopeOpen, setCancelScopeOpen] = useState(false);
   const [adminDeleteScopeOpen, setAdminDeleteScopeOpen] = useState(false);
   const [rescheduleOpen, setRescheduleOpen] = useState(false);
@@ -454,7 +457,9 @@ export function ProposalDetailDialog({
         proposalId,
         ...(addAttendeeRole === "required"
           ? { addRequired: [addAttendeeId.trim()] }
-          : { addOptional: [addAttendeeId.trim()] }),
+          : addAttendeeRole === "optional"
+            ? { addOptional: [addAttendeeId.trim()] }
+            : { addBooked: [addAttendeeId.trim()] }),
       });
       notifyResult(result);
       if (!result.ok) return;
@@ -471,6 +476,17 @@ export function ProposalDetailDialog({
         proposalId,
         removeUserIds: [userId],
       });
+      notifyResult(result);
+      if (!result.ok) return;
+      reloadDetail(proposalId);
+      router.refresh();
+    });
+  }
+
+  function handlePostToFeed() {
+    if (!proposalId) return;
+    startTransition(async () => {
+      const result = await postProposalToFeedAction(proposalId);
       notifyResult(result);
       if (!result.ok) return;
       reloadDetail(proposalId);
@@ -899,7 +915,17 @@ export function ProposalDetailDialog({
                       <Stack key={invitee.userId} spacing={0.5}>
                         <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
                           <Typography variant="body2">{invitee.displayName}</Typography>
-                          <Chip size="small" label={invitee.role} variant="outlined" />
+                          <Chip
+                            size="small"
+                            label={
+                              invitee.role === "booked"
+                                ? "Booked"
+                                : invitee.role === "required"
+                                  ? "Required"
+                                  : "Optional"
+                            }
+                            variant="outlined"
+                          />
                           {isPassive && (
                             <Chip
                               size="small"
@@ -980,11 +1006,14 @@ export function ProposalDetailDialog({
                       label="Role"
                       value={addAttendeeRole}
                       onChange={(e) =>
-                        setAddAttendeeRole(e.target.value as "required" | "optional")
+                        setAddAttendeeRole(e.target.value as "required" | "optional" | "booked")
                       }
                     >
                       <MenuItem value="required">Required</MenuItem>
                       <MenuItem value="optional">Optional</MenuItem>
+                      {detail.canAddBookedAttendee ? (
+                        <MenuItem value="booked">Booked</MenuItem>
+                      ) : null}
                     </Select>
                   </FormControl>
                   <Button
@@ -1107,7 +1136,7 @@ export function ProposalDetailDialog({
           <CardActions sx={{ px: 2, pb: 2, pt: 0, flexWrap: "wrap", gap: 1 }}>
             {detail?.canCancel && (
               <Button color="error" variant="outlined" onClick={handleCancelClick} disabled={pending} sx={outlinedButtonSx}>
-                Cancel
+                {detail.state === "resolved" ? "Cancel Event" : "Cancel"}
               </Button>
             )}
             {detail?.canAdminDeleteProposal && (
@@ -1147,6 +1176,16 @@ export function ProposalDetailDialog({
             {detail?.canReschedule && (
               <Button variant="outlined" onClick={openRescheduleDialog} disabled={pending} sx={outlinedButtonSx}>
                 Reschedule
+              </Button>
+            )}
+            {detail?.state === "resolved" && (
+              <Button
+                variant="outlined"
+                onClick={handlePostToFeed}
+                disabled={pending || !detail.canPostToFeed}
+                sx={outlinedButtonSx}
+              >
+                Post to Feed
               </Button>
             )}
             {detail?.pendingIcsId ? (

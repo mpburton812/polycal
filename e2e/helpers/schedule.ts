@@ -334,9 +334,8 @@ export async function createAndSubmitAllDaySpan(
 ): Promise<void> {
   const dialog = await openEventProposalDraft(page);
   await dialog.getByLabel("Title").fill(options.title);
-  await dialog.getByRole("button", { name: "Solo event (just me)" }).click();
   await selectDraftScheduleMode(dialog, "All Day");
   await fillProposalDateRange(dialog, options.startDate, options.endDate);
-  await dialog.getByRole("button", { name: "Save" }).click();
+  await dialog.getByRole("button", { name: "Solo (just me)", exact: true }).click();
   await submitProposalDraft(page, dialog);
 }

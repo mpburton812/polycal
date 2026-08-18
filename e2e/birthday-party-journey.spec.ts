@@ -33,13 +33,11 @@ test.describe("Birthday party journey", () => {
 
     const draft = await openEventProposalDraft(page);
     await draft.getByLabel("Title").fill(partyTitle);
-    await draft.getByRole("button", { name: "With invitees" }).click();
+    await fillProposalDateTimeField(draft.getByLabel("Start").first(), "2099-12-01T14:00");
+    await fillProposalDateTimeField(draft.getByLabel("End (optional)").first(), "2099-12-01T18:00");
     for (const invitee of REQUIRED_INVITEES) {
       await setInviteeRequired(draft, invitee.displayName);
     }
-    await fillProposalDateTimeField(draft.getByLabel("Start").first(), "2099-12-01T14:00");
-    await fillProposalDateTimeField(draft.getByLabel("End (optional)").first(), "2099-12-01T18:00");
-    await draft.getByRole("button", { name: "Save", exact: true }).click();
     await submitProposalDraft(page, draft);
     await logout(page);
 

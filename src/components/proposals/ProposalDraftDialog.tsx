@@ -16,6 +16,7 @@ import {
   MenuItem,
   Select,
   Stack,
+  TextField,
   ToggleButton,
   ToggleButtonGroup,
   Typography,
@@ -144,7 +145,12 @@ export function ProposalDraftDialog({
     "unset",
   );
   const [timingMode, setTimingMode] = useState<"window" | "allDay" | "poll" | null>(null);
-  const [postingKind, setPostingKind] = useState<"proposal" | "schedule" | null>(null);
+  const [postingKind, setPostingKind] = useState<"proposal" | "booking" | null>(null);
+  const [typePicked, setTypePicked] = useState(false);
+  const typeSnapshotRef = useRef<{
+    event?: { postingKind: "proposal" | "booking" | null; timingMode: "window" | "allDay" | "poll" | null; inviteeChoice: "unset" | "group" | "solo" | "network"; slots: SlotDraft[]; locationId: string; locationCustom: string };
+    sleeping?: { postingKind: "proposal" | "booking" | null; inviteeChoice: "unset" | "group" | "solo" | "network"; slots: SlotDraft[]; locationId: string; locationCustom: string; batchMode: boolean };
+  }>({});
   const [onBehalfOfUserId, setOnBehalfOfUserId] = useState("");
   const [composer, setComposer] = useState<DraftComposerSettings>(
     composerSettings ?? {
@@ -204,17 +210,21 @@ export function ProposalDraftDialog({
     inviteeChoice === "solo" ||
     (proposalType === "sleeping" ? intentionalSolo : soloEvent);
 
-  const dualPosting = composer.schedulingPosting === "proposals_and_schedule";
+  const dualPosting = composer.schedulingPosting === "proposals_and_bookings";
   const effectivePostingKind =
     dualPosting ? postingKind : "proposal";
-  const hidePoll = !composer.pollEnabled || effectivePostingKind === "schedule";
-  const showPostingChoice = dualPosting;
+  const hidePoll = !composer.pollEnabled || effectivePostingKind === "booking";
+  const showPostingChoice = typePicked && dualPosting;
+  const postingChosen = !dualPosting || postingKind !== null;
   const showScheduleType =
-    proposalType === "event" && (!dualPosting || postingKind !== null);
+    typePicked &&
+    postingChosen &&
+    proposalType === "event";
   const showProxySelect =
+    typePicked &&
     dualPosting &&
-    composer.proxySchedulingEnabled &&
-    postingKind === "schedule";
+    postingKind === "booking";
+  const showTypeBody = typePicked && postingChosen;
   const proxyPeople = useMemo(() => {
     const others = people.filter(
       (person) => person.id !== currentUserId && person.status === "active",
@@ -343,6 +353,7 @@ export function ProposalDraftDialog({
           : buildEmptyGridRows(),
       );
       setProposalType(toDraftableType(initialDetail.proposalType));
+      setTypePicked(true);
       setTitle(initialDetail.title);
       setDescription(initialDetail.description ?? "");
       setNotes(initialDetail.notes ?? "");
@@ -376,7 +387,7 @@ export function ProposalDraftDialog({
             })
           : null,
       );
-      setPostingKind(initialDetail.postingKind === "schedule" ? "schedule" : "proposal");
+      setPostingKind(initialDetail.postingKind === "booking" ? "booking" : "proposal");
       setOnBehalfOfUserId(initialDetail.onBehalfOfUserId ?? "");
       setEventIconKey(
         isEventIconKey(initialDetail.eventIconKey) ? initialDetail.eventIconKey : null,
@@ -405,10 +416,12 @@ export function ProposalDraftDialog({
             }))
           : [{ startAt: "", endAt: "", label: "" }],
       );
-      const modes: Record<string, InviteeSelection> = {};
-      for (const invitee of initialDetail.invitees) {
+    const modes: Record<string, InviteeSelection> = {};
+    for (const invitee of initialDetail.invitees) {
+      if (invitee.role === "required" || invitee.role === "optional") {
         modes[invitee.userId] = invitee.role;
       }
+    }
       setInviteeMode(modes);
       const reminder = minutesToReminderDisplay(initialDetail.reminderOffsetMinutes);
       setReminderEnabled(reminder.enabled);
@@ -417,6 +430,8 @@ export function ProposalDraftDialog({
       setPostToFeed(Boolean(initialDetail.postToFeed));
     } else if (!savedDraftId) {
       setProposalType(lockedProposalType ?? "event");
+      setTypePicked(Boolean(lockedProposalType));
+      typeSnapshotRef.current = {};
       setTitle("");
       setDescription("");
       setNotes("");
@@ -468,6 +483,7 @@ export function ProposalDraftDialog({
         : buildEmptyGridRows(),
     );
     setProposalType(toDraftableType(detail.proposalType));
+    setTypePicked(true);
     setTitle(detail.title);
     setDescription(detail.description ?? "");
     setNotes(detail.notes ?? "");
@@ -496,7 +512,7 @@ export function ProposalDraftDialog({
         ? timingModeFromFlags({ allDay: detail.isAllDay, isPoll: detail.isPoll })
         : null,
     );
-    setPostingKind(detail.postingKind === "schedule" ? "schedule" : "proposal");
+    setPostingKind(detail.postingKind === "booking" ? "booking" : "proposal");
     setOnBehalfOfUserId(detail.onBehalfOfUserId ?? "");
     setEventIconKey(isEventIconKey(detail.eventIconKey) ? detail.eventIconKey : null);
     setIsRecurring(detail.isRecurrenceParent);
@@ -517,7 +533,9 @@ export function ProposalDraftDialog({
     );
     const modes: Record<string, InviteeSelection> = {};
     for (const invitee of detail.invitees) {
-      modes[invitee.userId] = invitee.role;
+      if (invitee.role === "required" || invitee.role === "optional") {
+        modes[invitee.userId] = invitee.role;
+      }
     }
     setInviteeMode(modes);
   }
@@ -601,7 +619,9 @@ export function ProposalDraftDialog({
 
     return {
       title:
-        proposalType === "sleeping"
+        title.trim()
+          ? title
+          : proposalType === "sleeping"
           ? formatSleepingDisplayTitle({
               proposerName,
               inviteeNames: isSoloProposal
@@ -637,11 +657,11 @@ export function ProposalDraftDialog({
       isPoll: proposalType === "event" ? isPoll : false,
       isAllDay: proposalType === "event" ? allDay : false,
       postingKind:
-        effectivePostingKind === "schedule"
-          ? ("schedule" as const)
+        effectivePostingKind === "booking"
+          ? ("booking" as const)
           : ("proposal" as const),
       onBehalfOfUserId:
-        effectivePostingKind === "schedule" && onBehalfOfUserId
+        effectivePostingKind === "booking" && onBehalfOfUserId
           ? onBehalfOfUserId
           : null,
       eventIconKey: proposalType === "event" ? eventIconKey : null,
@@ -719,15 +739,24 @@ export function ProposalDraftDialog({
     });
   }
 
-  const draftReady = proposalType === "sleeping" || Boolean(title.trim());
-
-  function handleSave() {
-    startTransition(async () => {
-      const proposalId = await persistDraft();
-      if (!proposalId) return;
-      router.refresh();
-    });
-  }
+  const datesReady =
+    proposalType === "sleeping"
+      ? batchMode
+        ? configuredBatchEntries.length > 0
+        : Boolean(slots[0]?.startAt)
+      : timingMode !== null && Boolean(slots[0]?.startAt);
+  const inviteesReady =
+    batchMode ||
+    inviteeChoice === "solo" ||
+    inviteeChoice === "network" ||
+    (inviteeChoice === "group" &&
+      Object.values(inviteeMode).some((role) => role === "required" || role === "optional"));
+  const submitReady =
+    Boolean(title.trim()) &&
+    typePicked &&
+    postingChosen &&
+    datesReady &&
+    inviteesReady;
 
   function handleSubmit(confirm = false) {
     startTransition(async () => {
@@ -772,7 +801,7 @@ export function ProposalDraftDialog({
           <Stack direction="row" spacing={1} alignItems="flex-start" sx={{ mb: 1.5 }}>
             <Box sx={{ flex: 1, minWidth: 0 }}>
               <Typography variant="h6" component="h2" sx={{ fontSize: "1.1rem", fontWeight: 600 }}>
-                {isEdit ? "Edit draft" : "New proposal"}
+                {isEdit ? "Edit draft" : "New Event"}
               </Typography>
               <Stack direction="row" spacing={0.75} alignItems="center" flexWrap="wrap" sx={{ mt: 0.5 }}>
                 {batchMode && <Chip label="Batch" size="small" variant="outlined" />}
@@ -784,8 +813,8 @@ export function ProposalDraftDialog({
                     variant="outlined"
                   />
                 )}
-                {effectivePostingKind === "schedule" && (
-                  <Chip label="Schedule" size="small" variant="outlined" />
+                {effectivePostingKind === "booking" && (
+                  <Chip label="Booking" size="small" variant="outlined" />
                 )}
               </Stack>
             </Box>
@@ -848,30 +877,142 @@ export function ProposalDraftDialog({
             </Alert>
           )}
 
-          {!lockedProposalType && (
-            <FormControl fullWidth size="small" sx={{ mb: 2 }}>
-              <InputLabel id="proposal-type-label">Type</InputLabel>
-              <Select
-                labelId="proposal-type-label"
-                label="Type"
-                value={proposalType}
-                onChange={(event) => {
-                  const nextType = event.target.value as "event" | "sleeping";
-                  setProposalType(nextType);
-                  if (nextType === "event") {
-                    setIntentionalSolo(false);
-                    setBatchMode(false);
+          <TextField
+            label="Title"
+            value={title}
+            onChange={(event) => setTitle(event.target.value)}
+            required
+            fullWidth
+            size="small"
+            placeholder="Untitled event"
+            sx={{ mb: 2 }}
+          />
+
+          <Box sx={{ mb: 2 }}>
+            <Typography variant="subtitle2" sx={{ fontWeight: 600, color: POLY_GREEN, mb: 1 }}>
+              Social or Sleeping
+            </Typography>
+            <ToggleButtonGroup
+              exclusive
+              value={typePicked ? proposalType : null}
+              onChange={(_, value) => {
+                if (!value) {
+                  if (proposalType === "event") {
+                    typeSnapshotRef.current.event = {
+                      postingKind,
+                      timingMode,
+                      inviteeChoice,
+                      slots,
+                      locationId,
+                      locationCustom,
+                    };
                   } else {
-                    setSoloEvent(false);
-                    setIsPoll(false);
+                    typeSnapshotRef.current.sleeping = {
+                      postingKind,
+                      inviteeChoice,
+                      slots,
+                      locationId,
+                      locationCustom,
+                      batchMode,
+                    };
                   }
-                }}
-              >
-                <MenuItem value="event">Event</MenuItem>
-                <MenuItem value="sleeping">Sleeping</MenuItem>
-              </Select>
-            </FormControl>
-          )}
+                  setTypePicked(false);
+                  return;
+                }
+                const nextType = value as "event" | "sleeping";
+                if (typePicked && nextType !== proposalType) {
+                  if (proposalType === "event") {
+                    typeSnapshotRef.current.event = {
+                      postingKind,
+                      timingMode,
+                      inviteeChoice,
+                      slots,
+                      locationId,
+                      locationCustom,
+                    };
+                  } else {
+                    typeSnapshotRef.current.sleeping = {
+                      postingKind,
+                      inviteeChoice,
+                      slots,
+                      locationId,
+                      locationCustom,
+                      batchMode,
+                    };
+                  }
+                  const snap =
+                    nextType === "event"
+                      ? typeSnapshotRef.current.event
+                      : typeSnapshotRef.current.sleeping;
+                  if (snap) {
+                    setPostingKind(snap.postingKind);
+                    setInviteeChoice(snap.inviteeChoice);
+                    setSlots(snap.slots);
+                    setLocationId(snap.locationId);
+                    setLocationCustom(snap.locationCustom);
+                    if (nextType === "event" && "timingMode" in snap) {
+                      setTimingMode(snap.timingMode);
+                    }
+                    if (nextType === "sleeping" && "batchMode" in snap) {
+                      setBatchMode(snap.batchMode);
+                    }
+                  } else {
+                    setPostingKind(null);
+                    setTimingMode(null);
+                    setInviteeChoice("unset");
+                    setInviteeMode({});
+                    setSlots([{ startAt: "", endAt: "", label: "" }]);
+                    setLocationId("");
+                    setLocationCustom("");
+                    setBatchMode(false);
+                    setIsPoll(false);
+                    setAllDay(false);
+                  }
+                } else if (!typePicked) {
+                  const snap =
+                    nextType === "event"
+                      ? typeSnapshotRef.current.event
+                      : typeSnapshotRef.current.sleeping;
+                  if (snap) {
+                    setPostingKind(snap.postingKind);
+                    setInviteeChoice(snap.inviteeChoice);
+                    setSlots(snap.slots);
+                    setLocationId(snap.locationId);
+                    setLocationCustom(snap.locationCustom);
+                    if (nextType === "event" && "timingMode" in snap) {
+                      setTimingMode(snap.timingMode);
+                      if (snap.timingMode) {
+                        const flags = flagsFromTimingMode(snap.timingMode);
+                        setAllDay(flags.allDay);
+                        setIsPoll(flags.isPoll);
+                      }
+                    }
+                    if (nextType === "sleeping" && "batchMode" in snap) {
+                      setBatchMode(snap.batchMode);
+                    }
+                  }
+                }
+                setProposalType(nextType);
+                setTypePicked(true);
+                if (nextType === "event") {
+                  setIntentionalSolo(false);
+                } else {
+                  setSoloEvent(false);
+                  setIsPoll(false);
+                }
+              }}
+              size="small"
+              sx={{
+                "& .MuiToggleButton-root.Mui-selected": {
+                  bgcolor: POLY_GREEN,
+                  color: "#fff",
+                },
+              }}
+            >
+              <ToggleButton value="event">Social</ToggleButton>
+              <ToggleButton value="sleeping">Sleeping</ToggleButton>
+            </ToggleButtonGroup>
+          </Box>
 
           {showPostingChoice ? (
             <Box sx={{ mb: 2 }}>
@@ -882,11 +1023,24 @@ export function ProposalDraftDialog({
                 exclusive
                 value={postingKind}
                 onChange={(_, value) => {
-                  if (!value) return;
-                  setPostingKind(value as "proposal" | "schedule");
-                  if (value === "schedule") {
+                  if (!value) {
+                    setPostingKind(null);
+                    return;
+                  }
+                  const next = value as "proposal" | "booking";
+                  if (postingKind && next !== postingKind) {
+                    setTimingMode(null);
+                    setInviteeChoice("unset");
+                    setInviteeMode({});
+                    setSlots([{ startAt: "", endAt: "", label: "" }]);
+                    setLocationId("");
+                    setLocationCustom("");
                     setIsPoll(false);
-                    if (timingMode === "poll") setTimingMode(null);
+                    setAllDay(false);
+                  }
+                  setPostingKind(next);
+                  if (next === "booking") {
+                    setIsPoll(false);
                   }
                 }}
                 size="small"
@@ -898,17 +1052,17 @@ export function ProposalDraftDialog({
                 }}
               >
                 <ToggleButton value="proposal">Proposal</ToggleButton>
-                <ToggleButton value="schedule">Schedule</ToggleButton>
+                <ToggleButton value="booking">Booking</ToggleButton>
               </ToggleButtonGroup>
             </Box>
           ) : null}
 
           {showProxySelect ? (
             <FormControl fullWidth size="small" sx={{ mb: 2 }}>
-              <InputLabel id="proxy-on-behalf-label">Schedule on behalf of</InputLabel>
-              <Select
-                labelId="proxy-on-behalf-label"
-                label="Schedule on behalf of"
+            <InputLabel id="proxy-on-behalf-label">Booking for</InputLabel>
+            <Select
+              labelId="proxy-on-behalf-label"
+              label="Booking for"
                 value={onBehalfOfUserId}
                 onChange={(event) => setOnBehalfOfUserId(String(event.target.value))}
               >
@@ -958,7 +1112,7 @@ export function ProposalDraftDialog({
             />
           )}
 
-          {proposalType === "event" && (
+          {showTypeBody && proposalType === "event" && (
             <ProposalDraftEventFields
               title={title}
               onTitleChange={setTitle}
@@ -975,8 +1129,15 @@ export function ProposalDraftDialog({
                 setIntentionalSolo(false);
                 if (choice === "solo") setInviteeMode({});
               }}
-              hideInviteeRoles={effectivePostingKind === "schedule"}
+              hideInviteeRoles={effectivePostingKind === "booking"}
+              hideTitle
               showWhenFields={timingMode !== null}
+              showInvitees={timingMode !== null}
+              showLocation={
+                inviteeChoice === "solo" ||
+                (inviteeChoice === "group" &&
+                  Object.values(inviteeMode).some((role) => role === "required" || role === "optional"))
+              }
               candidates={candidates}
               inviteeMode={inviteeMode}
               setInviteeRole={setInviteeRole}
@@ -994,7 +1155,7 @@ export function ProposalDraftDialog({
             />
           )}
 
-          {proposalType === "sleeping" && (
+          {showTypeBody && proposalType === "sleeping" && (
             <ProposalDraftSleepingFields
               batchMode={batchMode}
               onBatchModeChange={setBatchMode}
@@ -1016,9 +1177,16 @@ export function ProposalDraftDialog({
               onInviteeChoiceChange={(choice) => {
                 setInviteeChoice(choice);
                 setIntentionalSolo(choice === "solo");
-                if (choice === "solo") setInviteeMode({});
+                if (choice === "solo" || choice === "unset") setInviteeMode({});
               }}
-              hideInviteeRoles={effectivePostingKind === "schedule"}
+              hideInviteeRoles={effectivePostingKind === "booking"}
+              showLocation={
+                inviteeChoice === "solo" ||
+                (inviteeChoice === "network" &&
+                  Object.values(inviteeMode).some(
+                    (role) => role === "required" || role === "optional",
+                  ))
+              }
               candidates={candidates}
               inviteeMode={inviteeMode}
               setInviteeRole={setInviteeRole}
@@ -1034,6 +1202,14 @@ export function ProposalDraftDialog({
             />
           )}
 
+          {showTypeBody &&
+          (batchMode ||
+            inviteeChoice === "solo" ||
+            (inviteeChoice === "group" &&
+              Object.values(inviteeMode).some(
+                (role) => role === "required" || role === "optional",
+              )) ||
+            inviteeChoice === "network") ? (
           <ProposalDraftMoreOptions
             proposalType={proposalType}
             description={description}
@@ -1051,6 +1227,7 @@ export function ProposalDraftDialog({
             postToFeed={postToFeed}
             onPostToFeedChange={setPostToFeed}
           />
+          ) : null}
         </CardContent>
 
         <CardActions sx={{ px: 2, pb: 2, pt: 0, justifyContent: "flex-end", gap: 1, flexShrink: 0 }}>
@@ -1069,20 +1246,12 @@ export function ProposalDraftDialog({
             Exit
           </Button>
           <Button
-            variant="outlined"
-            disabled={!draftReady || pending}
-            onClick={handleSave}
-            sx={outlinedButtonSx}
-          >
-            Save
-          </Button>
-          <Button
             variant="contained"
-            disabled={!draftReady || pending}
+            disabled={!submitReady || pending}
             onClick={() => handleSubmit()}
             sx={primaryButtonSx}
           >
-            {effectivePostingKind === "schedule" ? "Add to calendar" : "Submit"}
+            {effectivePostingKind === "booking" ? "Add to calendar" : "Submit"}
           </Button>
         </CardActions>
       </Card>

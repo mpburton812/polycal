@@ -183,7 +183,7 @@ export async function updateNetworkSettingsAction(
       feedEnabled: parsed.data.feedEnabled,
       pollEnabled: parsed.data.pollEnabled,
       schedulingPosting: parsed.data.schedulingPosting,
-      proxySchedulingEnabled: parsed.data.proxySchedulingEnabled,
+      proxySchedulingEnabled: parsed.data.schedulingPosting === "proposals_and_bookings",
       proxySchedulingScope: parsed.data.proxySchedulingScope,
       placesMapVisibility: parsed.data.placesMapVisibility,
       logTailLength: parsed.data.logTailLength,
@@ -248,7 +248,10 @@ export async function getDraftComposerSettingsAction(): Promise<DraftComposerSet
   return {
     pollEnabled: settings?.pollEnabled !== false,
     schedulingPosting: settings?.schedulingPosting ?? "proposals_only",
-    proxySchedulingEnabled: Boolean(settings?.proxySchedulingEnabled),
+    proxySchedulingEnabled:
+      (settings?.schedulingPosting ?? "proposals_only") === "proposals_and_bookings"
+        ? true
+        : Boolean(settings?.proxySchedulingEnabled),
     proxySchedulingScope: settings?.proxySchedulingScope ?? "sleeping_partners",
   };
 }

@@ -46,6 +46,7 @@ const NOTIFICATION_TYPE_LABELS: Record<string, string> = {
   proposal_at_risk: "Proposal at risk",
   proposal_redrafted: "Proposal returned to draft",
   proposal_attendee_added: "Added to proposal",
+  proposal_attendee_booked: "Booked for event",
   proposal_attendee_removed: "Removed from proposal",
   proposal_comment: "Proposal comment",
   residency_proposed: "Residency request",

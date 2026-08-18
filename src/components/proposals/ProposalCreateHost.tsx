@@ -63,6 +63,7 @@ export function ProposalCreateHost({
   const [fabMenuAnchor, setFabMenuAnchor] = useState<null | HTMLElement>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [createProposalType, setCreateProposalType] = useState<"event" | "sleeping">("event");
+  const [lockCreateType, setLockCreateType] = useState(false);
   const [createInitialStartAt, setCreateInitialStartAt] = useState<string | null>(null);
   const [partnerCreateOpen, setPartnerCreateOpen] = useState(false);
   const [fastSleepOpen, setFastSleepOpen] = useState(false);
@@ -95,6 +96,7 @@ export function ProposalCreateHost({
         setEditDetail(null);
         if (request?.lockedType) {
           setCreateProposalType(request.lockedType);
+          setLockCreateType(true);
           setCreateInitialStartAt(request.initialStartAt ?? null);
           setCreateOpen(true);
           return;
@@ -149,22 +151,12 @@ export function ProposalCreateHost({
             setFabMenuAnchor(null);
             setEditDetail(null);
             setCreateProposalType("event");
+            setLockCreateType(false);
             setCreateInitialStartAt(null);
             setCreateOpen(true);
           }}
         >
-          Event proposal
-        </MenuItem>
-        <MenuItem
-          onClick={() => {
-            setFabMenuAnchor(null);
-            setEditDetail(null);
-            setCreateProposalType("sleeping");
-            setCreateInitialStartAt(null);
-            setCreateOpen(true);
-          }}
-        >
-          Sleeping proposal
+          New Event
         </MenuItem>
         {fastSleepEnabled ? (
           <MenuItem
@@ -174,7 +166,7 @@ export function ProposalCreateHost({
             }}
             data-testid="fab-fast-sleep"
           >
-            FastSleep Proposal
+            Bulk Sleep Booking
           </MenuItem>
         ) : null}
         <MenuItem
@@ -205,7 +197,7 @@ export function ProposalCreateHost({
         places={places}
         currentUserId={currentUserId}
         initialDetail={editDetail}
-        lockedProposalType={editDetail ? undefined : createProposalType}
+        lockedProposalType={editDetail ? undefined : lockCreateType ? createProposalType : undefined}
         initialStartAt={createInitialStartAt}
         composerSettings={composerSettings ?? undefined}
       />

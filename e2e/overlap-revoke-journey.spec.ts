@@ -32,10 +32,9 @@ test.describe("In-flight overlap and revoke acceptance", () => {
     await goToProposals(page);
     const dialogA = await openEventProposalDraft(page);
     await dialogA.getByLabel("Title").fill(eventA);
-    await setInviteeRequired(dialogA, USERS.leia.displayName);
     await fillProposalDateTimeField(dialogA.getByLabel("Start").first(), slotStart);
     await fillProposalDateTimeField(dialogA.getByLabel("End (optional)").first(), slotEnd);
-    await dialogA.getByRole("button", { name: "Save" }).click();
+    await setInviteeRequired(dialogA, USERS.leia.displayName);
     await submitProposalDraft(page, dialogA);
 
     await logout(page);
@@ -56,13 +55,12 @@ test.describe("In-flight overlap and revoke acceptance", () => {
     await goToProposals(page);
     const dialogB = await openEventProposalDraft(page);
     await dialogB.getByLabel("Title").fill(eventB);
-    await setInviteeRequired(dialogB, USERS.leia.displayName);
     await fillProposalDateTimeField(dialogB.getByLabel("Start").first(), overlapStart);
     await fillProposalDateTimeField(
       dialogB.getByLabel("End (optional)").first(),
       "2099-11-10T17:00",
     );
-    await dialogB.getByRole("button", { name: "Save" }).click();
+    await setInviteeRequired(dialogB, USERS.leia.displayName);
     await submitProposalDraft(page, dialogB);
 
     await logout(page);

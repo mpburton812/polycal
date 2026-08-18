@@ -32,7 +32,8 @@ const ACTION_LABELS: Record<string, string> = {
   "residency.comment": "Residency comment",
   "proposals.admin_delete": "Admin deleted proposal",
   "proposals.draft_delete": "Deleted draft proposal",
-  "proposal.admin_rescheduled": "Admin rescheduled proposal",
+    "proposal.admin_rescheduled": "Admin rescheduled proposal",
+    "proposal.posted_to_feed": "Posted proposal to Feed",
   "schedule.slice_detail_error": "Schedule slice detail error",
   "schedule.slice_detach_error": "Schedule slice detach error",
 };

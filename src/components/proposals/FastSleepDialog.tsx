@@ -125,7 +125,7 @@ export function FastSleepDialog({
       maxWidth="md"
       data-testid="fast-sleep-dialog"
     >
-      <DialogTitle>FastSleep Proposal</DialogTitle>
+      <DialogTitle>Bulk Sleep Booking</DialogTitle>
       <DialogContent>
         <Stack spacing={2} sx={{ pt: 1 }}>
           <Typography variant="body2" color="text.secondary">
@@ -165,7 +165,7 @@ export function FastSleepDialog({
           onClick={() => submit(confirming)}
           data-testid="fast-sleep-submit"
         >
-          {confirming ? "Confirm FastSleep Proposal" : `Confirm ${configuredCount || ""} night${configuredCount === 1 ? "" : "s"}`}
+          {confirming ? "Confirm Bulk Sleep Booking" : `Confirm ${configuredCount || ""} night${configuredCount === 1 ? "" : "s"}`}
         </Button>
       </DialogActions>
     </Dialog>
