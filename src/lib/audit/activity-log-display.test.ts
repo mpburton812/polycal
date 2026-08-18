@@ -28,6 +28,7 @@ describe("activity-log-display (PC-245)", () => {
     expect(formatActivityLogAction("proposal.admin_rescheduled")).toBe(
       "Admin rescheduled proposal",
     );
+    expect(formatActivityLogAction("proposal.posted_to_feed")).toBe("Posted proposal to Feed");
   });
 
   it("prefers notification actor metadata and names the recipient in details", () => {

@@ -72,6 +72,7 @@ test.describe("Sleeping partnership journey", () => {
     // —— Phase 5: Han proposes sleeping event with Anakin at Millennium Falcon ——
     await goToProposals(page);
     const draft = await openSleepingProposalDraft(page);
+    await draft.getByLabel("Title").fill(`E2E sleeping with Anakin ${Date.now()}`);
     await setInviteeRequired(draft, USERS.anakin.displayName);
     await draft.getByLabel("Custom location (optional)").fill("Millennium Falcon");
     await fillProposalDateRange(draft, "2099-07-06");

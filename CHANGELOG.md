@@ -18,6 +18,11 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - Assessment security remediation (avatar IDOR, API secrets, session invalidation on password change).
 
+## [2026.08.17b] - 2026-08-17
+
+### Added
+- PC-426–PC-431: Proposals and Bookings — Booking language in admin/composer, New Event progressive disclosure, Booked attendees on resolved events, Post to Feed, SCHEMA_VERSION 50. Change control: `2026.08.17b`.
+
 ## [2026.08.17a] - 2026-08-17
 
 ### Added

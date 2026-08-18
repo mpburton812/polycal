@@ -4,7 +4,7 @@ import { login, logout } from "./helpers/auth";
 import { fillProposalDateTimeField } from "./helpers/datePickers";
 import { USERS } from "./helpers/constants";
 import { goToProposals, openProposalCard, selectProposalTab } from "./helpers/navigation";
-import { expandDraftMoreOptions, openEventOrSleepingProposalDraft, proposalCard, setInviteeRequired } from "./helpers/proposals";
+import { expandDraftMoreOptions, openEventOrSleepingProposalDraft, proposalCard, setInviteeRequired, submitProposalDraft } from "./helpers/proposals";
 import { expectToast } from "./helpers/toast";
 
 test.describe("Proposal invitee journey", () => {
@@ -17,14 +17,11 @@ test.describe("Proposal invitee journey", () => {
     await goToProposals(page);
     const draftDialog = await openEventOrSleepingProposalDraft(page);
     await draftDialog.getByLabel("Title").fill(title);
+    await fillProposalDateTimeField(draftDialog.getByLabel("Start").first(), "2099-07-10T18:00");
+    await setInviteeRequired(draftDialog, USERS.leia.displayName);
     await expandDraftMoreOptions(draftDialog);
     await draftDialog.getByLabel(/Description/i).fill("Single invitee then attendee add.");
-    await setInviteeRequired(draftDialog, USERS.leia.displayName);
-    await fillProposalDateTimeField(draftDialog.getByLabel("Start").first(), "2099-07-10T18:00");
-    await draftDialog.getByRole("button", { name: "Save", exact: true }).click();
-
-    await draftDialog.getByRole("button", { name: "Submit" }).click();
-    await expect(draftDialog).toBeHidden({ timeout: 15_000 });
+    await submitProposalDraft(page, draftDialog);
 
     await logout(page);
     await login(page, USERS.leia.username);

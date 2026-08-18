@@ -47,6 +47,7 @@ test.describe("Sleeping partner weekend journey", () => {
     await goToProposals(page);
 
     const sleepingDialog = await openSleepingProposalDraft(page);
+    await sleepingDialog.getByLabel("Title").fill(`E2E weekend ${Date.now()}`);
     await sleepingDialog
       .getByRole("checkbox", { name: /Batch nights/i })
       .click();

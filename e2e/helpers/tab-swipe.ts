@@ -24,9 +24,12 @@ export function mainTabLabel(href: MainTabPath): string {
 /**
  * Active keep-alive panel — scopes locators so hidden sibling tabs cannot
  * match (Playwright still finds `display:none` nodes in strict mode).
+ * Excludes Next.js layout/route loading shells that reuse the same test id.
  */
 export function activeMainPanel(page: Page) {
-  return page.locator('[data-testid^="main-tab-panel-"][data-active="true"]');
+  return page
+    .locator('[data-testid^="main-tab-panel-"][data-active="true"]')
+    .filter({ hasNot: page.locator('[role="status"][aria-busy="true"]') });
 }
 
 /** Asserts URL + active carousel panel for a main tab (PC-407). */
@@ -34,7 +37,10 @@ export async function expectMainTab(page: Page, href: MainTabPath): Promise<void
   await expect(page).toHaveURL(new RegExp(`${href.replace("/", "\\/")}`), {
     timeout: 15_000,
   });
-  const panel = page.getByTestId(`main-tab-panel-${href.slice(1)}`);
+  const panel = page
+    .getByTestId(`main-tab-panel-${href.slice(1)}`)
+    .filter({ hasNot: page.locator('[role="status"][aria-busy="true"]') });
+  await expect(panel).toHaveCount(1, { timeout: 15_000 });
   await expect(panel).toHaveAttribute("data-active", "true", { timeout: 15_000 });
 }
 
