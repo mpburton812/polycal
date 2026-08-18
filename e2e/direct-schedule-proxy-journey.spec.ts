@@ -10,6 +10,7 @@ import {
   exitDraftDialog,
   expandDraftMoreOptions,
   openEventProposalDraft,
+  openNewProposalFabMenu,
   proposalCard,
   submitProposalDraft,
 } from "./helpers/proposals";
@@ -44,6 +45,10 @@ test.describe("Direct booking and Booking for journey", () => {
       await goToProposals(page);
 
       const dualDraft = await openEventProposalDraft(page);
+      await expect(dualDraft.getByText("Proposal or Booking")).toBeVisible();
+      await expect(
+        dualDraft.getByText("(Proposals are voted, bookings are auto-accepted)"),
+      ).toBeVisible();
       await expect(dualDraft.getByRole("button", { name: "Proposal", exact: true })).toBeVisible();
       await expect(dualDraft.getByRole("button", { name: "Booking", exact: true })).toBeVisible();
       await expect(dualDraft.getByRole("button", { name: "Window", exact: true })).toHaveCount(0);
@@ -116,6 +121,32 @@ test.describe("Direct booking and Booking for journey", () => {
       await expandDraftMoreOptions(noPollDraft);
       await expect(noPollDraft.getByRole("button", { name: "Poll", exact: true })).toHaveCount(0);
       await exitDraftDialog(noPollDraft);
+
+      await logout(page);
+      await loginWithOnboardingIfNeeded(page, USERS.luke.username);
+      await setPostingMode(page, "Just Bookings");
+      await openNetworkSettings(page);
+      await expect(page.getByLabel("Enable Poll")).toBeDisabled();
+      await expect(page.getByLabel("Enable Poll")).not.toBeChecked();
+
+      await logout(page);
+      await loginWithOnboardingIfNeeded(page, USERS.han.username);
+      await goToProposals(page);
+      const bookingsOnlyDraft = await openEventProposalDraft(page);
+      await expect(bookingsOnlyDraft.getByRole("button", { name: "Proposal", exact: true })).toHaveCount(
+        0,
+      );
+      await expect(bookingsOnlyDraft.getByRole("button", { name: "Booking", exact: true })).toHaveCount(
+        0,
+      );
+      await expect(bookingsOnlyDraft.getByRole("button", { name: "Add to calendar" })).toBeVisible();
+      await expect(bookingsOnlyDraft.getByLabel("Booking for")).toBeVisible();
+      await expandDraftMoreOptions(bookingsOnlyDraft);
+      await expect(bookingsOnlyDraft.getByRole("button", { name: "Poll", exact: true })).toHaveCount(0);
+      await exitDraftDialog(bookingsOnlyDraft);
+      await openNewProposalFabMenu(page);
+      await expect(page.getByRole("menuitem", { name: "Sleeping partner proposal" })).toBeVisible();
+      await page.keyboard.press("Escape");
     } finally {
       await restoreDefaultComposerSettings(page);
     }
@@ -147,11 +178,11 @@ async function selectLabeledCombobox(
 
 async function setPostingMode(
   page: Page,
-  mode: "Just Proposals" | "Proposals and Bookings",
+  mode: "Just Proposals" | "Proposals and Bookings" | "Just Bookings",
 ): Promise<void> {
   await loginWithOnboardingIfNeeded(page, USERS.luke.username);
   await openNetworkSettings(page);
-  await selectLabeledCombobox(page, "Proposal posting", mode);
+  await selectLabeledCombobox(page, "Event Types", mode);
   await saveNetworkSettings(page);
 }
 
@@ -185,7 +216,7 @@ async function restoreDefaultComposerSettings(page: Page): Promise<void> {
     if (!(await poll.isChecked())) {
       await poll.click();
     }
-    await selectLabeledCombobox(page, "Proposal posting", "Just Proposals");
+    await selectLabeledCombobox(page, "Event Types", "Just Proposals");
     await saveNetworkSettings(page);
   } catch {
     // Best-effort restore so later serial specs keep default Poll-on / Just Proposals.

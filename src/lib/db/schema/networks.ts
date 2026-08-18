@@ -62,7 +62,8 @@ export const networks = sqliteTable("networks", {
     .default(true),
   /**
    * `proposals_only` hides Proposal vs Booking on the card.
-   * `proposals_and_bookings` allows direct calendar posting (PC-428).
+   * `proposals_and_bookings` allows a Proposal or Booking choice (PC-428).
+   * `bookings_only` forces booking and disables Poll (PC-447).
    */
   schedulingPosting: text("scheduling_posting")
     .notNull()

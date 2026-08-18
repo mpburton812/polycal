@@ -23,6 +23,7 @@ import { LONG_TEXT_MAX } from "@/lib/validation/string-limits";
 import type { NetworkSettings } from "@/types/network-settings";
 import {
   auditLogVisibilityLevels,
+  bookingsEnabled,
   placesMapVisibilityLevels,
   proxySchedulingScopes,
   schedulingPostingModes,
@@ -38,6 +39,7 @@ const AUDIT_LABELS: Record<string, string> = {
 const POSTING_LABELS: Record<string, string> = {
   proposals_only: "Just Proposals",
   proposals_and_bookings: "Proposals and Bookings",
+  bookings_only: "Just Bookings",
 };
 
 const PROXY_SCOPE_LABELS: Record<string, string> = {
@@ -128,7 +130,8 @@ export function AdminNetworkSettingsPanel({
           <FormControlLabel
             control={
               <Switch
-                checked={settings.pollEnabled}
+                checked={settings.schedulingPosting !== "bookings_only" && settings.pollEnabled}
+                disabled={settings.schedulingPosting === "bookings_only"}
                 onChange={(e) =>
                   setSettings({
                     ...settings,
@@ -141,7 +144,7 @@ export function AdminNetworkSettingsPanel({
           />
           <Typography variant="caption" color="text.secondary" sx={{ mt: -1, display: "block" }}>
             When off, Poll is hidden on new event proposals. Existing poll drafts are unchanged
-            (PC-423).
+            (PC-423). Just Bookings turns Poll off automatically (PC-447).
           </Typography>
           <FormControlLabel
             control={
@@ -198,21 +201,23 @@ export function AdminNetworkSettingsPanel({
             }
             label="Admins can see proposals they are not involved in"
           />
-          {/* labelId so the combobox exposes "Proposal posting" to getByRole / getByLabel (PC-424). */}
+          {/* labelId so the combobox exposes "Event Types" to getByRole / getByLabel (PC-424 / PC-447). */}
           <FormControl fullWidth>
-            <InputLabel id="proposal-posting-label">Proposal posting</InputLabel>
+            <InputLabel id="proposal-posting-label">Event Types</InputLabel>
             <Select
               labelId="proposal-posting-label"
               id="proposal-posting"
-              label="Proposal posting"
+              label="Event Types"
               value={settings.schedulingPosting}
-              onChange={(e) =>
+              onChange={(e) => {
+                const next = e.target.value as NetworkSettings["schedulingPosting"];
                 setSettings({
                   ...settings,
-                  schedulingPosting: e.target.value as NetworkSettings["schedulingPosting"],
-                  proxySchedulingEnabled: e.target.value === "proposals_and_bookings",
-                })
-              }
+                  schedulingPosting: next,
+                  proxySchedulingEnabled: bookingsEnabled(next),
+                  pollEnabled: next === "bookings_only" ? false : settings.pollEnabled,
+                });
+              }}
             >
               {schedulingPostingModes.map((mode) => (
                 <MenuItem key={mode} value={mode}>
@@ -222,10 +227,11 @@ export function AdminNetworkSettingsPanel({
             </Select>
           </FormControl>
           <Typography variant="caption" color="text.secondary" sx={{ mt: -1, display: "block" }}>
-            Proposals and Bookings adds a Proposal vs Booking choice on the draft card. A
-            booking goes on the calendar with no approval votes (PC-428).
+            Proposals and Bookings adds a Proposal or Booking choice on the draft card. A
+            booking goes on the calendar with no approval votes. Just Bookings always books and
+            turns Poll off (PC-447). Sleeping-partner and residency proposals are unchanged.
           </Typography>
-          {settings.schedulingPosting === "proposals_and_bookings" ? (
+          {bookingsEnabled(settings.schedulingPosting) ? (
             <FormControl fullWidth>
               <InputLabel id="proxy-for-label">Booking for</InputLabel>
               <Select

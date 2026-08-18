@@ -4,6 +4,12 @@ All notable changes to PolyCal are documented here.
 
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [2026.08.18c] - 2026-08-18
+
+### Changed
+
+- PC-443–PC-447: New Event chips stay sage-green; posting is Proposal or Booking (voted vs auto-accepted); Batch nights removed from New Event sleeping. Proposed detail: Cancel Event, Back to Draft, no Delete proposal or Reschedule. FAB hidden on Feed and People & Places. Admin Event Types adds Just Bookings (forces booking, disables Poll; partner/residency proposals remain). Change control: `2026.08.18c`.
+
 ## [2026.08.18b] - 2026-08-18
 
 ### Changed

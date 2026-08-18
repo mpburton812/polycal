@@ -78,6 +78,7 @@ import { sleepingDateToStartIso } from "@/lib/proposals/sleeping-schedule";
 import { formatSleepingDisplayTitle } from "@/lib/proposals/sleeping-display";
 import { parseEventIntent, type EventIntentChip } from "@/lib/proposals/event-intent-parse";
 import { inviteeIsSelected } from "@/lib/proposals/invitee-tap-cycle";
+import { bookingsEnabled } from "@/types/network-settings";
 import { rankPeople, type PersonRankStat } from "@/lib/proposals/composer-people-rank";
 import {
   minutesToReminderDisplay,
@@ -94,6 +95,25 @@ import {
   type InviteeSelection,
   type SlotDraft,
 } from "./proposalDraftDateUtils";
+
+/** Sage fill for the chosen chip; outlined sage for the other so it does not look disabled (PC-444). */
+const COMPOSER_TOGGLE_SX = {
+  "& .MuiToggleButton-root": {
+    color: POLY_GREEN,
+    borderColor: POLY_GREEN,
+    bgcolor: "transparent",
+    "&:hover": {
+      bgcolor: "rgba(90, 125, 96, 0.08)",
+    },
+    "&.Mui-selected": {
+      bgcolor: POLY_GREEN,
+      color: "#fff",
+      "&:hover": {
+        bgcolor: POLY_GREEN,
+      },
+    },
+  },
+};
 
 interface ProposalDraftDialogProps {
   open: boolean;
@@ -159,6 +179,7 @@ export function ProposalDraftDialog({
   const [timingMode, setTimingMode] = useState<"window" | "allDay" | "poll" | null>(null);
   const [postingKind, setPostingKind] = useState<"proposal" | "booking" | null>(null);
   const [typePicked, setTypePicked] = useState(false);
+  const [typeEverChosen, setTypeEverChosen] = useState(false);
   const typeSnapshotRef = useRef<{
     event?: { postingKind: "proposal" | "booking" | null; timingMode: "window" | "allDay" | "poll" | null; inviteeChoice: "unset" | "group" | "solo" | "network"; slots: SlotDraft[]; locationId: string; locationCustom: string };
     sleeping?: { postingKind: "proposal" | "booking" | null; inviteeChoice: "unset" | "group" | "solo" | "network"; slots: SlotDraft[]; locationId: string; locationCustom: string; batchMode: boolean };
@@ -223,15 +244,21 @@ export function ProposalDraftDialog({
   const isSoloProposal = !hasSelectedInvitees;
 
   const dualPosting = composer.schedulingPosting === "proposals_and_bookings";
-  const effectivePostingKind =
-    dualPosting ? postingKind : "proposal";
-  const hidePoll = !composer.pollEnabled || effectivePostingKind === "booking";
+  const bookingsOnly = composer.schedulingPosting === "bookings_only";
+  const bookingsOn = bookingsEnabled(composer.schedulingPosting);
+  const effectivePostingKind = bookingsOnly
+    ? "booking"
+    : dualPosting
+      ? postingKind
+      : "proposal";
+  const hidePoll =
+    !composer.pollEnabled || bookingsOnly || effectivePostingKind === "booking";
   const showPostingChoice = typePicked && dualPosting;
-  const postingChosen = !dualPosting || postingKind !== null;
+  const postingChosen = bookingsOnly || !dualPosting || postingKind !== null;
   const showProxySelect =
     typePicked &&
-    dualPosting &&
-    postingKind === "booking";
+    bookingsOn &&
+    effectivePostingKind === "booking";
   const showTypeBody = typePicked && postingChosen;
   const proxyPeople = useMemo(() => {
     const others = people.filter(
@@ -358,6 +385,13 @@ export function ProposalDraftDialog({
   }, [showTypeBody, proposalType, timingMode, isPoll]);
 
   useEffect(() => {
+    if (bookingsOnly) {
+      setPostingKind("booking");
+      setIsPoll(false);
+    }
+  }, [bookingsOnly]);
+
+  useEffect(() => {
     if (composerMode !== "nlp") return;
     const handle = window.setTimeout(() => {
       if (!nlpText.trim()) {
@@ -381,7 +415,7 @@ export function ProposalDraftDialog({
 
       if (parsed.needsBookingFor) {
         const allowed =
-          dualPosting &&
+          bookingsOn &&
           Boolean(parsed.sleeperUserId) &&
           proxyPeople.some((person) => person.id === parsed.sleeperUserId);
         if (!allowed) {
@@ -427,7 +461,7 @@ export function ProposalDraftDialog({
         } else if (parsed.personIds.length > 0) {
           const next: Record<string, InviteeSelection> = {};
           const role: InviteeSelection =
-            dualPosting && parsed.needsBookingFor ? "booked" : "required";
+            bookingsOn && parsed.needsBookingFor ? "booked" : "required";
           for (const id of parsed.personIds) {
             if (id === currentUserId) continue;
             if (id === parsed.sleeperUserId) continue;
@@ -453,7 +487,7 @@ export function ProposalDraftDialog({
     people,
     places,
     currentUserId,
-    dualPosting,
+    bookingsOn,
     proxyPeople,
     showToast,
   ]);
@@ -478,6 +512,7 @@ export function ProposalDraftDialog({
       );
       setProposalType(toDraftableType(initialDetail.proposalType));
       setTypePicked(true);
+      setTypeEverChosen(true);
       setTitle(initialDetail.title);
       setDescription(initialDetail.description ?? "");
       setNotes(initialDetail.notes ?? "");
@@ -555,6 +590,7 @@ export function ProposalDraftDialog({
     } else if (!savedDraftId) {
       setProposalType(lockedProposalType ?? "event");
       setTypePicked(Boolean(lockedProposalType));
+      setTypeEverChosen(Boolean(lockedProposalType));
       typeSnapshotRef.current = {};
       setTitle("");
       setNlpText("");
@@ -618,6 +654,7 @@ export function ProposalDraftDialog({
     );
     setProposalType(toDraftableType(detail.proposalType));
     setTypePicked(true);
+    setTypeEverChosen(true);
     setTitle(detail.title);
     setDescription(detail.description ?? "");
     setNotes(detail.notes ?? "");
@@ -1093,9 +1130,13 @@ export function ProposalDraftDialog({
             </Typography>
             <ToggleButtonGroup
               exclusive
-              value={typePicked ? proposalType : null}
+              value={typeEverChosen ? proposalType : null}
               onChange={(_, value) => {
                 if (!value) {
+                  if (!typePicked) {
+                    setTypePicked(true);
+                    return;
+                  }
                   if (proposalType === "event") {
                     typeSnapshotRef.current.event = {
                       postingKind,
@@ -1152,8 +1193,8 @@ export function ProposalDraftDialog({
                     if (nextType === "event" && "timingMode" in snap) {
                       setTimingMode(snap.timingMode);
                     }
-                    if (nextType === "sleeping" && "batchMode" in snap) {
-                      setBatchMode(snap.batchMode);
+                    if (nextType === "sleeping") {
+                      setBatchMode(Boolean(initialDetail?.isBatchSleeping));
                     }
                   } else {
                     setPostingKind(null);
@@ -1186,13 +1227,14 @@ export function ProposalDraftDialog({
                         setIsPoll(flags.isPoll);
                       }
                     }
-                    if (nextType === "sleeping" && "batchMode" in snap) {
-                      setBatchMode(snap.batchMode);
+                    if (nextType === "sleeping") {
+                      setBatchMode(Boolean(initialDetail?.isBatchSleeping));
                     }
                   }
                 }
                 setProposalType(nextType);
                 setTypePicked(true);
+                setTypeEverChosen(true);
                 nlpTouchedRef.current.add("type");
                 if (nextType === "event") {
                   setIntentionalSolo(false);
@@ -1202,12 +1244,7 @@ export function ProposalDraftDialog({
                 }
               }}
               size="small"
-              sx={{
-                "& .MuiToggleButton-root.Mui-selected": {
-                  bgcolor: POLY_GREEN,
-                  color: "#fff",
-                },
-              }}
+              sx={COMPOSER_TOGGLE_SX}
             >
               <ToggleButton value="event">Social</ToggleButton>
               <ToggleButton value="sleeping">Sleeping</ToggleButton>
@@ -1218,14 +1255,16 @@ export function ProposalDraftDialog({
           {showPostingChoice ? (
             <Box sx={{ mb: 2 }}>
               <Typography variant="subtitle2" sx={{ fontWeight: 600, color: POLY_GREEN, mb: 1 }}>
-                Posting
+                Proposal or Booking
+              </Typography>
+              <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 1 }}>
+                (Proposals are voted, bookings are auto-accepted)
               </Typography>
               <ToggleButtonGroup
                 exclusive
                 value={postingKind}
                 onChange={(_, value) => {
                   if (!value) {
-                    setPostingKind(null);
                     return;
                   }
                   const next = value as "proposal" | "booking";
@@ -1246,12 +1285,7 @@ export function ProposalDraftDialog({
                   }
                 }}
                 size="small"
-                sx={{
-                  "& .MuiToggleButton-root.Mui-selected": {
-                    bgcolor: POLY_GREEN,
-                    color: "#fff",
-                  },
-                }}
+                sx={COMPOSER_TOGGLE_SX}
               >
                 <ToggleButton value="proposal">Proposal</ToggleButton>
                 <ToggleButton value="booking">Booking</ToggleButton>
@@ -1331,7 +1365,6 @@ export function ProposalDraftDialog({
           {showTypeBody && proposalType === "sleeping" && (
             <ProposalDraftSleepingFields
               batchMode={batchMode}
-              onBatchModeChange={setBatchMode}
               fastPlanRows={fastPlanRows}
               onFastPlanRowsChange={setFastPlanRows}
               sleepingCandidates={sleepingCandidates}

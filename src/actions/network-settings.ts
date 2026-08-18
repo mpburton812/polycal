@@ -12,6 +12,7 @@ import { requireNetworkAdmin, requireNetworkSession } from "@/lib/networks/conte
 import { loadNetworkSettings, resolveNetworkSettings } from "@/lib/networks/settings";
 import {
   auditLogVisibilityLevels,
+  bookingsEnabled,
   placesMapVisibilityLevels,
   proxySchedulingScopes,
   schedulingPostingModes,
@@ -181,9 +182,10 @@ export async function updateNetworkSettingsAction(
       seePartnersSleepingArrangements: parsed.data.seePartnersSleepingArrangements,
       fastSleepEnabled: parsed.data.fastSleepEnabled,
       feedEnabled: parsed.data.feedEnabled,
-      pollEnabled: parsed.data.pollEnabled,
+      pollEnabled:
+        parsed.data.schedulingPosting === "bookings_only" ? false : parsed.data.pollEnabled,
       schedulingPosting: parsed.data.schedulingPosting,
-      proxySchedulingEnabled: parsed.data.schedulingPosting === "proposals_and_bookings",
+      proxySchedulingEnabled: bookingsEnabled(parsed.data.schedulingPosting),
       proxySchedulingScope: parsed.data.proxySchedulingScope,
       placesMapVisibility: parsed.data.placesMapVisibility,
       logTailLength: parsed.data.logTailLength,
@@ -246,12 +248,10 @@ export async function getDraftComposerSettingsAction(): Promise<DraftComposerSet
   await ensureDbReady();
   const settings = await loadNetworkSettings(networkSession.user.activeNetworkId);
   return {
-    pollEnabled: settings?.pollEnabled !== false,
+    pollEnabled:
+      settings?.schedulingPosting === "bookings_only" ? false : settings?.pollEnabled !== false,
     schedulingPosting: settings?.schedulingPosting ?? "proposals_only",
-    proxySchedulingEnabled:
-      (settings?.schedulingPosting ?? "proposals_only") === "proposals_and_bookings"
-        ? true
-        : Boolean(settings?.proxySchedulingEnabled),
+    proxySchedulingEnabled: bookingsEnabled(settings?.schedulingPosting ?? "proposals_only"),
     proxySchedulingScope: settings?.proxySchedulingScope ?? "sleeping_partners",
   };
 }

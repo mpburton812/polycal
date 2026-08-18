@@ -398,8 +398,8 @@ export async function createAndSubmitRecurringEventForEveryone(
 }
 
 /**
- * Creates a batch of solo sleeping nights in one proposal and submits it (normal approval;
- * solo auto-resolves). Nights must fall within the shared 14-day fast plan grid (today+13).
+ * Creates a batch of solo sleeping nights via Bulk Sleep Booking (auto-confirms).
+ * Nights must fall within the shared 14-day fast plan grid (today+13).
  */
 export async function createAndSubmitSoloSleepingWeek(
   page: Page,
@@ -410,12 +410,10 @@ export async function createAndSubmitSoloSleepingWeek(
   },
 ): Promise<number> {
   const nightDates = inclusiveNightDates(options.rangeStart, options.rangeEnd);
-  const dialog = await openSleepingProposalDraft(page);
-  await dialog.getByLabel("Title").fill(options.titlePrefix ?? `E2E sleeping ${Date.now()}`);
-  await dialog
-    .getByRole("checkbox", { name: /Batch nights/i })
-    .check();
-
+  await openNewProposalFabMenu(page);
+  await page.getByTestId("fab-fast-sleep").click();
+  const dialog = page.getByTestId("fast-sleep-dialog");
+  await expect(dialog).toBeVisible({ timeout: 15_000 });
   await expect(dialog.getByTestId("fast-sleeping-plan-grid")).toBeVisible({ timeout: 15_000 });
 
   for (const nightDate of nightDates) {
@@ -425,7 +423,11 @@ export async function createAndSubmitSoloSleepingWeek(
     });
   }
 
-  await submitProposalDraft(page, dialog);
+  await dialog.getByTestId("fast-sleep-submit").click();
+  if (await dialog.getByText(/Submit again/i).isVisible().catch(() => false)) {
+    await dialog.getByTestId("fast-sleep-submit").click();
+  }
+  await expect(dialog).toBeHidden({ timeout: 30_000 });
 
   return nightDates.length;
 }
@@ -847,7 +849,7 @@ export async function expectResolvedProposal(page: Page, title: string): Promise
   });
 }
 
-/** Creates and submits a batch sleeping night with a required partner invitee. */
+/** Creates and submits a sleeping night with a required partner invitee. */
 export async function createAndSubmitBatchSleepingWithInvitee(
   page: Page,
   options: {
@@ -859,14 +861,15 @@ export async function createAndSubmitBatchSleepingWithInvitee(
   },
 ): Promise<void> {
   const dialog = await openSleepingProposalDraft(page);
-  await dialog.getByLabel("Title").fill(options.title ?? `E2E batch sleeping ${Date.now()}`);
-  await dialog.getByRole("checkbox", { name: /Batch/i }).check();
-  await expect(dialog.getByTestId("fast-sleeping-plan-grid")).toBeVisible({ timeout: 15_000 });
-  await configureBatchNight(dialog, page, options.nightDate, {
-    nightDate: options.nightDate,
-    mode: "withInvitees",
-    requiredInvitees: [options.requiredPartnerName],
-    locationName: options.locationName,
-  });
+  await dialog.getByLabel("Title").fill(options.title ?? `E2E sleeping ${Date.now()}`);
+  await fillProposalDateRange(dialog, options.nightDate, options.nightDate);
+  await setInviteeRequired(dialog, options.requiredPartnerName);
+  if (options.locationName) {
+    await dialog.getByRole("button", { name: options.locationName, exact: true }).click();
+  }
+  if (options.comment) {
+    await expandDraftMoreOptions(dialog);
+    await dialog.getByLabel(/Details/i).fill(options.comment);
+  }
   await submitProposalDraft(page, dialog);
 }
