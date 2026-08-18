@@ -14,6 +14,7 @@ import type { ProposalPlaceOption } from "@/actions/proposals";
 import type { PersonSummary } from "@/actions/users";
 import { LONG_TEXT_MAX } from "@/lib/validation/string-limits";
 import { inviteeIsSelected } from "@/lib/proposals/invitee-tap-cycle";
+import { isStrictIsoDate } from "./proposalDateRangeUtils";
 
 import { ProposalDraftSectionHeader } from "./ProposalDraftSectionHeader";
 import { ProposalDateRangeField } from "./ProposalDateRangeField";
@@ -110,7 +111,7 @@ export function ProposalDraftEventFields({
 }: ProposalDraftEventFieldsProps) {
   const slot = slots[0] ?? { startAt: "", endAt: "", label: "" };
   const startDate = datePart(slot.startAt);
-  const endDate = datePart(slot.endAt || slot.startAt);
+  const endDate = datePart(slot.endAt);
   const startTime = timePart(slot.startAt, "19:00");
   const endTime = timePart(slot.endAt, "21:00");
   const selectedIds = Object.entries(inviteeMode)
@@ -118,18 +119,18 @@ export function ProposalDraftEventFields({
     .map(([id]) => id);
 
   function setDateRange(start: string, end: string) {
-    const nextEnd = end || start;
     if (allDay || isPoll) {
       const updated = [...slots];
-      updated[0] = { ...updated[0], startAt: start, endAt: nextEnd };
+      updated[0] = { ...updated[0], startAt: start, endAt: end };
       onSlotsChange(updated);
       return;
     }
+    const dayEnd = isStrictIsoDate(end) ? end : start;
     const updated = [...slots];
     updated[0] = {
       ...updated[0],
       startAt: combine(start, startTime),
-      endAt: combine(nextEnd, endTime),
+      endAt: combine(dayEnd, endTime),
     };
     onSlotsChange(updated);
   }

@@ -60,7 +60,8 @@ export function ProposalDateRangeField({
 
   function applyOrderedRange(a: string, b: string) {
     const next = orderDateRangeInputs(a, b);
-    onRangeChange(next.start, next.end || next.start);
+    // Keep incomplete End day text ("" / "2") instead of coalescing to start (PC-209).
+    onRangeChange(next.start, next.end);
   }
 
   function handleDaySelect(day: Dayjs | null) {

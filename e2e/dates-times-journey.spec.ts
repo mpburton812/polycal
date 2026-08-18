@@ -106,7 +106,7 @@ test.describe("Proposal When dates and times journey", () => {
     await dialog.getByLabel("Title").fill(title);
     await selectDraftScheduleMode(dialog, "Window");
     await fillProposalDateTimeField(dialog.getByLabel("Start").first(), "2099-08-01T10:00");
-    await fillProposalDateTimeField(dialog.getByLabel("End").first(), "2099-08-01T12:00");
+    await fillProposalDateTimeField(dialog.getByLabel("End (optional)").first(), "2099-08-01T12:00");
     await submitProposalDraft(page, dialog);
     await selectProposalTab(page, "Resolved");
     await expect(proposalCard(page, title)).toBeVisible();
@@ -117,9 +117,9 @@ test.describe("Proposal When dates and times journey", () => {
     await dialog.getByLabel("Title").fill(`E2E Window end-before ${Date.now()}`);
     await selectDraftScheduleMode(dialog, "Window");
     await fillProposalDateTimeField(dialog.getByLabel("Start").first(), "2099-08-01T10:00");
-    await fillProposalDateTimeField(dialog.getByLabel("End").first(), "2099-08-01T11:00");
+    await fillProposalDateTimeField(dialog.getByLabel("End (optional)").first(), "2099-08-01T11:00");
     await fillProposalDateTimeField(dialog.getByLabel("Start").first(), "2099-08-01T14:00");
-    const endValue = await dialog.getByLabel("End").first().inputValue();
+    const endValue = await dialog.getByLabel("End (optional)").first().inputValue();
     // Expected MUI display for 15:00 after +1h bump from 14:00.
     expect(endValue).toMatch(/03:00\s*PM|15:00|3:00/i);
     await expect(dialog.getByRole("button", { name: "Submit" })).toBeEnabled();
@@ -151,7 +151,7 @@ test.describe("Proposal When dates and times journey", () => {
     await selectDraftScheduleMode(dialog, "Window");
     await selectDraftScheduleMode(dialog, "Recurring");
     await fillProposalDateTimeField(dialog.getByLabel("Start").first(), "2099-09-01T10:00");
-    await fillProposalDateTimeField(dialog.getByLabel("End").first(), "2099-09-01T11:00");
+    await fillProposalDateTimeField(dialog.getByLabel("End (optional)").first(), "2099-09-01T11:00");
     await expect(dialog.getByRole("button", { name: "Submit" })).toBeEnabled();
   });
 
