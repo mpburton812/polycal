@@ -401,3 +401,4 @@
 2026-08-18 | 40c336f | PC-439 | allow 15 minutes for Playwright Chromium install | .github/workflows/e2e.yml
 2026-08-18 | 08b51a6 | PC-439 | write Start/End times after calendar + Add times | e2e/helpers/datePickers.ts
 2026-08-18 | 3a2e506 | PC-444 | composer UX, Back to Draft, and Just Bookings | src/actions/network-settings.ts
+2026-08-18 | 1c494ba | PC-444 | NLP type chip, Fast Sleep partner tap, Exit after Back to Draft | src/components/proposals/ProposalDraftDialog.tsx
