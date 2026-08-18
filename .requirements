@@ -393,3 +393,4 @@
 2026-08-17 | 4a4d5be | PC-431 | disambiguate Post vs Post to Feed and restore New Event fill order | e2e/batch-sleeping-partners-journey.spec.ts
 2026-08-18 | 58c80a8 | PC-431 | wait for schedule mode and anchor comment Post vs Post to Feed | e2e/batch-sleeping-partners-journey.spec.ts
 2026-08-18 | a62a4b3 | PC-431 | cache Playwright browsers and cap install at 8 minutes | .github/workflows/e2e.yml
+2026-08-18 | d36c307 | PC-433 | NLP Description, calendar Who/Where, and Network Configuration | src/actions/proposals.ts
