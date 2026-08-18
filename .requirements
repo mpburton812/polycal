@@ -395,3 +395,4 @@
 2026-08-18 | a62a4b3 | PC-431 | cache Playwright browsers and cap install at 8 minutes | .github/workflows/e2e.yml
 2026-08-18 | d36c307 | PC-433 | NLP Description, calendar Who/Where, and Network Configuration | src/actions/proposals.ts
 2026-08-18 | e3bf20e | PC-433 | keep partial End day text and target End (optional) | src/components/proposals/ProposalDateRangeField.tsx
+2026-08-18 | d5fbdb4 | PC-433 | do not switch Sleeping drafts to Social when setting invitees | e2e/helpers/proposals.ts
