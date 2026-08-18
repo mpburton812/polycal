@@ -396,3 +396,7 @@
 2026-08-18 | d36c307 | PC-433 | NLP Description, calendar Who/Where, and Network Configuration | src/actions/proposals.ts
 2026-08-18 | e3bf20e | PC-433 | keep partial End day text and target End (optional) | src/components/proposals/ProposalDateRangeField.tsx
 2026-08-18 | d5fbdb4 | PC-433 | do not switch Sleeping drafts to Social when setting invitees | e2e/helpers/proposals.ts
+2026-08-18 | 23a4dd3 | PC-439 | split New Event and NLP composers | src/components/proposals/ProposalCreateHost.tsx
+2026-08-18 | ce0f916 | PC-439 | fill dates before More options Poll/Recurring | e2e/helpers/datePickers.ts
+2026-08-18 | 40c336f | PC-439 | allow 15 minutes for Playwright Chromium install | .github/workflows/e2e.yml
+2026-08-18 | 08b51a6 | PC-439 | write Start/End times after calendar + Add times | e2e/helpers/datePickers.ts

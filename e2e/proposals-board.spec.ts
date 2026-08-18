@@ -41,12 +41,13 @@ test.describe("Proposals board", () => {
 
   test("FAB opens new proposal draft dialog", async ({ page }) => {
     const dialog = await openEventOrSleepingProposalDraft(page);
-    await expect(dialog.getByRole("heading", { name: "New Event" })).toBeVisible();
+    await expect(dialog.getByRole("heading", { name: "New Event", exact: true })).toBeVisible();
     await expect(dialog.getByLabel("Title")).toBeVisible();
+    await expect(dialog.getByLabel("Description")).toHaveCount(0);
     await expect(dialog.getByText("EVENT PROPOSAL")).toHaveCount(0);
     await expect(dialog.getByText("DRAFT", { exact: true })).toHaveCount(0);
     await expect(dialog.getByRole("button", { name: "Add times", exact: true })).toBeVisible();
-    await expect(dialog.getByText("Who:", { exact: true })).toBeVisible();
+    await expect(dialog.getByText("Who:", { exact: true })).toHaveCount(0);
     await expect(dialog.getByRole("button", { name: "Window", exact: true })).toHaveCount(0);
     await expect(dialog.getByRole("button", { name: "With Others", exact: true })).toHaveCount(0);
     await expect(dialog.getByRole("button", { name: "Submit" })).toBeDisabled();

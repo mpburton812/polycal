@@ -31,19 +31,27 @@ export async function fillProposalDateField(field: Locator, value: string): Prom
   await field.press("Tab");
 }
 
-/** Fills a MUI X DateTimePicker text field in a proposal draft dialog. */
+/**
+ * Fills a timed start. Social drafts hide Start until a day is chosen and Add times
+ * is on; fill the calendar first so Who/More options can appear (PC-440).
+ */
 export async function fillProposalDateTimeField(
   field: Locator,
   value: string,
 ): Promise<void> {
   const dialog = field.page().getByRole("dialog");
-  const addTimes = dialog.getByRole("button", { name: "Add times", exact: true });
-  if (
-    !(await field.isVisible().catch(() => false)) &&
-    (await addTimes.isVisible().catch(() => false))
-  ) {
-    await addTimes.click();
+  if (!(await field.isVisible().catch(() => false))) {
+    const date = value.slice(0, 10);
+    const startProbe = dialog.getByTestId("date-range-start").first();
+    if (await startProbe.isVisible().catch(() => false)) {
+      await fillProposalDateRange(dialog, date, date);
+    }
+    const addTimes = dialog.getByRole("button", { name: "Add times", exact: true });
+    if (value.includes("T") && (await addTimes.isVisible().catch(() => false))) {
+      await addTimes.click();
+    }
   }
+  await expect(field).toBeVisible({ timeout: 15_000 });
   await field.click();
   await field.fill(toMuiDateTimeDisplay(value));
   await field.press("Tab");
@@ -186,6 +194,19 @@ export function minutesFromNowDateTime(minutesFromNow: number): string {
 /** Expands More options so Poll / Recurring controls are reachable (PC-434). */
 async function ensureMoreOptionsExpanded(dialog: Locator): Promise<void> {
   const summary = dialog.getByRole("button", { name: /More options/i });
+  if (!(await summary.isVisible().catch(() => false))) {
+    const social = dialog.getByRole("button", { name: "Social", exact: true });
+    if (
+      (await social.count()) > 0 &&
+      (await social.getAttribute("aria-pressed")) !== "true"
+    ) {
+      await social.click();
+    }
+    const startField = dialog.getByTestId("date-range-start").first();
+    if (await startField.isVisible().catch(() => false)) {
+      await fillProposalDateRange(dialog, "2099-10-01");
+    }
+  }
   await expect(summary).toBeVisible({ timeout: 15_000 });
   if ((await summary.getAttribute("aria-expanded")) !== "true") {
     await summary.click();
