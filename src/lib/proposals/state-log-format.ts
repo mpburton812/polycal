@@ -29,6 +29,7 @@ function formatActionLabel(action: string): string {
     "proposal.admin_fast_add": "Admin fast sleeping add",
     "proposal.auto_resolved": "Auto-confirmed",
     "proposal.admin_rescheduled": "Rescheduled by admin",
+    "proposal.posted_to_feed": "Posted to Feed",
     "proposal.attendees_updated": "Attendees updated",
     "proposal.comment_added": "Comment added",
     "proposal.child_detached": "Child detached",
@@ -69,9 +70,11 @@ function formatProposalLogDetails(entry: ProposalLogEntry): string {
       const parts: string[] = [];
       const addedRequired = parsed.addedRequired as string[] | undefined;
       const addedOptional = parsed.addedOptional as string[] | undefined;
+      const addedBooked = parsed.addedBooked as string[] | undefined;
       const removed = parsed.removedUserIds as string[] | undefined;
       if (addedRequired?.length) parts.push(`added required: ${addedRequired.join(", ")}`);
       if (addedOptional?.length) parts.push(`added optional: ${addedOptional.join(", ")}`);
+      if (addedBooked?.length) parts.push(`added booked: ${addedBooked.join(", ")}`);
       if (removed?.length) parts.push(`removed: ${removed.join(", ")}`);
       return parts.length ? ` · ${parts.join("; ")}` : "";
     }

@@ -28,6 +28,29 @@ import { CHANGELOG_ARCHIVE } from "./entries.archive";
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "2026.08.17b",
+    date: "2026-08-17",
+    summary:
+      "Proposals and Bookings: New Event composer, Booked attendees, Post to Feed (PC-426–PC-431).",
+    changes: [
+      {
+        type: "changed",
+        description:
+          "Admin posting mode is Proposals and Bookings; Booking for replaces the Proxy Scheduling slider (PC-428). SCHEMA_VERSION 50.",
+      },
+      {
+        type: "changed",
+        description:
+          "FAB New Event (unlocked type) and Bulk Sleep Booking; Sleeping proposal removed; Save is gone; Submit vs Add to calendar (PC-429).",
+      },
+      {
+        type: "added",
+        description:
+          "Resolved events: Cancel Event, Booked invitee role with auto-accept notify, Post to Feed milestone (PC-430).",
+      },
+    ],
+  },
+  {
     version: "2026.08.17a",
     date: "2026-08-17",
     summary:

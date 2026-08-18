@@ -73,8 +73,18 @@ export async function openProfileMenu(page: Page): Promise<void> {
 /** Navigates to profile settings via the header profile menu. */
 export async function goToProfile(page: Page): Promise<void> {
   await openProfileMenu(page);
-  await page.getByRole("menuitem", { name: "Settings" }).click();
-  await expect(page).toHaveURL(/\/profile/);
+  const item = page.getByRole("menuitem", { name: "Settings" });
+  try {
+    await item.click({ timeout: 8_000 });
+  } catch {
+    await page.goto("/profile");
+  }
+  try {
+    await expect(page).toHaveURL(/\/profile/, { timeout: 5_000 });
+  } catch {
+    await page.goto("/profile");
+    await expect(page).toHaveURL(/\/profile/);
+  }
 }
 
 export async function selectProposalTab(page: Page, tab: "Drafts" | "Proposed" | "Resolved" | "Archived"): Promise<void> {

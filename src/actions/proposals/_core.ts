@@ -675,7 +675,7 @@ async function validateComposerPosting(
   actorId: string,
   input: {
     isPoll: boolean;
-    postingKind: "proposal" | "schedule";
+    postingKind: "proposal" | "booking";
     onBehalfOfUserId?: string | null;
   },
   isExistingPollDraft: boolean,
@@ -781,9 +781,9 @@ export async function createDraftProposalAction(
     return { ok: false, message: inviteeCheck.error };
   }
 
-  const postingKind = parsed.data.postingKind === "schedule" ? "schedule" : "proposal";
+  const postingKind = parsed.data.postingKind === "booking" ? "booking" : "proposal";
   const isPoll =
-    postingKind === "schedule"
+    postingKind === "booking"
       ? false
       : Boolean(parsed.data.isPoll) || (parsed.data.timeSlots?.length ?? 0) > 1;
   const composerCheck = await validateComposerPosting(
@@ -863,7 +863,7 @@ export async function createDraftProposalAction(
     postToFeed: Boolean(parsed.data.postToFeed),
     postingKind,
     onBehalfOfUserId:
-      postingKind === "schedule" && parsed.data.onBehalfOfUserId
+      postingKind === "booking" && parsed.data.onBehalfOfUserId
         ? parsed.data.onBehalfOfUserId
         : null,
     createdAt: now,
@@ -1003,9 +1003,9 @@ export async function updateDraftProposalAction(
   }
 
   const now = new Date().toISOString();
-  const postingKind = parsed.data.postingKind === "schedule" ? "schedule" : "proposal";
+  const postingKind = parsed.data.postingKind === "booking" ? "booking" : "proposal";
   const isPoll =
-    postingKind === "schedule"
+    postingKind === "booking"
       ? false
       : parsed.data.isPoll !== undefined
         ? parsed.data.isPoll
@@ -1113,7 +1113,7 @@ export async function updateDraftProposalAction(
           : proposal.postToFeed,
       postingKind,
       onBehalfOfUserId:
-        postingKind === "schedule" && parsed.data.onBehalfOfUserId
+        postingKind === "booking" && parsed.data.onBehalfOfUserId
           ? parsed.data.onBehalfOfUserId
           : null,
       updatedAt: now,
@@ -1147,7 +1147,7 @@ function shouldAutoResolveOnSubmit(
   requiredInviteeCount: number,
   postingKind?: string,
 ): boolean {
-  if (postingKind === "schedule") return true;
+  if (postingKind === "booking") return true;
   if (intentionalSolo) return true;
   if (requiredInviteeCount === 0) return false;
   return false;
@@ -1218,7 +1218,7 @@ export async function submitProposalAction(
   }
 
   if (
-    proposal.postingKind !== "schedule" &&
+    proposal.postingKind !== "booking" &&
     requiredCount === 0 &&
     !intentionalSolo &&
     optionalCount === 0
@@ -1288,7 +1288,7 @@ export async function submitProposalAction(
     await wipeProposalVotes(db, proposalId);
   }
 
-  if (proposal.postingKind === "schedule" && invitees.length > 0) {
+  if (proposal.postingKind === "booking" && invitees.length > 0) {
     await db
       .update(proposalInvitees)
       .set({ voteStatus: "accept", respondedAt: now })
@@ -1471,6 +1471,8 @@ export async function getProposalDetailAction(
     return { ok: false, message: "Proposal not found." };
   }
 
+  const networkSettings = row.networkId ? await loadNetworkSettings(row.networkId, db) : null;
+
   const inviteeRows = await db
     .select({
       userId: proposalInvitees.userId,
@@ -1499,9 +1501,8 @@ export async function getProposalDetailAction(
     })
   ) {
     // Partner-only schedule viewers can see the block but not open detail (PC-399).
-    const settings = row.networkId ? await loadNetworkSettings(row.networkId, db) : null;
     if (
-      settings?.seePartnersSleepingArrangements &&
+      networkSettings?.seePartnersSleepingArrangements &&
       isSleepingLikeType(row.proposalType)
     ) {
       const partnerIds = await loadAcceptedSleepingPartnerIds(
@@ -1798,12 +1799,23 @@ export async function getProposalDetailAction(
           adminCanSeeUninvolved,
         }),
       canCancel: canManage && (row.state === "proposed" || row.state === "resolved"),
-      canAdminDeleteProposal: isAdmin,
+      canAdminDeleteProposal: isAdmin && row.state !== "resolved",
       canRedraft: isProposer && row.state === "resolved",
       canReschedule:
         isAdmin &&
-        (row.state === "proposed" || row.state === "resolved") &&
+        row.state === "proposed" &&
         !row.isBatchSleeping,
+      canAddBookedAttendee:
+        row.state === "resolved" &&
+        (row.proposalType === "sleeping"
+          ? canManageSleepingAttendees(isProposer, isAdmin)
+          : isProposer || isAdmin || isInvitee) &&
+        networkSettings?.schedulingPosting === "proposals_and_bookings",
+      canPostToFeed:
+        row.state === "resolved" &&
+        (isProposer || isAdmin) &&
+        networkSettings?.feedEnabled !== false &&
+        !row.postToFeed,
       canRevokeAcceptance:
         viewerInvitee?.role === "required" &&
         row.state === "resolved" &&
@@ -1821,7 +1833,7 @@ export async function getProposalDetailAction(
       reminderOffsetMinutes: row.reminderOffsetMinutes ?? null,
       eventIconKey: row.proposalType !== "event" ? null : row.eventIconKey ?? null,
       postToFeed: Boolean(row.postToFeed),
-      postingKind: row.postingKind === "schedule" ? "schedule" : "proposal",
+      postingKind: row.postingKind === "booking" ? "booking" : "proposal",
       onBehalfOfUserId: row.onBehalfOfUserId ?? null,
       specialKind: getProposalSpecialKind(row.description) ?? undefined,
       pendingIcsId: (

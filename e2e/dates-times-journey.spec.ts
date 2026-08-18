@@ -7,13 +7,14 @@ import {
   selectDraftScheduleMode,
 } from "./helpers/datePickers";
 import { USERS } from "./helpers/constants";
-import { goToProposals } from "./helpers/navigation";
+import { goToProposals, selectProposalTab } from "./helpers/navigation";
 import { dismissMotdDialogIfOpen } from "./helpers/motd";
 import {
-  exitDraftDialog,
-  expectDraftCardAfterExit,
-  expandDraftMoreOptions,
   openEventProposalDraft,
+  proposalCard,
+  proposalCardsWithPrefix,
+  setInviteeRequired,
+  submitProposalDraft,
 } from "./helpers/proposals";
 
 /**
@@ -88,29 +89,29 @@ test.describe("Proposal When dates and times journey", () => {
     await expect(endField).toHaveValue("2099-07-15");
   });
 
-  test("All Day: valid multi-day span saves as draft", async ({ page }) => {
+  test("All Day: valid multi-day span submits a solo event", async ({ page }) => {
     const title = `E2E AllDay valid ${Date.now()}`;
     const dialog = await openEventProposalDraft(page);
     await dialog.getByLabel("Title").fill(title);
     await selectDraftScheduleMode(dialog, "All Day");
     await fillProposalDateRange(dialog, "2099-07-13", "2099-07-15");
-    await dialog.getByRole("button", { name: "Save", exact: true }).click();
-    await expect(dialog.getByRole("button", { name: "Submit" })).toBeVisible({ timeout: 15_000 });
-    await exitDraftDialog(dialog);
-    await expectDraftCardAfterExit(page, title);
+    await dialog.getByRole("button", { name: "Solo (just me)", exact: true }).click();
+    await submitProposalDraft(page, dialog);
+    await selectProposalTab(page, "Resolved");
+    await expect(proposalCard(page, title)).toBeVisible();
   });
 
-  test("Window: valid timed start/end saves as draft", async ({ page }) => {
+  test("Window: valid timed start/end submits a solo event", async ({ page }) => {
     const title = `E2E Window valid ${Date.now()}`;
     const dialog = await openEventProposalDraft(page);
     await dialog.getByLabel("Title").fill(title);
     await selectDraftScheduleMode(dialog, "Window");
     await fillProposalDateTimeField(dialog.getByLabel("Start").first(), "2099-08-01T10:00");
     await fillProposalDateTimeField(dialog.getByLabel("End").first(), "2099-08-01T12:00");
-    await dialog.getByRole("button", { name: "Save", exact: true }).click();
-    await expect(dialog.getByRole("button", { name: "Submit" })).toBeVisible({ timeout: 15_000 });
-    await exitDraftDialog(dialog);
-    await expectDraftCardAfterExit(page, title);
+    await dialog.getByRole("button", { name: "Solo (just me)", exact: true }).click();
+    await submitProposalDraft(page, dialog);
+    await selectProposalTab(page, "Resolved");
+    await expect(proposalCard(page, title)).toBeVisible();
   });
 
   test("Window: End auto-extends when Start moves past End", async ({ page }) => {
@@ -123,26 +124,24 @@ test.describe("Proposal When dates and times journey", () => {
     const endValue = await dialog.getByLabel("End").first().inputValue();
     // Expected MUI display for 15:00 after +1h bump from 14:00.
     expect(endValue).toMatch(/03:00\s*PM|15:00|3:00/i);
-    await dialog.getByRole("button", { name: "Save", exact: true }).click();
-    await expect(dialog.getByRole("button", { name: "Submit" })).toBeVisible({ timeout: 15_000 });
+    await dialog.getByRole("button", { name: "Solo (just me)", exact: true }).click();
+    await expect(dialog.getByRole("button", { name: "Submit" })).toBeEnabled();
   });
 
-  test("Poll: distinct slots save; duplicate same datetime still allows draft", async ({
+  test("Poll: distinct slots still allow submit after invitees", async ({
     page,
   }) => {
     const title = `E2E Poll slots ${Date.now()}`;
     const dialog = await openEventProposalDraft(page);
     await dialog.getByLabel("Title").fill(title);
     await selectDraftScheduleMode(dialog, "Poll");
-    await expandDraftMoreOptions(dialog);
 
     const startInputs = dialog.getByLabel("Start");
     await fillProposalDateTimeField(startInputs.nth(0), "2099-08-01T10:00");
     await dialog.getByRole("button", { name: "Add poll option" }).click();
     await fillProposalDateTimeField(startInputs.nth(1), "2099-08-01T10:00");
-
-    await dialog.getByRole("button", { name: "Save", exact: true }).click();
-    await expect(dialog.getByRole("button", { name: "Submit" })).toBeVisible({ timeout: 15_000 });
+    await setInviteeRequired(dialog, USERS.leia.displayName);
+    await expect(dialog.getByRole("button", { name: "Submit" })).toBeEnabled();
     await expect(dialog.getByLabel("Start")).toHaveCount(2);
   });
 
@@ -156,8 +155,8 @@ test.describe("Proposal When dates and times journey", () => {
     await selectDraftScheduleMode(dialog, "Recurring");
     await fillProposalDateTimeField(dialog.getByLabel("Start").first(), "2099-09-01T10:00");
     await fillProposalDateTimeField(dialog.getByLabel("End").first(), "2099-09-01T11:00");
-    await dialog.getByRole("button", { name: "Save", exact: true }).click();
-    await expect(dialog.getByRole("button", { name: "Submit" })).toBeVisible({ timeout: 15_000 });
+    await dialog.getByRole("button", { name: "Solo (just me)", exact: true }).click();
+    await expect(dialog.getByRole("button", { name: "Submit" })).toBeEnabled();
   });
 
   test("Recurring All Day: valid series span saves", async ({ page }) => {
@@ -167,9 +166,11 @@ test.describe("Proposal When dates and times journey", () => {
     await selectDraftScheduleMode(dialog, "All Day");
     await selectDraftScheduleMode(dialog, "Recurring");
     await fillProposalDateRange(dialog, "2099-09-01", "2099-09-01");
-    await dialog.getByRole("button", { name: "Save", exact: true }).click();
-    await expect(dialog.getByRole("button", { name: "Submit" })).toBeVisible({ timeout: 15_000 });
-    await exitDraftDialog(dialog);
-    await expectDraftCardAfterExit(page, title);
+    await dialog.getByLabel("Occurrences").fill("4");
+    await dialog.getByRole("button", { name: "Solo (just me)", exact: true }).click();
+    await submitProposalDraft(page, dialog);
+    await selectProposalTab(page, "Resolved");
+    // Parent keeps the exact title; children use `Title — weekday, month day`.
+    await expect(proposalCardsWithPrefix(page, title)).toHaveCount(4, { timeout: 20_000 });
   });
 });

@@ -24,6 +24,7 @@ export const FEED_RESOLVED_ACTIONS = [
   "proposal.cancelled",
   "proposal.at_risk",
   "proposal.admin_rescheduled",
+  "proposal.posted_to_feed",
 ] as const;
 
 /** Vote milestones — gated by Votes content pref (PC-267). */

@@ -15,7 +15,7 @@ const base = {
   allowedProxyUserIds: new Set(["leia"]),
 };
 
-describe("assertComposerPostingRules (PC-423–425)", () => {
+describe("assertComposerPostingRules (PC-427–PC-428)", () => {
   it("allows a normal proposal", () => {
     expect(assertComposerPostingRules(base)).toEqual({ ok: true });
   });
@@ -36,49 +36,51 @@ describe("assertComposerPostingRules (PC-423–425)", () => {
     ).toEqual({ ok: true });
   });
 
-  it("rejects schedule posting when the network is Just Proposals", () => {
-    const result = assertComposerPostingRules({ ...base, postingKind: "schedule" });
+  it("rejects booking posting when the network is Just Proposals", () => {
+    const result = assertComposerPostingRules({ ...base, postingKind: "booking" });
     expect(result.ok).toBe(false);
   });
 
-  it("rejects poll combined with schedule posting", () => {
+  it("rejects poll combined with booking posting", () => {
     const result = assertComposerPostingRules({
       ...base,
-      schedulingPosting: "proposals_and_schedule",
-      postingKind: "schedule",
+      schedulingPosting: "proposals_and_bookings",
+      postingKind: "booking",
       isPoll: true,
     });
     expect(result.ok).toBe(false);
   });
 
-  it("rejects proxy when the pulldown should be hidden", () => {
-    const result = assertComposerPostingRules({
-      ...base,
-      schedulingPosting: "proposals_and_schedule",
-      postingKind: "schedule",
-      onBehalfOfUserId: "leia",
-    });
-    expect(result.ok).toBe(false);
-  });
-
-  it("allows proxy for an in-scope partner", () => {
+  it("allows Booking for even when the legacy proxy flag is off", () => {
     expect(
       assertComposerPostingRules({
         ...base,
-        schedulingPosting: "proposals_and_schedule",
-        proxySchedulingEnabled: true,
-        postingKind: "schedule",
+        schedulingPosting: "proposals_and_bookings",
+        proxySchedulingEnabled: false,
+        postingKind: "booking",
         onBehalfOfUserId: "leia",
       }),
     ).toEqual({ ok: true });
   });
 
-  it("rejects proxy for someone outside the scope list", () => {
+  it("allows Booking for an in-scope partner", () => {
+    expect(
+      assertComposerPostingRules({
+        ...base,
+        schedulingPosting: "proposals_and_bookings",
+        proxySchedulingEnabled: true,
+        postingKind: "booking",
+        onBehalfOfUserId: "leia",
+      }),
+    ).toEqual({ ok: true });
+  });
+
+  it("rejects Booking for someone outside the scope list", () => {
     const result = assertComposerPostingRules({
       ...base,
-      schedulingPosting: "proposals_and_schedule",
+      schedulingPosting: "proposals_and_bookings",
       proxySchedulingEnabled: true,
-      postingKind: "schedule",
+      postingKind: "booking",
       onBehalfOfUserId: "han",
     });
     expect(result.ok).toBe(false);

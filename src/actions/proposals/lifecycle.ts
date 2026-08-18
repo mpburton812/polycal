@@ -41,6 +41,7 @@ import { enterAtRiskProposedState } from "@/lib/proposals/services/at-risk";
 import { logProposalTransition } from "@/lib/proposals/services/state-log";
 import { resetInviteeVotes } from "@/lib/proposals/services/votes";
 import { notifyProposalParticipants } from "@/lib/proposals/services/notify-participants";
+import { loadNetworkSettings } from "@/lib/networks/settings";
 import { canManageSleepingAttendees } from "@/lib/proposals/passive-auto-accept";
 import {
   sleepingDateToStartIso,
@@ -149,7 +150,20 @@ export async function updateResolvedAttendeesAction(
   let removedRequiredAttendee = false;
   const addedRequiredNames: string[] = [];
   const addedOptionalNames: string[] = [];
+  const addedBookedNames: string[] = [];
   const removedNames: string[] = [];
+
+  if ((parsed.data.addBooked?.length ?? 0) > 0) {
+    const settings = proposal.networkId
+      ? await loadNetworkSettings(proposal.networkId, db)
+      : null;
+    if (settings?.schedulingPosting !== "proposals_and_bookings") {
+      return {
+        ok: false,
+        message: "Booked attendees are only available when Proposals and Bookings is enabled.",
+      };
+    }
+  }
 
   async function displayNameFor(userId: string): Promise<string> {
     const [user] = await db
@@ -199,26 +213,38 @@ export async function updateResolvedAttendeesAction(
 
     if (existing) return;
 
+    const isBooked = role === "booked";
     await db.insert(proposalInvitees).values({
       id: `pi-${randomUUID()}`,
       proposalId: proposal.id,
       userId,
       role,
-      voteStatus: "not_seen",
+      voteStatus: isBooked ? "accept" : "not_seen",
+      respondedAt: isBooked ? now : null,
       addedByUserId: actorUserId,
       createdAt: now,
     });
     attendeesChanged = true;
 
     const name = await displayNameFor(userId);
-    if (role === "required") addedRequiredNames.push(name);
+    if (isBooked) addedBookedNames.push(name);
+    else if (role === "required") addedRequiredNames.push(name);
     else addedOptionalNames.push(name);
 
-    await notifyUser(userId, "proposal_attendee_added", `${actor.actorDisplayName} added you to "${proposal.title}".`, {
-      proposalId: proposal.id,
-      proposalType: proposal.proposalType,
-      ...actor,
-    });
+    // Booked people are auto-accepted; notify them only — no vote / at-risk fan-out (PC-430).
+    await notifyUser(
+      userId,
+      "proposal_attendee_added",
+      isBooked
+        ? `${actor.actorDisplayName} booked you for "${proposal.title}".`
+        : `${actor.actorDisplayName} added you to "${proposal.title}".`,
+      {
+        proposalId: proposal.id,
+        proposalType: proposal.proposalType,
+        role,
+        ...actor,
+      },
+    );
   }
 
   for (const userId of parsed.data.addRequired ?? []) {
@@ -227,6 +253,10 @@ export async function updateResolvedAttendeesAction(
 
   for (const userId of parsed.data.addOptional ?? []) {
     await addAttendee(userId, "optional");
+  }
+
+  for (const userId of parsed.data.addBooked ?? []) {
+    await addAttendee(userId, "booked");
   }
 
   if (attendeesChanged) {
@@ -263,6 +293,7 @@ export async function updateResolvedAttendeesAction(
       JSON.stringify({
         addedRequired: addedRequiredNames,
         addedOptional: addedOptionalNames,
+        addedBooked: addedBookedNames,
         removedUserIds: removedNames,
       }),
     );
@@ -411,7 +442,8 @@ export async function revokeResolvedAcceptanceAction(
 }
 
 /**
- * Admin-only reschedule of a proposed or resolved calendar event (PC-48 / spec §10).
+ * Admin-only reschedule of a proposed calendar event (PC-48 / PC-430).
+ * Resolved events are moved with Re-draft instead of Reschedule.
  */
 export async function rescheduleProposalAction(
   input: z.infer<typeof rescheduleProposalSchema>,
@@ -440,8 +472,8 @@ export async function rescheduleProposalAction(
     .where(eq(proposals.id, parsed.data.proposalId))
     .limit(1);
 
-  if (!proposal || (proposal.state !== "proposed" && proposal.state !== "resolved")) {
-    return { ok: false, message: "Proposal cannot be rescheduled." };
+  if (!proposal || proposal.state !== "proposed") {
+    return { ok: false, message: "Only proposed events can be rescheduled." };
   }
 
   const now = new Date().toISOString();
@@ -854,4 +886,71 @@ export async function nudgePendingVotersAction(
     message: `Nudged ${pending.length} pending voter${pending.length === 1 ? "" : "s"}.`,
     nudgedCount: pending.length,
   };
+}
+
+/**
+ * Posts a resolved event to the Feed by flipping post_to_feed and logging
+ * a resolved milestone (PC-430). Existing feed prefs and sleeping gates apply.
+ */
+export async function postProposalToFeedAction(
+  proposalId: string,
+): Promise<{ ok: boolean; message: string }> {
+  const session = await auth();
+  if (!session?.user) {
+    return { ok: false, message: "Sign in required." };
+  }
+
+  const trimmedId = proposalId.trim();
+  if (!trimmedId) {
+    return { ok: false, message: "Proposal is required." };
+  }
+
+  await ensureDbReady();
+  const db = getDb();
+  const isAdmin = await userHasAdminAccess(adminAccessFromSessionUser(session.user));
+
+  const [proposal] = await db
+    .select()
+    .from(proposals)
+    .where(eq(proposals.id, trimmedId))
+    .limit(1);
+
+  if (!proposal || proposal.state !== "resolved") {
+    return { ok: false, message: "Only resolved events can be posted to Feed." };
+  }
+
+  const isProposer = proposal.proposerId === session.user.id;
+  if (!isProposer && !isAdmin) {
+    return { ok: false, message: "Only the proposer or an admin can post this event to Feed." };
+  }
+
+  const settings = proposal.networkId
+    ? await loadNetworkSettings(proposal.networkId, db)
+    : null;
+  if (settings?.feedEnabled === false) {
+    return { ok: false, message: "Feed is disabled for this network." };
+  }
+
+  if (proposal.postToFeed) {
+    return { ok: false, message: "This event is already posted to Feed." };
+  }
+
+  const now = new Date().toISOString();
+  await db
+    .update(proposals)
+    .set({ postToFeed: true, updatedAt: now })
+    .where(eq(proposals.id, proposal.id));
+
+  await logProposalTransition(
+    db,
+    proposal.id,
+    session.user.id,
+    "proposal.posted_to_feed",
+    "Posted resolved event to Feed.",
+  );
+
+  revalidatePath("/proposals");
+  revalidatePath("/schedule");
+  revalidatePath("/feed");
+  return { ok: true, message: "Posted to Feed." };
 }

@@ -19,6 +19,8 @@ import {
 
 import type { ProposalPlaceOption } from "@/actions/proposals";
 import type { PersonSummary } from "@/actions/users";
+import { OrganicAvatar } from "@/components/ui/OrganicAvatar";
+import { avatarSrcForKey } from "@/lib/constants/avatars";
 import { LONG_TEXT_MAX, SHORT_TEXT_MAX } from "@/lib/validation/string-limits";
 
 import { ProposalDraftSectionHeader } from "./ProposalDraftSectionHeader";
@@ -38,8 +40,14 @@ export interface ProposalDraftEventFieldsProps {
   isSoloProposal: boolean;
   /** When false, hide When date fields until a schedule type is chosen (PC-421). */
   showWhenFields?: boolean;
+  /** When false, hide invitee controls until schedule type is chosen (PC-429). */
+  showInvitees?: boolean;
+  /** When false, hide location until invitees are chosen (PC-429). */
+  showLocation?: boolean;
+  /** Title is shown on the parent card (PC-429). */
+  hideTitle?: boolean;
   inviteeChoice: "unset" | "group" | "solo";
-  onInviteeChoiceChange: (choice: "group" | "solo") => void;
+  onInviteeChoiceChange: (choice: "unset" | "group" | "solo") => void;
   /** Schedule posting: people are attendees, no Required/Optional (PC-424). */
   hideInviteeRoles?: boolean;
   candidates: PersonSummary[];
@@ -75,6 +83,9 @@ export function ProposalDraftEventFields({
   onInviteeChoiceChange,
   hideInviteeRoles = false,
   showWhenFields = true,
+  showInvitees = true,
+  showLocation = true,
+  hideTitle = false,
   candidates,
   inviteeMode,
   setInviteeRole,
@@ -92,6 +103,7 @@ export function ProposalDraftEventFields({
 }: ProposalDraftEventFieldsProps) {
   return (
     <Stack spacing={2} sx={{ mb: 2 }}>
+      {!hideTitle ? (
       <TextField
         label="Title"
         value={title}
@@ -102,6 +114,7 @@ export function ProposalDraftEventFields({
         placeholder="Untitled Proposal"
         inputProps={{ maxLength: LONG_TEXT_MAX }}
       />
+      ) : null}
 
       {showWhenFields ? (
         <>
@@ -224,6 +237,8 @@ export function ProposalDraftEventFields({
         </>
       ) : null}
 
+      {showInvitees ? (
+      <>
       <ProposalDraftSectionHeader
         icon={<GroupsOutlinedIcon fontSize="small" />}
         title="Invitees"
@@ -239,7 +254,10 @@ export function ProposalDraftEventFields({
         exclusive
         value={inviteeChoice === "unset" ? null : inviteeChoice}
         onChange={(_, value) => {
-          if (!value) return;
+          if (!value) {
+            onInviteeChoiceChange("unset");
+            return;
+          }
           onInviteeChoiceChange(value as "group" | "solo");
         }}
         size="small"
@@ -252,8 +270,8 @@ export function ProposalDraftEventFields({
           },
         }}
       >
-        <ToggleButton value="group">With invitees</ToggleButton>
-        <ToggleButton value="solo">Solo event (just me)</ToggleButton>
+        <ToggleButton value="solo">Solo (just me)</ToggleButton>
+        <ToggleButton value="group">With Others</ToggleButton>
       </ToggleButtonGroup>
       {!isSoloProposal && inviteeChoice === "group" && (
         <Stack spacing={1}>
@@ -268,9 +286,17 @@ export function ProposalDraftEventFields({
                 justifyContent="space-between"
                 flexWrap="wrap"
               >
-                <Typography variant="body2" sx={{ minWidth: 96 }}>
-                  {person.displayName}
-                </Typography>
+                <Stack alignItems="center" spacing={0.5} sx={{ minWidth: 72 }}>
+                  <OrganicAvatar
+                    src={avatarSrcForKey(person.avatarKey)}
+                    alt=""
+                    label={person.displayName}
+                    size={36}
+                  />
+                  <Typography variant="caption" sx={{ textAlign: "center" }}>
+                    {person.displayName}
+                  </Typography>
+                </Stack>
                 {hideInviteeRoles ? (
                   <ToggleButton
                     value="optional"
@@ -319,7 +345,11 @@ export function ProposalDraftEventFields({
           })}
         </Stack>
       )}
+      </>
+      ) : null}
 
+      {showLocation ? (
+      <>
       <ProposalDraftSectionHeader
         icon={<LocationOnOutlinedIcon fontSize="small" />}
         title="Location"
@@ -361,6 +391,8 @@ export function ProposalDraftEventFields({
         placeholder="Type a location not in the list"
         inputProps={{ maxLength: SHORT_TEXT_MAX }}
       />
+      </>
+      ) : null}
     </Stack>
   );
 }

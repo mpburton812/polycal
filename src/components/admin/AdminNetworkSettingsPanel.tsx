@@ -37,7 +37,7 @@ const AUDIT_LABELS: Record<string, string> = {
 
 const POSTING_LABELS: Record<string, string> = {
   proposals_only: "Just Proposals",
-  proposals_and_schedule: "Proposals and Schedule",
+  proposals_and_bookings: "Proposals and Bookings",
 };
 
 const PROXY_SCOPE_LABELS: Record<string, string> = {
@@ -181,7 +181,7 @@ export function AdminNetworkSettingsPanel({
               }
             />
           }
-          label="Enable FastSleep Proposal"
+          label="Enable Bulk Sleep Booking"
         />
         <Typography variant="caption" color="text.secondary" sx={{ mt: -1, display: "block" }}>
           When on, members can auto-schedule up to 14 nights for themselves and their sleeping
@@ -234,9 +234,7 @@ export function AdminNetworkSettingsPanel({
               setSettings({
                 ...settings,
                 schedulingPosting: e.target.value as NetworkSettings["schedulingPosting"],
-                ...(e.target.value === "proposals_only"
-                  ? { proxySchedulingEnabled: false }
-                  : {}),
+                proxySchedulingEnabled: e.target.value === "proposals_and_bookings",
               })
             }
           >
@@ -248,53 +246,32 @@ export function AdminNetworkSettingsPanel({
           </Select>
         </FormControl>
         <Typography variant="caption" color="text.secondary" sx={{ mt: -1, display: "block" }}>
-          Proposals and Schedule adds a Proposal vs Schedule choice on the draft card. A
-          schedule goes on the calendar with no approval votes (PC-424).
+          Proposals and Bookings adds a Proposal vs Booking choice on the draft card. A
+          booking goes on the calendar with no approval votes (PC-428).
         </Typography>
-        {settings.schedulingPosting === "proposals_and_schedule" ? (
-          <>
-            <FormControlLabel
-              control={
-                <Switch
-                  checked={settings.proxySchedulingEnabled}
-                  onChange={(e) =>
-                    setSettings({
-                      ...settings,
-                      proxySchedulingEnabled: e.target.checked,
-                    })
-                  }
-                />
+        {settings.schedulingPosting === "proposals_and_bookings" ? (
+          <FormControl fullWidth>
+            <InputLabel id="proxy-for-label">Booking for</InputLabel>
+            <Select
+              labelId="proxy-for-label"
+              id="proxy-for"
+              label="Booking for"
+              value={settings.proxySchedulingScope}
+              onChange={(e) =>
+                setSettings({
+                  ...settings,
+                  proxySchedulingScope: e.target
+                    .value as NetworkSettings["proxySchedulingScope"],
+                })
               }
-              label="Proxy Scheduling"
-            />
-            <Typography variant="caption" color="text.secondary" sx={{ mt: -1, display: "block" }}>
-              When on, Schedule mode can pick a person to schedule on behalf of (PC-425).
-            </Typography>
-            {settings.proxySchedulingEnabled ? (
-              <FormControl fullWidth>
-                <InputLabel id="proxy-for-label">Proxy for</InputLabel>
-                <Select
-                  labelId="proxy-for-label"
-                  id="proxy-for"
-                  label="Proxy for"
-                  value={settings.proxySchedulingScope}
-                  onChange={(e) =>
-                    setSettings({
-                      ...settings,
-                      proxySchedulingScope: e.target
-                        .value as NetworkSettings["proxySchedulingScope"],
-                    })
-                  }
-                >
-                  {proxySchedulingScopes.map((scope) => (
-                    <MenuItem key={scope} value={scope}>
-                      {PROXY_SCOPE_LABELS[scope] ?? scope}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            ) : null}
-          </>
+            >
+              {proxySchedulingScopes.map((scope) => (
+                <MenuItem key={scope} value={scope}>
+                  {PROXY_SCOPE_LABELS[scope] ?? scope}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
         ) : null}
         <FormControl fullWidth>
           <InputLabel id="places-map-visibility-label">

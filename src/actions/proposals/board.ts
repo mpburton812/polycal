@@ -332,7 +332,7 @@ export async function listProposalBoardAction(): Promise<ProposalBoard> {
       atRiskExpiresAt: row.atRisk ? row.atRiskExpiresAt : null,
       canNudge,
       lastNudgeAt: row.lastNudgeAt ?? null,
-      canAdminDeleteProposal: isAdmin,
+      canAdminDeleteProposal: isAdmin && row.state !== "resolved",
       isPastSchedule,
       isBatchSleeping: row.isBatchSleeping,
       isRecurring: Boolean(row.isRecurrenceParent || row.parentProposalId),

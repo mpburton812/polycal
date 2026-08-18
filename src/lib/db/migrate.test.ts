@@ -26,4 +26,19 @@ describe("shouldSkipMigrations (PC-143)", () => {
     );
     expect(verifyScript).toContain(`EXPECTED_SCHEMA_VERSION = "${SCHEMA_VERSION}"`);
   });
+
+  it("backfills Booking enum literals in SCHEMA_VERSION 50 migrations (PC-427)", () => {
+    const networks = readFileSync(
+      path.join(process.cwd(), "src/lib/db/networks-migrations.ts"),
+      "utf8",
+    );
+    const proposals = readFileSync(
+      path.join(process.cwd(), "src/lib/db/proposals-migrations.ts"),
+      "utf8",
+    );
+    expect(networks).toContain("proposals_and_bookings");
+    expect(networks).toContain("proposals_and_schedule");
+    expect(proposals).toContain("posting_kind = 'booking'");
+    expect(proposals).toContain("posting_kind = 'schedule'");
+  });
 });

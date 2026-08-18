@@ -31,9 +31,8 @@ async function proposeEventForLeia(
   await goToProposals(page);
   const dialog = await openEventProposalDraft(page);
   await dialog.getByLabel("Title").fill(eventTitle);
-  await setInviteeRequired(dialog, USERS.leia.displayName);
   await fillProposalDateTimeField(dialog.getByLabel("Start").first(), start);
-  await dialog.getByRole("button", { name: "Save" }).click();
+  await setInviteeRequired(dialog, USERS.leia.displayName);
   await submitProposalDraft(page, dialog);
   await logout(page);
   await login(page, USERS.leia.username);
@@ -67,9 +66,8 @@ test.describe("Notification inbox journey", () => {
     const dialogB = await openEventProposalDraft(page);
     const eventB = `E2E Inbox B ${tag}`;
     await dialogB.getByLabel("Title").fill(eventB);
-    await setInviteeRequired(dialogB, USERS.leia.displayName);
     await fillProposalDateTimeField(dialogB.getByLabel("Start").first(), "2099-12-06T18:00");
-    await dialogB.getByRole("button", { name: "Save" }).click();
+    await setInviteeRequired(dialogB, USERS.leia.displayName);
     await submitProposalDraft(page, dialogB);
 
     await logout(page);
@@ -89,9 +87,8 @@ test.describe("Notification inbox journey", () => {
     const dialogC = await openEventProposalDraft(page);
     const eventC = `E2E Inbox C ${tag}`;
     await dialogC.getByLabel("Title").fill(eventC);
-    await setInviteeRequired(dialogC, USERS.leia.displayName);
     await fillProposalDateTimeField(dialogC.getByLabel("Start").first(), "2099-12-07T18:00");
-    await dialogC.getByRole("button", { name: "Save" }).click();
+    await setInviteeRequired(dialogC, USERS.leia.displayName);
     await submitProposalDraft(page, dialogC);
 
     await logout(page);

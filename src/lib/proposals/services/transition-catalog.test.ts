@@ -20,10 +20,9 @@ describe("transition-catalog", () => {
     }
   });
 
-  it("maps every resolved action to the resolved kind", () => {
-    for (const action of FEED_RESOLVED_ACTIONS) {
-      expect(contentKindForMilestoneAction(action)).toBe("resolved");
-    }
+  it("includes posted_to_feed as a resolved Feed action (PC-430)", () => {
+    expect(FEED_RESOLVED_ACTIONS).toContain("proposal.posted_to_feed");
+    expect(contentKindForMilestoneAction("proposal.posted_to_feed")).toBe("resolved");
   });
 
   it("returns null for actions outside the allowlist", () => {

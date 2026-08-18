@@ -186,6 +186,33 @@ export async function applyNetworksMigrations(sql: Client): Promise<void> {
   await rebuildSleepingPartnershipsUnique(sql);
   await backfillLegacyNetwork(sql);
   await grantDefaultPlatformAdmins(sql);
+  await backfillBookingEnums(sql);
+}
+
+/**
+ * SCHEMA_VERSION 50: rename Schedule posting literals to Booking (PC-427).
+ */
+async function backfillBookingEnums(sql: Client): Promise<void> {
+  await sql.execute(`
+    UPDATE networks
+    SET scheduling_posting = 'proposals_and_bookings'
+    WHERE scheduling_posting = 'proposals_and_schedule'
+  `);
+  await sql.execute(`
+    UPDATE poly_group
+    SET scheduling_posting = 'proposals_and_bookings'
+    WHERE scheduling_posting = 'proposals_and_schedule'
+  `);
+  await sql.execute(`
+    UPDATE networks
+    SET proxy_scheduling_enabled = 1
+    WHERE scheduling_posting = 'proposals_and_bookings'
+  `);
+  await sql.execute(`
+    UPDATE poly_group
+    SET proxy_scheduling_enabled = 1
+    WHERE scheduling_posting = 'proposals_and_bookings'
+  `);
 }
 
 /**
