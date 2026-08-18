@@ -51,6 +51,7 @@ import {
   postProposalToFeedAction,
   redraftProposalAction,
   rescheduleProposalAction,
+  returnProposedToDraftAction,
   revokeResolvedAcceptanceAction,
   submitProposalAction,
   updateResolvedAttendeesAction,
@@ -337,22 +338,6 @@ export function ProposalDetailDialog({
     });
   }
 
-  function handleAdminDeleteClick() {
-    if (!detail) return;
-    if (detail.isRecurring) {
-      setAdminDeleteScopeOpen(true);
-      return;
-    }
-    if (
-      !window.confirm(
-        "Permanently delete this proposal? All participants will be notified. This cannot be undone.",
-      )
-    ) {
-      return;
-    }
-    handleAdminDelete("occurrence");
-  }
-
   function handleRevokeAcceptance() {
     if (!proposalId || !window.confirm("Revoke your acceptance? The event will be flagged at risk.")) {
       return;
@@ -424,6 +409,24 @@ export function ProposalDetailDialog({
     }
     startTransition(async () => {
       const result = await redraftProposalAction(proposalId);
+      notifyResult(result);
+      if (!result.ok) return;
+      const detailResult = await getProposalDetailAction(proposalId);
+      if (detailResult.ok && detailResult.detail) {
+        onEdit(detailResult.detail);
+        return;
+      }
+      reloadDetail(proposalId);
+      router.refresh();
+    });
+  }
+
+  function handleBackToDraft() {
+    if (!proposalId || !window.confirm("Move this back to drafts? Votes will be reset.")) {
+      return;
+    }
+    startTransition(async () => {
+      const result = await returnProposedToDraftAction(proposalId);
       notifyResult(result);
       if (!result.ok) return;
       const detailResult = await getProposalDetailAction(proposalId);
@@ -1136,18 +1139,12 @@ export function ProposalDetailDialog({
           <CardActions sx={{ px: 2, pb: 2, pt: 0, flexWrap: "wrap", gap: 1 }}>
             {detail?.canCancel && (
               <Button color="error" variant="outlined" onClick={handleCancelClick} disabled={pending} sx={outlinedButtonSx}>
-                {detail.state === "resolved" ? "Cancel Event" : "Cancel"}
+                Cancel Event
               </Button>
             )}
-            {detail?.canAdminDeleteProposal && (
-              <Button
-                color="error"
-                variant="outlined"
-                onClick={handleAdminDeleteClick}
-                disabled={pending}
-                sx={outlinedButtonSx}
-              >
-                Delete proposal
+            {detail?.canCancel && detail.state === "proposed" && (
+              <Button variant="outlined" onClick={handleBackToDraft} disabled={pending} sx={outlinedButtonSx}>
+                Back to Draft
               </Button>
             )}
             {detail?.canRedraft && (
@@ -1172,11 +1169,6 @@ export function ProposalDetailDialog({
                   Submit
                 </Button>
               </>
-            )}
-            {detail?.canReschedule && (
-              <Button variant="outlined" onClick={openRescheduleDialog} disabled={pending} sx={outlinedButtonSx}>
-                Reschedule
-              </Button>
             )}
             {detail?.state === "resolved" && (
               <Button

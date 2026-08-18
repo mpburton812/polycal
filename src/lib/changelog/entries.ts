@@ -28,6 +28,34 @@ import { CHANGELOG_ARCHIVE } from "./entries.archive";
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "2026.08.18c",
+    date: "2026-08-18",
+    summary:
+      "New Event selection styling, proposed Cancel Event / Back to Draft, FAB off Feed and People & Places, Admin Event Types Just Bookings (PC-443–PC-447).",
+    changes: [
+      {
+        type: "changed",
+        description:
+          "New Event keeps Social/Sleeping and Proposal/Booking chips sage-green; posting is labeled Proposal or Booking with a voted vs auto-accepted caption; Batch nights is removed from new sleeping drafts (PC-444).",
+      },
+      {
+        type: "changed",
+        description:
+          "Proposed detail always shows Cancel Event, drops Delete proposal and Reschedule, and adds Back to Draft to reopen the composer (PC-445).",
+      },
+      {
+        type: "changed",
+        description:
+          "Sage create FAB is hidden on Feed and People & Places; it remains on Schedule and Proposals (PC-446).",
+      },
+      {
+        type: "added",
+        description:
+          "Admin Event Types includes Just Bookings, which forces calendar bookings on New Event, turns Poll off, and leaves sleeping-partner and residency proposals unchanged (PC-447).",
+      },
+    ],
+  },
+  {
     version: "2026.08.18b",
     date: "2026-08-18",
     summary:

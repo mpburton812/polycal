@@ -83,6 +83,7 @@ import {
 import { isSleepingLikeType } from "@/lib/proposals/sleeping-like";
 import { loadNetworkSettings } from "@/lib/networks/settings";
 import { assertComposerPostingRules } from "@/lib/proposals/composer-posting-rules";
+import { bookingsEnabled } from "@/types/network-settings";
 import { buildPartnershipProposalCopy } from "@/lib/partnerships/copy";
 import type { UserRole } from "@/types/user";
 
@@ -1851,7 +1852,7 @@ export async function getProposalDetailAction(
         (row.proposalType === "sleeping"
           ? canManageSleepingAttendees(isProposer, isAdmin)
           : isProposer || isAdmin || isInvitee) &&
-        networkSettings?.schedulingPosting === "proposals_and_bookings",
+        bookingsEnabled(networkSettings?.schedulingPosting ?? "proposals_only"),
       canPostToFeed:
         row.state === "resolved" &&
         (isProposer || isAdmin) &&

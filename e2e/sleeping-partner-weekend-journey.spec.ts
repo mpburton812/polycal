@@ -4,12 +4,13 @@ import { loginWithOnboardingIfNeeded, logout } from "./helpers/auth";
 import { USERS } from "./helpers/constants";
 import { goToProposals, openProposalCard, selectProposalTab } from "./helpers/navigation";
 import { dateOffsetIso } from "./helpers/schedule";
+import { fillProposalDateRange } from "./helpers/datePickers";
 import {
   acceptProposalWithComment,
-  configureBatchNight,
   openSleepingPartnerProposal,
   openSleepingProposalDraft,
   proposalCard,
+  setInviteeRequired,
   submitProposalDraft,
 } from "./helpers/proposals";
 
@@ -48,27 +49,8 @@ test.describe("Sleeping partner weekend journey", () => {
 
     const sleepingDialog = await openSleepingProposalDraft(page);
     await sleepingDialog.getByLabel("Title").fill(`E2E weekend ${Date.now()}`);
-    await sleepingDialog
-      .getByRole("checkbox", { name: /Batch nights/i })
-      .click();
-    await expect(sleepingDialog.getByTestId("fast-sleeping-plan-grid")).toBeVisible({
-      timeout: 15_000,
-    });
-
-    await configureBatchNight(sleepingDialog, page, night0, {
-      nightDate: night0,
-      mode: "withInvitees",
-      requiredInvitees: [USERS.leia.displayName],
-      customLocation: "Lars homestead guest room",
-    });
-
-    await configureBatchNight(sleepingDialog, page, night1, {
-      nightDate: night1,
-      mode: "withInvitees",
-      requiredInvitees: [USERS.leia.displayName],
-      customLocation: "Lars homestead guest room",
-    });
-
+    await fillProposalDateRange(sleepingDialog, night0, night1);
+    await setInviteeRequired(sleepingDialog, USERS.leia.displayName);
     await submitProposalDraft(page, sleepingDialog);
     await logout(page);
 

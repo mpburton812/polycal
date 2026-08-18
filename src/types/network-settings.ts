@@ -9,8 +9,22 @@ export type AuditLogVisibility = (typeof auditLogVisibilityLevels)[number];
 export const placesMapVisibilityLevels = ["all", "admins", "none"] as const;
 export type PlacesMapVisibility = (typeof placesMapVisibilityLevels)[number];
 
-export const schedulingPostingModes = ["proposals_only", "proposals_and_bookings"] as const;
+export const schedulingPostingModes = [
+  "proposals_only",
+  "proposals_and_bookings",
+  "bookings_only",
+] as const;
 export type SchedulingPostingMode = (typeof schedulingPostingModes)[number];
+
+/** Direct calendar booking (New Event Booking / Just Bookings) is allowed. */
+export function bookingsEnabled(mode: SchedulingPostingMode): boolean {
+  return mode !== "proposals_only";
+}
+
+/** Scheduling proposals (votes on Social/Sleeping New Event) are allowed. */
+export function schedulingProposalsEnabled(mode: SchedulingPostingMode): boolean {
+  return mode !== "bookings_only";
+}
 
 export const proxySchedulingScopes = ["anyone", "sleeping_partners"] as const;
 export type ProxySchedulingScope = (typeof proxySchedulingScopes)[number];
@@ -37,11 +51,12 @@ export interface NetworkSettings {
   /** When false, Poll is hidden on new event drafts (PC-423). Default true. */
   pollEnabled: boolean;
   /**
-   * Just Proposals vs Proposals and Bookings (PC-428). Default proposals_only.
-   * Dual mode adds a Proposal/Booking choice on the draft card.
+   * Just Proposals, Proposals and Bookings, or Just Bookings (PC-447).
+   * Default proposals_only. Dual mode adds a Proposal/Booking choice; Just Bookings
+   * forces booking and disables Poll.
    */
   schedulingPosting: SchedulingPostingMode;
-  /** Dual posting always enables Booking for; column kept and forced on (PC-428). */
+  /** Booking-for is on whenever bookings are enabled; column kept (PC-428 / PC-447). */
   proxySchedulingEnabled: boolean;
   /** Who may appear in the on-behalf-of pulldown (PC-425). */
   proxySchedulingScope: ProxySchedulingScope;

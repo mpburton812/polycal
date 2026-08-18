@@ -2,6 +2,8 @@
 
 import { createContext, useContext } from "react";
 
+import type { ProposalDetail } from "@/actions/proposals";
+
 export interface ProposalCreateRequest {
   lockedType: "event" | "sleeping";
   initialStartAt?: string | null;
@@ -9,6 +11,7 @@ export interface ProposalCreateRequest {
 
 export interface ProposalCreateContextValue {
   openCreate: (request?: ProposalCreateRequest) => void;
+  openEdit: (detail: ProposalDetail) => void;
 }
 
 export const ProposalCreateContext = createContext<ProposalCreateContextValue | null>(null);
@@ -22,6 +25,9 @@ export function useProposalCreate(): ProposalCreateContextValue {
     return {
       openCreate: () => {
         /* AppShell always mounts the host; no-op keeps tests that render ScheduleClient isolated. */
+      },
+      openEdit: () => {
+        /* Same isolated-test no-op as openCreate. */
       },
     };
   }

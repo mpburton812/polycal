@@ -24,6 +24,7 @@ import { ProposalCard } from "./ProposalCard";
 import { PartnershipProposalDialog } from "./PartnershipProposalDialog";
 import { PARTNERSHIP_CARD_PREFIX } from "@/lib/proposals/constants";
 import { useToast } from "@/components/providers/ToastProvider";
+import { useProposalCreate } from "@/components/proposals/ProposalCreateContext";
 import { EmptyState, type EmptyStateIllustration } from "@/components/ui/EmptyState";
 import { GARDEN_TOKENS } from "@/theme/tokens";
 import dynamic from "next/dynamic";
@@ -104,6 +105,7 @@ export function ProposalsClient({
 }: ProposalsClientProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { openEdit } = useProposalCreate();
   const [activeTab, setActiveTab] = useState<TabKey>(() => {
     // Survive soft-nav remounts so swipe keep-alive still restores the board tab (PC-407).
     if (typeof window === "undefined") return "draft";
@@ -195,8 +197,9 @@ export function ProposalsClient({
 
   function handleEditFromDetail(detail: ProposalDetail) {
     setDetailOpen(false);
-    setEditDetail(detail);
-    setCreateOpen(true);
+    setSelectedProposalId(null);
+    setActiveTab("draft");
+    openEdit(detail);
   }
 
   function handleDraftDialogClose() {

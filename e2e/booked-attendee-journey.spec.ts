@@ -113,11 +113,11 @@ async function openNetworkSettings(page: Page): Promise<void> {
 
 async function setPostingMode(
   page: Page,
-  mode: "Just Proposals" | "Proposals and Bookings",
+  mode: "Just Proposals" | "Proposals and Bookings" | "Just Bookings",
 ): Promise<void> {
   await loginWithOnboardingIfNeeded(page, USERS.luke.username);
   await openNetworkSettings(page);
-  const combo = page.getByRole("combobox", { name: "Proposal posting" });
+  const combo = page.getByRole("combobox", { name: "Event Types" });
   await expect(combo).toBeVisible({ timeout: 15_000 });
   await combo.click();
   await page.getByRole("option", { name: mode }).click();

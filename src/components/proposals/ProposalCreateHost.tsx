@@ -3,6 +3,7 @@
 import AddIcon from "@mui/icons-material/Add";
 import { Fab, Menu, MenuItem } from "@mui/material";
 import dynamic from "next/dynamic";
+import { usePathname } from "next/navigation";
 import { useCallback, useMemo, useState } from "react";
 
 import { getFastSleepEnabledAction } from "@/actions/fast-sleep";
@@ -78,6 +79,8 @@ export function ProposalCreateHost({
   const [peopleRank, setPeopleRank] = useState<PersonRankStat[]>([]);
   const [editDetail, setEditDetail] = useState<ProposalDetail | null>(null);
   const [composerMode, setComposerMode] = useState<"manual" | "nlp">("manual");
+  const pathname = usePathname();
+  const hideFab = pathname === "/feed" || pathname === "/people-places";
 
   const loadCreateData = useCallback(async () => {
     const [nextPeople, nextPlaces, nextResidency, nextFastSleep, nextComposer, nextRank] =
@@ -115,7 +118,20 @@ export function ProposalCreateHost({
     [loadCreateData],
   );
 
-  const contextValue = useMemo(() => ({ openCreate }), [openCreate]);
+  const openEdit = useCallback(
+    (detail: ProposalDetail) => {
+      void loadCreateData().then(() => {
+        setEditDetail(detail);
+        setLockCreateType(false);
+        setCreateInitialStartAt(null);
+        setComposerMode("manual");
+        setCreateOpen(true);
+      });
+    },
+    [loadCreateData],
+  );
+
+  const contextValue = useMemo(() => ({ openCreate, openEdit }), [openCreate, openEdit]);
 
   async function handleFabClick(event: React.MouseEvent<HTMLElement>) {
     const anchor = event.currentTarget;
@@ -126,6 +142,8 @@ export function ProposalCreateHost({
   return (
     <ProposalCreateContext.Provider value={contextValue}>
       {children}
+      {hideFab ? null : (
+        <>
       <Fab
         color="primary"
         aria-label="New proposal"
@@ -208,6 +226,8 @@ export function ProposalCreateHost({
           Residency Proposal
         </MenuItem>
       </Menu>
+        </>
+      )}
       <ProposalDraftDialog
         open={createOpen}
         onClose={() => {

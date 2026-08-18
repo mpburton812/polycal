@@ -66,7 +66,7 @@ async function openNetworkSettings(page: Page): Promise<void> {
 async function enableBookingsForAnyone(page: Page): Promise<void> {
   await loginWithOnboardingIfNeeded(page, USERS.luke.username);
   await openNetworkSettings(page);
-  const posting = page.getByRole("combobox", { name: "Proposal posting" });
+  const posting = page.getByRole("combobox", { name: "Event Types" });
   await expect(posting).toBeVisible({ timeout: 15_000 });
   await posting.click();
   await page.getByRole("option", { name: "Proposals and Bookings" }).click();
