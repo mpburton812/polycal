@@ -36,6 +36,7 @@ import {
 } from "@/actions/proposals";
 import type { PersonSummary } from "@/actions/users";
 import { FeedLikeRow } from "@/components/feed/FeedLikeControl";
+import { useProposalCreate } from "@/components/proposals/ProposalCreateContext";
 import {
   FeedControlsButton,
   FeedControlsDrawer,
@@ -347,6 +348,7 @@ export function FeedClient({
   isAdmin: boolean;
   people: PersonSummary[];
 }) {
+  const { openEdit } = useProposalCreate();
   const [items, setItems] = useState<FeedItem[]>([]);
   const [activeEvents, setActiveEvents] = useState<FeedActiveEvent[]>([]);
   const [controlsOpen, setControlsOpen] = useState(false);
@@ -1384,8 +1386,10 @@ export function FeedClient({
           proposalId={selectedProposalId}
           open={detailOpen}
           people={people}
-          onEdit={() => {
-            /* Edit opens from Proposals tab; Feed is read/comment focused. */
+          onEdit={(detail) => {
+            setDetailOpen(false);
+            setSelectedProposalId(null);
+            openEdit(detail);
           }}
           onClose={() => {
             setDetailOpen(false);

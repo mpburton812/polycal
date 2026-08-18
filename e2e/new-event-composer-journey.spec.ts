@@ -65,7 +65,7 @@ test.describe("New Event composer journey", () => {
     await dialog.getByRole("button", { name: "Social", exact: true }).click();
     await expect(dialog.getByRole("button", { name: "Social", exact: true })).toHaveAttribute(
       "aria-pressed",
-      "false",
+      "true",
     );
     await expect(dialog.getByRole("button", { name: "Add times", exact: true })).toHaveCount(0);
     await expect(dialog.getByRole("button", { name: "Submit" })).toBeDisabled();

@@ -3,9 +3,7 @@
 import AccessTimeIcon from "@mui/icons-material/AccessTime";
 import {
   Box,
-  Checkbox,
   FormControl,
-  FormControlLabel,
   InputLabel,
   MenuItem,
   Select,
@@ -29,7 +27,6 @@ import type { InviteeSelection, SlotDraft } from "./proposalDraftDateUtils";
 
 export interface ProposalDraftSleepingFieldsProps {
   batchMode: boolean;
-  onBatchModeChange: (value: boolean) => void;
   fastPlanRows: FastSleepingRow[];
   onFastPlanRowsChange: (rows: FastSleepingRow[]) => void;
   sleepingCandidates: PersonSummary[];
@@ -62,7 +59,6 @@ export interface ProposalDraftSleepingFieldsProps {
  */
 export function ProposalDraftSleepingFields({
   batchMode,
-  onBatchModeChange,
   fastPlanRows,
   onFastPlanRowsChange,
   sleepingCandidates,
@@ -91,17 +87,6 @@ export function ProposalDraftSleepingFields({
 }: ProposalDraftSleepingFieldsProps) {
   return (
     <Stack spacing={2} sx={{ mb: 2 }}>
-      <FormControlLabel
-        control={
-          <Checkbox
-            checked={batchMode}
-            onChange={(event) => onBatchModeChange(event.target.checked)}
-            sx={{ color: POLY_GREEN, "&.Mui-checked": { color: POLY_GREEN } }}
-          />
-        }
-        label="Batch nights (plan up to 14 nights in one proposal)"
-      />
-
       {batchMode ? (
         <>
           <ProposalDraftSectionHeader

@@ -7,6 +7,7 @@ export {
   redraftProposalAction,
   rescheduleProposalAction,
   respondAttendeeUpdateAction,
+  returnProposedToDraftAction,
   revokeResolvedAcceptanceAction,
   updateResolvedAttendeesAction,
 } from "./lifecycle";

@@ -38,10 +38,12 @@ import {
   runProposalEnforcement,
 } from "@/lib/proposals/enforcement";
 import { enterAtRiskProposedState } from "@/lib/proposals/services/at-risk";
+import { revertProposalToDraft } from "@/lib/proposals/services/resolution";
 import { logProposalTransition } from "@/lib/proposals/services/state-log";
 import { resetInviteeVotes } from "@/lib/proposals/services/votes";
 import { notifyProposalParticipants } from "@/lib/proposals/services/notify-participants";
 import { loadNetworkSettings } from "@/lib/networks/settings";
+import { bookingsEnabled } from "@/types/network-settings";
 import { canManageSleepingAttendees } from "@/lib/proposals/passive-auto-accept";
 import {
   sleepingDateToStartIso,
@@ -157,10 +159,10 @@ export async function updateResolvedAttendeesAction(
     const settings = proposal.networkId
       ? await loadNetworkSettings(proposal.networkId, db)
       : null;
-    if (settings?.schedulingPosting !== "proposals_and_bookings") {
+    if (!bookingsEnabled(settings?.schedulingPosting ?? "proposals_only")) {
       return {
         ok: false,
-        message: "Booked attendees are only available when Proposals and Bookings is enabled.",
+        message: "Booked attendees are only available when bookings are enabled.",
       };
     }
   }
@@ -739,6 +741,46 @@ export async function cancelProposalAction(
   }
 
   return { ok: true, message: "Proposal cancelled and archived." };
+}
+
+/**
+ * Returns a proposed event to drafts so the proposer can edit and resubmit (PC-445).
+ * Unlike redraft, this is for `proposed` (not resolved) and does not set at-risk.
+ */
+export async function returnProposedToDraftAction(
+  proposalId: string,
+): Promise<{ ok: boolean; message: string }> {
+  const session = await auth();
+  if (!session?.user) {
+    return { ok: false, message: "Sign in required." };
+  }
+
+  await ensureDbReady();
+  const db = getDb();
+  const [proposal] = await db
+    .select()
+    .from(proposals)
+    .where(eq(proposals.id, proposalId))
+    .limit(1);
+
+  if (!proposal || proposal.state !== "proposed") {
+    return { ok: false, message: "Only a proposed event can be returned to draft." };
+  }
+
+  const isAdmin = await userHasAdminAccess(adminAccessFromSessionUser(session.user));
+  if (proposal.proposerId !== session.user.id && !isAdmin) {
+    return { ok: false, message: "Only the proposer or an admin can return this to draft." };
+  }
+
+  const reason =
+    proposal.proposerId === session.user.id
+      ? "Returned to draft by the proposer."
+      : "Returned to draft by an admin.";
+  await revertProposalToDraft(db, proposal, session.user.id, reason);
+  revalidatePath("/proposals");
+  revalidatePath("/schedule");
+  revalidatePath("/feed");
+  return { ok: true, message: "Moved back to drafts." };
 }
 
 /**

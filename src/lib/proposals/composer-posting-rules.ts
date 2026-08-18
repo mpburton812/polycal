@@ -1,11 +1,13 @@
-import type {
-  PostingKind,
-  ProxySchedulingScope,
-  SchedulingPostingMode,
+import {
+  bookingsEnabled,
+  schedulingProposalsEnabled,
+  type PostingKind,
+  type ProxySchedulingScope,
+  type SchedulingPostingMode,
 } from "@/types/network-settings";
 
 /**
- * Validates Poll / posting-kind / Booking-for combinations against network settings (PC-427–PC-428).
+ * Validates Poll / posting-kind / Booking-for combinations against network settings (PC-427–PC-447).
  */
 export function assertComposerPostingRules(input: {
   pollEnabled: boolean;
@@ -20,12 +22,18 @@ export function assertComposerPostingRules(input: {
   allowedProxyUserIds: ReadonlySet<string>;
 }): { ok: true } | { ok: false; error: string } {
   const { postingKind } = input;
-  const dualPosting = input.schedulingPosting === "proposals_and_bookings";
-  if (postingKind === "booking" && !dualPosting) {
+  const canBook = bookingsEnabled(input.schedulingPosting);
+  if (postingKind === "booking" && !canBook) {
     return { ok: false, error: "Direct booking is disabled for this network." };
+  }
+  if (postingKind === "proposal" && !schedulingProposalsEnabled(input.schedulingPosting)) {
+    return { ok: false, error: "Scheduling proposals are disabled for this network." };
   }
   if (postingKind === "booking" && input.isPoll) {
     return { ok: false, error: "Poll is not available for calendar bookings." };
+  }
+  if (input.schedulingPosting === "bookings_only" && input.isPoll && !input.isExistingPollDraft) {
+    return { ok: false, error: "Poll is disabled when Event Types is Just Bookings." };
   }
   if (input.isPoll && !input.pollEnabled && !input.isExistingPollDraft) {
     return { ok: false, error: "Poll is disabled for this network." };
@@ -36,8 +44,8 @@ export function assertComposerPostingRules(input: {
     if (postingKind !== "booking") {
       return { ok: false, error: "You can only book on behalf of someone in Booking mode." };
     }
-    // Dual posting always enables Booking for; ignore a stale proxy_scheduling_enabled=0 row.
-    if (!dualPosting) {
+    // Bookings-enabled modes always allow Booking for; ignore a stale proxy_scheduling_enabled=0 row.
+    if (!canBook) {
       return { ok: false, error: "Booking for is disabled for this network." };
     }
     if (!input.allowedProxyUserIds.has(proxyId)) {

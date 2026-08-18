@@ -73,8 +73,8 @@ test.describe("App navigation (admin)", () => {
     await expect(page.getByRole("heading", { name: "Profile", level: 1 })).toBeVisible();
   });
 
-  test("sage create FAB is on Feed, Schedule, and People & Places", async ({ page }) => {
-    for (const go of [goToFeed, goToSchedule, goToPeoplePlaces]) {
+  test("sage create FAB is on Schedule and Proposals, not Feed or People & Places", async ({ page }) => {
+    for (const go of [goToSchedule, goToProposals]) {
       await go(page);
       await openNewProposalFabMenu(page);
       await expect(page.getByRole("menuitem", { name: "New Event", exact: true })).toBeVisible();
@@ -87,6 +87,11 @@ test.describe("App navigation (admin)", () => {
       await expect(page.getByRole("menuitem", { name: "Residency Proposal" })).toBeVisible();
       await page.keyboard.press("Escape");
       await expect(page.getByRole("menuitem", { name: "New Event", exact: true })).toBeHidden();
+    }
+
+    for (const go of [goToFeed, goToPeoplePlaces]) {
+      await go(page);
+      await expect(page.getByRole("button", { name: "New proposal" })).toHaveCount(0);
     }
   });
 });

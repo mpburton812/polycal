@@ -5,6 +5,7 @@ import { getDb } from "@/lib/db/client";
 import { networks } from "@/lib/db/schema";
 import {
   DEFAULT_ONBOARDING_WELCOME_MESSAGE,
+  bookingsEnabled,
   type AuditLogVisibility,
   type PlacesMapVisibility,
   type ProxySchedulingScope,
@@ -59,6 +60,13 @@ type NetworkSettingsRow = {
   sleepingPartnerProposalMaxDays: number;
 };
 
+function parseSchedulingPosting(value: string | null): SchedulingPostingMode {
+  if (value === "proposals_and_bookings" || value === "bookings_only") {
+    return value;
+  }
+  return "proposals_only";
+}
+
 function mapNetworkRow(row: NetworkSettingsRow): NetworkSettings {
   return {
     networkId: row.id,
@@ -71,14 +79,10 @@ function mapNetworkRow(row: NetworkSettingsRow): NetworkSettings {
     fastSleepEnabled: row.fastSleepEnabled ?? true,
     feedEnabled: row.feedEnabled ?? true,
     pollEnabled: row.pollEnabled ?? true,
-    schedulingPosting:
-      row.schedulingPosting === "proposals_and_bookings"
-        ? "proposals_and_bookings"
-        : "proposals_only",
-    proxySchedulingEnabled:
-      row.schedulingPosting === "proposals_and_bookings"
-        ? true
-        : Boolean(row.proxySchedulingEnabled),
+    schedulingPosting: parseSchedulingPosting(row.schedulingPosting),
+    proxySchedulingEnabled: bookingsEnabled(parseSchedulingPosting(row.schedulingPosting))
+      ? true
+      : Boolean(row.proxySchedulingEnabled),
     proxySchedulingScope:
       row.proxySchedulingScope === "anyone" ? "anyone" : "sleeping_partners",
     placesMapVisibility: row.placesMapVisibility as PlacesMapVisibility,
