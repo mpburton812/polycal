@@ -32,28 +32,29 @@ export async function fillProposalDateField(field: Locator, value: string): Prom
 }
 
 /**
- * Fills a timed start. Poll drafts still use a Start datetime field; Social
- * drafts use the calendar + Add times path, so Who can wait on dates (PC-440).
+ * Fills a timed start. Social drafts hide Start until a day is chosen and Add times
+ * is on; fill the calendar first so Who/More options can appear (PC-440).
  */
 export async function fillProposalDateTimeField(
   field: Locator,
   value: string,
 ): Promise<void> {
   const dialog = field.page().getByRole("dialog");
-  if (await field.isVisible().catch(() => false)) {
-    await field.click();
-    await field.fill(toMuiDateTimeDisplay(value));
-    await field.press("Tab");
-    return;
-  }
-  const date = value.slice(0, 10);
-  await fillProposalDateRange(dialog, date, date);
-  if (value.includes("T")) {
+  if (!(await field.isVisible().catch(() => false))) {
+    const date = value.slice(0, 10);
+    const startProbe = dialog.getByTestId("date-range-start").first();
+    if (await startProbe.isVisible().catch(() => false)) {
+      await fillProposalDateRange(dialog, date, date);
+    }
     const addTimes = dialog.getByRole("button", { name: "Add times", exact: true });
-    if (await addTimes.isVisible().catch(() => false)) {
+    if (value.includes("T") && (await addTimes.isVisible().catch(() => false))) {
       await addTimes.click();
     }
   }
+  await expect(field).toBeVisible({ timeout: 15_000 });
+  await field.click();
+  await field.fill(toMuiDateTimeDisplay(value));
+  await field.press("Tab");
 }
 
 /**
