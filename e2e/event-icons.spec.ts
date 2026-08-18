@@ -25,11 +25,10 @@ test.describe("Event category icons (PC-116)", () => {
 
     const dialog = await openEventProposalDraft(page);
     await dialog.getByLabel("Title").fill(title);
-    await dialog.getByRole("button", { name: "Solo event (just me)" }).click();
-    await selectEventIcon(dialog, "Food and pizza event");
     await fillProposalDateTimeField(dialog.getByLabel("Start").first(), start);
     await fillProposalDateTimeField(dialog.getByLabel("End (optional)").first(), end);
-    await dialog.getByRole("button", { name: "Save" }).click();
+    await dialog.getByRole("button", { name: "Solo (just me)", exact: true }).click();
+    await selectEventIcon(dialog, "Food and pizza event");
     await submitProposalDraft(page, dialog);
 
     await expectResolvedProposal(page, title);
@@ -46,11 +45,10 @@ test.describe("Event category icons (PC-116)", () => {
 
     const dialog = await openEventProposalDraft(page);
     await dialog.getByLabel("Title").fill(title);
-    await dialog.getByRole("button", { name: "Solo event (just me)" }).click();
-    await selectEventIcon(dialog, "Gaming event");
     await fillProposalDateTimeField(dialog.getByLabel("Start").first(), start);
     await fillProposalDateTimeField(dialog.getByLabel("End (optional)").first(), end);
-    await dialog.getByRole("button", { name: "Save" }).click();
+    await dialog.getByRole("button", { name: "Solo (just me)", exact: true }).click();
+    await selectEventIcon(dialog, "Gaming event");
     await submitProposalDraft(page, dialog);
 
     await expectResolvedProposal(page, title);

@@ -14,14 +14,14 @@ import {
 } from "./helpers/proposals";
 
 /**
- * Poll / posting / proxy admin gates (PC-423–PC-425).
+ * Poll / posting / Booking-for admin gates (PC-423–PC-428).
  * Mutates Rebel Alliance network settings and restores defaults in finally.
  */
-test.describe("Direct schedule and proxy journey", () => {
-  test("Just Proposals vs Schedule posting, proxy scopes, and Poll off", async ({ page }) => {
+test.describe("Direct booking and Booking for journey", () => {
+  test("Just Proposals vs Bookings posting, Booking for scopes, and Poll off", async ({ page }) => {
     test.setTimeout(600_000);
 
-    const title = `Direct schedule ${Date.now()}`;
+    const title = `Direct booking ${Date.now()}`;
 
     try {
       await loginWithOnboardingIfNeeded(page, USERS.luke.username);
@@ -32,10 +32,10 @@ test.describe("Direct schedule and proxy journey", () => {
         0,
       );
       await expect(defaultDraft.getByRole("button", { name: "Poll", exact: true })).toBeVisible();
-      await expect(defaultDraft.getByLabel("Schedule on behalf of")).toHaveCount(0);
+      await expect(defaultDraft.getByLabel("Booking for")).toHaveCount(0);
       await exitDraftDialog(defaultDraft);
 
-      await setPostingMode(page, "Proposals and Schedule");
+      await setPostingMode(page, "Proposals and Bookings");
 
       await logout(page);
       await loginWithOnboardingIfNeeded(page, USERS.han.username);
@@ -43,20 +43,20 @@ test.describe("Direct schedule and proxy journey", () => {
 
       const dualDraft = await openEventProposalDraft(page);
       await expect(dualDraft.getByRole("button", { name: "Proposal", exact: true })).toBeVisible();
-      await expect(dualDraft.getByRole("button", { name: "Schedule", exact: true })).toBeVisible();
+      await expect(dualDraft.getByRole("button", { name: "Booking", exact: true })).toBeVisible();
       await expect(dualDraft.getByRole("button", { name: "Window", exact: true })).toHaveCount(0);
-      await expect(dualDraft.getByLabel("Schedule on behalf of")).toHaveCount(0);
+      await expect(dualDraft.getByLabel("Booking for")).toHaveCount(0);
 
-      await dualDraft.getByRole("button", { name: "Schedule", exact: true }).click();
+      await dualDraft.getByRole("button", { name: "Booking", exact: true }).click();
       await expect(dualDraft.getByRole("button", { name: "Poll", exact: true })).toHaveCount(0);
       await expect(dualDraft.getByRole("button", { name: "Window", exact: true })).toBeVisible();
       await expect(dualDraft.getByRole("button", { name: "Add to calendar" })).toBeVisible();
+      await expect(dualDraft.getByLabel("Booking for")).toBeVisible();
 
       await dualDraft.getByLabel("Title").fill(title);
-      // Choose timing before the invitee roster so Window/Start stay on-screen (PC-424).
       await selectDraftScheduleMode(dualDraft, "Window");
       await fillProposalDateTimeField(dualDraft.getByLabel("Start").first(), "2099-11-15T10:00");
-      await dualDraft.getByRole("button", { name: "With invitees" }).click();
+      await dualDraft.getByRole("button", { name: "With Others", exact: true }).click();
       await expect(
         dualDraft.getByRole("button", { name: /Leia Organa required/i }),
       ).toHaveCount(0);
@@ -70,15 +70,15 @@ test.describe("Direct schedule and proxy journey", () => {
 
       await logout(page);
       await loginWithOnboardingIfNeeded(page, USERS.luke.username);
-      await setProxyScheduling(page, true, "Sleeping partners only");
+      await setBookingForScope(page, "Sleeping partners only");
 
       await logout(page);
       await loginWithOnboardingIfNeeded(page, USERS.han.username);
       await goToProposals(page);
       const partnerDraft = await openEventProposalDraft(page);
-      await partnerDraft.getByRole("button", { name: "Schedule", exact: true }).click();
-      await expect(partnerDraft.getByLabel("Schedule on behalf of")).toBeVisible();
-      await partnerDraft.getByLabel("Schedule on behalf of").click();
+      await partnerDraft.getByRole("button", { name: "Booking", exact: true }).click();
+      await expect(partnerDraft.getByLabel("Booking for")).toBeVisible();
+      await partnerDraft.getByLabel("Booking for").click();
       await expect(page.getByRole("option", { name: USERS.leia.displayName })).toBeVisible();
       await expect(page.getByRole("option", { name: USERS.chewie.displayName })).toHaveCount(0);
       await page.keyboard.press("Escape");
@@ -86,14 +86,14 @@ test.describe("Direct schedule and proxy journey", () => {
 
       await logout(page);
       await loginWithOnboardingIfNeeded(page, USERS.luke.username);
-      await setProxyScheduling(page, true, "Anyone on this network");
+      await setBookingForScope(page, "Anyone on this network");
 
       await logout(page);
       await loginWithOnboardingIfNeeded(page, USERS.han.username);
       await goToProposals(page);
       const anyoneDraft = await openEventProposalDraft(page);
-      await anyoneDraft.getByRole("button", { name: "Schedule", exact: true }).click();
-      await anyoneDraft.getByLabel("Schedule on behalf of").click();
+      await anyoneDraft.getByRole("button", { name: "Booking", exact: true }).click();
+      await anyoneDraft.getByLabel("Booking for").click();
       await expect(page.getByRole("option", { name: USERS.chewie.displayName })).toBeVisible();
       await page.keyboard.press("Escape");
       await exitDraftDialog(anyoneDraft);
@@ -140,7 +140,7 @@ async function selectLabeledCombobox(
 
 async function setPostingMode(
   page: Page,
-  mode: "Just Proposals" | "Proposals and Schedule",
+  mode: "Just Proposals" | "Proposals and Bookings",
 ): Promise<void> {
   await loginWithOnboardingIfNeeded(page, USERS.luke.username);
   await openNetworkSettings(page);
@@ -148,22 +148,14 @@ async function setPostingMode(
   await saveNetworkSettings(page);
 }
 
-async function setProxyScheduling(
+async function setBookingForScope(
   page: Page,
-  enabled: boolean,
-  scope?: "Anyone on this network" | "Sleeping partners only",
+  scope: "Anyone on this network" | "Sleeping partners only",
 ): Promise<void> {
   await loginWithOnboardingIfNeeded(page, USERS.luke.username);
   await openNetworkSettings(page);
-  const toggle = page.getByLabel("Proxy Scheduling");
-  await expect(toggle).toBeVisible({ timeout: 15_000 });
-  const checked = await toggle.isChecked();
-  if (checked !== enabled) {
-    await toggle.click();
-  }
-  if (enabled && scope) {
-    await selectLabeledCombobox(page, "Proxy for", scope);
-  }
+  await expect(page.getByLabel("Proxy Scheduling")).toHaveCount(0);
+  await selectLabeledCombobox(page, "Booking for", scope);
   await saveNetworkSettings(page);
 }
 

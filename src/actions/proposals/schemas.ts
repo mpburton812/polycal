@@ -13,7 +13,7 @@ import {
 
 export const inviteeInputSchema = z.object({
   userId: z.string().min(1),
-  role: z.enum(["required", "optional"]),
+  role: z.enum(["required", "optional", "booked"]),
 });
 
 export const timeSlotInputSchema = z.object({
@@ -50,7 +50,7 @@ export const draftProposalSchema = z.object({
   eventIconKey: z.enum(EVENT_ICON_KEYS).nullable().optional(),
   /** When true, lifecycle milestones post to the network Feed (PC-414). Default false. */
   postToFeed: z.boolean().optional(),
-  postingKind: z.enum(["proposal", "schedule"]).optional(),
+  postingKind: z.enum(["proposal", "booking"]).optional(),
   onBehalfOfUserId: z.string().min(1).nullable().optional(),
 });
 
@@ -89,6 +89,7 @@ export const attendeeUpdateSchema = z.object({
   proposalId: z.string().min(1),
   addRequired: z.array(z.string().min(1)).optional(),
   addOptional: z.array(z.string().min(1)).optional(),
+  addBooked: z.array(z.string().min(1)).optional(),
   removeUserIds: z.array(z.string().min(1)).optional(),
 });
 

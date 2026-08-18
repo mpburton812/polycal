@@ -37,6 +37,7 @@ test.describe("Batch sleeping partners journey", () => {
     await goToProposals(page);
 
     const dialog = await openSleepingProposalDraft(page);
+    await dialog.getByLabel("Title").fill(`E2E batch sleeping ${Date.now()}`);
     await dialog.getByRole("checkbox", { name: /Batch nights/i }).click();
     await expect(dialog.getByTestId("fast-sleeping-plan-grid")).toBeVisible({ timeout: 15_000 });
 
@@ -110,7 +111,6 @@ test.describe("Batch sleeping partners journey", () => {
       requiredInvitees: [BT_USERS.michael.displayName],
       locationName: BT_PLACES.michaelsPlace,
     });
-    await editDialog.getByRole("button", { name: "Save" }).click();
     await submitProposalDraft(page, editDialog);
     await logout(page);
 

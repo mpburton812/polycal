@@ -68,7 +68,7 @@ test.describe("Week schedule poly-family journey", () => {
     page.once("dialog", (dialog) => dialog.accept());
     await batchCard.getByRole("heading", { level: 2 }).click();
     const cancelDialog = page.getByRole("dialog");
-    await cancelDialog.getByRole("button", { name: "Cancel", exact: true }).click();
+    await cancelDialog.getByRole("button", { name: "Cancel Event", exact: true }).click();
     await expect(cancelDialog).toBeHidden({ timeout: 15_000 });
 
     await selectProposalTab(page, "Archived");

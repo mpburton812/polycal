@@ -51,25 +51,33 @@ export async function openNewProposalFabMenu(page: Page): Promise<void> {
   await fab.click();
 }
 
-/** Opens the event proposal draft dialog from the FAB menu. */
-export async function openEventProposalDraft(page: Page): Promise<Locator> {
+/** Opens the New Event composer without locking Social or Sleeping (PC-429). */
+export async function openNewEventComposer(page: Page): Promise<Locator> {
   await openNewProposalFabMenu(page);
-  await page.getByRole("menuitem", { name: "Event proposal" }).click();
+  await page.getByRole("menuitem", { name: "New Event" }).click();
   const dialog = page.getByRole("dialog");
-  await expect(dialog.getByRole("heading", { name: "New proposal" })).toBeVisible({
+  await expect(dialog.getByRole("heading", { name: "New Event" })).toBeVisible({
     timeout: 15_000,
   });
+  return dialog;
+}
+
+/** Opens the event proposal draft dialog from the FAB menu. */
+export async function openEventProposalDraft(page: Page): Promise<Locator> {
+  const dialog = await openNewEventComposer(page);
+  await dialog.getByRole("button", { name: "Social", exact: true }).click();
   return dialog;
 }
 
 /** Opens the sleeping proposal draft dialog from the FAB menu. */
 export async function openSleepingProposalDraft(page: Page): Promise<Locator> {
   await openNewProposalFabMenu(page);
-  await page.getByRole("menuitem", { name: "Sleeping proposal" }).click();
+  await page.getByRole("menuitem", { name: "New Event" }).click();
   const dialog = page.getByRole("dialog");
-  await expect(dialog.getByRole("heading", { name: "New proposal" })).toBeVisible({
+  await expect(dialog.getByRole("heading", { name: "New Event" })).toBeVisible({
     timeout: 15_000,
   });
+  await dialog.getByRole("button", { name: "Sleeping", exact: true }).click();
   return dialog;
 }
 
@@ -110,20 +118,13 @@ function inclusiveNightDates(rangeStart: string, rangeEnd: string): string[] {
 }
 
 /**
- * New drafts leave invitees unset until With invitees / With partners (PC-421).
+ * New drafts leave invitees unset until Solo (just me) / With Others (PC-421 / PC-429).
  */
 async function revealInviteeRoster(dialog: Locator): Promise<void> {
-  const withInvitees = dialog.getByRole("button", { name: "With invitees", exact: true });
-  const withPartners = dialog.getByRole("button", { name: "With partners", exact: true });
-  const opener =
-    (await withInvitees.count()) > 0
-      ? withInvitees
-      : (await withPartners.count()) > 0
-        ? withPartners
-        : null;
-  if (!opener) return;
-  if ((await opener.getAttribute("aria-pressed")) !== "true") {
-    await opener.click();
+  const withOthers = dialog.getByRole("button", { name: "With Others", exact: true });
+  await expect(withOthers).toBeVisible({ timeout: 15_000 });
+  if ((await withOthers.getAttribute("aria-pressed")) !== "true") {
+    await withOthers.click();
   }
 }
 
@@ -178,15 +179,14 @@ export async function expandDraftMoreOptions(dialog: Locator): Promise<void> {
   await expect(dialog.getByLabel(/Description/i)).toBeVisible();
 }
 
-/** Selects Sleeping or Event type on a new proposal draft. */
+/** Selects Sleeping or Social type on a new event draft. */
 export async function selectProposalType(page: Page, dialog: Locator, type: "Event" | "Sleeping") {
-  await dialog.getByLabel("Type").click();
-  await page.getByRole("option", { name: type }).click();
+  await dialog.getByRole("button", { name: type === "Event" ? "Social" : "Sleeping", exact: true }).click();
 }
 
-/** Persists a proposal draft via the Save button (PC-70 label). */
+/** @deprecated New Event drafts persist only via Submit / Add to calendar (PC-429). */
 export async function saveProposalDraft(dialog: Locator): Promise<void> {
-  await dialog.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(dialog.getByRole("button", { name: /^(Submit|Add to calendar)$/ })).toBeVisible();
 }
 
 /** Closes the draft dialog via Exit (PC-70 label). */
@@ -249,14 +249,13 @@ export async function createAndSubmitEvent(
 ): Promise<void> {
   const dialog = await openEventOrSleepingProposalDraft(page);
   await dialog.getByLabel("Title").fill(options.title);
+  await fillProposalDateTimeField(dialog.getByLabel("Start").first(), options.start);
+  await setInviteeRequired(dialog, options.requiredName);
+  await setInviteeOptional(dialog, options.optionalName);
   if (options.description) {
     await expandDraftMoreOptions(dialog);
     await dialog.getByLabel(/Description/i).fill(options.description);
   }
-  await setInviteeRequired(dialog, options.requiredName);
-  await setInviteeOptional(dialog, options.optionalName);
-  await fillProposalDateTimeField(dialog.getByLabel("Start").first(), options.start);
-  await dialog.getByRole("button", { name: "Save" }).click();
   await submitProposalDraft(page, dialog);
 }
 
@@ -272,14 +271,13 @@ export async function createAndSubmitSoloEvent(
 ): Promise<void> {
   const dialog = await openEventOrSleepingProposalDraft(page);
   await dialog.getByLabel("Title").fill(options.title);
-  await dialog.getByRole("button", { name: "Solo event (just me)" }).click();
+  await fillProposalDateTimeField(dialog.getByLabel("Start").first(), options.start);
+  await fillProposalDateTimeField(dialog.getByLabel("End (optional)").first(), options.end);
+  await dialog.getByRole("button", { name: "Solo (just me)", exact: true }).click();
   if (options.notes) {
     await expandDraftMoreOptions(dialog);
     await dialog.getByLabel(/Notes/i).fill(options.notes);
   }
-  await fillProposalDateTimeField(dialog.getByLabel("Start").first(), options.start);
-  await fillProposalDateTimeField(dialog.getByLabel("End (optional)").first(), options.end);
-  await dialog.getByRole("button", { name: "Save" }).click();
   await submitProposalDraft(page, dialog);
 }
 
@@ -296,7 +294,9 @@ export async function createAndSubmitSoloEventWithReminder(
 ): Promise<void> {
   const dialog = await openEventProposalDraft(page);
   await dialog.getByLabel("Title").fill(options.title);
-  await dialog.getByRole("button", { name: "Solo event (just me)" }).click();
+  await fillProposalDateTimeField(dialog.getByLabel("Start").first(), options.start);
+  await fillProposalDateTimeField(dialog.getByLabel("End (optional)").first(), options.end);
+  await dialog.getByRole("button", { name: "Solo (just me)", exact: true }).click();
   await expandDraftMoreOptions(dialog);
   await dialog.getByRole("checkbox", { name: "Reminder before event" }).check();
   await dialog.getByLabel("Amount").fill(String(options.reminderAmount));
@@ -311,9 +311,6 @@ export async function createAndSubmitSoloEventWithReminder(
             : "Minutes",
     })
     .click();
-  await fillProposalDateTimeField(dialog.getByLabel("Start").first(), options.start);
-  await fillProposalDateTimeField(dialog.getByLabel("End (optional)").first(), options.end);
-  await dialog.getByRole("button", { name: "Save" }).click();
   await submitProposalDraft(page, dialog);
 }
 
@@ -331,10 +328,9 @@ export async function createAndSubmitRecurringEventForEveryone(
   await dialog.getByLabel("Title").fill(options.title);
   await selectDraftScheduleMode(dialog, "Recurring");
   await dialog.getByLabel("Occurrences").fill(String(options.occurrenceCount ?? 4));
-  await setAllInviteesRequired(dialog);
   await fillProposalDateTimeField(dialog.getByLabel("Start").first(), options.start);
   await fillProposalDateTimeField(dialog.getByLabel("End (optional)").first(), options.end);
-  await dialog.getByRole("button", { name: "Save" }).click();
+  await setAllInviteesRequired(dialog);
   await submitProposalDraft(page, dialog);
 }
 
@@ -352,6 +348,7 @@ export async function createAndSubmitSoloSleepingWeek(
 ): Promise<number> {
   const nightDates = inclusiveNightDates(options.rangeStart, options.rangeEnd);
   const dialog = await openSleepingProposalDraft(page);
+  await dialog.getByLabel("Title").fill(options.titlePrefix ?? `E2E sleeping ${Date.now()}`);
   await dialog
     .getByRole("checkbox", { name: /Batch nights/i })
     .check();
@@ -416,10 +413,6 @@ export async function createAndSubmitPoll(
   const dialog = await openEventOrSleepingProposalDraft(page);
   await dialog.getByLabel("Title").fill(options.title);
   await selectDraftScheduleMode(dialog, "Poll");
-  if (options.description) {
-    await expandDraftMoreOptions(dialog);
-    await dialog.getByLabel(/Description/i).fill(options.description);
-  }
   for (const name of options.requiredNames) {
     await setInviteeRequired(dialog, name);
   }
@@ -437,6 +430,10 @@ export async function createAndSubmitPoll(
       dialog.getByLabel("Start").nth(index),
       options.slotStarts[index]!,
     );
+  }
+  if (options.description) {
+    await expandDraftMoreOptions(dialog);
+    await dialog.getByLabel(/Description/i).fill(options.description);
   }
   await submitProposalDraft(page, dialog);
 }
@@ -570,12 +567,11 @@ export async function createAndSubmitSoloTimedEvent(
 ): Promise<void> {
   const dialog = await openEventProposalDraft(page);
   await dialog.getByLabel("Title").fill(options.title);
-  await dialog.getByRole("button", { name: "Solo event (just me)" }).click();
-  await expandDraftMoreOptions(dialog);
-  await dialog.getByLabel(/Description/i).fill(options.comment);
   await fillProposalDateTimeField(dialog.getByLabel("Start").first(), options.start);
   await fillProposalDateTimeField(dialog.getByLabel("End (optional)").first(), options.end);
-  await dialog.getByRole("button", { name: "Save", exact: true }).click();
+  await dialog.getByRole("button", { name: "Solo (just me)", exact: true }).click();
+  await expandDraftMoreOptions(dialog);
+  await dialog.getByLabel(/Description/i).fill(options.comment);
   await submitProposalDraft(page, dialog);
 }
 
@@ -590,12 +586,11 @@ export async function createAndSubmitSoloAllDayEvent(
 ): Promise<void> {
   const dialog = await openEventProposalDraft(page);
   await dialog.getByLabel("Title").fill(options.title);
-  await dialog.getByRole("button", { name: "Solo event (just me)" }).click();
   await selectDraftScheduleMode(dialog, "All Day");
+  await fillProposalDateRange(dialog, options.day);
+  await dialog.getByRole("button", { name: "Solo (just me)", exact: true }).click();
   await expandDraftMoreOptions(dialog);
   await dialog.getByLabel(/Description/i).fill(options.comment);
-  await fillProposalDateRange(dialog, options.day);
-  await dialog.getByRole("button", { name: "Save", exact: true }).click();
   await submitProposalDraft(page, dialog);
 }
 
@@ -612,14 +607,13 @@ export async function createAndSubmitSoloRecurringTimedEvent(
 ): Promise<void> {
   const dialog = await openEventProposalDraft(page);
   await dialog.getByLabel("Title").fill(options.title);
-  await dialog.getByRole("button", { name: "Solo event (just me)" }).click();
   await selectDraftScheduleMode(dialog, "Recurring");
-  await expandDraftMoreOptions(dialog);
-  await dialog.getByLabel(/Description/i).fill(options.comment);
   await dialog.getByLabel("Occurrences").fill(String(options.occurrenceCount ?? 4));
   await fillProposalDateTimeField(dialog.getByLabel("Start").first(), options.start);
   await fillProposalDateTimeField(dialog.getByLabel("End (optional)").first(), options.end);
-  await dialog.getByRole("button", { name: "Save", exact: true }).click();
+  await dialog.getByRole("button", { name: "Solo (just me)", exact: true }).click();
+  await expandDraftMoreOptions(dialog);
+  await dialog.getByLabel(/Description/i).fill(options.comment);
   await submitProposalDraft(page, dialog);
 }
 
@@ -635,15 +629,14 @@ export async function createAndSubmitSoloRecurringAllDayEvent(
 ): Promise<void> {
   const dialog = await openEventProposalDraft(page);
   await dialog.getByLabel("Title").fill(options.title);
-  await dialog.getByRole("button", { name: "Solo event (just me)" }).click();
   await selectDraftScheduleMode(dialog, "All Day");
   await selectDraftScheduleMode(dialog, "Recurring");
-  await expandDraftMoreOptions(dialog);
-  await dialog.getByLabel(/Description/i).fill(options.comment);
   await dialog.getByLabel("Occurrences").fill(String(options.occurrenceCount ?? 4));
   const day = options.day.slice(0, 10);
   await fillProposalDateRange(dialog, day, day);
-  await dialog.getByRole("button", { name: "Save", exact: true }).click();
+  await dialog.getByRole("button", { name: "Solo (just me)", exact: true }).click();
+  await expandDraftMoreOptions(dialog);
+  await dialog.getByLabel(/Description/i).fill(options.comment);
   await submitProposalDraft(page, dialog);
 }
 
@@ -661,16 +654,15 @@ export async function createAndSubmitTimedEventWithInvitee(
 ): Promise<void> {
   const dialog = await openEventProposalDraft(page);
   await dialog.getByLabel("Title").fill(options.title);
-  await expandDraftMoreOptions(dialog);
-  await dialog.getByLabel(/Description/i).fill(options.comment);
+  await fillProposalDateTimeField(dialog.getByLabel("Start").first(), options.start);
+  await fillProposalDateTimeField(dialog.getByLabel("End (optional)").first(), options.end);
   if (options.inviteeRole === "required") {
     await setInviteeRequired(dialog, options.inviteeName);
   } else {
     await setInviteeOptional(dialog, options.inviteeName);
   }
-  await fillProposalDateTimeField(dialog.getByLabel("Start").first(), options.start);
-  await fillProposalDateTimeField(dialog.getByLabel("End (optional)").first(), options.end);
-  await dialog.getByRole("button", { name: "Save", exact: true }).click();
+  await expandDraftMoreOptions(dialog);
+  await dialog.getByLabel(/Description/i).fill(options.comment);
   await submitProposalDraft(page, dialog);
 }
 
@@ -710,7 +702,6 @@ export async function moveResolvedEventByRedraft(
     }
   }
 
-  await draftDialog.getByRole("button", { name: "Save", exact: true }).click();
   await submitProposalDraft(page, draftDialog);
 }
 
@@ -740,7 +731,6 @@ export async function moveDraftEventDates(
     }
   }
 
-  await draftDialog.getByRole("button", { name: "Save", exact: true }).click();
   await submitProposalDraft(page, draftDialog);
 }
 
@@ -802,6 +792,7 @@ export async function createAndSubmitBatchSleepingWithInvitee(
   },
 ): Promise<void> {
   const dialog = await openSleepingProposalDraft(page);
+  await dialog.getByLabel("Title").fill(options.title ?? `E2E batch sleeping ${Date.now()}`);
   await dialog.getByRole("checkbox", { name: /Batch/i }).check();
   await expect(dialog.getByTestId("fast-sleeping-plan-grid")).toBeVisible({ timeout: 15_000 });
   await configureBatchNight(dialog, page, options.nightDate, {

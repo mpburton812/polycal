@@ -46,6 +46,7 @@ export {
 export {
   cancelProposalAction,
   nudgePendingVotersAction,
+  postProposalToFeedAction,
   redraftProposalAction,
   rescheduleProposalAction,
   respondAttendeeUpdateAction,

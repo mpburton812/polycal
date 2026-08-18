@@ -25,8 +25,9 @@ test.describe("Sleeping vs events — no false conflicts", () => {
     await goToProposals(page);
 
     const sleepingDialog = await openSleepingProposalDraft(page);
+    await sleepingDialog.getByLabel("Title").fill(`E2E sleeping ${Date.now()}`);
     await fillProposalDateRange(sleepingDialog, nightDate);
-    await sleepingDialog.getByRole("button", { name: "Solo", exact: true }).first().click();
+    await sleepingDialog.getByRole("button", { name: "Solo (just me)", exact: true }).click();
     await submitProposalDraft(page, sleepingDialog);
 
     const eventDialog = await openEventProposalDraft(page);
@@ -52,8 +53,9 @@ test.describe("Sleeping vs events — no false conflicts", () => {
     await goToProposals(page);
 
     const first = await openSleepingProposalDraft(page);
+    await first.getByLabel("Title").fill(`E2E sleeping cancel ${Date.now()}`);
     await fillProposalDateRange(first, nightDate);
-    await first.getByRole("button", { name: "Solo", exact: true }).first().click();
+    await first.getByRole("button", { name: "Solo (just me)", exact: true }).click();
     await submitProposalDraft(page, first);
 
     await selectProposalTab(page, "Resolved");
@@ -64,7 +66,7 @@ test.describe("Sleeping vs events — no false conflicts", () => {
     page.once("dialog", (dialog) => dialog.accept());
     await card.getByRole("heading", { level: 2 }).click();
     const detail = page.getByRole("dialog");
-    await detail.getByRole("button", { name: "Cancel", exact: true }).click();
+    await detail.getByRole("button", { name: "Cancel Event", exact: true }).click();
     await expect(detail).toBeHidden({ timeout: 15_000 });
 
     await selectProposalTab(page, "Archived");
@@ -73,8 +75,9 @@ test.describe("Sleeping vs events — no false conflicts", () => {
     });
 
     const second = await openSleepingProposalDraft(page);
+    await second.getByLabel("Title").fill(`E2E sleeping resubmit ${Date.now()}`);
     await fillProposalDateRange(second, nightDate);
-    await second.getByRole("button", { name: "Solo", exact: true }).first().click();
+    await second.getByRole("button", { name: "Solo (just me)", exact: true }).click();
     await second.getByRole("button", { name: "Submit" }).click();
 
     const conflictDialog = page.getByRole("dialog", { name: "Schedule conflicts detected" });

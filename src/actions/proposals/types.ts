@@ -182,6 +182,8 @@ export interface ProposalDetail {
   canAdminDeleteProposal: boolean;
   canRedraft: boolean;
   canReschedule: boolean;
+  canAddBookedAttendee: boolean;
+  canPostToFeed: boolean;
   canRevokeAcceptance: boolean;
   viewerVoteStatus: InviteeVoteStatus | null;
   viewerSlotVotes: Record<string, InviteeVoteStatus>;
@@ -198,8 +200,8 @@ export interface ProposalDetail {
   eventIconKey: string | null;
   /** When true, lifecycle milestones appear on Feed (PC-414). */
   postToFeed: boolean;
-  /** Proposal vs direct calendar schedule (PC-424). */
-  postingKind?: "proposal" | "schedule";
+  /** Proposal vs direct calendar booking (PC-427). */
+  postingKind?: "proposal" | "booking";
   /** Proxy subject when scheduling on behalf of someone else (PC-425). */
   onBehalfOfUserId?: string | null;
   specialKind?: "residency";

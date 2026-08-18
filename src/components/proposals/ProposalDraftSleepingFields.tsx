@@ -20,7 +20,9 @@ import {
 
 import type { ProposalPlaceOption } from "@/actions/proposals";
 import type { PersonSummary } from "@/actions/users";
+import { OrganicAvatar } from "@/components/ui/OrganicAvatar";
 import type { BatchSleepingEntry } from "@/lib/proposals/batch-sleeping";
+import { avatarSrcForKey } from "@/lib/constants/avatars";
 import type { FastSleepingRow } from "@/lib/proposals/fast-sleeping-plan";
 import { SHORT_TEXT_MAX } from "@/lib/validation/string-limits";
 
@@ -45,8 +47,10 @@ export interface ProposalDraftSleepingFieldsProps {
   onIntentionalSoloChange: (solo: boolean) => void;
   isSoloProposal: boolean;
   inviteeChoice: "unset" | "solo" | "network";
-  onInviteeChoiceChange: (choice: "solo" | "network") => void;
+  onInviteeChoiceChange: (choice: "unset" | "solo" | "network") => void;
   hideInviteeRoles?: boolean;
+  /** When false, hide location until invitees are chosen (PC-429). */
+  showLocation?: boolean;
   candidates: PersonSummary[];
   inviteeMode: Record<string, InviteeSelection>;
   setInviteeRole: (personId: string, role: InviteeSelection) => void;
@@ -80,6 +84,7 @@ export function ProposalDraftSleepingFields({
   inviteeChoice,
   onInviteeChoiceChange,
   hideInviteeRoles = false,
+  showLocation = true,
   candidates,
   inviteeMode,
   setInviteeRole,
@@ -151,6 +156,31 @@ export function ProposalDraftSleepingFields({
       ) : (
         <>
           <ProposalDraftSectionHeader
+            icon={<AccessTimeIcon fontSize="small" />}
+            title="Night"
+            subtitle="Click two days for a night range — earliest is start, latest is end"
+          />
+          {slots.map((slot, index) => (
+            <ProposalDateRangeField
+              key={`sleep-slot-${index}`}
+              startLabel="Night of"
+              endLabel="Last night"
+              startValue={slot.startAt}
+              endValue={slot.endAt}
+              onRangeChange={(start, end) => {
+                const updated = [...slots];
+                updated[index] = {
+                  ...updated[index],
+                  startAt: start,
+                  endAt: end || start,
+                };
+                onSlotsChange(updated);
+              }}
+              helperText="Leave as a single day for one night"
+            />
+          ))}
+
+          <ProposalDraftSectionHeader
             icon={<GroupsOutlinedIcon fontSize="small" />}
             title="Who"
             subtitle={
@@ -163,7 +193,11 @@ export function ProposalDraftSleepingFields({
             exclusive
             value={inviteeChoice === "unset" ? null : inviteeChoice}
             onChange={(_, value) => {
-              if (!value) return;
+              if (!value) {
+                onInviteeChoiceChange("unset");
+                onIntentionalSoloChange(false);
+                return;
+              }
               onInviteeChoiceChange(value as "solo" | "network");
               onIntentionalSoloChange(value === "solo");
             }}
@@ -177,8 +211,8 @@ export function ProposalDraftSleepingFields({
               },
             }}
           >
-            <ToggleButton value="solo">Solo</ToggleButton>
-            <ToggleButton value="network">With partners</ToggleButton>
+            <ToggleButton value="solo">Solo (just me)</ToggleButton>
+            <ToggleButton value="network">With Others</ToggleButton>
           </ToggleButtonGroup>
           {!isSoloProposal && inviteeChoice === "network" && (
             <Stack spacing={1}>
@@ -199,9 +233,17 @@ export function ProposalDraftSleepingFields({
                       justifyContent="space-between"
                       flexWrap="wrap"
                     >
-                      <Typography variant="body2" sx={{ minWidth: 96 }}>
-                        {person.displayName}
-                      </Typography>
+                      <Stack alignItems="center" spacing={0.5} sx={{ minWidth: 72 }}>
+                        <OrganicAvatar
+                          src={avatarSrcForKey(person.avatarKey)}
+                          alt=""
+                          label={person.displayName}
+                          size={36}
+                        />
+                        <Typography variant="caption" sx={{ textAlign: "center" }}>
+                          {person.displayName}
+                        </Typography>
+                      </Stack>
                       {hideInviteeRoles ? (
                         <ToggleButton
                           value="optional"
@@ -258,31 +300,8 @@ export function ProposalDraftSleepingFields({
             </Stack>
           )}
 
-          <ProposalDraftSectionHeader
-            icon={<AccessTimeIcon fontSize="small" />}
-            title="Night"
-            subtitle="Click two days for a night range — earliest is start, latest is end"
-          />
-          {slots.map((slot, index) => (
-            <ProposalDateRangeField
-              key={`sleep-slot-${index}`}
-              startLabel="Night of"
-              endLabel="Last night"
-              startValue={slot.startAt}
-              endValue={slot.endAt}
-              onRangeChange={(start, end) => {
-                const updated = [...slots];
-                updated[index] = {
-                  ...updated[index],
-                  startAt: start,
-                  endAt: end || start,
-                };
-                onSlotsChange(updated);
-              }}
-              helperText="Leave as a single day for one night"
-            />
-          ))}
-
+          {showLocation ? (
+            <>
           <ProposalDraftSectionHeader
             icon={<LocationOnOutlinedIcon fontSize="small" />}
             title="Where"
@@ -345,6 +364,8 @@ export function ProposalDraftSleepingFields({
               </Select>
             </FormControl>
           )}
+            </>
+          ) : null}
         </>
       )}
     </Stack>

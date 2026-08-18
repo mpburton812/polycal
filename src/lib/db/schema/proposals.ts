@@ -7,6 +7,7 @@ import {
   proposalStates,
   proposalTypes,
 } from "./enums";
+import { postingKinds } from "@/types/network-settings";
 import { users } from "./identity";
 import { networks } from "./networks";
 import { locations } from "./places";
@@ -72,10 +73,10 @@ export const proposals = sqliteTable("proposals", {
   /** When true, lifecycle milestones appear on the network Feed (PC-414). Default off for new drafts. */
   postToFeed: integer("post_to_feed", { mode: "boolean" }).notNull().default(false),
   /**
-   * Proposal uses the vote workflow; schedule auto-resolves onto the calendar (PC-424).
+   * Proposal uses the vote workflow; booking auto-resolves onto the calendar (PC-428).
    */
-  postingKind: text("posting_kind").notNull().default("proposal"),
-  /** Subject when Proxy Scheduling posts on behalf of someone else (PC-425). */
+  postingKind: text("posting_kind", { enum: postingKinds }).notNull().default("proposal"),
+  /** Subject when Booking for posts on behalf of someone else (PC-428). */
   onBehalfOfUserId: text("on_behalf_of_user_id").references(() => users.id),
   /** Parent proposal when this row was detached from a batch night or span day slice. */
   detachedFromParentId: text("detached_from_parent_id"),

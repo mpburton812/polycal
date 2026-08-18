@@ -4,7 +4,7 @@ import { login } from "./helpers/auth";
 import { fillProposalDateTimeField, selectDraftScheduleMode } from "./helpers/datePickers";
 import { DEMO, USERS } from "./helpers/constants";
 import { goToProposals, openProposalCard, selectProposalTab } from "./helpers/navigation";
-import { exitDraftDialog, expandDraftMoreOptions, openEventOrSleepingProposalDraft, proposalCard } from "./helpers/proposals";
+import { exitDraftDialog, expandDraftMoreOptions, openEventOrSleepingProposalDraft, proposalCard, setInviteeRequired, submitProposalDraft } from "./helpers/proposals";
 
 test.describe("Resolved proposal actions", () => {
   test.beforeEach(async ({ page }) => {
@@ -29,7 +29,7 @@ test.describe("Resolved proposal actions", () => {
     const dialog = page.getByRole("dialog");
     await expect(dialog.getByText("EVENT PROPOSAL")).toBeVisible();
     await expect(dialog.getByText("RESOLVED")).toBeVisible();
-    await expect(dialog.getByRole("button", { name: "Cancel" })).toBeVisible();
+    await expect(dialog.getByRole("button", { name: "Cancel Event" })).toBeVisible();
   });
 });
 
@@ -44,24 +44,18 @@ test.describe("Poll proposal draft", () => {
     const dialog = await openEventOrSleepingProposalDraft(page);
     await dialog.getByLabel("Title").fill(title);
     await selectDraftScheduleMode(dialog, "Poll");
-    await expandDraftMoreOptions(dialog);
-    await dialog.getByLabel(/Description/i).fill("Poll with two options.");
 
     const startInputs = dialog.getByLabel("Start");
     await fillProposalDateTimeField(startInputs.nth(0), "2099-08-01T10:00");
     await dialog.getByRole("button", { name: "Add poll option" }).click();
     await fillProposalDateTimeField(startInputs.nth(1), "2099-08-02T10:00");
+    await setInviteeRequired(dialog, USERS.leia.displayName);
+    await expandDraftMoreOptions(dialog);
+    await dialog.getByLabel(/Description/i).fill("Poll with two options.");
+    await submitProposalDraft(page, dialog);
 
-    await dialog.getByRole("button", { name: "Save", exact: true }).click();
-    await expect(dialog.getByRole("button", { name: "Submit" })).toBeVisible();
-    await exitDraftDialog(dialog);
+    await selectProposalTab(page, "Proposed");
     await expect(proposalCard(page, title)).toBeVisible();
-    await proposalCard(page, title).getByRole("button", { name: "Continue Editing" }).click();
-    await expect(dialog.getByRole("button", { name: "Poll", exact: true })).toHaveAttribute(
-      "aria-pressed",
-      "true",
-    );
-    await expect(dialog.getByRole("button", { name: "Recurring", exact: true })).toBeDisabled();
   });
 });
 
@@ -77,12 +71,12 @@ test.describe("Recurring event draft", () => {
     await dialog.getByLabel("Title").fill(title);
     await selectDraftScheduleMode(dialog, "Recurring");
     await dialog.getByLabel("Occurrences").fill("4");
+    await fillProposalDateTimeField(dialog.getByLabel("Start").first(), "2099-09-01T09:00");
+    await dialog.getByRole("button", { name: "Solo (just me)", exact: true }).click();
     await expandDraftMoreOptions(dialog);
     await dialog.getByLabel(/Description/i).fill("Weekly council meetings.");
-    await fillProposalDateTimeField(dialog.getByLabel("Start").first(), "2099-09-01T09:00");
-    await dialog.getByRole("button", { name: "Save", exact: true }).click();
-    await expect(dialog.getByRole("button", { name: "Submit" })).toBeVisible();
-    await exitDraftDialog(dialog);
+    await submitProposalDraft(page, dialog);
+    await selectProposalTab(page, "Resolved");
     await expect(proposalCard(page, title)).toBeVisible();
   });
 });

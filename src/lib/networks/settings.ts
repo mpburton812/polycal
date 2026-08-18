@@ -72,10 +72,13 @@ function mapNetworkRow(row: NetworkSettingsRow): NetworkSettings {
     feedEnabled: row.feedEnabled ?? true,
     pollEnabled: row.pollEnabled ?? true,
     schedulingPosting:
-      row.schedulingPosting === "proposals_and_schedule"
-        ? "proposals_and_schedule"
+      row.schedulingPosting === "proposals_and_bookings"
+        ? "proposals_and_bookings"
         : "proposals_only",
-    proxySchedulingEnabled: row.proxySchedulingEnabled ?? false,
+    proxySchedulingEnabled:
+      row.schedulingPosting === "proposals_and_bookings"
+        ? true
+        : Boolean(row.proxySchedulingEnabled),
     proxySchedulingScope:
       row.proxySchedulingScope === "anyone" ? "anyone" : "sleeping_partners",
     placesMapVisibility: row.placesMapVisibility as PlacesMapVisibility,

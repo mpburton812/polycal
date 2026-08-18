@@ -3,6 +3,7 @@
  */
 export {
   cancelProposalAction,
+  postProposalToFeedAction,
   redraftProposalAction,
   rescheduleProposalAction,
   respondAttendeeUpdateAction,

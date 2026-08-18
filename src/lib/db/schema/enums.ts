@@ -17,7 +17,7 @@ export type ProposalState = (typeof proposalStates)[number];
 export const proposalTypes = ["event", "sleeping", "fast_sleep"] as const;
 export type ProposalType = (typeof proposalTypes)[number];
 
-export const inviteeRoles = ["required", "optional"] as const;
+export const inviteeRoles = ["required", "optional", "booked"] as const;
 export type InviteeRole = (typeof inviteeRoles)[number];
 
 export const inviteeVoteStatuses = [

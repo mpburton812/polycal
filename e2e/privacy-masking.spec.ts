@@ -17,7 +17,6 @@ test.describe("Privacy removal (PC-280)", () => {
     await goToProposals(page);
 
     const dialog = await openEventProposalDraft(page);
-    await expandDraftMoreOptions(dialog);
     await expect(dialog.getByLabel("Privacy")).toHaveCount(0);
     await expect(dialog.getByText("Private", { exact: true })).toHaveCount(0);
     await expect(dialog.getByText("Super private", { exact: true })).toHaveCount(0);
@@ -34,12 +33,12 @@ test.describe("Privacy removal (PC-280)", () => {
 
     const dialog = await openEventProposalDraft(page);
     await dialog.getByLabel("Title").fill(title);
-    await dialog.getByRole("button", { name: "Solo event (just me)" }).click();
     await fillProposalDateTimeField(dialog.getByLabel("Start").first(), "2099-09-02T19:00");
     await fillProposalDateTimeField(
       dialog.getByLabel("End (optional)").first(),
       "2099-09-02T21:00",
     );
+    await dialog.getByRole("button", { name: "Solo (just me)", exact: true }).click();
     await submitProposalDraft(page, dialog);
     await logout(page);
 
