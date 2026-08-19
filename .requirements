@@ -406,3 +406,4 @@
 2026-08-19 | 6e72802 | PC-449 | open FAB menu immediately with one bootstrap action | src/actions/proposals.ts
 2026-08-19 | 80dd5df | PC-449 | import ProposalPlaceOption from types for bootstrap | src/actions/proposals/create-bootstrap.ts
 2026-08-19 | 57ea9dc | PC-449 | force-refresh FAB bootstrap when opening composer | src/components/proposals/ProposalCreateHost.tsx
+2026-08-19 | 1b905d4 | PC-450 | SCHEMA_VERSION 51 network indexes and scoped list queries | src/actions/places.ts

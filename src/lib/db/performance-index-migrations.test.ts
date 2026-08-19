@@ -29,4 +29,15 @@ describe("performance index DDL (PC-355)", () => {
     expect(ddl).toContain("ON location_residents(user_id, status)");
     expect(ddl).toContain("ON sleeping_partnerships(user_low_id, status)");
   });
+
+  it("covers network-scoped and feed indexes for SCHEMA_VERSION 51 (PC-450)", () => {
+    const ddl = PERFORMANCE_INDEX_STATEMENTS.join("\n");
+    expect(ddl).toContain("ON proposals(network_id, state, scheduled_start_at)");
+    expect(ddl).toContain("ON proposal_state_log(proposal_id, created_at)");
+    expect(ddl).toContain("ON proposal_comments(proposal_id, created_at)");
+    expect(ddl).toContain("ON locations(network_id)");
+    expect(ddl).toContain("ON sleeping_partnerships(network_id, status)");
+    expect(ddl).toContain("ON network_chat_messages(network_id, created_at)");
+    expect(ddl).toContain("ON network_chat_comments(message_id, created_at)");
+  });
 });

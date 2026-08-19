@@ -4,6 +4,12 @@ All notable changes to PolyCal are documented here.
 
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [2026.08.19b] - 2026-08-19
+
+### Changed
+
+- PC-450: SCHEMA_VERSION 51 network/feed covering indexes. Place residents and schedule slot scans are scoped to the active network. Change control: `2026.08.19b`.
+
 ## [2026.08.19a] - 2026-08-19
 
 ### Changed

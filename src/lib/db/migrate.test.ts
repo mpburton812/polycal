@@ -27,6 +27,14 @@ describe("shouldSkipMigrations (PC-143)", () => {
     expect(verifyScript).toContain(`EXPECTED_SCHEMA_VERSION = "${SCHEMA_VERSION}"`);
   });
 
+  it("scopes listPlaces residents and schedule slots to the active network (PC-450)", () => {
+    const places = readFileSync(path.join(process.cwd(), "src/actions/places.ts"), "utf8");
+    const schedule = readFileSync(path.join(process.cwd(), "src/actions/schedule.ts"), "utf8");
+    expect(places).toContain("inArray(locationResidents.locationId, locationIds)");
+    expect(schedule).toContain("eq(proposals.networkId, networkId)");
+    expect(schedule).toContain("innerJoin(proposals, eq(proposalTimeSlots.proposalId, proposals.id))");
+  });
+
   it("backfills Booking enum literals in SCHEMA_VERSION 50 migrations (PC-427)", () => {
     const networks = readFileSync(
       path.join(process.cwd(), "src/lib/db/networks-migrations.ts"),

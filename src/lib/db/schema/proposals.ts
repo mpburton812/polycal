@@ -90,6 +90,8 @@ export const proposals = sqliteTable("proposals", {
   index("idx_proposals_state_scheduled_start").on(table.state, table.scheduledStartAt),
   index("idx_proposals_proposer_state").on(table.proposerId, table.state),
   index("idx_proposals_parent").on(table.parentProposalId),
+  // Network-scoped board and schedule range scans (PC-450).
+  index("idx_proposals_network_state_scheduled").on(table.networkId, table.state, table.scheduledStartAt),
 ]);
 
 /** Users invited to a proposal — voting queue and notifications (PC-40). */
@@ -177,7 +179,9 @@ export const proposalStateLog = sqliteTable("proposal_state_log", {
   details: text("details"),
   createdAt: text("created_at").notNull(),
   deletedAt: text("deleted_at"),
-});
+}, (table) => [
+  index("idx_proposal_state_log_proposal_created").on(table.proposalId, table.createdAt),
+]);
 
 /** Threaded discussion on a proposal (PC-40). */
 export const proposalComments = sqliteTable("proposal_comments", {
@@ -195,7 +199,9 @@ export const proposalComments = sqliteTable("proposal_comments", {
   deletedAt: text("deleted_at"),
   /** Cached Open Graph preview for the first URL in body (PC-279). */
   linkPreviewId: text("link_preview_id"),
-});
+}, (table) => [
+  index("idx_proposal_comments_proposal_created").on(table.proposalId, table.createdAt),
+]);
 
 export const proposalCommentImages = sqliteTable("proposal_comment_images", {
   id: text("id").primaryKey(),

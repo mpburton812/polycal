@@ -1,4 +1,4 @@
-import { blob, integer, sqliteTable, text, unique } from "drizzle-orm/sqlite-core";
+import { blob, index, integer, sqliteTable, text, unique } from "drizzle-orm/sqlite-core";
 
 import { users } from "./identity";
 import { networks } from "./networks";
@@ -24,7 +24,9 @@ export const networkChatMessages = sqliteTable("network_chat_messages", {
   deletedAt: text("deleted_at"),
   /** Cached Open Graph preview for the first URL in body (PC-279). */
   linkPreviewId: text("link_preview_id"),
-});
+}, (table) => [
+  index("idx_network_chat_messages_network_created").on(table.networkId, table.createdAt),
+]);
 
 /** Threaded replies on network chat messages (PC-234). */
 export const networkChatComments = sqliteTable("network_chat_comments", {
@@ -40,7 +42,9 @@ export const networkChatComments = sqliteTable("network_chat_comments", {
   deletedAt: text("deleted_at"),
   /** Cached Open Graph preview for the first URL in body (PC-279). */
   linkPreviewId: text("link_preview_id"),
-});
+}, (table) => [
+  index("idx_network_chat_comments_message_created").on(table.messageId, table.createdAt),
+]);
 
 export const networkChatMessageImages = sqliteTable("network_chat_message_images", {
   id: text("id").primaryKey(),
