@@ -2,7 +2,6 @@
 
 import { useCallback, useState } from "react";
 
-import type { ProposalDetail } from "@/actions/proposals";
 import type { ScheduleEvent } from "@/actions/schedule";
 import { isSliceGroupKind } from "@/lib/schedule/schedule-slices";
 import type { ScheduleSliceKind } from "@/lib/schedule/slice-types";
@@ -20,10 +19,6 @@ export interface ScheduleTapRouterState {
   sliceContext: SliceDialogContext | null;
   chooserOpen: boolean;
   chooserEvent: ScheduleEvent | null;
-  draftOpen: boolean;
-  editDetail: ProposalDetail | null;
-  createLockedType: "event" | "sleeping" | null;
-  createInitialStartAt: string | null;
 }
 
 const INITIAL_STATE: ScheduleTapRouterState = {
@@ -33,10 +28,6 @@ const INITIAL_STATE: ScheduleTapRouterState = {
   sliceContext: null,
   chooserOpen: false,
   chooserEvent: null,
-  draftOpen: false,
-  editDetail: null,
-  createLockedType: null,
-  createInitialStartAt: null,
 };
 
 /**
@@ -113,34 +104,6 @@ export function useScheduleTapRouter() {
     }));
   }, []);
 
-  const closeDraft = useCallback(() => {
-    setState((current) => ({
-      ...current,
-      draftOpen: false,
-      editDetail: null,
-    }));
-  }, []);
-
-  const handleEditFromDetail = useCallback((detail: ProposalDetail) => {
-    setState({
-      ...INITIAL_STATE,
-      draftOpen: true,
-      editDetail: detail,
-    });
-  }, []);
-
-  const openCreateDraft = useCallback(
-    (opts: { lockedType: "event" | "sleeping"; initialStartAt?: string }) => {
-      setState({
-        ...INITIAL_STATE,
-        draftOpen: true,
-        createLockedType: opts.lockedType,
-        createInitialStartAt: opts.initialStartAt ?? null,
-      });
-    },
-    [],
-  );
-
   const openRelatedProposal = useCallback((proposalId: string) => {
     setState((current) => ({
       ...current,
@@ -169,12 +132,9 @@ export function useScheduleTapRouter() {
     closeDetail,
     closeSlice,
     closeChooser,
-    closeDraft,
     closeAllDialogs,
-    handleEditFromDetail,
     openRelatedProposal,
     openDetachedProposal,
-    openCreateDraft,
   };
 }
 

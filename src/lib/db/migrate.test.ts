@@ -35,6 +35,24 @@ describe("shouldSkipMigrations (PC-143)", () => {
     expect(schedule).toContain("innerJoin(proposals, eq(proposalTimeSlots.proposalId, proposals.id))");
   });
 
+  it("hosts ProposalDraftDialog only on the sage create host (PC-451)", () => {
+    const host = readFileSync(
+      path.join(process.cwd(), "src/components/proposals/ProposalCreateHost.tsx"),
+      "utf8",
+    );
+    const proposals = readFileSync(
+      path.join(process.cwd(), "src/components/proposals/ProposalsClient.tsx"),
+      "utf8",
+    );
+    const schedule = readFileSync(
+      path.join(process.cwd(), "src/components/schedule/ScheduleClient.tsx"),
+      "utf8",
+    );
+    expect(host).toContain('import("./ProposalDraftDialog")');
+    expect(proposals).not.toContain("ProposalDraftDialog");
+    expect(schedule).not.toContain("ProposalDraftDialog");
+  });
+
   it("backfills Booking enum literals in SCHEMA_VERSION 50 migrations (PC-427)", () => {
     const networks = readFileSync(
       path.join(process.cwd(), "src/lib/db/networks-migrations.ts"),

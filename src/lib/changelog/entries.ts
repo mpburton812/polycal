@@ -28,6 +28,42 @@ import { CHANGELOG_ARCHIVE } from "./entries.archive";
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "2026.08.19d",
+    date: "2026-08-19",
+    summary:
+      "CI reuses the e2e Next build on promotion PRs and caches Playwright browsers for production (PC-452).",
+    changes: [
+      {
+        type: "changed",
+        description:
+          "dev.yml and test.yml drop a second Next build; e2e.yml remains the PR compile gate (PC-452).",
+      },
+      {
+        type: "changed",
+        description:
+          "Playwright caches Chromium and installs the browser without apt --with-deps so CI shards cannot hang on OS packages (PC-452).",
+      },
+    ],
+  },
+  {
+    version: "2026.08.19c",
+    date: "2026-08-19",
+    summary:
+      "Proposal mutations patch local detail; one shared draft dialog host (PC-451).",
+    changes: [
+      {
+        type: "changed",
+        description:
+          "Votes, comments, attendees, and feed post reload proposal detail without a full RSC refresh unless the card changes columns (PC-451).",
+      },
+      {
+        type: "changed",
+        description:
+          "ProposalDraftDialog lives only on the sage create host; Proposals and Schedule open it via openEdit (PC-451).",
+      },
+    ],
+  },
+  {
     version: "2026.08.19b",
     date: "2026-08-19",
     summary:
