@@ -35,7 +35,9 @@ export const locations = sqliteTable("locations", {
   createdById: text("created_by_id").references(() => users.id),
   createdAt: text("created_at").notNull(),
   updatedAt: text("updated_at").notNull(),
-});
+}, (table) => [
+  index("idx_locations_network").on(table.networkId),
+]);
 
 /** Undirected sleeping partnership edge with proposal workflow (PC-36). */
 export const sleepingPartnerships = sqliteTable("sleeping_partnerships", {
@@ -64,6 +66,7 @@ export const sleepingPartnerships = sqliteTable("sleeping_partnerships", {
   index("idx_sleeping_partnerships_status").on(table.status),
   index("idx_sleeping_partnerships_low_status").on(table.userLowId, table.status),
   index("idx_sleeping_partnerships_high_status").on(table.userHighId, table.status),
+  index("idx_sleeping_partnerships_network_status").on(table.networkId, table.status),
 ]);
 
 /** User residency at a place — active users must accept (PC-37). */

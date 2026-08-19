@@ -191,7 +191,8 @@ export async function listScheduleEventsAction(
       isDetached: proposalTimeSlots.isDetached,
     })
     .from(proposalTimeSlots)
-    .where(slotOverlapsRange(paddedStart, paddedEnd))
+    .innerJoin(proposals, eq(proposalTimeSlots.proposalId, proposals.id))
+    .where(and(eq(proposals.networkId, networkId), slotOverlapsRange(paddedStart, paddedEnd)))
     .orderBy(asc(proposalTimeSlots.sortOrder));
 
   const slotProposalIds = [...new Set(overlappingSlotRows.map((slot) => slot.proposalId))];

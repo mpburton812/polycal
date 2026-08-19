@@ -28,6 +28,24 @@ import { CHANGELOG_ARCHIVE } from "./entries.archive";
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "2026.08.19b",
+    date: "2026-08-19",
+    summary:
+      "SCHEMA_VERSION 51 network/feed indexes; scoped place residents and schedule slot scans (PC-450).",
+    changes: [
+      {
+        type: "changed",
+        description:
+          "Covering indexes on proposals.network_id, state log, comments, locations, sleeping partnerships, and feed chat (PC-450).",
+      },
+      {
+        type: "changed",
+        description:
+          "listPlaces loads residents only for network locations; schedule slot prefilter joins proposals.network_id (PC-450).",
+      },
+    ],
+  },
+  {
     version: "2026.08.19a",
     date: "2026-08-19",
     summary:
