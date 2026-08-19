@@ -4,6 +4,12 @@ All notable changes to PolyCal are documented here.
 
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [2026.08.19d] - 2026-08-19
+
+### Changed
+
+- PC-452: Promotion PRs reuse the e2e.yml Next build instead of compiling twice. Production Playwright caches Chromium. Change control: `2026.08.19d`.
+
 ## [2026.08.19c] - 2026-08-19
 
 ### Changed
