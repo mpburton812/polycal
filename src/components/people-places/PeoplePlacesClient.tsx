@@ -466,7 +466,6 @@ function PersonDetail({
                         });
                         setMessage(result.message);
                         loadPartnerships();
-                        router.refresh();
                       })
                     }
                   >
@@ -483,7 +482,6 @@ function PersonDetail({
                         });
                         setMessage(result.message);
                         loadPartnerships();
-                        router.refresh();
                       })
                     }
                   >
@@ -500,7 +498,6 @@ function PersonDetail({
                       const result = await removePartnershipAction(row.id);
                       setMessage(result.message);
                       loadPartnerships();
-                      router.refresh();
                     })
                   }
                 >
