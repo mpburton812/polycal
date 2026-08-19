@@ -19,4 +19,12 @@ describe("CI efficiency (PC-452)", () => {
     expect(production).toContain("Cache Playwright browsers");
     expect(production).toContain("~/.cache/ms-playwright");
   });
+
+  it("installs Chromium without apt --with-deps so shards cannot hang on OS packages", () => {
+    for (const name of ["e2e.yml", "production.yml"]) {
+      const workflow = readWorkflow(name);
+      expect(workflow).toContain("npx playwright install chromium");
+      expect(workflow).not.toContain("install chromium --with-deps");
+    }
+  });
 });

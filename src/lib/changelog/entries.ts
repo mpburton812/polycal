@@ -41,7 +41,7 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: "changed",
         description:
-          "production.yml caches Playwright Chromium under ~/.cache/ms-playwright (PC-452).",
+          "Playwright caches Chromium and installs the browser without apt --with-deps so CI shards cannot hang on OS packages (PC-452).",
       },
     ],
   },
