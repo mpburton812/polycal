@@ -142,9 +142,11 @@ jobs:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
 
+      # Skip --with-deps: apt font packages hang 15–25m on some GitHub ubuntu runners (PC-452).
+      # ubuntu-latest already ships Chromium OS libraries; install only the browser binary.
       - name: Install Playwright browsers
-        timeout-minutes: 25
-        run: npx playwright install chromium --with-deps
+        timeout-minutes: 5
+        run: npx playwright install chromium
 
       - name: Run Playwright ${{ matrix.suite }} ${{ matrix.shard }}/${{ matrix.shards }}
         run: npm run test:e2e:ci -- ${{ matrix.projects }} --shard=${{ matrix.shard }}/${{ matrix.shards }}
