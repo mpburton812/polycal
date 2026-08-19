@@ -405,3 +405,4 @@
 2026-08-18 | 8b89803 | PC-447 | split Just Bookings journey so posting spec stays under timeout | e2e/direct-schedule-proxy-journey.spec.ts
 2026-08-19 | 6e72802 | PC-449 | open FAB menu immediately with one bootstrap action | src/actions/proposals.ts
 2026-08-19 | 80dd5df | PC-449 | import ProposalPlaceOption from types for bootstrap | src/actions/proposals/create-bootstrap.ts
+2026-08-19 | 57ea9dc | PC-449 | force-refresh FAB bootstrap when opening composer | src/components/proposals/ProposalCreateHost.tsx
