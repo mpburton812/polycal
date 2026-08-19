@@ -51,6 +51,14 @@ coverage/
 playwright-report/
 test-results/
 
+# Android widget local SDK / binaries (source stays in android-widgets/)
+android-widgets/local.properties
+android-widgets/.gradle/
+*.apk
+*.aab
+*.jks
+*.keystore
+
 # Agent / CI scratch logs (never commit)
 e2e-*.txt
 pr*-*.txt

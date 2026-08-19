@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="garden_background">#F7F2EA</color>
+    <color name="garden_surface">#FFFDF8</color>
+    <color name="garden_ink">#1A1A1A</color>
+    <color name="garden_ink_muted">#5C534A</color>
+    <color name="garden_sage">#6B8F71</color>
+</resources>

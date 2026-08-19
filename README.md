@@ -84,6 +84,7 @@ npm run jira:sync-merge -- --range origin/dev...HEAD
 - [Dev promotion (PR required)](docs/DEV-PROMOTION.md)
 - [Architecture](docs/ARCHITECTURE.md)
 - [Changelog](CHANGELOG.md)
+- [Android compose widgets (sideload)](android-widgets/README.md)
 
 ## Reuse this workflow (template)
 

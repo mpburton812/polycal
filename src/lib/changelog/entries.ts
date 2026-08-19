@@ -28,6 +28,34 @@ import { CHANGELOG_ARCHIVE } from "./entries.archive";
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "2026.08.19c",
+    date: "2026-08-19",
+    summary:
+      "Android homescreen compose widgets and /feed?compose= deep-links; login keeps query strings (PC-453–PC-458).",
+    changes: [
+      {
+        type: "added",
+        description:
+          "/feed?compose=event&title= and /feed?compose=nlp&q= open the existing New Event / NLP composers with prefill, then strip the query (PC-454).",
+      },
+      {
+        type: "fixed",
+        description:
+          "Login callbackUrl keeps pathname + search (same-origin only) so widget and PWA compose links resume after sign-in (PC-455).",
+      },
+      {
+        type: "added",
+        description:
+          "PWA manifest shortcuts for New Event and Natural language add (PC-456).",
+      },
+      {
+        type: "added",
+        description:
+          "Sideloadable android-widgets module: two App Widgets launch compose URLs in Chrome Custom Tabs (PC-457).",
+      },
+    ],
+  },
+  {
     version: "2026.08.19b",
     date: "2026-08-19",
     summary:

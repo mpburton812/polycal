@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.PolyCalWidgets" parent="Theme.AppCompat.Light.NoActionBar">
+        <item name="android:windowBackground">@color/garden_background</item>
+        <item name="colorPrimary">@color/garden_sage</item>
+        <item name="android:statusBarColor">@color/garden_sage</item>
+        <item name="android:navigationBarColor">@color/garden_background</item>
+        <item name="android:textColor">@color/garden_ink</item>
+    </style>
+
+    <style name="Theme.PolyCalWidgets.Dialog" parent="Theme.AppCompat.Light.Dialog.MinWidth">
+        <item name="android:windowBackground">@color/garden_surface</item>
+        <item name="colorPrimary">@color/garden_sage</item>
+        <item name="android:textColor">@color/garden_ink</item>
+    </style>
+</resources>

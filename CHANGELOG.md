@@ -4,6 +4,12 @@ All notable changes to PolyCal are documented here.
 
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [2026.08.19c] - 2026-08-19
+
+### Added
+
+- PC-453–PC-458: Android homescreen compose widgets plus `/feed?compose=` deep-links (New Event title and NLP description). Login preserves callback query strings. PWA manifest shortcuts. Change control: `2026.08.19c`.
+
 ## [2026.08.19b] - 2026-08-19
 
 ### Changed
