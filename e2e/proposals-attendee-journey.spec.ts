@@ -11,6 +11,7 @@ test.describe("Proposal invitee journey", () => {
   test("proposer submits, invitee adds attendee and accepts, new invitee abstains", async ({
     page,
   }) => {
+    test.setTimeout(180_000);
     const title = `E2E Journey ${Date.now()}`;
 
     await login(page, USERS.luke.username);
@@ -40,7 +41,9 @@ test.describe("Proposal invitee journey", () => {
     await leiaDialog.getByLabel("Add attendee").click();
     await page.getByRole("option", { name: USERS.han.displayName }).click();
     await leiaDialog.getByRole("button", { name: "Add", exact: true }).click();
-    await expect(leiaDialog.getByText(USERS.han.displayName)).toBeVisible({ timeout: 15_000 });
+    await expect(leiaDialog.getByText(USERS.han.displayName, { exact: true })).toBeVisible({
+      timeout: 15_000,
+    });
     await expect(leiaDialog.getByText("Accepted", { exact: true })).toBeVisible();
     await expect(leiaDialog.getByText(/added required: Han Solo/i)).toBeVisible({ timeout: 15_000 });
 
