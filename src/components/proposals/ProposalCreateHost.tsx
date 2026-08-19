@@ -4,27 +4,23 @@ import AddIcon from "@mui/icons-material/Add";
 import { Fab, Menu, MenuItem } from "@mui/material";
 import dynamic from "next/dynamic";
 import { usePathname } from "next/navigation";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { getFastSleepEnabledAction } from "@/actions/fast-sleep";
 import {
-  getDraftComposerSettingsAction,
-  type DraftComposerSettings,
-} from "@/actions/network-settings";
-import {
-  listComposerPeopleRankAction,
-  listProposalPlaceOptionsAction,
-  listResidencyPlaceOptionsAction,
+  getProposalCreateBootstrapAction,
   type ProposalDetail,
   type ProposalPlaceOption,
 } from "@/actions/proposals";
-import { listPeopleAction, type PersonSummary } from "@/actions/users";
+import type { DraftComposerSettings } from "@/actions/network-settings";
+import type { PersonSummary } from "@/actions/users";
 import type { PersonRankStat } from "@/lib/proposals/composer-people-rank";
 import {
   ProposalCreateContext,
   type ProposalCreateRequest,
 } from "@/components/proposals/ProposalCreateContext";
 import { GARDEN_TOKENS } from "@/theme/tokens";
+
+const BOOTSTRAP_TTL_MS = 60_000;
 
 const ProposalDraftDialog = dynamic(
   () =>
@@ -53,8 +49,7 @@ const FastSleepDialog = dynamic(
 
 /**
  * Shared sage + create host mounted in AppShell so every screen has the full menu (PC-418).
- * `currentUserId` comes from the server layout — client `useSession()` can still be empty
- * when the FAB opens, which would submit residency/FastSleep as an invalid blank user.
+ * Menu opens immediately; composer lists load in one bootstrap action (PC-449).
  */
 export function ProposalCreateHost({
   children,
@@ -79,30 +74,38 @@ export function ProposalCreateHost({
   const [peopleRank, setPeopleRank] = useState<PersonRankStat[]>([]);
   const [editDetail, setEditDetail] = useState<ProposalDetail | null>(null);
   const [composerMode, setComposerMode] = useState<"manual" | "nlp">("manual");
+  const loadedAtRef = useRef(0);
   const pathname = usePathname();
   const hideFab = pathname === "/feed" || pathname === "/people-places";
 
-  const loadCreateData = useCallback(async () => {
-    const [nextPeople, nextPlaces, nextResidency, nextFastSleep, nextComposer, nextRank] =
-      await Promise.all([
-        listPeopleAction(),
-        listProposalPlaceOptionsAction(),
-        listResidencyPlaceOptionsAction(),
-        getFastSleepEnabledAction(),
-        getDraftComposerSettingsAction(),
-        listComposerPeopleRankAction(),
-      ]);
-    setPeople(nextPeople);
-    setPlaces(nextPlaces);
-    setResidencyPlaces(nextResidency);
-    setFastSleepEnabled(nextFastSleep);
-    setComposerSettings(nextComposer);
-    setPeopleRank(nextRank);
+  /**
+   * Prefetch may use the TTL cache; opening a composer always force-refreshes.
+   * Otherwise a settings change (e.g. Proposals and Bookings) stays stale for 60s.
+   */
+  const loadCreateData = useCallback(async (force = false) => {
+    if (!force && loadedAtRef.current && Date.now() - loadedAtRef.current < BOOTSTRAP_TTL_MS) {
+      return;
+    }
+    const next = await getProposalCreateBootstrapAction();
+    setPeople(next.people);
+    setPlaces(next.places);
+    setResidencyPlaces(next.residencyPlaces);
+    setFastSleepEnabled(next.fastSleepEnabled);
+    setComposerSettings(next.composer);
+    setPeopleRank(next.peopleRank);
+    loadedAtRef.current = Date.now();
   }, []);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      void loadCreateData();
+    }, 800);
+    return () => window.clearTimeout(timer);
+  }, [loadCreateData]);
 
   const openCreate = useCallback(
     (request?: ProposalCreateRequest) => {
-      void loadCreateData().then(() => {
+      void loadCreateData(true).then(() => {
         setEditDetail(null);
         if (request?.lockedType) {
           setCreateProposalType(request.lockedType);
@@ -120,7 +123,7 @@ export function ProposalCreateHost({
 
   const openEdit = useCallback(
     (detail: ProposalDetail) => {
-      void loadCreateData().then(() => {
+      void loadCreateData(true).then(() => {
         setEditDetail(detail);
         setLockCreateType(false);
         setCreateInitialStartAt(null);
@@ -133,10 +136,9 @@ export function ProposalCreateHost({
 
   const contextValue = useMemo(() => ({ openCreate, openEdit }), [openCreate, openEdit]);
 
-  async function handleFabClick(event: React.MouseEvent<HTMLElement>) {
-    const anchor = event.currentTarget;
-    await loadCreateData();
-    setFabMenuAnchor(anchor);
+  function handleFabClick(event: React.MouseEvent<HTMLElement>) {
+    setFabMenuAnchor(event.currentTarget);
+    void loadCreateData();
   }
 
   return (
@@ -147,7 +149,8 @@ export function ProposalCreateHost({
       <Fab
         color="primary"
         aria-label="New proposal"
-        onClick={(event) => void handleFabClick(event)}
+        onClick={handleFabClick}
+        onMouseEnter={() => void loadCreateData()}
         sx={{
           position: "fixed",
           bottom: 88,
@@ -175,12 +178,14 @@ export function ProposalCreateHost({
         <MenuItem
           onClick={() => {
             setFabMenuAnchor(null);
-            setEditDetail(null);
-            setCreateProposalType("event");
-            setLockCreateType(false);
-            setCreateInitialStartAt(null);
-            setComposerMode("manual");
-            setCreateOpen(true);
+            void loadCreateData(true).then(() => {
+              setEditDetail(null);
+              setCreateProposalType("event");
+              setLockCreateType(false);
+              setCreateInitialStartAt(null);
+              setComposerMode("manual");
+              setCreateOpen(true);
+            });
           }}
         >
           New Event
@@ -188,12 +193,14 @@ export function ProposalCreateHost({
         <MenuItem
           onClick={() => {
             setFabMenuAnchor(null);
-            setEditDetail(null);
-            setCreateProposalType("event");
-            setLockCreateType(false);
-            setCreateInitialStartAt(null);
-            setComposerMode("nlp");
-            setCreateOpen(true);
+            void loadCreateData(true).then(() => {
+              setEditDetail(null);
+              setCreateProposalType("event");
+              setLockCreateType(false);
+              setCreateInitialStartAt(null);
+              setComposerMode("nlp");
+              setCreateOpen(true);
+            });
           }}
         >
           New Event (NLP Input)
@@ -202,7 +209,7 @@ export function ProposalCreateHost({
           <MenuItem
             onClick={() => {
               setFabMenuAnchor(null);
-              setFastSleepOpen(true);
+              void loadCreateData(true).then(() => setFastSleepOpen(true));
             }}
             data-testid="fab-fast-sleep"
           >
@@ -212,7 +219,7 @@ export function ProposalCreateHost({
         <MenuItem
           onClick={() => {
             setFabMenuAnchor(null);
-            setPartnerCreateOpen(true);
+            void loadCreateData(true).then(() => setPartnerCreateOpen(true));
           }}
         >
           Sleeping partner proposal
@@ -220,7 +227,7 @@ export function ProposalCreateHost({
         <MenuItem
           onClick={() => {
             setFabMenuAnchor(null);
-            setResidencyCreateOpen(true);
+            void loadCreateData(true).then(() => setResidencyCreateOpen(true));
           }}
         >
           Residency Proposal
@@ -228,6 +235,7 @@ export function ProposalCreateHost({
       </Menu>
         </>
       )}
+      {createOpen ? (
       <ProposalDraftDialog
         open={createOpen}
         onClose={() => {
@@ -245,18 +253,24 @@ export function ProposalCreateHost({
         peopleRank={peopleRank}
         composerMode={editDetail ? "manual" : composerMode}
       />
+      ) : null}
+      {partnerCreateOpen ? (
       <SleepingPartnerCreateDialog
         open={partnerCreateOpen}
         onClose={() => setPartnerCreateOpen(false)}
         people={people}
         currentUserId={currentUserId}
       />
+      ) : null}
+      {fastSleepOpen ? (
       <FastSleepDialog
         open={fastSleepOpen}
         onClose={() => setFastSleepOpen(false)}
         places={places}
         currentUserId={currentUserId}
       />
+      ) : null}
+      {residencyCreateOpen ? (
       <ResidencyCreateDialog
         open={residencyCreateOpen}
         onClose={() => setResidencyCreateOpen(false)}
@@ -264,6 +278,7 @@ export function ProposalCreateHost({
         places={residencyPlaces.length > 0 ? residencyPlaces : places}
         currentUserId={currentUserId}
       />
+      ) : null}
     </ProposalCreateContext.Provider>
   );
 }

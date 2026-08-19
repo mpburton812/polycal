@@ -28,6 +28,24 @@ import { CHANGELOG_ARCHIVE } from "./entries.archive";
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "2026.08.19a",
+    date: "2026-08-19",
+    summary:
+      "Sage create menu opens immediately; composer lists load in one bootstrap action (PC-448–PC-449).",
+    changes: [
+      {
+        type: "changed",
+        description:
+          "FAB plus no longer waits on six server actions before the menu appears; dialogs mount only when opened (PC-449).",
+      },
+      {
+        type: "changed",
+        description:
+          "Place member names batch in one query and composer Who-chip rank is viewer-scoped SQL (PC-449).",
+      },
+    ],
+  },
+  {
     version: "2026.08.18c",
     date: "2026-08-18",
     summary:
