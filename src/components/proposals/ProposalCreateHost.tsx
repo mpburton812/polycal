@@ -78,6 +78,10 @@ export function ProposalCreateHost({
   const pathname = usePathname();
   const hideFab = pathname === "/feed" || pathname === "/people-places";
 
+  /**
+   * Prefetch may use the TTL cache; opening a composer always force-refreshes.
+   * Otherwise a settings change (e.g. Proposals and Bookings) stays stale for 60s.
+   */
   const loadCreateData = useCallback(async (force = false) => {
     if (!force && loadedAtRef.current && Date.now() - loadedAtRef.current < BOOTSTRAP_TTL_MS) {
       return;
@@ -101,7 +105,7 @@ export function ProposalCreateHost({
 
   const openCreate = useCallback(
     (request?: ProposalCreateRequest) => {
-      void loadCreateData().then(() => {
+      void loadCreateData(true).then(() => {
         setEditDetail(null);
         if (request?.lockedType) {
           setCreateProposalType(request.lockedType);
@@ -119,7 +123,7 @@ export function ProposalCreateHost({
 
   const openEdit = useCallback(
     (detail: ProposalDetail) => {
-      void loadCreateData().then(() => {
+      void loadCreateData(true).then(() => {
         setEditDetail(detail);
         setLockCreateType(false);
         setCreateInitialStartAt(null);
@@ -174,7 +178,7 @@ export function ProposalCreateHost({
         <MenuItem
           onClick={() => {
             setFabMenuAnchor(null);
-            void loadCreateData().then(() => {
+            void loadCreateData(true).then(() => {
               setEditDetail(null);
               setCreateProposalType("event");
               setLockCreateType(false);
@@ -189,7 +193,7 @@ export function ProposalCreateHost({
         <MenuItem
           onClick={() => {
             setFabMenuAnchor(null);
-            void loadCreateData().then(() => {
+            void loadCreateData(true).then(() => {
               setEditDetail(null);
               setCreateProposalType("event");
               setLockCreateType(false);
@@ -205,7 +209,7 @@ export function ProposalCreateHost({
           <MenuItem
             onClick={() => {
               setFabMenuAnchor(null);
-              void loadCreateData().then(() => setFastSleepOpen(true));
+              void loadCreateData(true).then(() => setFastSleepOpen(true));
             }}
             data-testid="fab-fast-sleep"
           >
@@ -215,7 +219,7 @@ export function ProposalCreateHost({
         <MenuItem
           onClick={() => {
             setFabMenuAnchor(null);
-            void loadCreateData().then(() => setPartnerCreateOpen(true));
+            void loadCreateData(true).then(() => setPartnerCreateOpen(true));
           }}
         >
           Sleeping partner proposal
@@ -223,7 +227,7 @@ export function ProposalCreateHost({
         <MenuItem
           onClick={() => {
             setFabMenuAnchor(null);
-            void loadCreateData().then(() => setResidencyCreateOpen(true));
+            void loadCreateData(true).then(() => setResidencyCreateOpen(true));
           }}
         >
           Residency Proposal
