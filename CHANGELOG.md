@@ -4,6 +4,12 @@ All notable changes to PolyCal are documented here.
 
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [2026.08.19a] - 2026-08-19
+
+### Changed
+
+- PC-448–PC-449: Sage create menu opens immediately. Composer people/places load in one bootstrap action. Place members batch in one query; Who-chip rank is viewer-scoped. Change control: `2026.08.19a`.
+
 ## [2026.08.18c] - 2026-08-18
 
 ### Changed

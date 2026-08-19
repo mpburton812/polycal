@@ -62,4 +62,6 @@ export {
 } from "./proposals/slices";
 
 export { listProposalBoardAction } from "./proposals/board";
+export { getProposalCreateBootstrapAction } from "./proposals/create-bootstrap";
+export type { ProposalCreateBootstrap } from "./proposals/create-bootstrap";
 export { adminDeleteProposalAction, deleteDraftProposalAction } from "./proposals/mutations";

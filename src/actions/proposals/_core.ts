@@ -254,13 +254,15 @@ async function enrichPlaceOptionsWithMembers(
   options: ProposalPlaceOption[],
 ): Promise<ProposalPlaceOption[]> {
   if (options.length === 0) return options;
-  const { listAcceptedPlaceMemberNames } = await import("@/lib/places/membership");
-  return Promise.all(
-    options.map(async (option) => {
-      const members = await listAcceptedPlaceMemberNames(db, option.id);
-      return { ...option, owners: members.owners, residents: members.residents };
-    }),
+  const { listAcceptedPlaceMembersByLocationIds } = await import("@/lib/places/membership");
+  const membersByPlace = await listAcceptedPlaceMembersByLocationIds(
+    db,
+    options.map((option) => option.id),
   );
+  return options.map((option) => {
+    const members = membersByPlace.get(option.id) ?? { owners: [], residents: [] };
+    return { ...option, owners: members.owners, residents: members.residents };
+  });
 }
 
 /**
@@ -312,31 +314,36 @@ export async function listComposerPeopleRankAction(): Promise<
   const db = getDb();
   const networkId = networkSession.user.activeNetworkId;
   const viewerId = networkSession.user.id;
-  const rows = await db
+  const asProposer = await db
     .select({
       userId: proposalInvitees.userId,
       createdAt: proposalInvitees.createdAt,
-      proposerId: proposals.proposerId,
     })
     .from(proposalInvitees)
     .innerJoin(proposals, eq(proposalInvitees.proposalId, proposals.id))
-    .where(eq(proposals.networkId, networkId));
-
-  const stats = new Map<string, { inviteCount: number; lastAt: string | null }>();
-  for (const row of rows) {
-    const otherId =
-      row.proposerId === viewerId
-        ? row.userId
-        : row.userId === viewerId
-          ? row.proposerId
-          : null;
-    if (!otherId || otherId === viewerId) continue;
-    const current = stats.get(otherId) ?? { inviteCount: 0, lastAt: null };
-    current.inviteCount += 1;
-    if (!current.lastAt || row.createdAt > current.lastAt) current.lastAt = row.createdAt;
-    stats.set(otherId, current);
-  }
-  return [...stats.entries()].map(([userId, value]) => ({ userId, ...value }));
+    .where(
+      and(
+        eq(proposals.networkId, networkId),
+        eq(proposals.proposerId, viewerId),
+        ne(proposalInvitees.userId, viewerId),
+      ),
+    );
+  const asInvitee = await db
+    .select({
+      proposerId: proposals.proposerId,
+      createdAt: proposalInvitees.createdAt,
+    })
+    .from(proposalInvitees)
+    .innerJoin(proposals, eq(proposalInvitees.proposalId, proposals.id))
+    .where(
+      and(
+        eq(proposals.networkId, networkId),
+        eq(proposalInvitees.userId, viewerId),
+        ne(proposals.proposerId, viewerId),
+      ),
+    );
+  const { mergeViewerInviteRankRows } = await import("@/lib/proposals/composer-people-rank");
+  return mergeViewerInviteRankRows(asProposer, asInvitee);
 }
 
 /**
