@@ -376,18 +376,23 @@ export async function listPlacesAction(): Promise<PlaceSummary[]> {
     .from(locations)
     .where(eq(locations.networkId, networkId))
     .orderBy(asc(locations.name));
-  const residentRows = await db
-    .select({
-      id: locationResidents.id,
-      locationId: locationResidents.locationId,
-      userId: locationResidents.userId,
-      status: locationResidents.status,
-      placeRole: locationResidents.placeRole,
-      proposedById: locationResidents.proposedById,
-      displayName: users.displayName,
-    })
-    .from(locationResidents)
-    .innerJoin(users, eq(locationResidents.userId, users.id));
+  const locationIds = rows.map((row) => row.id);
+  const residentRows =
+    locationIds.length === 0
+      ? []
+      : await db
+          .select({
+            id: locationResidents.id,
+            locationId: locationResidents.locationId,
+            userId: locationResidents.userId,
+            status: locationResidents.status,
+            placeRole: locationResidents.placeRole,
+            proposedById: locationResidents.proposedById,
+            displayName: users.displayName,
+          })
+          .from(locationResidents)
+          .innerJoin(users, eq(locationResidents.userId, users.id))
+          .where(inArray(locationResidents.locationId, locationIds));
 
   const viewerId = networkSession.user.id;
 

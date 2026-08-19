@@ -35,7 +35,25 @@ function scorePerson(
   return count * 1000 + recency + partnerBoost;
 }
 
-/** More recent ISO timestamps score higher (max 365). */
+/**
+ * Folds proposer-side and invitee-side invite rows into Who-chip rank stats (PC-449).
+ * Viewer-scoped SQL feeds this instead of scanning every network invitee.
+ */
+export function mergeViewerInviteRankRows(
+  asProposer: Array<{ userId: string; createdAt: string }>,
+  asInvitee: Array<{ proposerId: string; createdAt: string }>,
+): PersonRankStat[] {
+  const stats = new Map<string, { inviteCount: number; lastAt: string | null }>();
+  const bump = (otherId: string, createdAt: string) => {
+    const current = stats.get(otherId) ?? { inviteCount: 0, lastAt: null };
+    current.inviteCount += 1;
+    if (!current.lastAt || createdAt > current.lastAt) current.lastAt = createdAt;
+    stats.set(otherId, current);
+  };
+  for (const row of asProposer) bump(row.userId, row.createdAt);
+  for (const row of asInvitee) bump(row.proposerId, row.createdAt);
+  return [...stats.entries()].map(([userId, value]) => ({ userId, ...value }));
+}
 function recencyScore(lastAt: string | null): number {
   if (!lastAt) return 0;
   const then = Date.parse(lastAt);

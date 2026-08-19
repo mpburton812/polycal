@@ -25,7 +25,6 @@ import dynamic from "next/dynamic";
 import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import type { ProposalPlaceOption } from "@/actions/proposals";
 import {
   listScheduleEventsAction,
   type ScheduleFilterMode,
@@ -71,13 +70,6 @@ const ProposalDetailDialog = dynamic(
     })),
   { ssr: false },
 );
-const ProposalDraftDialog = dynamic(
-  () =>
-    import("@/components/proposals/ProposalDraftDialog").then((mod) => ({
-      default: mod.ProposalDraftDialog,
-    })),
-  { ssr: false },
-);
 const SeriesOccurrenceChooserDialog = dynamic(
   () =>
     import("@/components/schedule/SeriesOccurrenceChooserDialog").then((mod) => ({
@@ -97,7 +89,6 @@ interface ScheduleClientProps {
   initialPayload: SchedulePayload;
   initialWeekStartIso: string;
   people: PersonSummary[];
-  places: ProposalPlaceOption[];
   currentUserId: string;
   acceptedPartnerIds: string[];
   timeZone: string;
@@ -110,7 +101,6 @@ export function ScheduleClient({
   initialPayload,
   initialWeekStartIso,
   people,
-  places,
   currentUserId,
   acceptedPartnerIds,
   timeZone,
@@ -138,15 +128,13 @@ export function ScheduleClient({
   const [pending, setPending] = useState(false);
   const [optionsOpen, setOptionsOpen] = useState(false);
   const [daySheetDay, setDaySheetDay] = useState<Date | null>(null);
-  const { openCreate } = useProposalCreate();
+  const { openCreate, openEdit } = useProposalCreate();
   const {
     state: dialogState,
     openScheduleEvent,
     closeDetail,
     closeSlice,
     closeChooser,
-    closeDraft,
-    handleEditFromDetail,
     openRelatedProposal,
     openDetachedProposal,
     openProposal,
@@ -784,23 +772,12 @@ export function ScheduleClient({
           closeDetail();
           refreshCurrentView();
         }}
-        onEdit={handleEditFromDetail}
-        people={people}
-        onOpenRelatedProposal={openRelatedProposal}
-      />
-
-      <ProposalDraftDialog
-        open={dialogState.draftOpen}
-        onClose={() => {
-          closeDraft();
-          refreshCurrentView();
+        onEdit={(detail) => {
+          closeDetail();
+          openEdit(detail);
         }}
         people={people}
-        places={places}
-        currentUserId={currentUserId}
-        initialDetail={dialogState.editDetail}
-        lockedProposalType={dialogState.createLockedType ?? undefined}
-        initialStartAt={dialogState.createInitialStartAt}
+        onOpenRelatedProposal={openRelatedProposal}
       />
     </Box>
   );

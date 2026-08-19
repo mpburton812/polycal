@@ -30,6 +30,4 @@ jobs:
 
       - name: Vitest unit tests
         run: npm run test:unit
-
-      - name: Production build
-        run: npm run build
+      # Next production build runs once in e2e.yml (`build` job) and is reused by Playwright shards (PC-452).

@@ -28,6 +28,78 @@ import { CHANGELOG_ARCHIVE } from "./entries.archive";
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "2026.08.19d",
+    date: "2026-08-19",
+    summary:
+      "CI reuses the e2e Next build on promotion PRs and caches Playwright browsers for production (PC-452).",
+    changes: [
+      {
+        type: "changed",
+        description:
+          "dev.yml and test.yml drop a second Next build; e2e.yml remains the PR compile gate (PC-452).",
+      },
+      {
+        type: "changed",
+        description:
+          "Playwright caches Chromium and installs the browser without apt --with-deps so CI shards cannot hang on OS packages (PC-452).",
+      },
+    ],
+  },
+  {
+    version: "2026.08.19c",
+    date: "2026-08-19",
+    summary:
+      "Proposal mutations patch local detail; one shared draft dialog host (PC-451).",
+    changes: [
+      {
+        type: "changed",
+        description:
+          "Votes, comments, attendees, and feed post reload proposal detail without a full RSC refresh unless the card changes columns (PC-451).",
+      },
+      {
+        type: "changed",
+        description:
+          "ProposalDraftDialog lives only on the sage create host; Proposals and Schedule open it via openEdit (PC-451).",
+      },
+    ],
+  },
+  {
+    version: "2026.08.19b",
+    date: "2026-08-19",
+    summary:
+      "SCHEMA_VERSION 51 network/feed indexes; scoped place residents and schedule slot scans (PC-450).",
+    changes: [
+      {
+        type: "changed",
+        description:
+          "Covering indexes on proposals.network_id, state log, comments, locations, sleeping partnerships, and feed chat (PC-450).",
+      },
+      {
+        type: "changed",
+        description:
+          "listPlaces loads residents only for network locations; schedule slot prefilter joins proposals.network_id (PC-450).",
+      },
+    ],
+  },
+  {
+    version: "2026.08.19a",
+    date: "2026-08-19",
+    summary:
+      "Sage create menu opens immediately; composer lists load in one bootstrap action (PC-448–PC-449).",
+    changes: [
+      {
+        type: "changed",
+        description:
+          "FAB plus no longer waits on six server actions before the menu appears; dialogs mount only when opened (PC-449).",
+      },
+      {
+        type: "changed",
+        description:
+          "Place member names batch in one query and composer Who-chip rank is viewer-scoped SQL (PC-449).",
+      },
+    ],
+  },
+  {
     version: "2026.08.18c",
     date: "2026-08-18",
     summary:

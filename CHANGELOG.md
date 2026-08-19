@@ -4,6 +4,30 @@ All notable changes to PolyCal are documented here.
 
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [2026.08.19d] - 2026-08-19
+
+### Changed
+
+- PC-452: Promotion PRs reuse the e2e.yml Next build instead of compiling twice. Playwright caches Chromium and installs the browser binary without apt `--with-deps` (that hang stalled serial shards for 25 minutes). Change control: `2026.08.19d`.
+
+## [2026.08.19c] - 2026-08-19
+
+### Changed
+
+- PC-451: Proposal detail mutations patch local state instead of `router.refresh` unless the card moves columns. One shared ProposalDraftDialog on the sage create host. Change control: `2026.08.19c`.
+
+## [2026.08.19b] - 2026-08-19
+
+### Changed
+
+- PC-450: SCHEMA_VERSION 51 network/feed covering indexes. Place residents and schedule slot scans are scoped to the active network. Change control: `2026.08.19b`.
+
+## [2026.08.19a] - 2026-08-19
+
+### Changed
+
+- PC-448–PC-449: Sage create menu opens immediately. Composer people/places load in one bootstrap action. Place members batch in one query; Who-chip rank is viewer-scoped. Change control: `2026.08.19a`.
+
 ## [2026.08.18c] - 2026-08-18
 
 ### Changed

@@ -77,7 +77,9 @@ test.describe("App navigation (admin)", () => {
     for (const go of [goToSchedule, goToProposals]) {
       await go(page);
       await openNewProposalFabMenu(page);
-      await expect(page.getByRole("menuitem", { name: "New Event", exact: true })).toBeVisible();
+      await expect(page.getByRole("menuitem", { name: "New Event", exact: true })).toBeVisible({
+        timeout: 2_000,
+      });
       await expect(
         page.getByRole("menuitem", { name: "New Event (NLP Input)", exact: true }),
       ).toBeVisible();

@@ -186,7 +186,10 @@ export function ProposalDetailDialog({
     showToast(result.message, result.ok ? "success" : "error");
   }
 
-  function reloadDetail(id: string, options?: { isInitial?: boolean }) {
+  function reloadDetail(
+    id: string,
+    options?: { isInitial?: boolean; refreshIfStateChangesFrom?: string },
+  ) {
     if (options?.isInitial) {
       setDetailLoading(true);
       setUnavailableMessage(null);
@@ -203,6 +206,13 @@ export function ProposalDetailDialog({
         }
         setUnavailableMessage(null);
         setDetail(result.detail);
+        // Board/schedule RSC lists only need a refresh when the card moves columns (PC-451).
+        if (
+          options?.refreshIfStateChangesFrom &&
+          result.detail.state !== options.refreshIfStateChangesFrom
+        ) {
+          router.refresh();
+        }
       } finally {
         if (options?.isInitial) {
           setDetailLoading(false);
@@ -233,18 +243,17 @@ export function ProposalDetailDialog({
       notifyResult(result);
       if (!result.ok) return;
       reloadDetail(proposalId);
-      router.refresh();
     });
   }
 
   function handleVote(vote: "accept" | "abstain" | "decline" | "accept_suboptimal") {
     if (!proposalId) return;
+    const previousState = detail?.state;
     startTransition(async () => {
       const result = await castProposalVoteAction({ proposalId, vote });
       notifyResult(result);
       if (!result.ok) return;
-      reloadDetail(proposalId);
-      router.refresh();
+      reloadDetail(proposalId, { refreshIfStateChangesFrom: previousState });
     });
   }
 
@@ -253,12 +262,12 @@ export function ProposalDetailDialog({
     vote: "accept" | "abstain" | "decline" | "accept_suboptimal",
   ) {
     if (!proposalId) return;
+    const previousState = detail?.state;
     startTransition(async () => {
       const result = await castProposalVoteAction({ proposalId, vote, onBehalfOfUserId });
       notifyResult(result);
       if (!result.ok) return;
-      reloadDetail(proposalId);
-      router.refresh();
+      reloadDetail(proposalId, { refreshIfStateChangesFrom: previousState });
     });
   }
 
@@ -267,12 +276,12 @@ export function ProposalDetailDialog({
     vote: "accept" | "abstain" | "decline" | "accept_suboptimal",
   ) {
     if (!proposalId) return;
+    const previousState = detail?.state;
     startTransition(async () => {
       const result = await castSlotVoteAction({ proposalId, timeSlotId, vote });
       notifyResult(result);
       if (!result.ok) return;
-      reloadDetail(proposalId);
-      router.refresh();
+      reloadDetail(proposalId, { refreshIfStateChangesFrom: previousState });
     });
   }
 
@@ -413,6 +422,7 @@ export function ProposalDetailDialog({
       if (!result.ok) return;
       const detailResult = await getProposalDetailAction(proposalId);
       if (detailResult.ok && detailResult.detail) {
+        router.refresh();
         onEdit(detailResult.detail);
         return;
       }
@@ -431,6 +441,7 @@ export function ProposalDetailDialog({
       if (!result.ok) return;
       const detailResult = await getProposalDetailAction(proposalId);
       if (detailResult.ok && detailResult.detail) {
+        router.refresh();
         onEdit(detailResult.detail);
         return;
       }
@@ -468,7 +479,6 @@ export function ProposalDetailDialog({
       if (!result.ok) return;
       setAddAttendeeId("");
       reloadDetail(proposalId);
-      router.refresh();
     });
   }
 
@@ -482,7 +492,6 @@ export function ProposalDetailDialog({
       notifyResult(result);
       if (!result.ok) return;
       reloadDetail(proposalId);
-      router.refresh();
     });
   }
 
@@ -493,7 +502,6 @@ export function ProposalDetailDialog({
       notifyResult(result);
       if (!result.ok) return;
       reloadDetail(proposalId);
-      router.refresh();
     });
   }
 
@@ -1191,7 +1199,7 @@ export function ProposalDetailDialog({
                   startTransition(async () => {
                     const result = await retryProposalCalendarSyncAction(detail.id);
                     showToast(result.message, result.ok ? "success" : "error");
-                    if (result.ok) router.refresh();
+                    if (result.ok) reloadDetail(detail.id);
                   });
                 }}
                 sx={outlinedButtonSx}

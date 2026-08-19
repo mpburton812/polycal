@@ -1,11 +1,22 @@
 import { type Page, expect } from "@playwright/test";
 
+import { activeMainPanel } from "./tab-swipe";
+
 /** Expands a place accordion on the Places tab. */
 export async function expandPlace(page: Page, placeName: string): Promise<void> {
-  await page.getByRole("tab", { name: "Places" }).click();
-  await page.getByRole("heading", { name: placeName, level: 2 }).click();
+  const panel = activeMainPanel(page);
+  await panel.getByRole("tab", { name: "Places" }).click();
+  // exact: true so the section header (role=button) is not confused with the chevron.
+  // Skip the heading click when already expanded — a second click collapses the row.
+  const collapseButton = panel.getByRole("button", {
+    name: `Collapse ${placeName}`,
+    exact: true,
+  });
+  if (!(await collapseButton.isVisible())) {
+    await panel.getByRole("heading", { name: placeName, level: 2 }).click();
+  }
   await expect(
-    page.getByRole("button", { name: /Add|Edit place|Delete place/i }).first(),
+    panel.getByRole("button", { name: /Add|Edit place|Delete place/i }).first(),
   ).toBeVisible({ timeout: 15_000 });
 }
 
