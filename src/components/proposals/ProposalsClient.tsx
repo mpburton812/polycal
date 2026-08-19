@@ -17,7 +17,6 @@ import {
   type ProposalCard as ProposalCardData,
   type ProposalDetail,
 } from "@/actions/proposals";
-import type { ProposalPlaceOption } from "@/actions/proposals";
 import type { PersonSummary } from "@/actions/users";
 
 import { ProposalCard } from "./ProposalCard";
@@ -33,11 +32,6 @@ import dynamic from "next/dynamic";
 const ProposalDetailDialog = dynamic(
   () =>
     import("./ProposalDetailDialog").then((mod) => ({ default: mod.ProposalDetailDialog })),
-  { ssr: false },
-);
-const ProposalDraftDialog = dynamic(
-  () =>
-    import("./ProposalDraftDialog").then((mod) => ({ default: mod.ProposalDraftDialog })),
   { ssr: false },
 );
 
@@ -74,7 +68,7 @@ const TAB_EMPTY: Record<
   },
 };
 
-/** Event/sleeping drafts edited via ProposalDraftDialog — not residency. */
+/** Event/sleeping drafts edited via the shared create host — not residency. */
 function isStandardDraftProposal(proposal: ProposalCardData): boolean {
   if (proposal.state !== "draft") return false;
   if (proposal.specialKind === "residency") {
@@ -87,7 +81,6 @@ function isStandardDraftProposal(proposal: ProposalCardData): boolean {
 interface ProposalsClientProps {
   board: ProposalBoard;
   people: PersonSummary[];
-  places: ProposalPlaceOption[];
   currentUserId: string;
   /** App admin — enables oversight chrome on others' cards (PC-196). */
   isAdmin?: boolean;
@@ -99,7 +92,6 @@ interface ProposalsClientProps {
 export function ProposalsClient({
   board,
   people,
-  places,
   currentUserId,
   isAdmin = false,
 }: ProposalsClientProps) {
@@ -112,8 +104,6 @@ export function ProposalsClient({
     const stored = window.sessionStorage.getItem("polycal.proposals.activeTab");
     return TAB_KEYS.includes(stored as TabKey) ? (stored as TabKey) : "draft";
   });
-  const [createOpen, setCreateOpen] = useState(false);
-  const [editDetail, setEditDetail] = useState<ProposalDetail | null>(null);
   const [selectedProposalId, setSelectedProposalId] = useState<string | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
   const [partnershipCard, setPartnershipCard] = useState<ProposalCardData | null>(null);
@@ -147,8 +137,7 @@ export function ProposalsClient({
         showToast(result.message, "error");
         return;
       }
-      setEditDetail(result.detail);
-      setCreateOpen(true);
+      openEdit(result.detail);
     });
   }
 
@@ -200,12 +189,6 @@ export function ProposalsClient({
     setSelectedProposalId(null);
     setActiveTab("draft");
     openEdit(detail);
-  }
-
-  function handleDraftDialogClose() {
-    setCreateOpen(false);
-    setEditDetail(null);
-    router.refresh();
   }
 
   const handledOpenRef = useRef<string | null>(null);
@@ -307,14 +290,6 @@ export function ProposalsClient({
         </Box>
       )}
 
-      <ProposalDraftDialog
-        open={createOpen}
-        onClose={handleDraftDialogClose}
-        people={people}
-        places={places}
-        currentUserId={currentUserId}
-        initialDetail={editDetail}
-      />
       <ProposalDetailDialog
         proposalId={selectedProposalId}
         open={detailOpen}

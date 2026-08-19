@@ -407,3 +407,6 @@
 2026-08-19 | 80dd5df | PC-449 | import ProposalPlaceOption from types for bootstrap | src/actions/proposals/create-bootstrap.ts
 2026-08-19 | 57ea9dc | PC-449 | force-refresh FAB bootstrap when opening composer | src/components/proposals/ProposalCreateHost.tsx
 2026-08-19 | 1b905d4 | PC-450 | SCHEMA_VERSION 51 network indexes and scoped list queries | src/actions/places.ts
+2026-08-19 | 74e9bde | PC-451 | patch proposal detail locally and share one draft dialog | src/components/people-places/PeoplePlacesClient.tsx
+2026-08-19 | f3782b0 | PC-451 | raise Playwright install timeout so serial shards finish | .github/workflows/e2e.yml
+2026-08-19 | 36f1954 | PC-451 | install Playwright Chromium without apt --with-deps | .github/workflows/e2e.yml

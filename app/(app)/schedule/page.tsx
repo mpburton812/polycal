@@ -2,7 +2,6 @@ import { Typography } from "@mui/material";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 
-import { listProposalPlaceOptionsAction } from "@/actions/proposals";
 import { listScheduleEventsAction } from "@/actions/schedule";
 import { listPartnershipsForUserAction } from "@/actions/partnerships";
 import { listPeopleAction } from "@/actions/users";
@@ -35,13 +34,12 @@ export default async function SchedulePage() {
     .limit(1);
   const timeZone = resolveTimezone(userRow?.timezone);
 
-  const [scheduleResult, people, places, partnerships] = await Promise.all([
+  const [scheduleResult, people, partnerships] = await Promise.all([
     listScheduleEventsAction({
       rangeStart: weekStart.toISOString(),
       rangeEnd: rangeEnd.toISOString(),
     }),
     listPeopleAction(),
-    listProposalPlaceOptionsAction(),
     listPartnershipsForUserAction(session.user.id),
   ]);
 
@@ -59,7 +57,6 @@ export default async function SchedulePage() {
           initialPayload={scheduleResult.payload}
           initialWeekStartIso={weekStart.toISOString()}
           people={people}
-          places={places}
           currentUserId={session.user.id}
           acceptedPartnerIds={acceptedPartnerIds}
           timeZone={timeZone}
