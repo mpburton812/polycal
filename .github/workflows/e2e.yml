@@ -143,7 +143,7 @@ jobs:
           key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
 
       - name: Install Playwright browsers
-        timeout-minutes: 15
+        timeout-minutes: 25
         run: npx playwright install chromium --with-deps
 
       - name: Run Playwright ${{ matrix.suite }} ${{ matrix.shard }}/${{ matrix.shards }}
