@@ -16,6 +16,13 @@ cycle, signing infrastructure, and release process that the current alpha group 
 need. Revisit when the product needs push on iOS Safari older than 16.4, deep OS
 integration, or store discovery.
 
+**Limited exception (PC-453–PC-457): Android compose widgets.** `android-widgets/` is a
+small sideloadable App Widget APK (New Event + Natural language). It launches `/feed?compose=`
+URLs in Chrome Custom Tabs so the existing Auth.js Chrome/TWA session is reused. It is **not**
+a Capacitor WebView, Play listing, Bubblewrap TWA, or store-signed release. See
+[android-widgets/README.md](../android-widgets/README.md). PWA manifest shortcuts cover the
+same compose URLs on long-press of the installed icon.
+
 Consequences of the web/PWA path:
 
 - No app-store review gate, but the same substantive requirements still apply — a public

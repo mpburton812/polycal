@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/widget_background"
+    android:contentDescription="@string/widget_nlp_description"
+    android:orientation="vertical"
+    android:padding="8dp">
+
+    <TextView
+        android:id="@+id/widget_header"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:contentDescription="@string/widget_nlp_label"
+        android:paddingBottom="4dp"
+        android:text="@string/widget_nlp_label"
+        android:textColor="@color/garden_surface"
+        android:textSize="12sp"
+        android:textStyle="bold" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <EditText
+            android:id="@+id/widget_input"
+            android:layout_width="0dp"
+            android:layout_height="40dp"
+            android:layout_weight="1"
+            android:background="@drawable/widget_field_background"
+            android:clickable="true"
+            android:contentDescription="@string/widget_nlp_hint"
+            android:cursorVisible="false"
+            android:focusable="false"
+            android:gravity="center_vertical"
+            android:hint="@string/widget_nlp_hint"
+            android:imeOptions="actionSend"
+            android:inputType="textCapSentences"
+            android:maxLines="1"
+            android:paddingStart="10dp"
+            android:paddingEnd="10dp"
+            android:textColor="@color/garden_ink"
+            android:textColorHint="@color/garden_ink_muted"
+            android:textSize="14sp" />
+
+        <ImageButton
+            android:id="@+id/widget_send"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:background="@android:color/transparent"
+            android:contentDescription="@string/widget_send"
+            android:padding="8dp"
+            android:src="@drawable/ic_send"
+            android:tint="@color/garden_surface" />
+    </LinearLayout>
+</LinearLayout>

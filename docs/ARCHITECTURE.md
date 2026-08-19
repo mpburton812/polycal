@@ -14,6 +14,7 @@ polycal/
 │   └── types/              # Shared TypeScript types
 ├── apps/
 │   └── alpha-feedback-tracker/  # Tauri desktop triage UI (separate package)
+├── android-widgets/        # Sideload App Widgets → Chrome Custom Tabs compose URLs
 ├── e2e/                    # Playwright specs (journey + regression)
 ├── scripts/                # Tooling (requirements, Jira sync, CI helpers)
 ├── docs/                   # Architecture, workflow, ADRs, security
@@ -26,6 +27,14 @@ GitLab CI (`.gitlab-ci.yml`) is a **secondary/legacy mirror** of a subset of gat
 ### Companion app: alpha-feedback-tracker
 
 `apps/alpha-feedback-tracker` is intentionally **outside** the Next.js TypeScript project (`tsconfig.json` excludes `apps/`) and is **not** an npm workspace member. Root Next (Vite 8 for Vitest) and the tracker’s Vite 6 toolchain must not hoist together. Keep separate `package-lock.json` files; align React/MUI majors manually when bumping. Path-filtered CI (`.github/workflows/alpha-feedback-tracker.yml`) runs `npm run build` (tsc + Vite). Full Tauri installer builds remain local (Windows + Rust). The tracker talks only to PolyCal admin HTTP APIs — never to Turso directly.
+
+### Companion app: android-widgets
+
+`android-widgets/` is a focused Android App Widget APK (not an npm package, not a WebView
+shell). Two homescreen widgets launch `/feed?compose=event` and `/feed?compose=nlp` in
+Chrome Custom Tabs against a configurable HTTPS origin. Event create/submit stays in the
+Next.js `ProposalDraftDialog` server-action pipeline. Sideload only this phase — see
+[android-widgets/README.md](../android-widgets/README.md) and [STORE-READINESS.md](./STORE-READINESS.md).
 
 ## Layer model
 

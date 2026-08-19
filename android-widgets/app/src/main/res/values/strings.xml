@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">PolyCal Widgets</string>
+    <string name="widget_new_event_label">PolyCal: New Event</string>
+    <string name="widget_nlp_label">PolyCal: Natural language</string>
+    <string name="widget_new_event_description">Type a title, then open the New Event card in PolyCal.</string>
+    <string name="widget_nlp_description">Type a description, then open the natural-language New Event card in PolyCal.</string>
+    <string name="widget_new_event_hint">Title</string>
+    <string name="widget_nlp_hint">Description</string>
+    <string name="widget_send">Send</string>
+    <string name="info_blurb">Long-press your home screen and add PolyCal: New Event or PolyCal: Natural language. Each widget opens the live PolyCal site in Chrome so your existing sign-in is reused.</string>
+    <string name="info_host_label">Host URL</string>
+</resources>

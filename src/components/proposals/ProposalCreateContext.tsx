@@ -5,8 +5,14 @@ import { createContext, useContext } from "react";
 import type { ProposalDetail } from "@/actions/proposals";
 
 export interface ProposalCreateRequest {
-  lockedType: "event" | "sleeping";
+  lockedType?: "event" | "sleeping";
   initialStartAt?: string | null;
+  /** Manual Title-first vs Description-first NLP (PC-454). */
+  composerMode?: "manual" | "nlp";
+  /** Prefills Title for widget / compose deep-links (PC-454). */
+  initialTitle?: string;
+  /** Prefills NLP Description so parseEventIntent runs as today (PC-454). */
+  initialNlpText?: string;
 }
 
 export interface ProposalCreateContextValue {

@@ -132,6 +132,10 @@ interface ProposalDraftDialogProps {
   peopleRank?: PersonRankStat[];
   /** Manual Title-first composer vs Description-first NLP (PC-439). */
   composerMode?: "manual" | "nlp";
+  /** Prefills Title when opening from a compose deep-link / widget (PC-454). */
+  initialTitle?: string;
+  /** Prefills NLP Description so parseEventIntent runs as today (PC-454). */
+  initialNlpText?: string;
 }
 
 /**
@@ -149,6 +153,8 @@ export function ProposalDraftDialog({
   composerSettings,
   peopleRank = [],
   composerMode = "manual",
+  initialTitle = "",
+  initialNlpText = "",
 }: ProposalDraftDialogProps) {
   const router = useRouter();
   const [savedDraftId, setSavedDraftId] = useState<string | null>(null);
@@ -593,8 +599,8 @@ export function ProposalDraftDialog({
       setTypePicked(Boolean(lockedProposalType));
       setTypeEverChosen(Boolean(lockedProposalType));
       typeSnapshotRef.current = {};
-      setTitle("");
-      setNlpText("");
+      setTitle(initialTitle);
+      setNlpText(initialNlpText);
       setNlpChips([]);
       nlpTouchedRef.current = new Set();
       nlpBlockedToastRef.current = false;
@@ -639,7 +645,7 @@ export function ProposalDraftDialog({
       setReminderUnit("hours");
       setPostToFeed(false);
     }
-  }, [open, initialDetail, lockedProposalType, savedDraftId, initialStartAt]);
+  }, [open, initialDetail, lockedProposalType, savedDraftId, initialStartAt, initialTitle, initialNlpText]);
 
   function handleClose() {
     setSavedDraftId(null);
