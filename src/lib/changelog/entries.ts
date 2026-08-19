@@ -28,6 +28,24 @@ import { CHANGELOG_ARCHIVE } from "./entries.archive";
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "2026.08.19d",
+    date: "2026-08-19",
+    summary:
+      "CI reuses the e2e Next build on promotion PRs and caches Playwright browsers for production (PC-452).",
+    changes: [
+      {
+        type: "changed",
+        description:
+          "dev.yml and test.yml drop a second Next build; e2e.yml remains the PR compile gate (PC-452).",
+      },
+      {
+        type: "changed",
+        description:
+          "Playwright caches Chromium and installs the browser without apt --with-deps so CI shards cannot hang on OS packages (PC-452).",
+      },
+    ],
+  },
+  {
     version: "2026.08.19c",
     date: "2026-08-19",
     summary:
