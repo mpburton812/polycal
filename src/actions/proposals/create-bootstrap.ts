@@ -9,10 +9,10 @@ import {
   listComposerPeopleRankAction,
   listProposalPlaceOptionsAction,
   listResidencyPlaceOptionsAction,
-  type ProposalPlaceOption,
 } from "@/actions/proposals/_core";
 import { listPeopleAction, type PersonSummary } from "@/actions/users";
 import type { PersonRankStat } from "@/lib/proposals/composer-people-rank";
+import type { ProposalPlaceOption } from "./types";
 
 export interface ProposalCreateBootstrap {
   people: PersonSummary[];
