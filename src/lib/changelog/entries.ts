@@ -48,6 +48,11 @@ export const CHANGELOG: ChangelogEntry[] = [
         description:
           "Place-card Add person filters stay relative inner locators so residency journeys resolve the select (PC-448).",
       },
+      {
+        type: "fixed",
+        description:
+          "Batch-sleeping journey clicks the solo Han night, not the seeded Han+Leia Tatooine proposal (PC-448).",
+      },
     ],
   },
   {
