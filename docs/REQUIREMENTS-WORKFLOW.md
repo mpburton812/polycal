@@ -60,6 +60,16 @@ flowchart TD
 5. **post-commit** appends a row to `.requirements`.
 6. Include `.requirements` updates in the same MR (final commit before merge is fine).
 
+### Parallel feature changelogs
+
+Two `feature/*` PRs cut from the same `dev` tip both prepend a new `2026.MM.DDx` entry. After the first PR merges:
+
+1. Rebase (or merge) the second branch onto `origin/dev`.
+2. Keep **both** changelog entries, newest first (`CHANGELOG.md` and `src/lib/changelog/entries.ts`).
+3. Do not skip changelog commits to “win” the rebase.
+
+Use the next letter suffix (`2026.08.19c` then `2026.08.19d`) rather than overwriting the sibling entry.
+
 ---
 
 ## Phase 3 — Review and merge

@@ -8,6 +8,7 @@ import {
 } from "./helpers/schedule";
 import { createAndSubmitSoloSleepingWeek } from "./helpers/proposals";
 import { goToProposals, selectProposalTab } from "./helpers/navigation";
+import { activeMainPanel } from "./helpers/tab-swipe";
 
 test.describe("Batch sleeping slice journey", () => {
   test("resolved batch night opens slice detail on schedule", async ({ page }) => {
@@ -35,19 +36,20 @@ test.describe("Batch sleeping slice journey", () => {
 
     await advanceScheduleUntilEventVisible(
       page,
-      /Sleeping: Han Solo/i,
+      /Sleeping: Han Solo(?!,)/i,
       { targetDateIso: rangeStart },
     );
 
-    await page
-      .getByTestId("main-tab-panel-schedule")
-      .getByRole("button", { name: /Sleeping: Han Solo/i })
+    // Seed sleeping with Leia is titled "Sleeping: Han Solo, Leia…" and sits on
+    // the current week in August — `.first()` used to open that parent dialog.
+    await activeMainPanel(page)
+      .getByRole("button", { name: /Sleeping: Han Solo(?!,)/i })
       .first()
       .click();
 
     await expect(
       page.getByRole("dialog").getByRole("heading", { name: "This night" }),
-    ).toBeVisible();
+    ).toBeVisible({ timeout: 15_000 });
     await expect(page.getByRole("button", { name: "Open parent" })).toBeVisible();
   });
 });
