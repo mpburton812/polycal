@@ -414,3 +414,4 @@
 2026-08-19 | ac620d2 | PC-452 | allow 25 minutes for Playwright browser install | src/lib/changelog/entries.ts
 2026-08-19 | 6674563 | PC-452 | install Playwright Chromium without apt --with-deps | src/lib/changelog/entries.ts
 2026-08-19 | 7bc32b1 | PC-448 | stabilize attendee and residency journeys | e2e/helpers/people-places.ts
+2026-08-19 | 78b478b | PC-448 | encode post-production harness rules | src/lib/changelog/entries.ts
