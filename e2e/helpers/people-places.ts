@@ -31,10 +31,13 @@ export async function addPersonToPlace(
 ): Promise<void> {
   await expandPlace(page, placeName);
   const panel = activeMainPanel(page);
+  // `has` locators must be page-rooted so Playwright treats them as relative
+  // inner locators. Chaining panel.getByRole here matched every descendant div
+  // and .last() missed the Add person select (PC-448 CI serial 3).
   const placePanel = panel
     .locator("div")
-    .filter({ has: panel.getByRole("heading", { name: placeName, level: 2 }) })
-    .filter({ has: panel.getByRole("button", { name: "Add", exact: true }) })
+    .filter({ has: page.getByRole("heading", { name: placeName, level: 2 }) })
+    .filter({ has: page.getByRole("button", { name: "Add", exact: true }) })
     .last();
   await placePanel.getByLabel("Add person").click();
   await page.getByRole("option", { name: personDisplayName }).click();

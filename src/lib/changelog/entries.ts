@@ -43,6 +43,11 @@ export const CHANGELOG: ChangelogEntry[] = [
         description:
           "Journey specs default to 180s; locators use the active tab panel and exact invitee names (PC-448).",
       },
+      {
+        type: "fixed",
+        description:
+          "Place-card Add person filters stay relative inner locators so residency journeys resolve the select (PC-448).",
+      },
     ],
   },
   {

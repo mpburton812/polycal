@@ -8,7 +8,7 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
-- PC-448: Agent harness — `gh pr create` (no ManagePullRequest), Playwright Chromium install without apt `--with-deps`, 180s journey timeout, active-panel locators, production flake policy. Change control: `2026.08.19e`.
+- PC-448: Agent harness — `gh pr create` (no ManagePullRequest), Playwright Chromium install without apt `--with-deps`, 180s journey timeout, active-panel locators, production flake policy. Place-card `has` filters stay page-rooted so residency journeys find Add person. Change control: `2026.08.19e`.
 
 ## [2026.08.19d] - 2026-08-19
 
