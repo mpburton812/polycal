@@ -69,6 +69,8 @@ changed in that version:
    list of `changes` (`added` / `changed` / `fixed`).
 2. Mirror the human-readable summary in `CHANGELOG.md`.
 
+Parallel `feature/*` PRs from the same `dev` tip will conflict on those two files. Rebase the later branch onto `origin/dev` and keep **both** new entries (newest first). Do not drop the sibling version.
+
 The in-app **Admin → Code Status** panel reads `src/lib/changelog/entries.ts`,
 shows the live build number and when it went live, surfaces the most recent entry,
 and exposes the full log via the build-number link. This keeps the deployed change
@@ -79,6 +81,7 @@ history visible per environment.
 - `git checkout dev && git merge feature/... && git push` (bypasses PR checks and Jira In Review)
 - `git push origin dev` from a feature branch
 - Promote without adding a change control log entry (see above)
+- Force-push `dev`, `test`, `production`, or `main`. `git push --force-with-lease` is allowed only on `feature/*` / `cursor/*` after rebase onto `origin/dev`.
 
 ## GitHub branch protection (recommended)
 
@@ -103,6 +106,12 @@ This enforces PR-only promotion at the platform level.
 | `test` → `production` | Full CI chain | **Mandatory** — run before opening or merging the production PR |
 
 Before production promotion, complete [SECURITY-CHECKLIST.md](./SECURITY-CHECKLIST.md) and document user journey pass status in the PR test plan.
+
+Local journey failures that **reproduce** on isolated retry must be fixed on `feature/*` and promoted through `dev` and `test` before production. Failures that **pass** on isolated retry and already passed CI e2e may be documented as flakes (spec name, error, retry result). Do not merge production with an unexplained red local suite.
+
+Ignore `CANCELLED` / `SKIPPED` e2e.yml jobs on the PR rollup (`concurrency.cancel-in-progress` skips push E2E when a PR exists).
+
+If CI fails on **Install Playwright browsers**, that is infrastructure (do not raise the install timeout past 5 minutes; do not use `--with-deps` on GitHub ubuntu-latest).
 
 Examples:
 

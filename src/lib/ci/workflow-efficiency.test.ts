@@ -25,6 +25,15 @@ describe("CI efficiency (PC-452)", () => {
       const workflow = readWorkflow(name);
       expect(workflow).toContain("npx playwright install chromium");
       expect(workflow).not.toContain("install chromium --with-deps");
+      expect(workflow).toMatch(/timeout-minutes:\s*5/);
     }
+  });
+
+  it("documents the same Playwright install policy in .cursorrules", () => {
+    const rules = readFileSync(path.join(process.cwd(), ".cursorrules"), "utf8");
+    expect(rules).toContain("npx playwright install chromium");
+    expect(rules).not.toContain("install chromium --with-deps");
+    expect(rules).toContain("gh pr create");
+    expect(rules).not.toContain("ManagePullRequest");
   });
 });

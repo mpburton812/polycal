@@ -49,4 +49,7 @@ rules live in `.cursorrules`. Only the non-obvious, environment-specific gotchas
 - Unit: `npm run test:unit` (Vitest, no server needed).
 - E2E: `npm run test:e2e` (Playwright) is self-contained — it uses `file:e2e.db`, sets its
   own `AUTH_SECRET`/`E2E_TEST_MODE`, and boots its own server on port 3099. Requires
-  `npx playwright install` once for the Chromium binary (not part of the startup script).
+  `npx playwright install chromium` once for the Chromium binary (not part of the startup script).
+  CI must **not** use `playwright install chromium --with-deps` (apt hangs on some GitHub
+  ubuntu runners). Journey specs (`e2e/*journey*.spec.ts`) default to a 180s timeout.
+  Production promotions require `npm run test:e2e:journeys` (see `.cursorrules`).
