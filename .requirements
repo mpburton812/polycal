@@ -416,3 +416,4 @@
 2026-08-19 | 7bc32b1 | PC-448 | stabilize attendee and residency journeys | e2e/helpers/people-places.ts
 2026-08-19 | 78b478b | PC-448 | encode post-production harness rules | src/lib/changelog/entries.ts
 2026-08-20 | d306d1a | PC-448 | keep place-card has-filters relative to each card | src/lib/changelog/entries.ts
+2026-08-20 | 5cb29d6 | PC-448 | click solo batch night, not seeded Han+Leia | src/lib/changelog/entries.ts
