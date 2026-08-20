@@ -28,6 +28,34 @@ import { CHANGELOG_ARCHIVE } from "./entries.archive";
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "2026.08.19e",
+    date: "2026-08-19",
+    summary:
+      "Agent harness: Playwright install without apt, journey timeouts, and production flake policy (PC-448).",
+    changes: [
+      {
+        type: "changed",
+        description:
+          "Agents use gh pr create; CI Playwright installs Chromium without --with-deps; cancelled e2e jobs are ignored (PC-448).",
+      },
+      {
+        type: "changed",
+        description:
+          "Journey specs default to 180s; locators use the active tab panel and exact invitee names (PC-448).",
+      },
+      {
+        type: "fixed",
+        description:
+          "Place-card Add person filters stay relative inner locators so residency journeys resolve the select (PC-448).",
+      },
+      {
+        type: "fixed",
+        description:
+          "Batch-sleeping journey clicks the solo Han night, not the seeded Han+Leia Tatooine proposal (PC-448).",
+      },
+    ],
+  },
+  {
     version: "2026.08.19d",
     date: "2026-08-19",
     summary:

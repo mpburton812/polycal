@@ -2,11 +2,12 @@ import { type Locator, type Page, expect } from "@playwright/test";
 
 import { fillProposalDateTimeField, fillProposalDateRange, selectDraftScheduleMode } from "./datePickers";
 import { goToProposals, openProposalCard, selectProposalTab } from "./navigation";
+import { activeMainPanel } from "./tab-swipe";
 import { expectToast } from "./toast";
 
 /** Locates a proposal Kanban card by exact title heading. */
 export function proposalCard(page: Page, title: string | RegExp) {
-  return page.locator(".MuiCard-root").filter({
+  return activeMainPanel(page).locator(".MuiCard-root").filter({
     has: page.getByRole("heading", {
       name: title,
       level: 2,
@@ -24,14 +25,14 @@ function escapeRegex(value: string): string {
 /** Locates cards whose titles start with the given prefix (events, recurring series). */
 export function proposalCardsWithPrefix(page: Page, titlePrefix: string) {
   const escaped = escapeRegex(titlePrefix);
-  return page.locator(".MuiCard-root").filter({
+  return activeMainPanel(page).locator(".MuiCard-root").filter({
     has: page.getByRole("heading", { level: 2, name: new RegExp(`^${escaped}`) }),
   });
 }
 
 /** Locates all auto-titled sleeping proposal cards (PC-66). */
 export function sleepingProposalCards(page: Page) {
-  return page.locator(".MuiCard-root").filter({
+  return activeMainPanel(page).locator(".MuiCard-root").filter({
     has: page.getByRole("heading", { level: 2, name: /Sleeping:/ }),
   });
 }

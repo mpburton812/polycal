@@ -6,6 +6,7 @@ import { USERS } from "./helpers/constants";
 import { goToProposals, openProposalCard, selectProposalTab } from "./helpers/navigation";
 import { expandDraftMoreOptions, openEventOrSleepingProposalDraft, proposalCard, setInviteeRequired, submitProposalDraft } from "./helpers/proposals";
 import { expectToast } from "./helpers/toast";
+import { expectExactText } from "./helpers/text";
 
 test.describe("Proposal invitee journey", () => {
   test("proposer submits, invitee adds attendee and accepts, new invitee abstains", async ({
@@ -41,9 +42,7 @@ test.describe("Proposal invitee journey", () => {
     await leiaDialog.getByLabel("Add attendee").click();
     await page.getByRole("option", { name: USERS.han.displayName }).click();
     await leiaDialog.getByRole("button", { name: "Add", exact: true }).click();
-    await expect(leiaDialog.getByText(USERS.han.displayName, { exact: true })).toBeVisible({
-      timeout: 15_000,
-    });
+    await expectExactText(leiaDialog, USERS.han.displayName);
     await expect(leiaDialog.getByText("Accepted", { exact: true })).toBeVisible();
     await expect(leiaDialog.getByText(/added required: Han Solo/i)).toBeVisible({ timeout: 15_000 });
 
