@@ -10,6 +10,8 @@ const AUTH_DIR = path.join(__dirname, "..", ".auth");
 type WorkerScoped = {
   baseURL: string;
   storageState: string | { cookies: []; origins: [] };
+  /** Journey files get 180s unless the spec already raised the timeout (PC-448). */
+  _journeyTimeout: void;
 };
 
 /**
@@ -30,6 +32,16 @@ const workerScoped = base.extend<WorkerScoped>({
       await use(path.join(AUTH_DIR, `luke-w${index}.json`));
     },
     { option: true },
+  ],
+  _journeyTimeout: [
+    async ({}, use, testInfo) => {
+      // Default 60s is too short for multi-login Windows journeys; specs may still raise higher.
+      if (testInfo.file.includes("journey") && testInfo.timeout <= 60_000) {
+        testInfo.setTimeout(180_000);
+      }
+      await use();
+    },
+    { auto: true },
   ],
 });
 

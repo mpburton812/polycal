@@ -30,10 +30,11 @@ export async function addPersonToPlace(
   role: "Owner" | "Resident" = "Resident",
 ): Promise<void> {
   await expandPlace(page, placeName);
-  const placePanel = page
+  const panel = activeMainPanel(page);
+  const placePanel = panel
     .locator("div")
-    .filter({ has: page.getByRole("heading", { name: placeName, level: 2 }) })
-    .filter({ has: page.getByRole("button", { name: "Add", exact: true }) })
+    .filter({ has: panel.getByRole("heading", { name: placeName, level: 2 }) })
+    .filter({ has: panel.getByRole("button", { name: "Add", exact: true }) })
     .last();
   await placePanel.getByLabel("Add person").click();
   await page.getByRole("option", { name: personDisplayName }).click();

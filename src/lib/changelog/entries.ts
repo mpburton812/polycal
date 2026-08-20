@@ -28,6 +28,24 @@ import { CHANGELOG_ARCHIVE } from "./entries.archive";
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "2026.08.19e",
+    date: "2026-08-19",
+    summary:
+      "Agent harness: Playwright install without apt, journey timeouts, and production flake policy (PC-448).",
+    changes: [
+      {
+        type: "changed",
+        description:
+          "Agents use gh pr create; CI Playwright installs Chromium without --with-deps; cancelled e2e jobs are ignored (PC-448).",
+      },
+      {
+        type: "changed",
+        description:
+          "Journey specs default to 180s; locators use the active tab panel and exact invitee names (PC-448).",
+      },
+    ],
+  },
+  {
     version: "2026.08.19d",
     date: "2026-08-19",
     summary:
