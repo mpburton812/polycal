@@ -3,6 +3,7 @@ import dynamic from "next/dynamic";
 import { redirect } from "next/navigation";
 
 import { listActivityLogAction } from "@/actions/admin";
+import { listPlatformSystemLogAction } from "@/actions/platform-log";
 import {
   getActiveNetworkDashboardAction,
 } from "@/actions/networks";
@@ -63,6 +64,13 @@ const AdminActivityLogPanel = dynamic(
     })),
   { loading: () => <AdminPanelFallback /> },
 );
+const AdminPlatformSystemLogPanel = dynamic(
+  () =>
+    import("@/components/admin/AdminPlatformSystemLogPanel").then((mod) => ({
+      default: mod.AdminPlatformSystemLogPanel,
+    })),
+  { loading: () => <AdminPanelFallback /> },
+);
 const AdminTestDataPanel = dynamic(
   () =>
     import("@/components/admin/AdminTestDataPanel").then((mod) => ({
@@ -97,6 +105,7 @@ export default async function AdminPage() {
     settings,
     adminUsers,
     logEntries,
+    platformLogEntries,
     networkDashboard,
     networkMotd,
     platformMotd,
@@ -104,6 +113,7 @@ export default async function AdminPage() {
     isLegacyAdmin ? getNetworkSettingsAction() : Promise.resolve(null),
     isLegacyAdmin ? listAdminUsersAction() : Promise.resolve([]),
     isLegacyAdmin ? listActivityLogAction() : Promise.resolve([]),
+    isPlatformAdmin ? listPlatformSystemLogAction() : Promise.resolve([]),
     isNetworkAdmin ? getActiveNetworkDashboardAction() : Promise.resolve(null),
     isNetworkAdmin
       ? getNetworkMotdAdminStateAction().then((r) => (r.ok ? r.data : null))
@@ -138,7 +148,12 @@ export default async function AdminPage() {
         )}
         {isLegacyAdmin && settings && (
           <>
-            <AdminNetworkSettingsPanel initialSettings={settings} />
+            <AdminNetworkSettingsPanel
+              initialSettings={settings}
+              isSponsor={activeNetworkRole === "sponsor"}
+              networkStatus={networkDashboard?.status ?? "active"}
+              pendingDeleteAt={networkDashboard?.pendingDeleteAt ?? null}
+            />
             <AdminFastSleepingPlanPanel users={adminUsers} />
             <AdminUserManagementPanel
               users={adminUsers}
@@ -147,6 +162,9 @@ export default async function AdminPage() {
               impersonationEnabled={isImpersonationConfigured()}
             />
             <AdminActivityLogPanel entries={logEntries} />
+            {isPlatformAdmin && (
+              <AdminPlatformSystemLogPanel entries={platformLogEntries} />
+            )}
             {isNonProductionEnvironment() && <AdminTestDataPanel />}
           </>
         )}

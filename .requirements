@@ -418,3 +418,4 @@
 2026-08-20 | d306d1a | PC-448 | keep place-card has-filters relative to each card | src/lib/changelog/entries.ts
 2026-08-20 | 5cb29d6 | PC-448 | click solo batch night, not seeded Han+Leia | src/lib/changelog/entries.ts
 2026-08-20 | e6714b3 | PC-460 | add Sponsor role and schema 52 | src/actions/networks.ts
+2026-08-20 | aa426bc | PC-461 | autosave Network Configuration patches | src/actions/network-settings.ts
