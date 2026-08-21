@@ -2,21 +2,23 @@
 
 import { eq } from "drizzle-orm";
 import { headers } from "next/headers";
+import { redirect } from "next/navigation";
 import { z } from "zod";
 
+import { type ActionFailure } from "@/lib/actions/result";
 import { logUserActivity } from "@/lib/audit";
-import { emailLoginExpiresAt } from "@/lib/auth/email-login";
+import { signIn } from "@/lib/auth";
+import { emailLoginExpiresAt, isNextRedirectError } from "@/lib/auth/email-login";
 import { hashLinkToken } from "@/lib/crypto/token-hash";
+import { getDb } from "@/lib/db/client";
+import { ensureDbReady } from "@/lib/db/ensure-ready";
+import { users } from "@/lib/db/schema";
 import { newEmailLoginToken } from "@/lib/email/credentials";
 import { sendEmail } from "@/lib/email/send";
 import { buildEmailLoginContent } from "@/lib/email/templates";
 import { getPublicAppUrl } from "@/lib/env";
 import { getClientIpFromHeaders } from "@/lib/http/client-ip";
-import { getDb } from "@/lib/db/client";
-import { ensureDbReady } from "@/lib/db/ensure-ready";
-import { users } from "@/lib/db/schema";
 import { checkRateLimitPersistent } from "@/lib/rate-limit";
-import { type ActionFailure } from "@/lib/actions/result";
 
 const GENERIC_REQUEST_MESSAGE =
   "If that account has a verified notification email, we sent a login link.";
@@ -107,4 +109,24 @@ export async function requestEmailLoginAction(
   }
 
   return { ok: true, message: GENERIC_REQUEST_MESSAGE };
+}
+
+/**
+ * Completes email login from the magic-link page form (PC-465).
+ * Must run as a server action so Auth.js can set the session cookie.
+ */
+export async function redeemEmailLoginAction(formData: FormData): Promise<void> {
+  const token = String(formData.get("token") ?? "").trim();
+  if (!token) {
+    redirect("/login?error=CredentialsSignin");
+  }
+  try {
+    await signIn("credentials", {
+      emailLoginToken: token,
+      redirectTo: "/feed",
+    });
+  } catch (error) {
+    if (isNextRedirectError(error)) throw error;
+    redirect("/login?error=CredentialsSignin");
+  }
 }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { isEmailLoginTokenExpired } from "@/lib/auth/email-login";
+import { isEmailLoginTokenExpired, isNextRedirectError } from "@/lib/auth/email-login";
 
 describe("email login token expiry (PC-465)", () => {
   it("treats missing expiry as expired", () => {
@@ -16,5 +16,13 @@ describe("email login token expiry (PC-465)", () => {
   it("rejects an expired token", () => {
     const expiresAt = new Date(Date.now() - 1_000).toISOString();
     expect(isEmailLoginTokenExpired(expiresAt)).toBe(true);
+  });
+});
+
+describe("isNextRedirectError", () => {
+  it("recognizes Auth.js / Next.js redirect errors", () => {
+    expect(isNextRedirectError({ digest: "NEXT_REDIRECT;replace;/feed;303;" })).toBe(true);
+    expect(isNextRedirectError(new Error("CredentialsSignin"))).toBe(false);
+    expect(isNextRedirectError(null)).toBe(false);
   });
 });
