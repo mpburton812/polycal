@@ -1,10 +1,10 @@
 /** Multi-network tenancy types (PC-357). */
 
-export const networkStatuses = ["active", "paused"] as const;
+export const networkStatuses = ["active", "paused", "pending_delete"] as const;
 export type NetworkStatus = (typeof networkStatuses)[number];
 
 /** Role within a single network (platform identity is separate). */
-export const networkMemberRoles = ["network_admin", "user", "passive"] as const;
+export const networkMemberRoles = ["sponsor", "network_admin", "user", "passive"] as const;
 export type NetworkMemberRole = (typeof networkMemberRoles)[number];
 
 export const networkMemberStatuses = ["active", "removed"] as const;
@@ -33,7 +33,7 @@ export function legacyRoleToNetworkRole(
 export function networkRoleToLegacyRole(
   role: NetworkMemberRole,
 ): "admin" | "user" | "passive" {
-  if (role === "network_admin") return "admin";
+  if (role === "sponsor" || role === "network_admin") return "admin";
   if (role === "passive") return "passive";
   return "user";
 }

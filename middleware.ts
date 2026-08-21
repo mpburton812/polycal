@@ -27,6 +27,7 @@ export default edgeAuth((request) => {
     "/terms",
     "/paused",
     "/banned",
+    "/network-closed",
     "/feedback",
     "/offline",
     "/api/auth",

@@ -21,6 +21,8 @@ declare module "next-auth" {
       activeNetworkRole?: NetworkMemberRole;
       isPlatformAdmin?: boolean;
       networkIds?: string[];
+      /** Session came from a one-time email login link — skip must-change-password (PC-465). */
+      emailLoginSession?: boolean;
     } & DefaultSession["user"];
   }
 
@@ -38,6 +40,7 @@ declare module "next-auth" {
     activeNetworkRole?: NetworkMemberRole;
     isPlatformAdmin?: boolean;
     networkIds?: string[];
+    emailLoginSession?: boolean;
   }
 }
 
@@ -60,6 +63,7 @@ declare module "next-auth/jwt" {
     activeNetworkRole?: NetworkMemberRole;
     isPlatformAdmin?: boolean;
     networkIds?: string[];
+    emailLoginSession?: boolean;
   }
 }
 

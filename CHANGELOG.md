@@ -4,6 +4,12 @@ All notable changes to PolyCal are documented here.
 
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [2026.08.20a] - 2026-08-20
+
+### Added
+
+- PC-459–PC-466: Sponsor role, autosave Network Configuration, 24h pending-delete then hard-wipe, Platform System Log + operator alerts, About/support message, email magic-link login (no password change), and app icons from `assets/images/icon.webp`. SCHEMA_VERSION 52. Change control: `2026.08.20a`.
+
 ## [2026.08.19e] - 2026-08-19
 
 ### Changed

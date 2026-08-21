@@ -7,6 +7,7 @@ import {
 } from "@/lib/networks/membership";
 import type { NetworkMemberRole } from "@/types/network";
 import type { UserRole } from "@/types/user";
+import { canAccessRestrictedNetwork, isElevatedNetworkRole } from "@/lib/networks/roles";
 import {
   PAUSED_ACCOUNT_MESSAGE,
   type ActionContextError,
@@ -23,9 +24,13 @@ export interface NetworkSessionUser extends SessionUser {
 export const NETWORK_PAUSED_MESSAGE =
   "This network is paused. Contact a network admin or platform operator.";
 
+export const NETWORK_CLOSING_MESSAGE =
+  "This network is closing. Contact the Sponsor or a platform operator.";
+
 /**
  * Requires session + active network membership. Paused networks reject
- * non–network_admin members (PC-357 / PC-359).
+ * non-elevated members; pending-delete rejects everyone except the Sponsor
+ * (and platform operators) (PC-357 / PC-359 / PC-462).
  */
 export async function requireNetworkSession(): Promise<
   { ok: true; user: NetworkSessionUser; membership: MembershipRow } | ActionContextError
@@ -57,17 +62,27 @@ export async function requireNetworkSession(): Promise<
       : undefined) ?? memberships[0];
 
   if (
-    membership.networkStatus === "paused" &&
-    membership.role !== "network_admin" &&
-    session.user.isPlatformAdmin !== true
+    !canAccessRestrictedNetwork({
+      role: membership.role,
+      networkStatus: membership.networkStatus,
+      isPlatformAdmin: session.user.isPlatformAdmin === true,
+    })
   ) {
-    const fallback = memberships.find(
-      (m) =>
-        m.networkStatus === "active" ||
-        m.role === "network_admin",
+    const fallback = memberships.find((m) =>
+      canAccessRestrictedNetwork({
+        role: m.role,
+        networkStatus: m.networkStatus,
+        isPlatformAdmin: session.user.isPlatformAdmin === true,
+      }),
     );
     if (!fallback) {
-      return { ok: false, message: NETWORK_PAUSED_MESSAGE };
+      return {
+        ok: false,
+        message:
+          membership.networkStatus === "pending_delete"
+            ? NETWORK_CLOSING_MESSAGE
+            : NETWORK_PAUSED_MESSAGE,
+      };
     }
     membership = fallback;
   }
@@ -88,7 +103,7 @@ export async function requireNetworkSession(): Promise<
 }
 
 /**
- * Requires network_admin (or platform admin) in the active network (PC-357).
+ * Requires network_admin or sponsor (or platform admin) in the active network (PC-357 / PC-460).
  */
 export async function requireNetworkAdmin(): Promise<
   { ok: true; user: NetworkSessionUser; membership: MembershipRow } | ActionContextError
@@ -96,10 +111,25 @@ export async function requireNetworkAdmin(): Promise<
   const result = await requireNetworkSession();
   if (!result.ok) return result;
   if (
-    result.user.activeNetworkRole !== "network_admin" &&
+    !isElevatedNetworkRole(result.user.activeNetworkRole) &&
     !result.user.isPlatformAdmin
   ) {
     return { ok: false, message: "Network admin access required." };
+  }
+  return result;
+}
+
+/**
+ * Requires the unique Sponsor membership. Platform admin is not enough unless
+ * they are also this network's Sponsor — only Sponsor may start DELETE (PC-460 / PC-462).
+ */
+export async function requireNetworkSponsor(): Promise<
+  { ok: true; user: NetworkSessionUser; membership: MembershipRow } | ActionContextError
+> {
+  const result = await requireNetworkSession();
+  if (!result.ok) return result;
+  if (result.user.activeNetworkRole !== "sponsor") {
+    return { ok: false, message: "Sponsor access required." };
   }
   return result;
 }
@@ -148,5 +178,5 @@ export async function isActiveNetworkAdmin(
 ): Promise<boolean> {
   if (isPlatformAdmin) return true;
   const membership = await getMembership(userId, networkId);
-  return membership?.role === "network_admin";
+  return isElevatedNetworkRole(membership?.role);
 }

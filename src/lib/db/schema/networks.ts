@@ -29,6 +29,12 @@ export const networks = sqliteTable("networks", {
   status: text("status", { enum: networkStatuses }).notNull().default("active"),
   createdByUserId: text("created_by_user_id").references(() => users.id),
   createdByEmail: text("created_by_email"),
+  /** Unique Sponsor for this network — cannot be demoted or removed (PC-460). */
+  sponsorUserId: text("sponsor_user_id").references(() => users.id),
+  /** When set, network is pending hard-wipe (PC-462). */
+  pendingDeleteAt: text("pending_delete_at"),
+  /** When set, the T-1h Sponsor email has already been sent (PC-462). */
+  pendingDeleteNotifyAt: text("pending_delete_notify_at"),
   allowUserProvisioning: integer("allow_user_provisioning", { mode: "boolean" })
     .notNull()
     .default(false),

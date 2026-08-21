@@ -14,8 +14,12 @@ import {
   Typography,
 } from "@mui/material";
 import { useRouter } from "next/navigation";
-import { useState, useTransition, type ReactNode } from "react";
+import { useEffect, useRef, useState, useTransition, type ReactNode } from "react";
 
+import {
+  reactivateNetworkAction,
+  requestNetworkDeleteAction,
+} from "@/actions/networks";
 import { updateNetworkSettingsAction } from "@/actions/network-settings";
 import { AdminCollapsibleSection } from "@/components/admin/AdminCollapsibleSection";
 import { useToast } from "@/components/providers/ToastProvider";
@@ -53,6 +57,8 @@ const MAP_VISIBILITY_LABELS: Record<string, string> = {
   none: "Hidden",
 };
 
+const TEXT_DEBOUNCE_MS = 400;
+
 function SettingsSubsection({ title, children }: { title: string; children: ReactNode }) {
   return (
     <Stack spacing={2}>
@@ -65,46 +71,117 @@ function SettingsSubsection({ title, children }: { title: string; children: Reac
 }
 
 /**
- * Network Configuration editor for the Admin tab (PC-30 / PC-437).
- * Same keys and save action; subsection order is the only UI change.
+ * Network Configuration editor — switches persist immediately; text/number persist
+ * on blur, Enter, and a short debounce (PC-461). Sponsor danger zone is PC-462.
  */
 export function AdminNetworkSettingsPanel({
   initialSettings,
+  isSponsor = false,
+  networkStatus = "active",
+  pendingDeleteAt = null,
 }: {
   initialSettings: NetworkSettings;
+  isSponsor?: boolean;
+  networkStatus?: string;
+  pendingDeleteAt?: string | null;
 }) {
   const router = useRouter();
   const { showToast } = useToast();
   const [settings, setSettings] = useState(initialSettings);
-  const [message, setMessage] = useState<string | null>(null);
+  const lastSaved = useRef(initialSettings);
+  const debounceTimers = useRef<Partial<Record<keyof NetworkSettings, ReturnType<typeof setTimeout>>>>(
+    {},
+  );
   const [error, setError] = useState<string | null>(null);
-  const [savePending, startSaveTransition] = useTransition();
+  const [, startSaveTransition] = useTransition();
+  const [deleteConfirm, setDeleteConfirm] = useState("");
+  const [deletePending, startDeleteTransition] = useTransition();
 
-  function save() {
-    setMessage(null);
+  useEffect(() => {
+    setSettings(initialSettings);
+    lastSaved.current = initialSettings;
+  }, [initialSettings]);
+
+  function revertKey<K extends keyof NetworkSettings>(key: K) {
+    setSettings((current) => ({ ...current, [key]: lastSaved.current[key] }));
+  }
+
+  function persistPatch(patch: Partial<NetworkSettings>, revertKeys: (keyof NetworkSettings)[]) {
     setError(null);
     startSaveTransition(async () => {
-      const result = await updateNetworkSettingsAction(settings);
+      const result = await updateNetworkSettingsAction(patch);
       if (!result.ok) {
         setError(result.message);
         showToast(result.message, "error");
+        for (const key of revertKeys) revertKey(key);
         return;
       }
-      setMessage(result.message);
+      lastSaved.current = { ...lastSaved.current, ...patch };
       showToast(result.message, "success");
-      router.refresh();
     });
   }
+
+  function persistImmediate<K extends keyof NetworkSettings>(key: K, value: NetworkSettings[K]) {
+    const next = { ...settings, [key]: value };
+    if (key === "schedulingPosting") {
+      const mode = value as NetworkSettings["schedulingPosting"];
+      next.proxySchedulingEnabled = bookingsEnabled(mode);
+      next.pollEnabled = mode === "bookings_only" ? false : settings.pollEnabled;
+    }
+    setSettings(next);
+    persistPatch(
+      key === "schedulingPosting"
+        ? {
+            schedulingPosting: value as NetworkSettings["schedulingPosting"],
+            proxySchedulingEnabled: next.proxySchedulingEnabled,
+            pollEnabled: next.pollEnabled,
+          }
+        : { [key]: value },
+      key === "schedulingPosting"
+        ? ["schedulingPosting", "proxySchedulingEnabled", "pollEnabled"]
+        : [key],
+    );
+  }
+
+  function persistText<K extends keyof NetworkSettings>(key: K, value: NetworkSettings[K]) {
+    setSettings((current) => ({ ...current, [key]: value }));
+    const existing = debounceTimers.current[key];
+    if (existing) clearTimeout(existing);
+    debounceTimers.current[key] = setTimeout(() => {
+      persistPatch({ [key]: value } as Partial<NetworkSettings>, [key]);
+    }, TEXT_DEBOUNCE_MS);
+  }
+
+  function flushText<K extends keyof NetworkSettings>(key: K, value: NetworkSettings[K]) {
+    const existing = debounceTimers.current[key];
+    if (existing) clearTimeout(existing);
+    if (lastSaved.current[key] === value) return;
+    persistPatch({ [key]: value } as Partial<NetworkSettings>, [key]);
+  }
+
+  const closing = networkStatus === "pending_delete";
 
   return (
     <AdminCollapsibleSection title="Network Configuration">
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
-      {message && <Alert severity="success" sx={{ mb: 2 }}>{message}</Alert>}
+      {closing && (
+        <Alert severity="warning" sx={{ mb: 2 }}>
+          This network is scheduled to close
+          {pendingDeleteAt ? ` at ${new Date(pendingDeleteAt).toLocaleString()}` : ""}.
+        </Alert>
+      )}
       <Stack spacing={2}>
         <TextField
           label="Network name"
           value={settings.name}
-          onChange={(e) => setSettings({ ...settings, name: e.target.value })}
+          onChange={(e) => persistText("name", e.target.value)}
+          onBlur={(e) => flushText("name", e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              flushText("name", settings.name);
+            }
+          }}
           fullWidth
           inputProps={{ maxLength: LONG_TEXT_MAX }}
         />
@@ -114,12 +191,7 @@ export function AdminNetworkSettingsPanel({
             control={
               <Switch
                 checked={settings.feedEnabled}
-                onChange={(e) =>
-                  setSettings({
-                    ...settings,
-                    feedEnabled: e.target.checked,
-                  })
-                }
+                onChange={(e) => persistImmediate("feedEnabled", e.target.checked)}
               />
             }
             label="Enable Feed"
@@ -132,12 +204,7 @@ export function AdminNetworkSettingsPanel({
               <Switch
                 checked={settings.schedulingPosting !== "bookings_only" && settings.pollEnabled}
                 disabled={settings.schedulingPosting === "bookings_only"}
-                onChange={(e) =>
-                  setSettings({
-                    ...settings,
-                    pollEnabled: e.target.checked,
-                  })
-                }
+                onChange={(e) => persistImmediate("pollEnabled", e.target.checked)}
               />
             }
             label="Enable Poll"
@@ -150,12 +217,7 @@ export function AdminNetworkSettingsPanel({
             control={
               <Switch
                 checked={settings.fastSleepEnabled}
-                onChange={(e) =>
-                  setSettings({
-                    ...settings,
-                    fastSleepEnabled: e.target.checked,
-                  })
-                }
+                onChange={(e) => persistImmediate("fastSleepEnabled", e.target.checked)}
               />
             }
             label="Enable Bulk Sleeping Booking"
@@ -174,10 +236,10 @@ export function AdminNetworkSettingsPanel({
               label="Sleeping partner tab visibility"
               value={settings.placesMapVisibility}
               onChange={(e) =>
-                setSettings({
-                  ...settings,
-                  placesMapVisibility: e.target.value as NetworkSettings["placesMapVisibility"],
-                })
+                persistImmediate(
+                  "placesMapVisibility",
+                  e.target.value as NetworkSettings["placesMapVisibility"],
+                )
               }
             >
               {placesMapVisibilityLevels.map((level) => (
@@ -194,14 +256,11 @@ export function AdminNetworkSettingsPanel({
             control={
               <Switch
                 checked={settings.adminCanSeeUninvolved}
-                onChange={(e) =>
-                  setSettings({ ...settings, adminCanSeeUninvolved: e.target.checked })
-                }
+                onChange={(e) => persistImmediate("adminCanSeeUninvolved", e.target.checked)}
               />
             }
             label="Admins can see proposals they are not involved in"
           />
-          {/* labelId so the combobox exposes "Event Types" to getByRole / getByLabel (PC-424 / PC-447). */}
           <FormControl fullWidth>
             <InputLabel id="proposal-posting-label">Event Types</InputLabel>
             <Select
@@ -209,15 +268,12 @@ export function AdminNetworkSettingsPanel({
               id="proposal-posting"
               label="Event Types"
               value={settings.schedulingPosting}
-              onChange={(e) => {
-                const next = e.target.value as NetworkSettings["schedulingPosting"];
-                setSettings({
-                  ...settings,
-                  schedulingPosting: next,
-                  proxySchedulingEnabled: bookingsEnabled(next),
-                  pollEnabled: next === "bookings_only" ? false : settings.pollEnabled,
-                });
-              }}
+              onChange={(e) =>
+                persistImmediate(
+                  "schedulingPosting",
+                  e.target.value as NetworkSettings["schedulingPosting"],
+                )
+              }
             >
               {schedulingPostingModes.map((mode) => (
                 <MenuItem key={mode} value={mode}>
@@ -240,11 +296,10 @@ export function AdminNetworkSettingsPanel({
                 label="Booking for"
                 value={settings.proxySchedulingScope}
                 onChange={(e) =>
-                  setSettings({
-                    ...settings,
-                    proxySchedulingScope: e.target
-                      .value as NetworkSettings["proxySchedulingScope"],
-                  })
+                  persistImmediate(
+                    "proxySchedulingScope",
+                    e.target.value as NetworkSettings["proxySchedulingScope"],
+                  )
                 }
               >
                 {proxySchedulingScopes.map((scope) => (
@@ -265,10 +320,10 @@ export function AdminNetworkSettingsPanel({
               label="Proposal audit log visibility"
               value={settings.auditLogVisibility}
               onChange={(e) =>
-                setSettings({
-                  ...settings,
-                  auditLogVisibility: e.target.value as NetworkSettings["auditLogVisibility"],
-                })
+                persistImmediate(
+                  "auditLogVisibility",
+                  e.target.value as NetworkSettings["auditLogVisibility"],
+                )
               }
             >
               {auditLogVisibilityLevels.map((level) => (
@@ -287,11 +342,23 @@ export function AdminNetworkSettingsPanel({
             inputProps={{ min: 0, max: 365 }}
             value={settings.proposedMaxDays}
             onChange={(e) =>
-              setSettings({
-                ...settings,
-                proposedMaxDays: Math.min(365, Math.max(0, Number(e.target.value) || 0)),
-              })
+              persistText(
+                "proposedMaxDays",
+                Math.min(365, Math.max(0, Number(e.target.value) || 0)),
+              )
             }
+            onBlur={(e) =>
+              flushText(
+                "proposedMaxDays",
+                Math.min(365, Math.max(0, Number(e.target.value) || 0)),
+              )
+            }
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                flushText("proposedMaxDays", settings.proposedMaxDays);
+              }
+            }}
             helperText="0 = expire only when event start passes without resolution"
           />
           <TextField
@@ -300,10 +367,16 @@ export function AdminNetworkSettingsPanel({
             inputProps={{ min: 1, max: 365 }}
             value={settings.atRiskTtlDays}
             onChange={(e) =>
-              setSettings({
-                ...settings,
-                atRiskTtlDays: Math.min(365, Math.max(1, Number(e.target.value) || 1)),
-              })
+              persistText(
+                "atRiskTtlDays",
+                Math.min(365, Math.max(1, Number(e.target.value) || 1)),
+              )
+            }
+            onBlur={(e) =>
+              flushText(
+                "atRiskTtlDays",
+                Math.min(365, Math.max(1, Number(e.target.value) || 1)),
+              )
             }
             helperText="How long collision/re-draft drafts stay editable before archive"
           />
@@ -313,13 +386,16 @@ export function AdminNetworkSettingsPanel({
             inputProps={{ min: 1, max: 365 }}
             value={settings.sleepingPartnerProposalMaxDays}
             onChange={(e) =>
-              setSettings({
-                ...settings,
-                sleepingPartnerProposalMaxDays: Math.min(
-                  365,
-                  Math.max(1, Number(e.target.value) || 1),
-                ),
-              })
+              persistText(
+                "sleepingPartnerProposalMaxDays",
+                Math.min(365, Math.max(1, Number(e.target.value) || 1)),
+              )
+            }
+            onBlur={(e) =>
+              flushText(
+                "sleepingPartnerProposalMaxDays",
+                Math.min(365, Math.max(1, Number(e.target.value) || 1)),
+              )
             }
             helperText="Unanswered sleeping-partner proposals are deleted after this many days; both people are notified"
           />
@@ -329,10 +405,16 @@ export function AdminNetworkSettingsPanel({
             inputProps={{ min: 0, max: 8760 }}
             value={settings.archiveGraceHours}
             onChange={(e) =>
-              setSettings({
-                ...settings,
-                archiveGraceHours: Math.min(8760, Math.max(0, Number(e.target.value) || 0)),
-              })
+              persistText(
+                "archiveGraceHours",
+                Math.min(8760, Math.max(0, Number(e.target.value) || 0)),
+              )
+            }
+            onBlur={(e) =>
+              flushText(
+                "archiveGraceHours",
+                Math.min(8760, Math.max(0, Number(e.target.value) || 0)),
+              )
             }
             helperText="Resolved events auto-archive this many hours after scheduled end"
           />
@@ -342,10 +424,16 @@ export function AdminNetworkSettingsPanel({
             inputProps={{ min: 1, max: 168 }}
             value={settings.redraftDeadlineHours}
             onChange={(e) =>
-              setSettings({
-                ...settings,
-                redraftDeadlineHours: Math.min(168, Math.max(1, Number(e.target.value) || 1)),
-              })
+              persistText(
+                "redraftDeadlineHours",
+                Math.min(168, Math.max(1, Number(e.target.value) || 1)),
+              )
+            }
+            onBlur={(e) =>
+              flushText(
+                "redraftDeadlineHours",
+                Math.min(168, Math.max(1, Number(e.target.value) || 1)),
+              )
             }
             helperText="At-risk resolved events return to proposed within this window"
           />
@@ -356,9 +444,7 @@ export function AdminNetworkSettingsPanel({
             control={
               <Switch
                 checked={settings.allowUserProvisioning}
-                onChange={(e) =>
-                  setSettings({ ...settings, allowUserProvisioning: e.target.checked })
-                }
+                onChange={(e) => persistImmediate("allowUserProvisioning", e.target.checked)}
               />
             }
             label="Any user can add people (not only admins)"
@@ -367,9 +453,7 @@ export function AdminNetworkSettingsPanel({
             control={
               <Switch
                 checked={settings.hideSleepingArrangements}
-                onChange={(e) =>
-                  setSettings({ ...settings, hideSleepingArrangements: e.target.checked })
-                }
+                onChange={(e) => persistImmediate("hideSleepingArrangements", e.target.checked)}
               />
             }
             label="Mask sleeping details for uninvolved admins on calendar"
@@ -379,10 +463,7 @@ export function AdminNetworkSettingsPanel({
               <Switch
                 checked={settings.seePartnersSleepingArrangements}
                 onChange={(e) =>
-                  setSettings({
-                    ...settings,
-                    seePartnersSleepingArrangements: e.target.checked,
-                  })
+                  persistImmediate("seePartnersSleepingArrangements", e.target.checked)
                 }
               />
             }
@@ -402,19 +483,24 @@ export function AdminNetworkSettingsPanel({
             inputProps={{ min: 0, max: 1000 }}
             value={settings.logTailLength}
             onChange={(e) =>
-              setSettings({
-                ...settings,
-                logTailLength: Math.min(1000, Math.max(0, Number(e.target.value) || 0)),
-              })
+              persistText(
+                "logTailLength",
+                Math.min(1000, Math.max(0, Number(e.target.value) || 0)),
+              )
+            }
+            onBlur={(e) =>
+              flushText(
+                "logTailLength",
+                Math.min(1000, Math.max(0, Number(e.target.value) || 0)),
+              )
             }
             helperText="0 hides the log; max 1000 entries"
           />
           <TextField
             label="First-login welcome message"
             value={settings.onboardingWelcomeMessage}
-            onChange={(e) =>
-              setSettings({ ...settings, onboardingWelcomeMessage: e.target.value })
-            }
+            onChange={(e) => persistText("onboardingWelcomeMessage", e.target.value)}
+            onBlur={(e) => flushText("onboardingWelcomeMessage", e.target.value)}
             multiline
             minRows={4}
             fullWidth
@@ -423,9 +509,56 @@ export function AdminNetworkSettingsPanel({
           />
         </SettingsSubsection>
 
-        <Button variant="contained" onClick={save} disabled={savePending}>
-          {savePending ? "Saving…" : "Save settings"}
-        </Button>
+        {isSponsor && (
+          <SettingsSubsection title="Danger zone">
+            {closing ? (
+              <Button
+                color="success"
+                variant="contained"
+                disabled={deletePending}
+                onClick={() =>
+                  startDeleteTransition(async () => {
+                    const result = await reactivateNetworkAction();
+                    showToast(result.message, result.ok ? "success" : "error");
+                    if (result.ok) router.refresh();
+                  })
+                }
+              >
+                Re-activate network
+              </Button>
+            ) : (
+              <>
+                <Typography variant="body2" color="error">
+                  Closing this network locks everyone except you for 24 hours, then permanently
+                  deletes network data. Type DELETE to confirm.
+                </Typography>
+                <TextField
+                  label="Type DELETE to close this network"
+                  value={deleteConfirm}
+                  onChange={(e) => setDeleteConfirm(e.target.value)}
+                  inputProps={{ "aria-label": "Type DELETE to close this network" }}
+                />
+                <Button
+                  color="error"
+                  variant="contained"
+                  disabled={deletePending || deleteConfirm !== "DELETE"}
+                  onClick={() =>
+                    startDeleteTransition(async () => {
+                      const result = await requestNetworkDeleteAction(deleteConfirm);
+                      showToast(result.message, result.ok ? "success" : "error");
+                      if (result.ok) {
+                        setDeleteConfirm("");
+                        router.refresh();
+                      }
+                    })
+                  }
+                >
+                  Close network
+                </Button>
+              </>
+            )}
+          </SettingsSubsection>
+        )}
       </Stack>
     </AdminCollapsibleSection>
   );

@@ -22,9 +22,7 @@ test.describe("Admin", () => {
     ).toHaveCount(0);
     await expect(page.getByRole("heading", { name: "Code Status", level: 2 })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Network Configuration", level: 2 })).toBeVisible();
-    await expect(
-      page.getByRole("heading", { name: "System administrator log", level: 2 }),
-    ).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Network Administrator Log", level: 2 })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Test data", level: 2 })).toBeVisible();
 
     await expandAdminSection(page, "Code Status");

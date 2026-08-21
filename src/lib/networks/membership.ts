@@ -3,8 +3,9 @@ import { randomUUID } from "crypto";
 
 import { getDb } from "@/lib/db/client";
 import { networkMembers, networks, users } from "@/lib/db/schema";
-import type { NetworkMemberRole } from "@/types/network";
+import type { NetworkMemberRole, NetworkStatus } from "@/types/network";
 import { networkRoleToLegacyRole } from "@/types/network";
+import { isSponsorRole } from "@/lib/networks/roles";
 
 export type MembershipRow = {
   id: string;
@@ -13,7 +14,7 @@ export type MembershipRow = {
   role: NetworkMemberRole;
   status: "active" | "removed";
   networkName: string;
-  networkStatus: "active" | "paused";
+  networkStatus: NetworkStatus;
 };
 
 /**
@@ -43,7 +44,7 @@ export async function listActiveMemberships(
     ...r,
     role: r.role as NetworkMemberRole,
     status: r.status as "active" | "removed",
-    networkStatus: r.networkStatus as "active" | "paused",
+    networkStatus: r.networkStatus as NetworkStatus,
   }));
 }
 
@@ -81,7 +82,7 @@ export async function getMembership(
     ...row,
     role: row.role as NetworkMemberRole,
     status: row.status as "active" | "removed",
-    networkStatus: row.networkStatus as "active" | "paused",
+    networkStatus: row.networkStatus as NetworkStatus,
   };
 }
 
@@ -92,7 +93,9 @@ export async function getMembership(
 export async function syncDenormalizedUserRole(userId: string): Promise<void> {
   const memberships = await listActiveMemberships(userId);
   const primary =
-    memberships.find((m) => m.role === "network_admin") ?? memberships[0];
+    memberships.find((m) => m.role === "sponsor") ??
+    memberships.find((m) => m.role === "network_admin") ??
+    memberships[0];
   if (!primary) return;
 
   const db = getDb();
@@ -117,7 +120,7 @@ export async function upsertMembership(input: {
   const db = getDb();
   const now = new Date().toISOString();
   const [existing] = await db
-    .select({ id: networkMembers.id })
+    .select({ id: networkMembers.id, role: networkMembers.role })
     .from(networkMembers)
     .where(
       and(
@@ -128,10 +131,15 @@ export async function upsertMembership(input: {
     .limit(1);
 
   if (existing) {
+    // Sponsor membership is sticky — inhabit / access-level writes must not demote (PC-460).
+    const nextRole =
+      isSponsorRole(existing.role) && !isSponsorRole(input.role)
+        ? existing.role
+        : input.role;
     await db
       .update(networkMembers)
       .set({
-        role: input.role,
+        role: nextRole,
         status: "active",
         updatedAt: now,
       })

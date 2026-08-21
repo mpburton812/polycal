@@ -9,7 +9,7 @@ export * from "./calendar";
 export * from "./admin";
 export * from "./infra";
 
-import { alphaFeedbackSubmissions, motdAcknowledgments, motdMessages } from "./admin";
+import { alphaFeedbackSubmissions, motdAcknowledgments, motdMessages, platformLogAcknowledgments, platformSystemLog } from "./admin";
 import { calendarConnections, calendarEventLinks, calendarIcsPending } from "./calendar";
 import {
   feedImageUploads,
@@ -53,6 +53,8 @@ export const schema = {
   platformSettings,
   motdMessages,
   motdAcknowledgments,
+  platformSystemLog,
+  platformLogAcknowledgments,
   locations,
   userActivityLog,
   storedImages,

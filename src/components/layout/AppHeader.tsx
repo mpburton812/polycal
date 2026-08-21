@@ -3,6 +3,7 @@
 import CalendarMonthIcon from "@mui/icons-material/CalendarMonth";
 import AdminPanelSettingsIcon from "@mui/icons-material/AdminPanelSettings";
 import FeedbackIcon from "@mui/icons-material/Feedback";
+import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import LogoutIcon from "@mui/icons-material/Logout";
 import SettingsIcon from "@mui/icons-material/Settings";
 import {
@@ -26,10 +27,13 @@ import { useEffect, useState, type MouseEvent } from "react";
 import type { NotificationItem } from "@/actions/notifications";
 import { listMyNetworksAction } from "@/actions/networks";
 import { useFeedbackDialog } from "@/components/feedback/FeedbackDialog";
+import { AboutDialog } from "@/components/layout/AboutDialog";
 import { NotificationInbox } from "@/components/layout/NotificationInbox";
 import { OrganicAvatar } from "@/components/ui/OrganicAvatar";
 import { fontFamilies } from "@/theme/fonts";
 import { GARDEN_TOKENS } from "@/theme/tokens";
+import { canAccessRestrictedNetwork } from "@/lib/networks/roles";
+import type { NetworkMemberRole } from "@/types/network";
 
 /**
  * Primary app chrome — cream surface, ink borders, blob avatar (Garden Brutalism).
@@ -60,6 +64,7 @@ export function AppHeader({
   const [networks, setNetworks] = useState<
     { networkId: string; name: string; role: string; status: string }[]
   >([]);
+  const [aboutOpen, setAboutOpen] = useState(false);
   const { capturing, openDialog: openFeedback, dialog: feedbackDialog } = useFeedbackDialog();
 
   useEffect(() => {
@@ -96,14 +101,20 @@ export function AppHeader({
 
   async function onSwitchNetwork(networkId: string) {
     const target = networks.find((n) => n.networkId === networkId);
+    if (
+      target &&
+      !canAccessRestrictedNetwork({
+        role: target.role,
+        networkStatus: target.status,
+        isPlatformAdmin,
+      })
+    ) {
+      return;
+    }
     await update({
       user: {
         activeNetworkId: networkId,
-        activeNetworkRole: target?.role as
-          | "network_admin"
-          | "user"
-          | "passive"
-          | undefined,
+        activeNetworkRole: target?.role as NetworkMemberRole | undefined,
       },
     });
     router.refresh();
@@ -149,12 +160,25 @@ export function AppHeader({
                   ".MuiOutlinedInput-notchedOutline": { borderColor: GARDEN_TOKENS.ink },
                 }}
               >
-                {networks.map((n) => (
-                  <MenuItem key={n.networkId} value={n.networkId}>
-                    {n.name}
-                    {n.status === "paused" ? " (paused)" : ""}
-                  </MenuItem>
-                ))}
+                {networks.map((n) => {
+                  const locked = !canAccessRestrictedNetwork({
+                    role: n.role,
+                    networkStatus: n.status,
+                    isPlatformAdmin,
+                  });
+                  const suffix =
+                    n.status === "paused"
+                      ? " (paused)"
+                      : n.status === "pending_delete"
+                        ? " (closing)"
+                        : "";
+                  return (
+                    <MenuItem key={n.networkId} value={n.networkId} disabled={locked}>
+                      {n.name}
+                      {suffix}
+                    </MenuItem>
+                  );
+                })}
               </Select>
             </FormControl>
           ) : (
@@ -236,6 +260,17 @@ export function AppHeader({
           <MenuItem
             onClick={() => {
               closeProfileMenu();
+              setAboutOpen(true);
+            }}
+          >
+            <ListItemIcon>
+              <InfoOutlinedIcon fontSize="small" />
+            </ListItemIcon>
+            <ListItemText>About</ListItemText>
+          </MenuItem>
+          <MenuItem
+            onClick={() => {
+              closeProfileMenu();
               void openFeedback();
             }}
             disabled={capturing}
@@ -259,6 +294,7 @@ export function AppHeader({
       </Toolbar>
     </AppBar>
     {feedbackDialog}
+    <AboutDialog open={aboutOpen} onClose={() => setAboutOpen(false)} />
     </>
   );
 }

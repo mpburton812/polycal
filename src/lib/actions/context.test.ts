@@ -49,7 +49,7 @@ describe("action context helpers", () => {
     const result = await requireSession();
     expect(result).toEqual({
       ok: true,
-      user: { id: "u1", role: "user", isImpersonating: false },
+      user: { id: "u1", role: "user", isImpersonating: false, isPlatformAdmin: false },
     });
   });
 
@@ -61,7 +61,7 @@ describe("action context helpers", () => {
     const result = await requireSession();
     expect(result).toEqual({
       ok: true,
-      user: { id: "u1", role: "user", isImpersonating: true },
+      user: { id: "u1", role: "user", isImpersonating: true, isPlatformAdmin: false },
     });
   });
 
@@ -97,6 +97,9 @@ describe("action context helpers", () => {
     vi.mocked(resolveAdminAccess).mockReturnValue(true);
     const allowed = await requireAdminAccess();
     expect(allowed.ok).toBe(true);
+    if (allowed.ok) {
+      expect(allowed.user.isPlatformAdmin).toBe(false);
+    }
   });
 
   it("withDb ensures ready and passes db handle", async () => {
