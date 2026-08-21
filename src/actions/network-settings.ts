@@ -23,14 +23,10 @@ import {
   type NetworkSettingsPatch,
 } from "@/lib/networks/settings-schema";
 
-export type { PlacesMapVisibility };
-
 export interface NetworkSettingsActionResult {
   ok: boolean;
   message: string;
 }
-
-export { settingsPatchSchema, type NetworkSettingsPatch };
 
 const HIGH_SIGNAL_KEYS = new Set(["name", "feedEnabled"]);
 
