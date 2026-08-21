@@ -425,3 +425,4 @@
 2026-08-20 | 0357ec6 | PC-465 | email login magic link without password change | src/actions/email-login.ts
 2026-08-20 | 8afc8f5 | PC-466 | generate app icons from icon.webp | assets/images/icon.webp
 2026-08-20 | ac413cf | PC-459 | changelog 2026.08.20a and sponsor-ops e2e | src/lib/changelog/entries.ts
+2026-08-20 | f49a581 | PC-462 | do not keep JWT on a closing network | src/lib/email/templates.test.ts
