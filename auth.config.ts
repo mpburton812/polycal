@@ -169,10 +169,11 @@ export const authConfig = {
               isPlatformAdmin: row.isPlatformAdmin === true,
             }),
           );
+          // Only usable memberships stay active — pending_delete is Sponsor /
+          // Platform Admin only, so do not fall back to a locked tenant (PC-462).
           const preferred =
             typeof token.activeNetworkId === "string"
-              ? usable.find((m) => m.networkId === token.activeNetworkId) ??
-                memberships.find((m) => m.networkId === token.activeNetworkId)
+              ? usable.find((m) => m.networkId === token.activeNetworkId)
               : undefined;
           const next = preferred ?? usable[0] ?? memberships[0];
           if (next) {
