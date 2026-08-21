@@ -95,7 +95,6 @@ test.describe("FastSleep journey", () => {
     if (await toggle.isChecked()) {
       await toggle.click();
     }
-    await page.getByRole("button", { name: /Save settings/i }).click();
     await expectToast(page, /Network settings saved/i);
     await expect(page.getByLabel("Enable Bulk Sleeping Booking")).not.toBeChecked();
 

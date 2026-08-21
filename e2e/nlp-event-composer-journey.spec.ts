@@ -74,7 +74,6 @@ async function enableBookingsForAnyone(page: Page): Promise<void> {
   await expect(bookingFor).toBeVisible({ timeout: 15_000 });
   await bookingFor.click();
   await page.getByRole("option", { name: "Anyone on this network" }).click();
-  await page.getByRole("button", { name: /Save settings/i }).click();
   await expect(page.getByText(/Network settings saved/i).first()).toBeVisible({
     timeout: 15_000,
   });

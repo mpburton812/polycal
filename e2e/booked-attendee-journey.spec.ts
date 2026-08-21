@@ -121,7 +121,6 @@ async function setPostingMode(
   await expect(combo).toBeVisible({ timeout: 15_000 });
   await combo.click();
   await page.getByRole("option", { name: mode }).click();
-  await page.getByRole("button", { name: /Save settings/i }).click();
   await expect(page.getByText(/Network settings saved/i).first()).toBeVisible({
     timeout: 15_000,
   });

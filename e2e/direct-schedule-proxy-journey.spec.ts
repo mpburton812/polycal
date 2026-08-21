@@ -168,7 +168,6 @@ async function openNetworkSettings(page: Page): Promise<void> {
 }
 
 async function saveNetworkSettings(page: Page): Promise<void> {
-  await page.getByRole("button", { name: /Save settings/i }).click();
   await expect(page.getByText(/Network settings saved/i).first()).toBeVisible({
     timeout: 15_000,
   });

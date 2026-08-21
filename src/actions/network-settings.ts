@@ -2,20 +2,16 @@
 
 import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
-import { z } from "zod";
 
 import { logUserActivity } from "@/lib/audit";
+import { logPlatformEvent } from "@/lib/platform-log";
 import { getDb } from "@/lib/db/client";
 import { ensureDbReady } from "@/lib/db/ensure-ready";
 import { networks } from "@/lib/db/schema";
 import { requireNetworkAdmin, requireNetworkSession } from "@/lib/networks/context";
 import { loadNetworkSettings, resolveNetworkSettings } from "@/lib/networks/settings";
 import {
-  auditLogVisibilityLevels,
   bookingsEnabled,
-  placesMapVisibilityLevels,
-  proxySchedulingScopes,
-  schedulingPostingModes,
   type AuditLogVisibility,
   type NetworkSettings,
   type PlacesMapVisibility,
@@ -23,10 +19,9 @@ import {
   type SchedulingPostingMode,
 } from "@/types/network-settings";
 import {
-  LONG_TEXT_MAX,
-  maxCharsMessage,
-  requiredLimitedString,
-} from "@/lib/validation/string-limits";
+  settingsPatchSchema,
+  type NetworkSettingsPatch,
+} from "@/lib/networks/settings-schema";
 
 export type { PlacesMapVisibility };
 
@@ -35,32 +30,9 @@ export interface NetworkSettingsActionResult {
   message: string;
 }
 
-const settingsSchema = z.object({
-  name: requiredLimitedString("Network name", LONG_TEXT_MAX),
-  adminCanSeeUninvolved: z.boolean(),
-  auditLogVisibility: z.enum(auditLogVisibilityLevels),
-  allowUserProvisioning: z.boolean(),
-  hideSleepingArrangements: z.boolean(),
-  seePartnersSleepingArrangements: z.boolean(),
-  fastSleepEnabled: z.boolean(),
-  feedEnabled: z.boolean(),
-  pollEnabled: z.boolean(),
-  schedulingPosting: z.enum(schedulingPostingModes),
-  proxySchedulingEnabled: z.boolean(),
-  proxySchedulingScope: z.enum(proxySchedulingScopes),
-  placesMapVisibility: z.enum(placesMapVisibilityLevels),
-  logTailLength: z.number().int().min(0).max(1000),
-  onboardingWelcomeMessage: z
-    .string()
-    .trim()
-    .min(1, "Welcome message is required.")
-    .max(LONG_TEXT_MAX, maxCharsMessage("Welcome message", LONG_TEXT_MAX)),
-  proposedMaxDays: z.number().int().min(0).max(365),
-  atRiskTtlDays: z.number().int().min(1).max(365),
-  archiveGraceHours: z.number().int().min(0).max(8760),
-  redraftDeadlineHours: z.number().int().min(1).max(168),
-  sleepingPartnerProposalMaxDays: z.number().int().min(1).max(365),
-});
+export { settingsPatchSchema, type NetworkSettingsPatch };
+
+const HIGH_SIGNAL_KEYS = new Set(["name", "feedEnabled"]);
 
 function toNetworkSettings(row: {
   name: string;
@@ -142,17 +114,17 @@ export async function getNetworkSettingsAction(): Promise<NetworkSettings | null
 }
 
 /**
- * Persists active-network settings (PC-30 / PC-364).
+ * Persists a partial settings patch for the active network (PC-30 / PC-364 / PC-461).
  */
 export async function updateNetworkSettingsAction(
-  input: NetworkSettings,
+  input: Partial<NetworkSettings>,
 ): Promise<NetworkSettingsActionResult> {
   const adminResult = await requireNetworkAdmin();
   if (!adminResult.ok) {
     return { ok: false, message: adminResult.message };
   }
 
-  const parsed = settingsSchema.safeParse(input);
+  const parsed = settingsPatchSchema.safeParse(input);
   if (!parsed.success) {
     return { ok: false, message: parsed.error.issues[0]?.message ?? "Invalid settings." };
   }
@@ -161,7 +133,7 @@ export async function updateNetworkSettingsAction(
   const db = getDb();
   const networkId = adminResult.user.activeNetworkId;
   const [current] = await db
-    .select({ id: networks.id })
+    .select()
     .from(networks)
     .where(eq(networks.id, networkId))
     .limit(1);
@@ -169,32 +141,19 @@ export async function updateNetworkSettingsAction(
     return { ok: false, message: "Network not found." };
   }
 
+  const patch = parsed.data;
+  const nextScheduling = patch.schedulingPosting ?? current.schedulingPosting;
   const now = new Date().toISOString();
 
   await db
     .update(networks)
     .set({
-      name: parsed.data.name,
-      adminCanSeeUninvolved: parsed.data.adminCanSeeUninvolved,
-      auditLogVisibility: parsed.data.auditLogVisibility,
-      allowUserProvisioning: parsed.data.allowUserProvisioning,
-      hideSleepingArrangements: parsed.data.hideSleepingArrangements,
-      seePartnersSleepingArrangements: parsed.data.seePartnersSleepingArrangements,
-      fastSleepEnabled: parsed.data.fastSleepEnabled,
-      feedEnabled: parsed.data.feedEnabled,
+      ...patch,
       pollEnabled:
-        parsed.data.schedulingPosting === "bookings_only" ? false : parsed.data.pollEnabled,
-      schedulingPosting: parsed.data.schedulingPosting,
-      proxySchedulingEnabled: bookingsEnabled(parsed.data.schedulingPosting),
-      proxySchedulingScope: parsed.data.proxySchedulingScope,
-      placesMapVisibility: parsed.data.placesMapVisibility,
-      logTailLength: parsed.data.logTailLength,
-      onboardingWelcomeMessage: parsed.data.onboardingWelcomeMessage,
-      proposedMaxDays: parsed.data.proposedMaxDays,
-      atRiskTtlDays: parsed.data.atRiskTtlDays,
-      archiveGraceHours: parsed.data.archiveGraceHours,
-      redraftDeadlineHours: parsed.data.redraftDeadlineHours,
-      sleepingPartnerProposalMaxDays: parsed.data.sleepingPartnerProposalMaxDays,
+        nextScheduling === "bookings_only"
+          ? false
+          : (patch.pollEnabled ?? current.pollEnabled),
+      proxySchedulingEnabled: bookingsEnabled(nextScheduling),
       updatedAt: now,
     })
     .where(eq(networks.id, networkId));
@@ -202,9 +161,24 @@ export async function updateNetworkSettingsAction(
   await logUserActivity(
     adminResult.user.id,
     "admin.network_settings_update",
-    JSON.stringify({ name: parsed.data.name, networkId }),
+    JSON.stringify({ keys: Object.keys(patch), networkId }),
     "system",
   );
+
+  const highSignal = Object.keys(patch).filter((key) => HIGH_SIGNAL_KEYS.has(key));
+  if (highSignal.length > 0) {
+    const name = patch.name ?? current.name;
+    await logPlatformEvent({
+      actorUserId: adminResult.user.id,
+      networkId,
+      networkName: name,
+      action: "admin.network_settings_update",
+      summary: highSignal.includes("name")
+        ? `Network renamed to ${name}`
+        : `Feed ${patch.feedEnabled ? "enabled" : "disabled"} on ${name}`,
+      severity: "major",
+    });
+  }
 
   revalidatePath("/admin");
   revalidatePath("/people-places");
