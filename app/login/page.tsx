@@ -4,6 +4,7 @@ import Link from "next/link";
 import { eq } from "drizzle-orm";
 import { redirect } from "next/navigation";
 
+import { requestEmailLoginAction } from "@/actions/email-login";
 import { auth, signIn } from "@/lib/auth";
 import { getLiveUserStatus } from "@/lib/auth-session";
 import { getDb } from "@/lib/db/client";
@@ -15,7 +16,7 @@ import { brutalPaperSx } from "@/theme/brutalUi";
 import { GARDEN_TOKENS } from "@/theme/tokens";
 
 interface LoginPageProps {
-  searchParams: Promise<{ error?: string; callbackUrl?: string; reset?: string }>;
+  searchParams: Promise<{ error?: string; callbackUrl?: string; reset?: string; emailed?: string }>;
 }
 
 /**
@@ -67,6 +68,13 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
     }
   }
 
+  async function emailLoginAction(formData: FormData) {
+    "use server";
+    const username = String(formData.get("username") ?? "").trim().toLowerCase();
+    await requestEmailLoginAction(username);
+    redirect("/login?emailed=1");
+  }
+
   return (
     <Box
       sx={{
@@ -109,6 +117,11 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
             Password updated. Sign in with your new password.
           </Typography>
         )}
+        {params.emailed === "1" && (
+          <Typography color="success.main" variant="body2" sx={{ mb: 2 }}>
+            If that account has a verified notification email, we sent a login link.
+          </Typography>
+        )}
         <Box component="form" action={loginAction}>
           <input
             type="hidden"
@@ -128,7 +141,6 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
             label="Password"
             type="password"
             fullWidth
-            required
             autoComplete="current-password"
             margin="normal"
           />
@@ -144,6 +156,15 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
             }}
           >
             Sign in
+          </Button>
+          <Button
+            type="submit"
+            formAction={emailLoginAction}
+            variant="outlined"
+            fullWidth
+            sx={{ mt: 1.5, color: GARDEN_TOKENS.ink }}
+          >
+            Email login
           </Button>
         </Box>
         <Button

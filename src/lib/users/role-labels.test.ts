@@ -36,7 +36,12 @@ describe("resolveAccessLevel / formatAccessLevel", () => {
     expect(resolveAccessLevel({ role: "passive", isPlatformAdmin: false })).toBe(
       "passive",
     );
-    expect(formatAccessLevel("user")).toBe("User");
-    expect(formatAccessLevel("passive")).toBe("Proxy");
+    expect(formatAccessLevel("sponsor")).toBe("Sponsor");
+    expect(
+      formatAccessLevel({ role: "admin", isPlatformAdmin: false, networkRole: "sponsor" }),
+    ).toBe("Sponsor");
+    expect(resolveAccessLevel({ role: "admin", isPlatformAdmin: false, networkRole: "sponsor" })).toBe(
+      "sponsor",
+    );
   });
 });

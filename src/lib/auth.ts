@@ -6,7 +6,7 @@ import { eq } from "drizzle-orm";
 import { cookies } from "next/headers";
 import { z } from "zod";
 
-import { recordSuccessfulLogin } from "@/lib/audit";
+import { recordSuccessfulLogin, logUserActivity } from "@/lib/audit";
 import { isValidImpersonationSecret } from "@/lib/auth/impersonation";
 import { authConfig } from "../../auth.config";
 import { getDb } from "@/lib/db/client";
@@ -14,6 +14,7 @@ import { ensureDbReady } from "@/lib/db/ensure-ready";
 import { users, type UserRole } from "@/lib/db/schema";
 import { listActiveMemberships } from "@/lib/networks/membership";
 import { checkRateLimitPersistent } from "@/lib/rate-limit";
+import { canAccessRestrictedNetwork, isElevatedNetworkRole } from "@/lib/networks/roles";
 import type { NetworkMemberRole } from "@/types/network";
 
 async function networkClaimsForUser(userId: string): Promise<{
@@ -29,8 +30,12 @@ async function networkClaimsForUser(userId: string): Promise<{
     .where(eq(users.id, userId))
     .limit(1);
   const memberships = await listActiveMemberships(userId);
-  const usable = memberships.filter(
-    (m) => m.networkStatus === "active" || m.role === "network_admin",
+  const usable = memberships.filter((m) =>
+    canAccessRestrictedNetwork({
+      role: m.role,
+      networkStatus: m.networkStatus,
+      isPlatformAdmin: row?.isPlatformAdmin === true,
+    }),
   );
   const first = usable[0] ?? memberships[0];
   return {
@@ -79,7 +84,7 @@ async function hasAdminSessionJwt(): Promise<boolean> {
     });
     if (
       token?.role === "admin" ||
-      token?.activeNetworkRole === "network_admin" ||
+      isElevatedNetworkRole(token?.activeNetworkRole) ||
       token?.isPlatformAdmin === true
     ) {
       return true;
@@ -101,9 +106,59 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         password: { label: "Password", type: "password" },
         impersonateUserId: { label: "Impersonate", type: "text" },
         impersonateSecret: { label: "Impersonate secret", type: "password" },
+        emailLoginToken: { label: "Email login token", type: "text" },
       },
       async authorize(raw) {
         await ensureDbReady();
+
+        if (raw?.emailLoginToken) {
+          const { hashLinkToken } = await import("@/lib/crypto/token-hash");
+          const { isEmailLoginTokenExpired } = await import("@/lib/auth/email-login");
+          const tokenHash = hashLinkToken(String(raw.emailLoginToken));
+          if (!(await checkRateLimitPersistent(`email-login-redeem:${tokenHash.slice(0, 16)}`, 10, 60_000))) {
+            return null;
+          }
+          const db = getDb();
+          const [row] = await db
+            .select()
+            .from(users)
+            .where(eq(users.emailLoginToken, tokenHash))
+            .limit(1);
+          if (!row || row.status !== "active" || row.role === "passive") {
+            return null;
+          }
+          if (isEmailLoginTokenExpired(row.emailLoginTokenExpiresAt)) {
+            return null;
+          }
+          const now = new Date().toISOString();
+          await db
+            .update(users)
+            .set({
+              emailLoginToken: null,
+              emailLoginTokenExpiresAt: null,
+              updatedAt: now,
+            })
+            .where(eq(users.id, row.id));
+          await recordSuccessfulLogin(row.id);
+          await logUserActivity(row.id, "auth.email_login_completed");
+          const claims = await networkClaimsForUser(row.id);
+          return {
+            id: row.id,
+            name: row.displayName,
+            email: row.username,
+            role: row.role,
+            accountStatus: row.status,
+            mustChangePassword: false,
+            onboardingComplete: row.onboardingComplete,
+            sessionVersion: row.sessionVersion,
+            displayName: row.displayName,
+            avatarKey: row.avatarKey ?? undefined,
+            theme: row.theme,
+            isImpersonating: false,
+            emailLoginSession: true,
+            ...claims,
+          };
+        }
 
         if (raw?.impersonateUserId) {
           // Constant-time compare, and denied outright on production unless

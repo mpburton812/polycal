@@ -18,6 +18,8 @@ import { useRouter } from "next/navigation";
 import { useState, type ReactNode } from "react";
 
 import type { PlatformUserRow } from "@/actions/platform-admin";
+import type { PlatformSystemLogEntry } from "@/actions/platform-log";
+import { AdminPlatformSystemLogPanel } from "@/components/admin/AdminPlatformSystemLogPanel";
 import type { PlatformSettings } from "@/types/network";
 import { ModerationDialog } from "@/components/platform/ModerationDialog";
 import { NetworkDetailDialog } from "@/components/platform/NetworkDetailDialog";
@@ -37,7 +39,7 @@ type NetworkRow = {
 
 type ModerationTarget = { userId: string; displayName: string; kind: "pause" | "ban" };
 
-type AssignableAccessLevel = Exclude<AccountAccessLevel, "passive">;
+type AssignableAccessLevel = Exclude<AccountAccessLevel, "passive" | "sponsor">;
 
 function DetailRow({ label, children }: { label: string; children: ReactNode }) {
   return (
@@ -70,6 +72,7 @@ export function PlatformAdminClient({
   deleteUserPlatformAction,
   inhabitNetworkAdminAction,
   setUserAccessLevelAction,
+  platformLogEntries = [],
 }: {
   initialNetworks: NetworkRow[];
   initialSettings: PlatformSettings;
@@ -102,6 +105,7 @@ export function PlatformAdminClient({
     userId: string;
     accessLevel: AssignableAccessLevel;
   }) => Promise<{ ok: boolean; message: string; accessLevelLabel?: string }>;
+  platformLogEntries?: PlatformSystemLogEntry[];
 }) {
   const router = useRouter();
   const { update } = useSession();
@@ -241,6 +245,8 @@ export function PlatformAdminClient({
         </Stack>
       </Paper>
 
+      <AdminPlatformSystemLogPanel entries={platformLogEntries} compact />
+
       <Paper sx={{ ...brutalPaperSx, p: 2 }}>
         <Typography variant="body2" color="text.secondary">
           Message of the day is managed under Admin → Network → Message of the
@@ -297,8 +303,10 @@ export function PlatformAdminClient({
           {users.map((user) => {
             const isSelf = user.id === currentUserId;
             const canChangeAccess = !isSelf && user.role !== "passive";
-            const selectValue: AssignableAccessLevel | "passive" =
-              user.accessLevel === "passive" ? "passive" : user.accessLevel;
+            const selectValue: AssignableAccessLevel | "passive" | "sponsor" =
+              user.accessLevel === "passive" || user.accessLevel === "sponsor"
+                ? user.accessLevel
+                : user.accessLevel;
 
             return (
               <Paper
@@ -384,14 +392,19 @@ export function PlatformAdminClient({
                       value={selectValue}
                       aria-label={`Access level for ${user.displayName}`}
                       onChange={(e) => {
-                        const next = e.target.value as AssignableAccessLevel | "passive";
-                        if (next === "passive") return;
+                        const next = e.target.value as AssignableAccessLevel | "passive" | "sponsor";
+                        if (next === "passive" || next === "sponsor") return;
                         void changeAccessLevel(user, next);
                       }}
                     >
                       <MenuItem value="platform_admin">Platform Admin</MenuItem>
                       <MenuItem value="admin">Admin</MenuItem>
                       <MenuItem value="user">User</MenuItem>
+                      {user.accessLevel === "sponsor" && (
+                        <MenuItem value="sponsor" disabled>
+                          Sponsor
+                        </MenuItem>
+                      )}
                       {user.accessLevel === "passive" && (
                         <MenuItem value="passive" disabled>
                           Proxy

@@ -10,6 +10,7 @@ describe("network role mapping (PC-357)", () => {
   it("maps legacy admin to network_admin and back", () => {
     expect(legacyRoleToNetworkRole("admin")).toBe("network_admin");
     expect(networkRoleToLegacyRole("network_admin")).toBe("admin");
+    expect(networkRoleToLegacyRole("sponsor")).toBe("admin");
   });
 
   it("maps passive unchanged", () => {

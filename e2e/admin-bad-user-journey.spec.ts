@@ -87,7 +87,7 @@ test.describe("Admin bad user lifecycle journey", () => {
     await goToAdmin(page);
     await expandAdminSection(page, "User management");
     await expect(page.getByRole("row").filter({ hasText: "Former User" })).toHaveCount(0);
-    await expect(page.getByText(USERS.badUser.displayName)).toHaveCount(0);
+    await expect(page.getByRole("row").filter({ hasText: USERS.badUser.displayName })).toHaveCount(0);
 
     await goToProposals(page);
     await selectProposalTab(page, "Proposed");

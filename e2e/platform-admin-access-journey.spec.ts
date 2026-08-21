@@ -3,6 +3,7 @@ import { expect, test } from "./helpers/test";
 import { expandAdminSection } from "./helpers/admin";
 import { login } from "./helpers/auth";
 import { USERS } from "./helpers/constants";
+import { dismissBlockingDialogsIfOpen } from "./helpers/motd";
 import { openProfileMenu } from "./helpers/navigation";
 
 /**
@@ -37,20 +38,27 @@ test.describe("Platform admin access levels", () => {
 
     await leiaCard.getByLabel(`Access level for ${USERS.leia.displayName}`).click();
     await page.getByRole("option", { name: "Platform Admin" }).click();
-    await expect(page.getByTestId(`platform-user-access-${USERS.leia.username}`)).toHaveText(
-      "Platform Admin",
-      { timeout: 20_000 },
-    );
+    await expect(async () => {
+      await dismissBlockingDialogsIfOpen(page);
+      await expect(page.getByTestId(`platform-user-access-${USERS.leia.username}`)).toHaveText(
+        "Platform Admin",
+        { timeout: 2_000 },
+      );
+    }).toPass({ timeout: 25_000 });
 
     // Demote back so Admin user-management elevate can re-grant.
     await leiaCard.getByLabel(`Access level for ${USERS.leia.displayName}`).click();
     await page.getByRole("option", { name: "User", exact: true }).click();
-    await expect(page.getByTestId(`platform-user-access-${USERS.leia.username}`)).toHaveText(
-      "User",
-      { timeout: 20_000 },
-    );
+    await expect(async () => {
+      await dismissBlockingDialogsIfOpen(page);
+      await expect(page.getByTestId(`platform-user-access-${USERS.leia.username}`)).toHaveText(
+        "User",
+        { timeout: 2_000 },
+      );
+    }).toPass({ timeout: 25_000 });
 
     await page.goto("/admin");
+    await dismissBlockingDialogsIfOpen(page);
     await expandAdminSection(page, "User management");
     const leiaRow = page.getByRole("row").filter({ hasText: USERS.leia.displayName });
     await expect(leiaRow.getByText("User", { exact: true })).toBeVisible({ timeout: 15_000 });
@@ -63,8 +71,11 @@ test.describe("Platform admin access levels", () => {
     await page.getByRole("option", { name: "Platform Admin" }).click();
     await editDialog.getByRole("button", { name: "Save" }).click();
     await expect(editDialog).toBeHidden({ timeout: 20_000 });
-    await expect(leiaRow.getByText("Platform Admin", { exact: true })).toBeVisible({
-      timeout: 20_000,
-    });
+    await expect(async () => {
+      await dismissBlockingDialogsIfOpen(page);
+      await expect(leiaRow.getByText("Platform Admin", { exact: true })).toBeVisible({
+        timeout: 2_000,
+      });
+    }).toPass({ timeout: 25_000 });
   });
 });

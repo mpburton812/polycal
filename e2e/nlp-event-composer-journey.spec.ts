@@ -68,14 +68,18 @@ async function enableBookingsForAnyone(page: Page): Promise<void> {
   await openNetworkSettings(page);
   const posting = page.getByRole("combobox", { name: "Event Types" });
   await expect(posting).toBeVisible({ timeout: 15_000 });
-  await posting.click();
-  await page.getByRole("option", { name: "Proposals and Bookings" }).click();
+  const postingText = (await posting.textContent()) ?? "";
+  if (!postingText.includes("Proposals and Bookings")) {
+    await posting.click();
+    await page.getByRole("option", { name: "Proposals and Bookings" }).click();
+    await expectToast(page, /Network settings saved/i);
+  }
   const bookingFor = page.getByRole("combobox", { name: "Booking for" });
   await expect(bookingFor).toBeVisible({ timeout: 15_000 });
-  await bookingFor.click();
-  await page.getByRole("option", { name: "Anyone on this network" }).click();
-  await page.getByRole("button", { name: /Save settings/i }).click();
-  await expect(page.getByText(/Network settings saved/i).first()).toBeVisible({
-    timeout: 15_000,
-  });
+  const bookingText = (await bookingFor.textContent()) ?? "";
+  if (!bookingText.includes("Anyone on this network")) {
+    await bookingFor.click();
+    await page.getByRole("option", { name: "Anyone on this network" }).click();
+    await expectToast(page, /Network settings saved/i);
+  }
 }

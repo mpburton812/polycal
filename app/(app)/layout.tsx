@@ -45,6 +45,25 @@ async function AppLayoutReady({ children }: { children: React.ReactNode }) {
     redirect("/banned");
   }
 
+  const { listActiveMemberships } = await import("@/lib/networks/membership");
+  const { canAccessRestrictedNetwork } = await import("@/lib/networks/roles");
+  const memberships = await listActiveMemberships(session.user.id);
+  if (memberships.length > 0) {
+    const usable = memberships.filter((m) =>
+      canAccessRestrictedNetwork({
+        role: m.role,
+        networkStatus: m.networkStatus,
+        isPlatformAdmin: session.user.isPlatformAdmin === true,
+      }),
+    );
+    if (
+      usable.length === 0 &&
+      memberships.some((m) => m.networkStatus === "pending_delete")
+    ) {
+      redirect("/network-closed");
+    }
+  }
+
   const themeId = normalizeUserThemeId(session.user.theme ?? "sage");
   const showOnboarding = !session.user.onboardingComplete;
 
@@ -86,7 +105,9 @@ async function AppLayoutReady({ children }: { children: React.ReactNode }) {
           isAdmin={showAdminTab}
           isPlatformAdmin={isPlatformAdmin}
           showOnboarding={showOnboarding}
-          mustChangePassword={session.user.mustChangePassword}
+          mustChangePassword={
+            session.user.mustChangePassword && session.user.emailLoginSession !== true
+          }
           themeId={themeId}
           userId={session.user.id}
           notificationInboxPromise={notificationInboxPromise}

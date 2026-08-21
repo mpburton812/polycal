@@ -80,6 +80,22 @@ export function buildPasswordResetEmailContent(resetUrl: string): {
 }
 
 /**
+ * Passwordless email login link (PC-465).
+ */
+export function buildEmailLoginContent(loginUrl: string): {
+  subject: string;
+  html: string;
+  text: string;
+} {
+  const url = escapeHtml(loginUrl);
+  return {
+    subject: "Your PolyCal email login link",
+    html: `<p>Sign in to PolyCal:</p><p><a href="${url}">${url}</a></p><p>This link expires in 15 minutes and can be used once. Your existing password still works.</p>`,
+    text: `Sign in to PolyCal:\n${loginUrl}\n\nThis link expires in 15 minutes and can be used once. Your existing password still works.`,
+  };
+}
+
+/**
  * Event / activity notification email body with optional deep link.
  */
 export function buildNotificationEmailContent(options: {

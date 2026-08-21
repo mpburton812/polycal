@@ -13,6 +13,8 @@ export interface SessionUser {
   role: UserRole;
   /** True when an admin is impersonating this account (PC-344). */
   isImpersonating: boolean;
+  /** Cross-network operator flag from the JWT (PC-357 / PC-462). */
+  isPlatformAdmin: boolean;
 }
 
 export type ActionContextError = { ok: false; message: string };
@@ -47,6 +49,7 @@ export async function requireSession():
       id: session.user.id,
       role: session.user.role as UserRole,
       isImpersonating: session.user.isImpersonating === true,
+      isPlatformAdmin: session.user.isPlatformAdmin === true,
     },
   };
 }
@@ -75,6 +78,7 @@ export async function requireAdminAccess():
       id: session.user.id,
       role: session.user.role as UserRole,
       isImpersonating: session.user.isImpersonating === true,
+      isPlatformAdmin: session.user.isPlatformAdmin === true,
     },
   };
 }

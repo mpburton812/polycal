@@ -65,8 +65,12 @@ export async function goToAdmin(page: Page): Promise<void> {
 
 /** Opens the header profile menu (avatar button). */
 export async function openProfileMenu(page: Page): Promise<void> {
-  await dismissBlockingDialogsIfOpen(page);
-  await page.getByRole("button", { name: /Profile menu for/i }).click();
+  const button = page.getByRole("button", { name: /Profile menu for/i });
+  await expect(async () => {
+    await dismissBlockingDialogsIfOpen(page);
+    await expect(button).toBeVisible({ timeout: 1_500 });
+  }).toPass({ timeout: 25_000 });
+  await button.click();
   await expect(page.getByRole("menu")).toBeVisible();
 }
 

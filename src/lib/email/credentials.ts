@@ -112,6 +112,13 @@ export function newPasswordResetToken(): string {
 }
 
 /**
+ * Creates a 15-minute email-login token id (PC-465).
+ */
+export function newEmailLoginToken(): string {
+  return `el-${randomUUID()}`;
+}
+
+/**
  * Sends a standalone verification email (profile flow).
  */
 export async function sendVerificationEmail(options: {

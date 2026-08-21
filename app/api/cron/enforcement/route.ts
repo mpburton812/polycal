@@ -27,11 +27,14 @@ export async function GET(request: Request): Promise<NextResponse> {
   const remindersSent = await runEventReminders(db);
   const { expireStaleMotds } = await import("@/lib/motd/service");
   const motdsExpired = await expireStaleMotds(db);
+  const { runPendingNetworkDeletes } = await import("@/lib/networks/pending-delete");
+  const pendingDeletes = await runPendingNetworkDeletes();
 
   return NextResponse.json({
     ok: true,
     ranAt: new Date().toISOString(),
     remindersSent,
     motdsExpired,
+    pendingDeletes,
   });
 }
