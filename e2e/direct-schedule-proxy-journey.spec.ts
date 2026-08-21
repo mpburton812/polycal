@@ -6,6 +6,7 @@ import { USERS } from "./helpers/constants";
 import { fillProposalDateTimeField, selectDraftScheduleMode } from "./helpers/datePickers";
 import { expandAdminSection } from "./helpers/admin";
 import { goToAdmin, goToProposals, selectProposalTab } from "./helpers/navigation";
+import { expectToast } from "./helpers/toast";
 import {
   exitDraftDialog,
   expandDraftMoreOptions,
@@ -168,9 +169,7 @@ async function openNetworkSettings(page: Page): Promise<void> {
 }
 
 async function saveNetworkSettings(page: Page): Promise<void> {
-  await expect(page.getByText(/Network settings saved/i).first()).toBeVisible({
-    timeout: 15_000,
-  });
+  await expectToast(page, /Network settings saved/i);
 }
 
 async function selectLabeledCombobox(

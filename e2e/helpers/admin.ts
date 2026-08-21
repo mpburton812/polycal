@@ -1,8 +1,14 @@
 import { type Page, expect } from "@playwright/test";
 
-/** Expands a collapsed admin accordion section by title. */
+/** Expands a collapsed admin accordion section by title. Idempotent — does not toggle closed. */
 export async function expandAdminSection(page: Page, title: string): Promise<void> {
-  await page.getByRole("heading", { name: title, level: 2 }).click();
+  const heading = page.getByRole("heading", { name: title, level: 2 });
+  await expect(heading).toBeVisible({ timeout: 20_000 });
+  const toggle = heading.locator("xpath=ancestor::*[@role='button'][1]");
+  if ((await toggle.getAttribute("aria-expanded")) !== "true") {
+    await heading.click();
+  }
+  await expect(toggle).toHaveAttribute("aria-expanded", "true");
 }
 
 function userRow(page: Page, displayName: string) {

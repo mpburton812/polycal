@@ -82,7 +82,7 @@ test.describe("Residency proposal journey", () => {
 
     // —— Phase 5: Admin activity log (human-readable action labels, PC-245) ——
     await goToAdmin(page);
-    await expandAdminSection(page, "System administrator log");
+    await expandAdminSection(page, "Network Administrator Log");
     await expect(page.getByText("Added person to place").first()).toBeVisible({
       timeout: 15_000,
     });

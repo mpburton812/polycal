@@ -12,6 +12,7 @@ import {
   submitProposalDraft,
 } from "./helpers/proposals";
 import { activeMainPanel } from "./helpers/tab-swipe";
+import { expectToast } from "./helpers/toast";
 
 /**
  * Booked attendees on resolved events and Post to Feed (PC-430 / PC-431).
@@ -121,9 +122,7 @@ async function setPostingMode(
   await expect(combo).toBeVisible({ timeout: 15_000 });
   await combo.click();
   await page.getByRole("option", { name: mode }).click();
-  await expect(page.getByText(/Network settings saved/i).first()).toBeVisible({
-    timeout: 15_000,
-  });
+  await expectToast(page, /Network settings saved/i);
 }
 
 async function restoreJustProposals(page: Page): Promise<void> {

@@ -118,7 +118,6 @@ export function AdminNetworkSettingsPanel({
       }
       lastSaved.current = { ...lastSaved.current, ...patch };
       showToast(result.message, "success");
-      router.refresh();
     });
   }
 

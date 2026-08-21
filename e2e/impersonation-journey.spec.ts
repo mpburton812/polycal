@@ -45,7 +45,7 @@ test.describe("Impersonation journey", () => {
     await logout(page);
     await login(page, USERS.luke.username);
     await goToAdmin(page);
-    await expandAdminSection(page, "System administrator log");
+    await expandAdminSection(page, "Network Administrator Log");
 
     const logTable = page.getByRole("table");
     await expect(logTable.getByText("Impersonation")).toBeVisible({ timeout: 15_000 });
