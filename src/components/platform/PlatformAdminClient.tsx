@@ -18,6 +18,8 @@ import { useRouter } from "next/navigation";
 import { useState, type ReactNode } from "react";
 
 import type { PlatformUserRow } from "@/actions/platform-admin";
+import type { PlatformSystemLogEntry } from "@/actions/platform-log";
+import { AdminPlatformSystemLogPanel } from "@/components/admin/AdminPlatformSystemLogPanel";
 import type { PlatformSettings } from "@/types/network";
 import { ModerationDialog } from "@/components/platform/ModerationDialog";
 import { NetworkDetailDialog } from "@/components/platform/NetworkDetailDialog";
@@ -70,6 +72,7 @@ export function PlatformAdminClient({
   deleteUserPlatformAction,
   inhabitNetworkAdminAction,
   setUserAccessLevelAction,
+  platformLogEntries = [],
 }: {
   initialNetworks: NetworkRow[];
   initialSettings: PlatformSettings;
@@ -102,6 +105,7 @@ export function PlatformAdminClient({
     userId: string;
     accessLevel: AssignableAccessLevel;
   }) => Promise<{ ok: boolean; message: string; accessLevelLabel?: string }>;
+  platformLogEntries?: PlatformSystemLogEntry[];
 }) {
   const router = useRouter();
   const { update } = useSession();
@@ -240,6 +244,8 @@ export function PlatformAdminClient({
           </Box>
         </Stack>
       </Paper>
+
+      <AdminPlatformSystemLogPanel entries={platformLogEntries} compact />
 
       <Paper sx={{ ...brutalPaperSx, p: 2 }}>
         <Typography variant="body2" color="text.secondary">

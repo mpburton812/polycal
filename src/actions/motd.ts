@@ -3,6 +3,7 @@
 import { getDb } from "@/lib/db/client";
 import { ensureDbReady } from "@/lib/db/ensure-ready";
 import { logUserActivity } from "@/lib/audit";
+import { logPlatformEvent } from "@/lib/platform-log";
 import {
   acknowledgeMotd,
   clearActiveMotdsForScope,
@@ -162,6 +163,13 @@ export async function publishNetworkMotdAction(input: {
     "motd.network.publish",
     JSON.stringify({ motdId: row.id, endsAt: row.endsAt }),
   );
+  await logPlatformEvent({
+    actorUserId: admin.user.id,
+    networkId: admin.user.activeNetworkId,
+    action: "motd.network.publish",
+    summary: `Admin set a network MOTD on ${admin.user.networkName}`,
+    severity: "major",
+  });
   return { ok: true, data: row };
 }
 
@@ -209,6 +217,12 @@ export async function publishPlatformMotdAction(input: {
     "motd.platform.publish",
     JSON.stringify({ motdId: row.id, endsAt: row.endsAt }),
   );
+  await logPlatformEvent({
+    actorUserId: admin.user.id,
+    action: "motd.platform.publish",
+    summary: "Admin set a platform MOTD",
+    severity: "major",
+  });
   return { ok: true, data: row };
 }
 

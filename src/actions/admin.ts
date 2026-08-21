@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 
 import { auth } from "@/lib/auth";
 import { logUserActivity } from "@/lib/audit";
+import { logPlatformEvent } from "@/lib/platform-log";
 import {
   formatActivityLogDetails,
   getNotificationActivityActor,
@@ -125,6 +126,12 @@ export async function adminImpersonateUserAction(userId: string): Promise<AdminA
     }),
     "system",
   );
+  await logPlatformEvent({
+    actorUserId: adminResult.user.id,
+    action: "admin.impersonate",
+    summary: `Admin impersonated ${target?.displayName ?? "a user"}`,
+    severity: "major",
+  });
 
   const { signIn } = await import("@/lib/auth");
   await signIn("credentials", {

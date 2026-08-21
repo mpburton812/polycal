@@ -24,7 +24,7 @@ function eventColor(eventType: string): string {
 }
 
 /**
- * System administrator log viewer with export (PC-32).
+ * Network Administrator Log viewer with export (PC-32 / PC-463).
  */
 export function AdminActivityLogPanel({ entries }: { entries: ActivityLogEntry[] }) {
   const [pending, startTransition] = useTransition();
@@ -46,7 +46,7 @@ export function AdminActivityLogPanel({ entries }: { entries: ActivityLogEntry[]
 
   return (
     <AdminCollapsibleSection
-      title="System administrator log"
+        title="Network Administrator Log"
       headerAction={
         entries.length > 0 ? (
           <Button
