@@ -431,3 +431,4 @@
 2026-08-20 | 47c2a35 | PC-461 | do not export Zod schema from use server settings action | src/actions/network-settings.ts
 2026-08-20 | b27959d | PC-465 | redeem email login without swallowing Auth.js redirect | app/login/email/page.tsx
 2026-08-20 | c95d9a4 | PC-465 | redeem email login via auto-submit server action | src/actions/email-login.ts
+2026-08-20 | b800ee8 | PC-459 | update admin log title and wait for autosave toast | src/components/admin/AdminNetworkSettingsPanel.tsx
