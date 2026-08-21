@@ -427,3 +427,4 @@
 2026-08-20 | ac413cf | PC-459 | changelog 2026.08.20a and sponsor-ops e2e | src/lib/changelog/entries.ts
 2026-08-20 | f49a581 | PC-462 | do not keep JWT on a closing network | src/lib/email/templates.test.ts
 2026-08-20 | e845aa6 | PC-459 | type-check Sponsor access levels for production build | src/actions/network-settings.ts
+2026-08-20 | de8c833 | PC-459 | expect isPlatformAdmin on SessionUser in context tests | src/lib/actions/context.test.ts
