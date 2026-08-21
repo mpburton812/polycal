@@ -135,7 +135,7 @@ function SetupNetworkWizard() {
       await update({
         user: {
           activeNetworkId: result.networkId,
-          activeNetworkRole: "network_admin",
+          activeNetworkRole: "sponsor",
         },
       });
     }

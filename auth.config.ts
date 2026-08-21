@@ -38,6 +38,10 @@ export const authConfig = {
         token.activeNetworkRole = user.activeNetworkRole;
         token.isPlatformAdmin = user.isPlatformAdmin === true;
         token.networkIds = user.networkIds ?? [];
+        token.emailLoginSession = user.emailLoginSession === true;
+        if (token.emailLoginSession) {
+          token.mustChangePassword = false;
+        }
         token.dbRefreshedAt = Date.now();
         delete token.error;
       }
@@ -144,7 +148,8 @@ export const authConfig = {
 
         token.accountStatus = row.status;
         token.role = row.role;
-        token.mustChangePassword = row.mustChangePassword;
+        token.mustChangePassword =
+          token.emailLoginSession === true ? false : row.mustChangePassword;
         token.onboardingComplete = row.onboardingComplete;
         token.displayName = row.displayName;
         token.avatarKey = row.avatarKey ?? undefined;
@@ -155,9 +160,14 @@ export const authConfig = {
         // (E2E per-test reset) or membership was removed (PC-357).
         try {
           const { listActiveMemberships } = await import("@/lib/networks/membership");
+          const { canAccessRestrictedNetwork } = await import("@/lib/networks/roles");
           const memberships = await listActiveMemberships(token.id as string);
-          const usable = memberships.filter(
-            (m) => m.networkStatus === "active" || m.role === "network_admin",
+          const usable = memberships.filter((m) =>
+            canAccessRestrictedNetwork({
+              role: m.role,
+              networkStatus: m.networkStatus,
+              isPlatformAdmin: row.isPlatformAdmin === true,
+            }),
           );
           const preferred =
             typeof token.activeNetworkId === "string"
@@ -205,6 +215,7 @@ export const authConfig = {
         session.user.activeNetworkRole = token.activeNetworkRole;
         session.user.isPlatformAdmin = token.isPlatformAdmin === true;
         session.user.networkIds = token.networkIds ?? [];
+        session.user.emailLoginSession = token.emailLoginSession === true;
       }
       return session;
     },

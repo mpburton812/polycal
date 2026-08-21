@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { logUserActivity } from "@/lib/audit";
+import { logPlatformEvent } from "@/lib/platform-log";
 import { getDb } from "@/lib/db/client";
 import { ensureDbReady } from "@/lib/db/ensure-ready";
 import {
@@ -15,6 +16,8 @@ import {
   users,
 } from "@/lib/db/schema";
 import {
+  getMembership,
+  listActiveMemberships,
   removeAllMemberships,
   upsertMembership,
 } from "@/lib/networks/membership";
@@ -209,17 +212,28 @@ export async function inhabitNetworkAdminAction(
   const [network] = await db.select().from(networks).where(eq(networks.id, networkId)).limit(1);
   if (!network) return { ok: false, message: "Network not found." };
 
-  await upsertMembership({
-    networkId,
-    userId: admin.user.id,
-    role: "network_admin",
-  });
+  const existing = await getMembership(admin.user.id, networkId);
+  if (!existing || existing.role !== "sponsor") {
+    await upsertMembership({
+      networkId,
+      userId: admin.user.id,
+      role: "network_admin",
+    });
+  }
 
   await logUserActivity(
     admin.user.id,
     "platform.inhabit_network",
     JSON.stringify({ networkId, networkName: network.name }),
   );
+  await logPlatformEvent({
+    actorUserId: admin.user.id,
+    networkId,
+    networkName: network.name,
+    action: "platform.inhabit_network",
+    summary: `Platform Admin inhabited ${network.name}`,
+    severity: "major",
+  });
 
   return {
     ok: true,
@@ -337,9 +351,16 @@ export async function setUserAccessLevelAction(
   }
 
   const now = new Date().toISOString();
+  const memberships = await listActiveMemberships(user.id);
+  const isSponsor = memberships.some((m) => m.role === "sponsor");
+  if (isSponsor && parsed.data.accessLevel === "user") {
+    return { ok: false, message: "The Sponsor cannot be demoted." };
+  }
+
   const nextIsPlatformAdmin = parsed.data.accessLevel === "platform_admin";
-  const nextRole: "admin" | "user" =
-    parsed.data.accessLevel === "admin"
+  const nextRole: "admin" | "user" = isSponsor
+    ? "admin"
+    : parsed.data.accessLevel === "admin"
       ? "admin"
       : parsed.data.accessLevel === "user"
         ? "user"
@@ -378,6 +399,12 @@ export async function setUserAccessLevelAction(
       },
     }),
   );
+  await logPlatformEvent({
+    actorUserId: admin.user.id,
+    action: "platform.set_access_level",
+    summary: `Access level changed for ${user.displayName}`,
+    severity: "major",
+  });
 
   revalidatePath("/platform-admin");
   revalidatePath("/admin");
@@ -432,6 +459,15 @@ async function applyModeration(
     .where(eq(users.id, userId));
 
   await logUserActivity(actorUserId, auditAction, JSON.stringify({ userId, reason, expiresAt }));
+  await logPlatformEvent({
+    actorUserId: actorUserId,
+    action: auditAction,
+    summary:
+      status === "paused"
+        ? `User paused: ${user.displayName}`
+        : `User banned: ${user.displayName}`,
+    severity: "major",
+  });
   revalidatePath("/platform-admin");
   revalidatePath("/admin");
   revalidatePath("/people-places");
@@ -503,6 +539,12 @@ export async function resumeUserPlatformAction(
     .where(eq(users.id, userId));
 
   await logUserActivity(admin.user.id, "platform.resume_user", JSON.stringify({ userId }));
+  await logPlatformEvent({
+    actorUserId: admin.user.id,
+    action: "platform.resume_user",
+    summary: `User resumed: ${user.displayName}`,
+    severity: "major",
+  });
   revalidatePath("/platform-admin");
   revalidatePath("/admin");
   return { ok: true, message: `Resumed ${user.displayName}.` };

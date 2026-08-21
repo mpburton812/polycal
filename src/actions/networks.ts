@@ -17,8 +17,10 @@ import {
 import { sendEmail } from "@/lib/email/send";
 import { getPublicAppUrl } from "@/lib/env";
 import { logUserActivity } from "@/lib/audit";
+import { logPlatformEvent } from "@/lib/platform-log";
 import {
   ensureOwnedPassivesInNetwork,
+  getMembership,
   listActiveMemberships,
   removeAllMemberships,
   removeMembership,
@@ -27,10 +29,12 @@ import {
 import { importResidencesAndPassiveSleeping } from "@/lib/networks/import-on-join";
 import {
   requireNetworkAdmin,
+  requireNetworkSponsor,
   requirePlatformAdmin,
 } from "@/lib/networks/context";
 import { resolveSetupCreator } from "@/lib/networks/setup-creator";
 import { requireSession } from "@/lib/actions/context";
+import { canAccessRestrictedNetwork, isSponsorRole } from "@/lib/networks/roles";
 import {
   DEFAULT_PLATFORM_SETTINGS,
   type PlatformSettings,
@@ -345,8 +349,8 @@ const wizardSchema = z.object({
 });
 
 /**
- * Completes network setup: creates network, assigns creator as network_admin,
- * invites, optional import, and consumes the setup token (PC-360).
+ * Completes network setup: creates network, assigns creator as Sponsor,
+ * invites, optional import, and consumes the setup token (PC-360 / PC-460).
  */
 export async function completeNetworkSetupAction(
   raw: z.infer<typeof wizardSchema>,
@@ -418,6 +422,7 @@ export async function completeNetworkSetupAction(
     status: "active",
     createdByUserId: creatorId,
     createdByEmail: email,
+    sponsorUserId: creatorId,
     allowUserProvisioning: input.allowUserProvisioning ?? false,
     adminCanSeeUninvolved: input.adminCanSeeUninvolved ?? true,
     auditLogVisibility: "admin_only",
@@ -440,7 +445,7 @@ export async function completeNetworkSetupAction(
   await upsertMembership({
     networkId,
     userId: creatorId,
-    role: "network_admin",
+    role: "sponsor",
   });
   await ensureOwnedPassivesInNetwork(creatorId, networkId);
 
@@ -467,6 +472,14 @@ export async function completeNetworkSetupAction(
     "networks.create",
     JSON.stringify({ networkId, name: input.networkName }),
   );
+  await logPlatformEvent({
+    actorUserId: creatorId,
+    networkId,
+    networkName: input.networkName.trim(),
+    action: "networks.create",
+    summary: `A new network was created: ${input.networkName.trim()}`,
+    severity: "major",
+  });
 
   return {
     ok: true,
@@ -489,6 +502,8 @@ export async function getActiveNetworkDashboardAction(): Promise<{
   createdByEmail: string | null;
   allowUserProvisioning: boolean;
   role: string;
+  pendingDeleteAt: string | null;
+  sponsorUserId: string | null;
 } | null> {
   const admin = await requireNetworkAdmin();
   if (!admin.ok) return null;
@@ -518,6 +533,8 @@ export async function getActiveNetworkDashboardAction(): Promise<{
     createdByEmail: network.createdByEmail,
     allowUserProvisioning: network.allowUserProvisioning,
     role: admin.user.activeNetworkRole,
+    pendingDeleteAt: network.pendingDeleteAt,
+    sponsorUserId: network.sponsorUserId,
   };
 }
 
@@ -552,10 +569,19 @@ export async function switchActiveNetworkAction(
     return { ok: false, message: "You are not a member of that network." };
   }
   if (
-    membership.networkStatus === "paused" &&
-    membership.role !== "network_admin"
+    !canAccessRestrictedNetwork({
+      role: membership.role,
+      networkStatus: membership.networkStatus,
+      isPlatformAdmin: session.user.isPlatformAdmin === true,
+    })
   ) {
-    return { ok: false, message: "That network is paused." };
+    return {
+      ok: false,
+      message:
+        membership.networkStatus === "pending_delete"
+          ? "That network is closing."
+          : "That network is paused.",
+    };
   }
   return { ok: true, message: "Switched.", /* client calls session.update */ };
 }
@@ -614,6 +640,10 @@ export async function removeUserFromActiveNetworkAction(
     return { ok: false, message: "You cannot remove yourself." };
   }
   await ensureDbReady();
+  const targetMembership = await getMembership(userId, admin.user.activeNetworkId);
+  if (isSponsorRole(targetMembership?.role)) {
+    return { ok: false, message: "The Sponsor cannot be removed." };
+  }
   const removed = await removeMembership(userId, admin.user.activeNetworkId);
   if (!removed) {
     return { ok: false, message: "User is not a member of this network." };
@@ -623,6 +653,13 @@ export async function removeUserFromActiveNetworkAction(
     "networks.member_remove",
     JSON.stringify({ userId, networkId: admin.user.activeNetworkId }),
   );
+  await logPlatformEvent({
+    actorUserId: admin.user.id,
+    networkId: admin.user.activeNetworkId,
+    action: "networks.member_remove",
+    summary: `A user was removed from ${admin.user.networkName}`,
+    severity: "major",
+  });
   return { ok: true, message: "Removed from this network." };
 }
 
@@ -703,9 +740,163 @@ export async function setNetworkStatusAction(
   if (!admin.ok) return { ok: false, message: admin.message };
   await ensureDbReady();
   const db = getDb();
+  const [network] = await db
+    .select({ id: networks.id, name: networks.name, status: networks.status })
+    .from(networks)
+    .where(eq(networks.id, networkId))
+    .limit(1);
+  if (!network) return { ok: false, message: "Network not found." };
+
+  const now = new Date().toISOString();
+  const clearingDelete = status === "active";
   await db
     .update(networks)
-    .set({ status, updatedAt: new Date().toISOString() })
+    .set({
+      status,
+      ...(clearingDelete
+        ? { pendingDeleteAt: null, pendingDeleteNotifyAt: null }
+        : {}),
+      updatedAt: now,
+    })
     .where(eq(networks.id, networkId));
+
+  if (clearingDelete && network.status === "pending_delete") {
+    await logUserActivity(
+      admin.user.id,
+      "networks.reactivate",
+      JSON.stringify({ networkId }),
+    );
+    await logPlatformEvent({
+      actorUserId: admin.user.id,
+      networkId,
+      networkName: network.name,
+      action: "networks.reactivate",
+      summary: `Network re-activated: ${network.name}`,
+      severity: "major",
+    });
+    return { ok: true, message: `Network ${network.name} re-activated.` };
+  }
+
   return { ok: true, message: `Network marked ${status}.` };
+}
+
+/**
+ * Sponsor-only close: 24h pending_delete lock, then cron hard-wipe (PC-462).
+ * Confirmation must be the literal string DELETE.
+ */
+export async function requestNetworkDeleteAction(
+  confirmation: string,
+): Promise<{ ok: boolean; message: string; pendingDeleteAt?: string }> {
+  const sponsor = await requireNetworkSponsor();
+  if (!sponsor.ok) return { ok: false, message: sponsor.message };
+  if (confirmation !== "DELETE") {
+    return { ok: false, message: "Type DELETE in all caps to close this network." };
+  }
+
+  await ensureDbReady();
+  const db = getDb();
+  const networkId = sponsor.user.activeNetworkId;
+  const [network] = await db
+    .select()
+    .from(networks)
+    .where(eq(networks.id, networkId))
+    .limit(1);
+  if (!network) return { ok: false, message: "Network not found." };
+  if (network.status === "pending_delete") {
+    return {
+      ok: false,
+      message: "This network is already scheduled to close.",
+      pendingDeleteAt: network.pendingDeleteAt ?? undefined,
+    };
+  }
+
+  const now = Date.now();
+  const pendingDeleteAt = new Date(now + 24 * 60 * 60 * 1000).toISOString();
+  const updatedAt = new Date(now).toISOString();
+  await db
+    .update(networks)
+    .set({
+      status: "pending_delete",
+      pendingDeleteAt,
+      pendingDeleteNotifyAt: null,
+      updatedAt,
+    })
+    .where(eq(networks.id, networkId));
+
+  const { bumpNonSponsorSessions } = await import("@/lib/networks/purge");
+  await bumpNonSponsorSessions(networkId);
+
+  await logUserActivity(
+    sponsor.user.id,
+    "networks.delete_requested",
+    JSON.stringify({ networkId, pendingDeleteAt }),
+  );
+  await logPlatformEvent({
+    actorUserId: sponsor.user.id,
+    networkId,
+    networkName: network.name,
+    action: "networks.delete_requested",
+    summary: `Network close started: ${network.name}`,
+    severity: "major",
+  });
+
+  return {
+    ok: true,
+    message: "This network will be permanently deleted in 24 hours.",
+    pendingDeleteAt,
+  };
+}
+
+/**
+ * Clears pending_delete. Sponsor on the network, or any platform operator (PC-462).
+ */
+export async function reactivateNetworkAction(
+  networkId?: string,
+): Promise<{ ok: boolean; message: string }> {
+  await ensureDbReady();
+  const db = getDb();
+  const session = await requireNetworkSponsor();
+  const platform = session.ok ? null : await requirePlatformAdmin();
+  if (!session.ok && (!platform || !platform.ok)) {
+    return { ok: false, message: session.ok ? "Platform admin access required." : session.message };
+  }
+
+  const targetId = networkId ?? (session.ok ? session.user.activeNetworkId : "");
+  if (!targetId) return { ok: false, message: "Network not found." };
+
+  const actorId = session.ok ? session.user.id : platform && platform.ok ? platform.user.id : null;
+  const [network] = await db
+    .select()
+    .from(networks)
+    .where(eq(networks.id, targetId))
+    .limit(1);
+  if (!network) return { ok: false, message: "Network not found." };
+  if (network.status !== "pending_delete") {
+    return { ok: false, message: "This network is not scheduled to close." };
+  }
+
+  await db
+    .update(networks)
+    .set({
+      status: "active",
+      pendingDeleteAt: null,
+      pendingDeleteNotifyAt: null,
+      updatedAt: new Date().toISOString(),
+    })
+    .where(eq(networks.id, targetId));
+
+  await logUserActivity(
+    actorId,
+    "networks.reactivate",
+    JSON.stringify({ networkId: targetId }),
+  );
+  await logPlatformEvent({
+    actorUserId: actorId,
+    networkId: targetId,
+    networkName: network.name,
+    action: "networks.reactivate",
+    summary: `Network re-activated: ${network.name}`,
+    severity: "major",
+  });
+  return { ok: true, message: `${network.name} is active again.` };
 }

@@ -1,5 +1,7 @@
 import type { Client } from "@libsql/client";
 
+import { pickSponsorUserId } from "@/lib/networks/roles";
+
 /**
  * Multi-network tenancy tables + backfill from singleton poly_group (PC-357 / PC-358).
  *
@@ -187,6 +189,7 @@ export async function applyNetworksMigrations(sql: Client): Promise<void> {
   await backfillLegacyNetwork(sql);
   await grantDefaultPlatformAdmins(sql);
   await backfillBookingEnums(sql);
+  await applySponsorAndPendingDeleteColumns(sql);
 }
 
 /**
@@ -415,6 +418,66 @@ async function grantDefaultPlatformAdmins(sql: Client): Promise<void> {
           ON CONFLICT(key) DO NOTHING`,
     args: [],
   });
+}
+
+async function applySponsorAndPendingDeleteColumns(sql: Client): Promise<void> {
+  await ensureColumn(sql, "networks", "sponsor_user_id", "TEXT");
+  await ensureColumn(sql, "networks", "pending_delete_at", "TEXT");
+  await ensureColumn(sql, "networks", "pending_delete_notify_at", "TEXT");
+  await backfillSponsors(sql);
+}
+
+/**
+ * SCHEMA_VERSION 52: assign one Sponsor per network without clobbering an
+ * already-written sponsor_user_id (PC-460).
+ */
+async function backfillSponsors(sql: Client): Promise<void> {
+  const networksResult = await sql.execute(
+    `SELECT id, created_by_user_id, sponsor_user_id FROM networks`,
+  );
+  const now = new Date().toISOString();
+
+  for (const row of networksResult.rows) {
+    const networkId = String(row.id);
+    const existingSponsor =
+      typeof row.sponsor_user_id === "string" && row.sponsor_user_id
+        ? String(row.sponsor_user_id)
+        : null;
+    if (existingSponsor) {
+      await sql.execute({
+        sql: `UPDATE network_members SET role = 'sponsor', updated_at = ?
+              WHERE network_id = ? AND user_id = ? AND status = 'active'`,
+        args: [now, networkId, existingSponsor],
+      });
+      continue;
+    }
+
+    const membersResult = await sql.execute({
+      sql: `SELECT user_id, status, created_at, role FROM network_members WHERE network_id = ?`,
+      args: [networkId],
+    });
+    const sponsorUserId = pickSponsorUserId({
+      createdByUserId:
+        typeof row.created_by_user_id === "string" ? String(row.created_by_user_id) : null,
+      members: membersResult.rows.map((member) => ({
+        userId: String(member.user_id),
+        status: String(member.status),
+        createdAt: String(member.created_at),
+        role: String(member.role),
+      })),
+    });
+    if (!sponsorUserId) continue;
+
+    await sql.execute({
+      sql: `UPDATE networks SET sponsor_user_id = ?, updated_at = ? WHERE id = ?`,
+      args: [sponsorUserId, now, networkId],
+    });
+    await sql.execute({
+      sql: `UPDATE network_members SET role = 'sponsor', updated_at = ?
+            WHERE network_id = ? AND user_id = ? AND status = 'active'`,
+      args: [now, networkId, sponsorUserId],
+    });
+  }
 }
 
 async function ensureColumn(
