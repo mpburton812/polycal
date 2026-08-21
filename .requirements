@@ -432,3 +432,4 @@
 2026-08-20 | b27959d | PC-465 | redeem email login without swallowing Auth.js redirect | app/login/email/page.tsx
 2026-08-20 | c95d9a4 | PC-465 | redeem email login via auto-submit server action | src/actions/email-login.ts
 2026-08-20 | b800ee8 | PC-459 | update admin log title and wait for autosave toast | src/components/admin/AdminNetworkSettingsPanel.tsx
+2026-08-20 | ce2a12e | PC-463 | dismiss platform alerts and skip unchanged autosave | e2e/booked-attendee-journey.spec.ts
