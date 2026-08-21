@@ -11,9 +11,10 @@ import { applyCalendarMigrations } from "./calendar-migrations";
 import { applyPerformanceIndexMigrations } from "./performance-index-migrations";
 import { applyNetworksMigrations } from "./networks-migrations";
 import { applyMotdMigrations } from "./motd-migrations";
+import { applyPlatformLogMigrations } from "./platform-log-migrations";
 
 /** Bump whenever bootstrap DDL or *-migrations.ts modules change (PC-143). */
-export const SCHEMA_VERSION = "51";
+export const SCHEMA_VERSION = "52";
 
 /**
  * True when the stored schema version already matches the app target — skip
@@ -67,6 +68,7 @@ export async function runMigrations(): Promise<void> {
   await applyCalendarMigrations(sql);
   await applyNetworksMigrations(sql);
   await applyMotdMigrations(sql);
+  await applyPlatformLogMigrations(sql);
   // Indexes last: every table they cover exists by this point (PC-355).
   await applyPerformanceIndexMigrations(sql);
 

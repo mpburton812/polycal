@@ -66,6 +66,42 @@ export const motdMessages = sqliteTable(
   ],
 );
 
+/**
+ * Platform-wide operator log. Survives network hard-wipe because networkName is
+ * snapshotted at write time (PC-463).
+ */
+export const platformSystemLog = sqliteTable(
+  "platform_system_log",
+  {
+    id: text("id").primaryKey(),
+    createdAt: text("created_at").notNull(),
+    networkName: text("network_name"),
+    networkId: text("network_id"),
+    actorUserId: text("actor_user_id").references(() => users.id),
+    actorDisplayName: text("actor_display_name"),
+    severity: text("severity", { enum: ["major", "info"] }).notNull().default("info"),
+    action: text("action").notNull(),
+    summary: text("summary").notNull(),
+    emphasized: integer("emphasized", { mode: "boolean" }).notNull().default(false),
+  },
+  (table) => [index("idx_platform_system_log_created").on(table.createdAt)],
+);
+
+/** Per-operator dismiss-once for major/emphasized platform log alerts (PC-463). */
+export const platformLogAcknowledgments = sqliteTable(
+  "platform_log_acknowledgments",
+  {
+    logId: text("log_id")
+      .notNull()
+      .references(() => platformSystemLog.id),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id),
+    acknowledgedAt: text("acknowledged_at").notNull(),
+  },
+  (table) => [unique().on(table.logId, table.userId)],
+);
+
 /** Per-user dismiss-once acknowledgments for MOTD pop-ups — PC-392. */
 export const motdAcknowledgments = sqliteTable(
   "motd_acknowledgments",

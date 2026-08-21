@@ -6,6 +6,7 @@ import { AppTabs } from "@/components/layout/AppTabs";
 import { DevBar } from "@/components/layout/DevBar";
 import { MainTabCarousel } from "@/components/layout/MainTabCarousel";
 import { MotdPopupHost } from "@/components/motd/MotdPopupHost";
+import { PlatformLogAlertHost } from "@/components/motd/PlatformLogAlertHost";
 import { CalendarSyncFailurePopupHost } from "@/components/calendar/CalendarSyncFailurePopupHost";
 import { PushSubscriptionManager } from "@/components/notifications/PushSubscriptionManager";
 import { avatarSrcForKey } from "@/lib/constants/avatars";
@@ -86,6 +87,7 @@ export function AppShell({
       </Container>
       <AppTabs isAdmin={isAdmin} feedEnabled={feedEnabled} />
       <MotdPopupHost />
+      {isPlatformAdmin ? <PlatformLogAlertHost /> : null}
       <CalendarSyncFailurePopupHost disabled={e2eTestMode} />
       <Box sx={{ height: 56 }} aria-hidden />
     </ProposalCreateHost>

@@ -51,6 +51,10 @@ export async function resetTestDatabase(): Promise<{
   await client.execute("DELETE FROM stored_images");
   await client.execute("DELETE FROM locations");
   // Multi-network tables reference users — wipe before users (PC-357).
+  await client.execute("DELETE FROM motd_acknowledgments");
+  await client.execute("DELETE FROM motd_messages");
+  await client.execute("DELETE FROM platform_log_acknowledgments");
+  await client.execute("DELETE FROM platform_system_log");
   await client.execute("DELETE FROM network_setup_tokens");
   await client.execute("DELETE FROM network_members");
   await client.execute("DELETE FROM networks");

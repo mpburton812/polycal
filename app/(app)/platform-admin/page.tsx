@@ -15,6 +15,7 @@ import {
   resumeUserPlatformAction,
   setUserAccessLevelAction,
 } from "@/actions/platform-admin";
+import { listPlatformSystemLogAction } from "@/actions/platform-log";
 import { auth } from "@/lib/auth";
 import { PlatformAdminClient } from "@/components/platform/PlatformAdminClient";
 
@@ -28,10 +29,11 @@ export default async function PlatformAdminPage() {
     redirect("/feed");
   }
 
-  const [networks, settings, users] = await Promise.all([
+  const [networks, settings, users, platformLog] = await Promise.all([
     listAllNetworksAction(),
     getPlatformSettingsAction(),
     listPlatformUsersAction(),
+    listPlatformSystemLogAction(50),
   ]);
 
   return (
@@ -48,6 +50,7 @@ export default async function PlatformAdminPage() {
       deleteUserPlatformAction={deleteUserPlatformAction}
       inhabitNetworkAdminAction={inhabitNetworkAdminAction}
       setUserAccessLevelAction={setUserAccessLevelAction}
+      platformLogEntries={platformLog}
     />
   );
 }

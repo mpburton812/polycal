@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   buildCredentialsEmailContent,
+  buildEmailLoginContent,
   buildPasswordResetEmailContent,
   buildVerifyEmailContent,
 } from "@/lib/email/templates";
@@ -43,6 +44,14 @@ describe("email templates", () => {
     const content = buildPasswordResetEmailContent("https://example.com/reset-password?token=t1");
     expect(content.html).toContain("/reset-password?token=t1");
     expect(content.text).toContain("1 hour");
+  });
+
+  it("builds email login content without implying a password change (PC-465)", () => {
+    const content = buildEmailLoginContent("https://example.com/login/email?token=abc");
+    expect(content.html).toContain("/login/email?token=abc");
+    expect(content.text).toContain("15 minutes");
+    expect(content.text).toContain("existing password still works");
+    expect(content.text.toLowerCase()).not.toContain("change your password");
   });
 });
 

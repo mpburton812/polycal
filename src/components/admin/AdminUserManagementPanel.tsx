@@ -60,7 +60,7 @@ import {
 import { LONG_TEXT_MAX } from "@/lib/validation/string-limits";
 import { GARDEN_TOKENS, ORGANIC_RADIUS, STROKE_DEFAULT } from "@/theme/tokens";
 
-type AssignableAccessLevel = Exclude<AccountAccessLevel, "passive">;
+type AssignableAccessLevel = Exclude<AccountAccessLevel, "passive" | "sponsor">;
 
 /**
  * Admin user management with edit, impersonate, and delete (PC-31 / PC-178 / PC-369).
@@ -126,8 +126,11 @@ export function AdminUserManagementPanel({
     const level = resolveAccessLevel({
       role: user.role,
       isPlatformAdmin: user.isPlatformAdmin,
+      networkRole: user.networkRole,
     });
-    setEditAccessLevel(level === "passive" ? "user" : level);
+    setEditAccessLevel(
+      level === "platform_admin" ? "platform_admin" : level === "user" ? "user" : "admin",
+    );
     setEditGender(user.gender ?? "");
     setEditAvatarKey(user.avatarKey ?? AVATAR_OPTIONS[0].key);
     setEditUsernameStatus(
@@ -138,10 +141,16 @@ export function AdminUserManagementPanel({
   }
 
   function accessLabel(user: AdminUserRow): string {
+    if (user.networkRole === "sponsor") return "Sponsor";
     return formatAccessLevel({
       role: user.role,
       isPlatformAdmin: user.isPlatformAdmin,
+      networkRole: user.networkRole,
     });
+  }
+
+  function isSponsorUser(user: AdminUserRow | null): boolean {
+    return user?.networkRole === "sponsor";
   }
 
   function checkEditUsername(userId: string) {
@@ -304,7 +313,7 @@ export function AdminUserManagementPanel({
             </span>
           </Tooltip>
         )}
-        {user.id !== currentUserId && user.status !== "deleted" && (
+        {user.id !== currentUserId && user.status !== "deleted" && !isSponsorUser(user) && (
           <Tooltip title="Delete">
             <span>
               <IconButton
@@ -374,6 +383,9 @@ export function AdminUserManagementPanel({
                         : "Never logged in",
                     ].join(" · ")}
                   </Typography>
+                  {user.networkRole === "sponsor" && (
+                    <Chip size="small" label="Sponsor" color="secondary" />
+                  )}
                   {statusChip(user)}
                 </Stack>
                 {userActions(user)}
@@ -401,7 +413,13 @@ export function AdminUserManagementPanel({
                     {user.displayName}
                   </TableCell>
                   <TableCell sx={{ overflowWrap: "anywhere" }}>{user.gender ?? "—"}</TableCell>
-                  <TableCell sx={{ overflowWrap: "anywhere" }}>{accessLabel(user)}</TableCell>
+                  <TableCell sx={{ overflowWrap: "anywhere" }}>
+                    {user.networkRole === "sponsor" ? (
+                      <Chip size="small" label="Sponsor" color="secondary" data-testid="sponsor-chip" />
+                    ) : (
+                      accessLabel(user)
+                    )}
+                  </TableCell>
                   <TableCell>{statusChip(user)}</TableCell>
                   <TableCell sx={{ overflowWrap: "anywhere", wordBreak: "break-word" }}>
                     {user.lastLoginAt
@@ -484,7 +502,31 @@ export function AdminUserManagementPanel({
                       : "Availability is checked when you leave this field."
                   }
                 />
-                {canManagePlatformAdmin && editUser?.id !== currentUserId ? (
+                {editUser && isSponsorUser(editUser) ? (
+                  <Stack spacing={1}>
+                    <Chip label="Sponsor" color="secondary" data-testid="sponsor-chip" />
+                    {canManagePlatformAdmin && editUser.id !== currentUserId ? (
+                      <FormControl fullWidth>
+                        <InputLabel id="edit-sponsor-platform-admin-label">
+                          Platform operator
+                        </InputLabel>
+                        <Select
+                          labelId="edit-sponsor-platform-admin-label"
+                          label="Platform operator"
+                          value={editAccessLevel === "platform_admin" ? "platform_admin" : "sponsor"}
+                          onChange={(e) =>
+                            setEditAccessLevel(
+                              e.target.value === "platform_admin" ? "platform_admin" : "admin",
+                            )
+                          }
+                        >
+                          <MenuItem value="sponsor">Keep Sponsor</MenuItem>
+                          <MenuItem value="platform_admin">Also Platform Admin</MenuItem>
+                        </Select>
+                      </FormControl>
+                    ) : null}
+                  </Stack>
+                ) : canManagePlatformAdmin && editUser?.id !== currentUserId ? (
                   <FormControl fullWidth>
                     <InputLabel id="edit-user-access-level-label">Access level</InputLabel>
                     <Select
@@ -558,14 +600,18 @@ export function AdminUserManagementPanel({
                   ...(editUser.role !== "passive"
                     ? {
                         username: editUsername,
-                        role:
-                          canManagePlatformAdmin && editUser.id !== currentUserId
-                            ? editAccessLevel === "admin"
-                              ? "admin"
-                              : editAccessLevel === "user"
-                                ? "user"
-                                : editRole
-                            : editRole,
+                        ...(isSponsorUser(editUser)
+                          ? {}
+                          : {
+                              role:
+                                canManagePlatformAdmin && editUser.id !== currentUserId
+                                  ? editAccessLevel === "admin"
+                                    ? "admin"
+                                    : editAccessLevel === "user"
+                                      ? "user"
+                                      : editRole
+                                  : editRole,
+                            }),
                       }
                     : {}),
                 });

@@ -1,5 +1,6 @@
 import type { NetworkMemberRole } from "@/types/network";
 import type { UserRole } from "@/types/user";
+import { isElevatedNetworkRole } from "@/lib/networks/roles";
 
 /**
  * Whether the user may access Admin tab features. Power management ("all users as
@@ -18,7 +19,7 @@ export interface AdminAccessSession {
  */
 export function resolveAdminAccess(user: AdminAccessSession): boolean {
   if (user.isPlatformAdmin === true) return true;
-  if (user.activeNetworkRole === "network_admin") return true;
+  if (isElevatedNetworkRole(user.activeNetworkRole)) return true;
   return false;
 }
 

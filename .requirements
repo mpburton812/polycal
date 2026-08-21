@@ -417,3 +417,20 @@
 2026-08-19 | 78b478b | PC-448 | encode post-production harness rules | src/lib/changelog/entries.ts
 2026-08-20 | d306d1a | PC-448 | keep place-card has-filters relative to each card | src/lib/changelog/entries.ts
 2026-08-20 | 5cb29d6 | PC-448 | click solo batch night, not seeded Han+Leia | src/lib/changelog/entries.ts
+2026-08-20 | e6714b3 | PC-460 | add Sponsor role and schema 52 | src/actions/networks.ts
+2026-08-20 | aa426bc | PC-461 | autosave Network Configuration patches | src/actions/network-settings.ts
+2026-08-20 | 129e48b | PC-462 | 24h pending_delete lock and hard-wipe | src/components/layout/AppHeader.tsx
+2026-08-20 | 0ca4c29 | PC-463 | platform system log and operator alerts | src/actions/admin.ts
+2026-08-20 | df3415d | PC-464 | About menu with privacy terms and support | src/actions/support-message.ts
+2026-08-20 | 0357ec6 | PC-465 | email login magic link without password change | src/actions/email-login.ts
+2026-08-20 | 8afc8f5 | PC-466 | generate app icons from icon.webp | assets/images/icon.webp
+2026-08-20 | ac413cf | PC-459 | changelog 2026.08.20a and sponsor-ops e2e | src/lib/changelog/entries.ts
+2026-08-20 | f49a581 | PC-462 | do not keep JWT on a closing network | src/lib/email/templates.test.ts
+2026-08-20 | e845aa6 | PC-459 | type-check Sponsor access levels for production build | src/actions/network-settings.ts
+2026-08-20 | de8c833 | PC-459 | expect isPlatformAdmin on SessionUser in context tests | src/lib/actions/context.test.ts
+2026-08-20 | 47c2a35 | PC-461 | do not export Zod schema from use server settings action | src/actions/network-settings.ts
+2026-08-20 | b27959d | PC-465 | redeem email login without swallowing Auth.js redirect | app/login/email/page.tsx
+2026-08-20 | c95d9a4 | PC-465 | redeem email login via auto-submit server action | src/actions/email-login.ts
+2026-08-20 | b800ee8 | PC-459 | update admin log title and wait for autosave toast | src/components/admin/AdminNetworkSettingsPanel.tsx
+2026-08-20 | ce2a12e | PC-463 | dismiss platform alerts and skip unchanged autosave | e2e/booked-attendee-journey.spec.ts
+2026-08-21 | f02c26f | PC-463 | retry-dismiss platform alerts before admin locators | e2e/admin-bad-user-journey.spec.ts

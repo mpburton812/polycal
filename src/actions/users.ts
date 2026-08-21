@@ -8,6 +8,7 @@ import { z } from "zod";
 
 import { auth } from "@/lib/auth";
 import { logUserActivity } from "@/lib/audit";
+import { logPlatformEvent } from "@/lib/platform-log";
 import { requireAdminAccess, requireSession, withDb } from "@/lib/actions/context";
 import { isCustomAvatarKey } from "@/lib/constants/avatars";
 import { getDb } from "@/lib/db/client";
@@ -28,10 +29,12 @@ import {
   type UserRole,
 } from "@/lib/db/schema";
 import {
+  getMembership,
   listActiveMemberships,
   removeMembership,
   upsertMembership,
 } from "@/lib/networks/membership";
+import { isSponsorRole } from "@/lib/networks/roles";
 import { resolveAdminAccess } from "@/lib/admin-access";
 import { requireNetworkSession } from "@/lib/networks/context";
 import { loadNetworkSettings } from "@/lib/networks/settings";
@@ -56,6 +59,7 @@ import {
   generateTemporaryPassword,
 } from "@/lib/users/credentials";
 import { LONG_TEXT_MAX, maxCharsMessage } from "@/lib/validation/string-limits";
+import type { NetworkMemberRole } from "@/types/network";
 
 /** Shared username rules for provisioned active accounts. */
 const usernameSchema = z
@@ -116,6 +120,7 @@ export interface AdminUserRow {
   loginCount: number;
   isPlatformAdmin: boolean;
   avatarKey: string | null;
+  networkRole: NetworkMemberRole | null;
 }
 
 export interface CreateUserResult {
@@ -553,6 +558,15 @@ export async function createActiveUserAction(
     "users.create_active",
     JSON.stringify({ userId, username, role, emailedTo: Boolean(notificationEmail) }),
   );
+  if (networkSession.ok) {
+    await logPlatformEvent({
+      actorUserId: session?.user?.id ?? null,
+      networkId: networkSession.user.activeNetworkId,
+      action: "users.create_active",
+      summary: `A user was added to ${networkSession.user.networkName}`,
+      severity: "major",
+    });
+  }
 
   const delivery = await deliverLoginCredentials({
     actorUserId: session?.user?.id ?? null,
@@ -812,6 +826,13 @@ export async function updateUserAction(
 
   if (user.role !== "passive") {
     if (parsed.data.role) {
+      const networkSession = await requireNetworkSession();
+      if (networkSession.ok) {
+        const membership = await getMembership(user.id, networkSession.user.activeNetworkId);
+        if (isSponsorRole(membership?.role) && parsed.data.role !== "admin") {
+          return { ok: false, message: "The Sponsor cannot be demoted." };
+        }
+      }
       updates.role = parsed.data.role;
     }
     if (parsed.data.username) {
@@ -831,6 +852,14 @@ export async function updateUserAction(
     "users.admin_update",
     JSON.stringify({ userId: user.id, updates }),
   );
+  if (parsed.data.role && parsed.data.role !== user.role) {
+    await logPlatformEvent({
+      actorUserId: adminResult.user.id,
+      action: "users.admin_update",
+      summary: `Access level changed for ${parsed.data.displayName}`,
+      severity: "major",
+    });
+  }
 
   revalidatePath("/people-places");
   revalidatePath("/admin");
@@ -942,6 +971,10 @@ export async function deleteUserAction(userId: string): Promise<UserActionResult
 
   const networkSession = await requireNetworkSession();
   if (networkSession.ok) {
+    const membership = await getMembership(userId, networkSession.user.activeNetworkId);
+    if (isSponsorRole(membership?.role)) {
+      return { ok: false, message: "The Sponsor cannot be removed." };
+    }
     await removeMembership(userId, networkSession.user.activeNetworkId);
   }
 
@@ -956,6 +989,13 @@ export async function deleteUserAction(userId: string): Promise<UserActionResult
         networkId: networkSession.ok ? networkSession.user.activeNetworkId : null,
       }),
     );
+    await logPlatformEvent({
+      actorUserId: adminResult.user.id,
+      networkId: networkSession.ok ? networkSession.user.activeNetworkId : null,
+      action: "users.network_remove",
+      summary: `A user was removed from ${networkSession.ok ? networkSession.user.networkName : "a network"}`,
+      severity: "major",
+    });
     revalidateAfterAccountRemoval();
     return {
       ok: true,
@@ -1073,6 +1113,7 @@ export async function listAdminUsersAction(): Promise<AdminUserRow[]> {
 
   await ensureDbReady();
   const db = getDb();
+  const networkSession = await requireNetworkSession();
   const rows = await db
     .select({
       id: users.id,
@@ -1090,9 +1131,26 @@ export async function listAdminUsersAction(): Promise<AdminUserRow[]> {
     .where(ne(users.status, "deleted"))
     .orderBy(asc(users.displayName));
 
+  const memberships = networkSession.ok
+    ? await db
+        .select({
+          userId: networkMembers.userId,
+          role: networkMembers.role,
+        })
+        .from(networkMembers)
+        .where(
+          and(
+            eq(networkMembers.networkId, networkSession.user.activeNetworkId),
+            eq(networkMembers.status, "active"),
+          ),
+        )
+    : [];
+  const roleByUser = new Map(memberships.map((row) => [row.userId, row.role as NetworkMemberRole]));
+
   return rows.map((row) => ({
     ...row,
     isPlatformAdmin: row.isPlatformAdmin === true,
+    networkRole: roleByUser.get(row.id) ?? null,
   }));
 }
 
@@ -1141,6 +1199,12 @@ export async function pauseUserAction(
     "users.admin_pause",
     JSON.stringify({ userId, reason }),
   );
+  await logPlatformEvent({
+    actorUserId: adminResult.user.id,
+    action: "users.admin_pause",
+    summary: `User paused: ${user.displayName}`,
+    severity: "major",
+  });
   revalidatePath("/admin");
   revalidatePath("/people-places");
   revalidatePath("/proposals");
@@ -1169,6 +1233,12 @@ export async function resumeUserAction(userId: string): Promise<UserActionResult
     .where(eq(users.id, userId));
 
   await logUserActivity(adminResult.user.id, "users.admin_resume", JSON.stringify({ userId }));
+  await logPlatformEvent({
+    actorUserId: adminResult.user.id,
+    action: "users.admin_resume",
+    summary: `User resumed: ${user.displayName}`,
+    severity: "major",
+  });
   revalidatePath("/admin");
   revalidatePath("/people-places");
   return { ok: true, message: `Resumed ${user.displayName}.` };
@@ -1221,6 +1291,12 @@ export async function adminResetPasswordAction(
     "users.admin_reset_password",
     JSON.stringify({ userId: user.id }),
   );
+  await logPlatformEvent({
+    actorUserId: adminResult.user.id,
+    action: "users.admin_reset_password",
+    summary: `Admin reset password for ${user.displayName}`,
+    severity: "major",
+  });
 
   const canEmail = Boolean(user.notificationEmail && user.emailVerifiedAt);
   const delivery = await deliverLoginCredentials({
