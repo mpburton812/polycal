@@ -39,7 +39,7 @@ type NetworkRow = {
 
 type ModerationTarget = { userId: string; displayName: string; kind: "pause" | "ban" };
 
-type AssignableAccessLevel = Exclude<AccountAccessLevel, "passive">;
+type AssignableAccessLevel = Exclude<AccountAccessLevel, "passive" | "sponsor">;
 
 function DetailRow({ label, children }: { label: string; children: ReactNode }) {
   return (
@@ -303,8 +303,10 @@ export function PlatformAdminClient({
           {users.map((user) => {
             const isSelf = user.id === currentUserId;
             const canChangeAccess = !isSelf && user.role !== "passive";
-            const selectValue: AssignableAccessLevel | "passive" =
-              user.accessLevel === "passive" ? "passive" : user.accessLevel;
+            const selectValue: AssignableAccessLevel | "passive" | "sponsor" =
+              user.accessLevel === "passive" || user.accessLevel === "sponsor"
+                ? user.accessLevel
+                : user.accessLevel;
 
             return (
               <Paper
@@ -390,14 +392,19 @@ export function PlatformAdminClient({
                       value={selectValue}
                       aria-label={`Access level for ${user.displayName}`}
                       onChange={(e) => {
-                        const next = e.target.value as AssignableAccessLevel | "passive";
-                        if (next === "passive") return;
+                        const next = e.target.value as AssignableAccessLevel | "passive" | "sponsor";
+                        if (next === "passive" || next === "sponsor") return;
                         void changeAccessLevel(user, next);
                       }}
                     >
                       <MenuItem value="platform_admin">Platform Admin</MenuItem>
                       <MenuItem value="admin">Admin</MenuItem>
                       <MenuItem value="user">User</MenuItem>
+                      {user.accessLevel === "sponsor" && (
+                        <MenuItem value="sponsor" disabled>
+                          Sponsor
+                        </MenuItem>
+                      )}
                       {user.accessLevel === "passive" && (
                         <MenuItem value="passive" disabled>
                           Proxy

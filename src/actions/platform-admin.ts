@@ -291,9 +291,16 @@ export async function listPlatformUsersAction(): Promise<PlatformUserRow[]> {
   }
 
   return userRows.map((row) => {
+    const memberNetworks = networksByUser.get(row.id) ?? [];
+    const networkRole = memberNetworks.some((m) => m.role === "sponsor")
+      ? "sponsor"
+      : memberNetworks.some((m) => m.role === "network_admin")
+        ? "network_admin"
+        : undefined;
     const accessLevel = resolveAccessLevel({
       role: row.role,
       isPlatformAdmin: row.isPlatformAdmin === true,
+      networkRole,
     });
     return {
       id: row.id,
@@ -305,7 +312,7 @@ export async function listPlatformUsersAction(): Promise<PlatformUserRow[]> {
       accessLevel,
       accessLevelLabel: formatAccessLevel(accessLevel),
       avatarKey: row.avatarKey,
-      networks: networksByUser.get(row.id) ?? [],
+      networks: memberNetworks,
       moderationReason: row.moderationReason,
       moderationExpiresAt: row.moderationExpiresAt,
     };

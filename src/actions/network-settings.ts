@@ -142,7 +142,8 @@ export async function updateNetworkSettingsAction(
   }
 
   const patch = parsed.data;
-  const nextScheduling = patch.schedulingPosting ?? current.schedulingPosting;
+  const nextScheduling: SchedulingPostingMode =
+    patch.schedulingPosting ?? (current.schedulingPosting as SchedulingPostingMode);
   const now = new Date().toISOString();
 
   await db

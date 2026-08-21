@@ -60,7 +60,7 @@ import {
 import { LONG_TEXT_MAX } from "@/lib/validation/string-limits";
 import { GARDEN_TOKENS, ORGANIC_RADIUS, STROKE_DEFAULT } from "@/theme/tokens";
 
-type AssignableAccessLevel = Exclude<AccountAccessLevel, "passive">;
+type AssignableAccessLevel = Exclude<AccountAccessLevel, "passive" | "sponsor">;
 
 /**
  * Admin user management with edit, impersonate, and delete (PC-31 / PC-178 / PC-369).
@@ -126,8 +126,11 @@ export function AdminUserManagementPanel({
     const level = resolveAccessLevel({
       role: user.role,
       isPlatformAdmin: user.isPlatformAdmin,
+      networkRole: user.networkRole,
     });
-    setEditAccessLevel(level === "passive" ? "user" : level);
+    setEditAccessLevel(
+      level === "platform_admin" ? "platform_admin" : level === "user" ? "user" : "admin",
+    );
     setEditGender(user.gender ?? "");
     setEditAvatarKey(user.avatarKey ?? AVATAR_OPTIONS[0].key);
     setEditUsernameStatus(
@@ -499,7 +502,7 @@ export function AdminUserManagementPanel({
                       : "Availability is checked when you leave this field."
                   }
                 />
-                {isSponsorUser(editUser) ? (
+                {editUser && isSponsorUser(editUser) ? (
                   <Stack spacing={1}>
                     <Chip label="Sponsor" color="secondary" data-testid="sponsor-chip" />
                     {canManagePlatformAdmin && editUser.id !== currentUserId ? (
