@@ -1,7 +1,10 @@
 import { type Page, expect } from "@playwright/test";
 
+import { dismissBlockingDialogsIfOpen } from "./motd";
+
 /** Expands a collapsed admin accordion section by title. Idempotent — does not toggle closed. */
 export async function expandAdminSection(page: Page, title: string): Promise<void> {
+  await dismissBlockingDialogsIfOpen(page);
   const heading = page.getByRole("heading", { name: title, level: 2 });
   await expect(heading).toBeVisible({ timeout: 20_000 });
   const toggle = heading.locator("xpath=ancestor::*[@role='button'][1]");

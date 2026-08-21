@@ -120,6 +120,8 @@ async function setPostingMode(
   await openNetworkSettings(page);
   const combo = page.getByRole("combobox", { name: "Event Types" });
   await expect(combo).toBeVisible({ timeout: 15_000 });
+  const current = (await combo.textContent()) ?? "";
+  if (current.includes(mode)) return;
   await combo.click();
   await page.getByRole("option", { name: mode }).click();
   await expectToast(page, /Network settings saved/i);

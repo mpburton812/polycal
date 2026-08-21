@@ -179,8 +179,11 @@ async function selectLabeledCombobox(
 ): Promise<void> {
   const combo = page.getByRole("combobox", { name: label });
   await expect(combo).toBeVisible({ timeout: 15_000 });
+  const current = (await combo.textContent()) ?? "";
+  if (current.includes(option)) return;
   await combo.click();
   await page.getByRole("option", { name: option }).click();
+  await saveNetworkSettings(page);
 }
 
 async function setPostingMode(
@@ -190,7 +193,6 @@ async function setPostingMode(
   await loginWithOnboardingIfNeeded(page, USERS.luke.username);
   await openNetworkSettings(page);
   await selectLabeledCombobox(page, "Event Types", mode);
-  await saveNetworkSettings(page);
 }
 
 async function setBookingForScope(
@@ -201,7 +203,6 @@ async function setBookingForScope(
   await openNetworkSettings(page);
   await expect(page.getByLabel("Proxy Scheduling")).toHaveCount(0);
   await selectLabeledCombobox(page, "Booking for", scope);
-  await saveNetworkSettings(page);
 }
 
 async function setPollEnabled(page: Page, enabled: boolean): Promise<void> {
@@ -211,8 +212,8 @@ async function setPollEnabled(page: Page, enabled: boolean): Promise<void> {
   await expect(toggle).toBeVisible({ timeout: 15_000 });
   if ((await toggle.isChecked()) !== enabled) {
     await toggle.click();
+    await saveNetworkSettings(page);
   }
-  await saveNetworkSettings(page);
 }
 
 async function restoreDefaultComposerSettings(page: Page): Promise<void> {
@@ -225,8 +226,8 @@ async function restoreDefaultComposerSettings(page: Page): Promise<void> {
     await expect(poll).toBeEnabled({ timeout: 15_000 });
     if (!(await poll.isChecked())) {
       await poll.click();
+      await saveNetworkSettings(page);
     }
-    await saveNetworkSettings(page);
   } catch {
     // Best-effort restore so later serial specs keep default Poll-on / Just Proposals.
   }

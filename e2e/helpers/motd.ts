@@ -29,4 +29,20 @@ export async function dismissCalendarSyncDialogIfOpen(page: Page): Promise<void>
 export async function dismissBlockingDialogsIfOpen(page: Page): Promise<void> {
   await dismissMotdDialogIfOpen(page);
   await dismissCalendarSyncDialogIfOpen(page);
+  await dismissPlatformLogAlertIfOpen(page);
+}
+
+/**
+ * Dismisses queued platform-operator alerts (PC-463). Unacked major log rows
+ * otherwise block Profile menu / accordion clicks for the rest of the worker.
+ */
+export async function dismissPlatformLogAlertIfOpen(page: Page): Promise<void> {
+  for (let i = 0; i < 10; i += 1) {
+    const dialog = page.getByRole("dialog", { name: "Platform alert" });
+    if (!(await dialog.isVisible().catch(() => false))) return;
+    await dialog.getByRole("button", { name: "OK" }).click();
+    await expect(dialog)
+      .toHaveCount(0, { timeout: 5_000 })
+      .catch(() => {});
+  }
 }
