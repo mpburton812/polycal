@@ -42,7 +42,7 @@ export async function dismissPlatformLogAlertIfOpen(page: Page): Promise<void> {
     if (!(await dialog.isVisible().catch(() => false))) return;
     await dialog.getByRole("button", { name: "OK" }).click();
     await expect(dialog)
-      .toHaveCount(0, { timeout: 5_000 })
+      .toBeHidden({ timeout: 5_000 })
       .catch(() => {});
   }
 }

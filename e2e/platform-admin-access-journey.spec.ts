@@ -3,6 +3,7 @@ import { expect, test } from "./helpers/test";
 import { expandAdminSection } from "./helpers/admin";
 import { login } from "./helpers/auth";
 import { USERS } from "./helpers/constants";
+import { dismissBlockingDialogsIfOpen } from "./helpers/motd";
 import { openProfileMenu } from "./helpers/navigation";
 
 /**
@@ -51,6 +52,7 @@ test.describe("Platform admin access levels", () => {
     );
 
     await page.goto("/admin");
+    await dismissBlockingDialogsIfOpen(page);
     await expandAdminSection(page, "User management");
     const leiaRow = page.getByRole("row").filter({ hasText: USERS.leia.displayName });
     await expect(leiaRow.getByText("User", { exact: true })).toBeVisible({ timeout: 15_000 });
