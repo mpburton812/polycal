@@ -28,6 +28,49 @@ import { CHANGELOG_ARCHIVE } from "./entries.archive";
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "2026.08.20a",
+    date: "2026-08-20",
+    summary:
+      "Sponsor role, autosave Network Configuration, 24h network close, platform system log, About, email login, and app icon (PC-459–PC-466).",
+    changes: [
+      {
+        type: "added",
+        description:
+          "Sponsor membership role with sticky elevation; Network Admins can still promote other admins (PC-460).",
+      },
+      {
+        type: "changed",
+        description:
+          "Network Configuration autosaves switches immediately and text fields on blur (PC-461).",
+      },
+      {
+        type: "added",
+        description:
+          "Sponsor-only DELETE confirmation starts a 24h pending_delete lock then hard-wipe; Platform Admin can re-activate (PC-462).",
+      },
+      {
+        type: "added",
+        description:
+          "Network Administrator Log rename plus Platform System Log and operator alerts (PC-463).",
+      },
+      {
+        type: "added",
+        description:
+          "About menu with privacy/terms links and a support message for platform operators (PC-464).",
+      },
+      {
+        type: "added",
+        description:
+          "Email login magic link is a full session and does not force a password change (PC-465).",
+      },
+      {
+        type: "changed",
+        description:
+          "PWA icons generated from assets/images/icon.webp (PC-466). SCHEMA_VERSION 52.",
+      },
+    ],
+  },
+  {
     version: "2026.08.19e",
     date: "2026-08-19",
     summary:

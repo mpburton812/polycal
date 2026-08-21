@@ -65,16 +65,16 @@ Shared helpers: `src/lib/actions/context.ts` (`requireSession`, `requireAdminAcc
 | External calendars | Google Calendar API (OAuth connect, not login) + ICS download/email (Option B); tokens encrypted with `CALENDAR_TOKEN_ENCRYPTION_KEY`. See [GOOGLE-CALENDAR-SYNC.md](./GOOGLE-CALENDAR-SYNC.md) for sync notifications, triage, and recovery. |
 | Database | libSQL — `file:local.db` (local), Turso (`polycal-dev` / `polycal-test` / `polycal-prod`) |
 | Hosting | Vercel (+ Render cron for dev/test enforcement) |
-| Identity roles | Admin, User (active), Proxy (schedulable, upgrade path to User; DB role `passive`) |
+| Identity roles | **Sponsor** (one per network; maps to legacy admin), Network Admin, User (active), Proxy (schedulable, upgrade path to User; DB role `passive`). Platform Admin is an account flag, not a network membership. |
 
 ## Admin capability matrix
 
 | Capability | `role === "admin"` | Notes |
 |------------|-------------------|--------|
-| Admin panel (`/admin`) | Yes (also network_admin / platform admin) | Entry via **header profile menu** (below Platform admin), not bottom tabs (PC-393). Platform dashboard lives only on `/platform-admin`. |
-| Pause/delete users | Yes | |
+| Admin panel (`/admin`) | Yes (also sponsor / network_admin / platform admin) | Entry via **header profile menu** (below Platform admin), not bottom tabs (PC-393). Platform dashboard lives only on `/platform-admin`. Sponsor-only DELETE starts a 24h `pending_delete` lock then hard-wipe (PC-460 / PC-462). |
+| Pause/delete users | Yes | Sponsor membership cannot be demoted or removed. |
 | Impersonation | Yes when `AUTH_IMPERSONATION_SECRET` is set | Admin User management (prod allowed); Test data / DevBar non-prod only |
-| Message of the Day | Network admin (network scope) / Platform admin (all nodes) | Pop-up via `MotdPopupHost`; dismiss-once ack; optional `endsAt` (PC-392) |
+| Message of the Day | Network admin (network scope) / Platform admin (all nodes) | Pop-up via `MotdPopupHost`; dismiss-once ack; optional `endsAt` (PC-392). Platform System Log is a separate operator queue (`PlatformLogAlertHost`), not the human MOTD composer (PC-463). |
 | Sleeping proposal visibility | Involved-only (hard default) | Proposer, invitees, and admins when `adminCanSeeUninvolved`; masked copy shows “Busy” / Hidden for non-participants |
 
 Server actions that gate on admin use `userHasAdminAccess` (role-based; no delegated power-management).
