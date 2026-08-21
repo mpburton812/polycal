@@ -429,3 +429,4 @@
 2026-08-20 | e845aa6 | PC-459 | type-check Sponsor access levels for production build | src/actions/network-settings.ts
 2026-08-20 | de8c833 | PC-459 | expect isPlatformAdmin on SessionUser in context tests | src/lib/actions/context.test.ts
 2026-08-20 | 47c2a35 | PC-461 | do not export Zod schema from use server settings action | src/actions/network-settings.ts
+2026-08-20 | b27959d | PC-465 | redeem email login without swallowing Auth.js redirect | app/login/email/page.tsx
