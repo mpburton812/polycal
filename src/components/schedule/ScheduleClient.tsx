@@ -60,6 +60,8 @@ import {
 } from "@/lib/schedule/dates";
 import { startOfMonth } from "@/lib/schedule/month-grid";
 import { computeScheduleFetchRange } from "@/lib/schedule/fetch-range";
+import { SCHEDULE_INVALIDATE_EVENT } from "@/lib/schedule/invalidate";
+import { ssrWeekCoversVisibleRange } from "@/lib/schedule/visible-payload";
 import { GARDEN_TOKENS } from "@/theme/tokens";
 
 /** Heavy dialogs load on demand so the calendar paints sooner (PC-145). */
@@ -246,12 +248,40 @@ export function ScheduleClient({
   }, [viewState]);
 
   useEffect(() => {
-    // Re-apply whenever RSC passes a new payload. Keep-alive can reuse this
-    // fiber across soft navigations; a one-shot hydrate left stale empty weeks
-    // after proposals were created on another tab (PC-407).
-    setPayload(initialPayload);
     initialPayloadHydratedRef.current = true;
-  }, [initialPayload]);
+    // SSR always ships the current calendar week (page.tsx). Applying that
+    // slice over a 2-week / month / day / other-week client fetch blanks
+    // visible days until reload (PC-474). PC-407 still applies when the
+    // SSR week is exactly the window on screen.
+    const covers = ssrWeekCoversVisibleRange({
+      layout: viewState.calendarLayout,
+      compact: viewState.compact,
+      visibleAnchor: fetchAnchor,
+      ssrWeekStart: new Date(initialWeekStartIso),
+      timeZone,
+    });
+    if (covers) {
+      setPayload(initialPayload);
+      return;
+    }
+    refreshCurrentView();
+  }, [
+    fetchAnchor,
+    initialPayload,
+    initialWeekStartIso,
+    refreshCurrentView,
+    timeZone,
+    viewState.calendarLayout,
+    viewState.compact,
+  ]);
+
+  useEffect(() => {
+    function onInvalidate() {
+      refreshCurrentView();
+    }
+    window.addEventListener(SCHEDULE_INVALIDATE_EVENT, onInvalidate);
+    return () => window.removeEventListener(SCHEDULE_INVALIDATE_EVENT, onInvalidate);
+  }, [refreshCurrentView]);
 
   /** Hydrate from URL once (PC-167); fall back to persisted anchors (PC-164). */
   useEffect(() => {

@@ -28,6 +28,19 @@ import { CHANGELOG_ARCHIVE } from "./entries.archive";
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "2026.08.24a",
+    date: "2026-08-24",
+    summary:
+      "Keep overlapping multi-day events on 2-week and month schedule after create (PC-474).",
+    changes: [
+      {
+        type: "fixed",
+        description:
+          "Creating a multi-day event no longer replaces a 2-week/month/day client fetch with the SSR current-week payload, which had blanked overlapping Fri–Sun blocks until reload (PC-474).",
+      },
+    ],
+  },
+  {
     version: "2026.08.20a",
     date: "2026-08-20",
     summary:
