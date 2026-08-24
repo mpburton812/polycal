@@ -51,7 +51,8 @@ test.describe("Overlapping multi-day events stay visible in 2-week view", () => 
     });
     await waitForScheduleReady(page);
     const panel = activeMainPanel(page);
-    await expect(panel.getByRole("button", { name: new RegExp(firstTitle, "i") })).toBeVisible({
+    // Multi-day all-day blocks paint once per civil day (Fri/Sat/Sun).
+    await expect(panel.getByRole("button", { name: new RegExp(firstTitle, "i") }).first()).toBeVisible({
       timeout: 30_000,
     });
 
@@ -62,10 +63,10 @@ test.describe("Overlapping multi-day events stay visible in 2-week view", () => 
     });
     await waitForScheduleReady(page);
 
-    await expect(panel.getByRole("button", { name: new RegExp(firstTitle, "i") })).toBeVisible({
+    await expect(panel.getByRole("button", { name: new RegExp(firstTitle, "i") }).first()).toBeVisible({
       timeout: 30_000,
     });
-    await expect(panel.getByRole("button", { name: new RegExp(secondTitle, "i") })).toBeVisible({
+    await expect(panel.getByRole("button", { name: new RegExp(secondTitle, "i") }).first()).toBeVisible({
       timeout: 30_000,
     });
     await expect(page).toHaveURL(/\/schedule/);
