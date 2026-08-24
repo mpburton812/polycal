@@ -435,3 +435,4 @@
 2026-08-20 | ce2a12e | PC-463 | dismiss platform alerts and skip unchanged autosave | e2e/booked-attendee-journey.spec.ts
 2026-08-21 | f02c26f | PC-463 | retry-dismiss platform alerts before admin locators | e2e/admin-bad-user-journey.spec.ts
 2026-08-21 | 23f9a3f | PC-463 | dismiss platform alerts after access-level changes | e2e/platform-admin-access-journey.spec.ts
+2026-08-24 | 008d763 | PC-474 | keep overlapping multi-day events after create | src/components/proposals/ProposalDraftDialog.tsx
