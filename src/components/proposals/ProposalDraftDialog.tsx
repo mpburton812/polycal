@@ -74,6 +74,7 @@ import {
   PAST_SCHEDULE_TEXT,
 } from "./proposalCardTheme";
 import { GARDEN_TOKENS } from "@/theme/tokens";
+import { invalidateSchedule } from "@/lib/schedule/invalidate";
 import { sleepingDateToStartIso } from "@/lib/proposals/sleeping-schedule";
 import { formatSleepingDisplayTitle } from "@/lib/proposals/sleeping-display";
 import { parseEventIntent, type EventIntentChip } from "@/lib/proposals/event-intent-parse";
@@ -909,6 +910,7 @@ export function ProposalDraftDialog({
       showToast(result.message, result.ok ? "success" : "error");
       if (result.ok) {
         onClose();
+        invalidateSchedule();
         router.refresh();
       }
     });
@@ -958,6 +960,7 @@ export function ProposalDraftDialog({
       setShowConflictConfirm(false);
       setConflictDialogOpen(false);
       handleClose();
+      invalidateSchedule();
       router.refresh();
     });
   }
