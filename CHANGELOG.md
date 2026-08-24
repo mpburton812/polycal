@@ -4,6 +4,12 @@ All notable changes to PolyCal are documented here.
 
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [2026.08.24a] - 2026-08-24
+
+### Fixed
+
+- PC-474: After creating a multi-day event, 2-week and month schedule no longer apply the SSR current-week payload over a wider client fetch (overlapping events no longer vanish until reload). Composer submit invalidates the visible schedule range. Change control: `2026.08.24a`.
+
 ## [2026.08.20a] - 2026-08-20
 
 ### Added
