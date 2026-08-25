@@ -1,0 +1,40 @@
+{
+  "packageId": "app.polycal",
+  "host": "polycal-ebon.vercel.app",
+  "name": "PolyCal Group Scheduling",
+  "launcherName": "PolyCal",
+  "display": "standalone",
+  "themeColor": "#6B8F71",
+  "themeColorDark": "#000000",
+  "navigationColor": "#6B8F71",
+  "navigationColorDark": "#000000",
+  "navigationDividerColor": "#00000000",
+  "navigationDividerColorDark": "#00000000",
+  "backgroundColor": "#F7F2EA",
+  "enableNotifications": true,
+  "startUrl": "/",
+  "iconUrl": "https://polycal-ebon.vercel.app/icons/icon-512.png",
+  "maskableIconUrl": "https://polycal-ebon.vercel.app/icons/icon-maskable-512.png",
+  "splashScreenFadeOutDuration": 300,
+  "signingKey": {
+    "path": "./android.keystore",
+    "alias": "android"
+  },
+  "appVersionName": "1",
+  "appVersionCode": 1,
+  "shortcuts": [],
+  "generatorApp": "bubblewrap-cli",
+  "webManifestUrl": "https://polycal-ebon.vercel.app/manifest.webmanifest",
+  "fallbackType": "customtabs",
+  "features": {},
+  "alphaDependencies": {
+    "enabled": false
+  },
+  "enableSiteSettingsShortcut": true,
+  "orientation": "portrait-primary",
+  "fullScopeUrl": "https://polycal-ebon.vercel.app/",
+  "minSdkVersion": 21,
+  "displayOverride": [],
+  "additionalTrustedOrigins": [],
+  "retainedBundles": []
+}

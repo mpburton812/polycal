@@ -1,3 +1,4 @@
+import { loginCallbackUrlFromRequest } from "@/lib/auth/callback-url";
 import { edgeAuth } from "@/lib/auth-edge";
 import { isE2eApiAuthorized } from "@/lib/e2e-api";
 
@@ -30,6 +31,9 @@ export default edgeAuth((request) => {
     "/network-closed",
     "/feedback",
     "/offline",
+    "/.well-known",
+    "/manifest.webmanifest",
+    "/manifest",
     "/api/auth",
     "/api/cron",
     "/api/admin/alpha-feedback",
@@ -45,7 +49,10 @@ export default edgeAuth((request) => {
 
   if (!session?.user?.id) {
     const loginUrl = new URL("/login", request.nextUrl.origin);
-    loginUrl.searchParams.set("callbackUrl", pathname);
+    loginUrl.searchParams.set(
+      "callbackUrl",
+      loginCallbackUrlFromRequest(request.nextUrl),
+    );
     return Response.redirect(loginUrl);
   }
 

@@ -4,6 +4,12 @@ All notable changes to PolyCal are documented here.
 
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [2026.08.25a] - 2026-08-25
+
+### Added
+
+- PC-475–PC-480: Android Trusted Web Activity (`app.polycal`) with a home-screen NLP bar that opens New Event (NLP Input) inside the TWA. `/feed?compose=` deep-links, login callback query, Digital Asset Links, PWA shortcuts. Apple PWA unchanged. Play listing deferred. Bubblewrap stays a global CLI (`npm run twa:ensure`) so `npm audit` stays clean. Change control: `2026.08.25a`.
+
 ## [2026.08.24a] - 2026-08-24
 
 ### Fixed
