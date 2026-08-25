@@ -21,6 +21,12 @@ You are an AI programming assistant. You must adhere strictly to the following a
   - **Cancelled/skipped jobs:** `concurrency.cancel-in-progress` skips the push workflow when an open PR already covers the branch, and cancels superseded runs. Ignore `CANCELLED` / `SKIPPED` decide/build/playwright jobs on the PR rollup.
 - **Data Isolation:** Maintain strict logical and physical separation between non-production (`dev`/`test`) and `production` databases.
 - **Database Seeding:** Generate and maintain dedicated seeding scripts that populate `dev` and `test` environments with predictable, reset-friendly, realistic test scenarios derived from current and previous builds. Ensure production deployments strictly exclude all seeding logic and dummy data.
+- **Android TWA / PWA packaging (agent rules):** Hard constraints from Play-shaped packaging. How-to detail lives in `android-twa/README.md` and env gotchas in `AGENTS.md`.
+  - **Public install surfaces:** Keep `/manifest.webmanifest`, `/manifest`, and `/.well-known` reachable without sign-in (`middleware.ts` public allowlist). Never login-gate them — Bubblewrap `update` and Digital Asset Links fail when the web manifest redirects to login.
+  - **Bubblewrap is global only:** Never add `@bubblewrap/cli` to the app `package.json` / lockfile (it fails `npm audit` and blocks feature→dev). Use `npm run twa:ensure` so the CLI is on PATH.
+  - **Non-interactive JDK/SDK config:** Before the first Bubblewrap CLI run on a machine, write `%USERPROFILE%\.bubblewrap\config.json` (UTF-8, **no BOM**) with `jdkPath` and `androidSdkPath`. Interactive JDK install prompts hang agent shells.
+  - **`bubblewrap update` overwrites widgets:** After `bubblewrap update`, re-apply custom widget Java/XML under `android-twa/app/src/main/` — the update clobbers generated app sources.
+  - **Windows local e2e vs dirty `.next`:** Prefer green CI and `npm run test:e2e:journeys` over diagnosing a single local Playwright spec while a dirty `.next` cache is in play (webpack EPERM / missing vendor chunks / login 500). Clear `.next` or rely on CI when that pattern appears.
 
 ## 2. Documentation & Traceability
 - **Requirement Breakdown:** Deconstruct broad feature requests into individual, discrete requirements before writing code. Link these specific requirements directly to their corresponding code modules.

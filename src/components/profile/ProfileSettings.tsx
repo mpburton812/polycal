@@ -560,10 +560,13 @@ export function ProfileSettings({
             label="Email"
           />
         </FormGroup>
-        <Typography variant="subtitle2">Browser push</Typography>
+        <Typography variant="subtitle2">Browser / Android push</Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-          Push requires explicit opt-in. Enable below to receive alerts on this device even when
-          PolyCal is closed.
+          Push requires explicit opt-in. On the PolyCal Android app (TWA), enabled push
+          delivers Android system notifications (shade + sound per your device settings),
+          not only the in-app bell. On a browser or home-screen PWA, alerts use the browser
+          notification channel. PolyCal must stay allowed under Install unknown apps /
+          Notifications for the OS prompt to appear.
         </Typography>
         {pushError && <Alert severity="error" sx={{ mb: 1 }}>{pushError}</Alert>}
         {pushMessage && <Alert severity="success" sx={{ mb: 1 }}>{pushMessage}</Alert>}

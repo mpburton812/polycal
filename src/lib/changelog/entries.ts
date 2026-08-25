@@ -28,6 +28,34 @@ import { CHANGELOG_ARCHIVE } from "./entries.archive";
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "2026.08.25b",
+    date: "2026-08-25",
+    summary:
+      "Android GitHub Releases, in-TWA APK update prompt, and system notification docs (PC-481–PC-485).",
+    changes: [
+      {
+        type: "added",
+        description:
+          "Production push publishes signed PolyCal-{version}.apk GitHub Releases (android-v* tags, versionName from change control) (PC-482).",
+      },
+      {
+        type: "added",
+        description:
+          "TWA checks GitHub Releases on launch and prompts to update with the release changelog (PC-483).",
+      },
+      {
+        type: "changed",
+        description:
+          "Profile push copy clarifies that the Android TWA uses Web Push notification delegation for system shade/sound; VAPID + DAL required (PC-484).",
+      },
+      {
+        type: "changed",
+        description:
+          "Agent rules: keep manifest public, Bubblewrap global via twa:ensure, config.json UTF-8 no BOM, re-apply widgets after bubblewrap update (PC-485).",
+      },
+    ],
+  },
+  {
     version: "2026.08.25a",
     date: "2026-08-25",
     summary:

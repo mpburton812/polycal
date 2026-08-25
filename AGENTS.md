@@ -53,3 +53,17 @@ rules live in `.cursorrules`. Only the non-obvious, environment-specific gotchas
   CI must **not** use `playwright install chromium --with-deps` (apt hangs on some GitHub
   ubuntu runners). Journey specs (`e2e/*journey*.spec.ts`) default to a 180s timeout.
   Production promotions require `npm run test:e2e:journeys` (see `.cursorrules`).
+- **Windows + dirty `.next`:** A concurrent `next dev` / stale webpack pack can make a lone
+  local Playwright run fail at login (`Username` missing, `/login` 500, EPERM renaming
+  `.next/cache/webpack/...`). Prefer CI results and `npm run test:e2e:journeys` (prepare
+  boots its own server on :3099). If you must debug one spec locally, stop other Next
+  processes and delete `.next` first.
+
+### Android TWA (Bubblewrap)
+- Package lives in `android-twa/` (`applicationId` `app.polycal`). Agent rules are in
+  `.cursorrules` §1; operator steps are in `android-twa/README.md`.
+- Run `npm run twa:ensure` from the repo root — do **not** `npm i @bubblewrap/cli` into
+  this app (audit gate). Write `%USERPROFILE%\.bubblewrap\config.json` (UTF-8, no BOM)
+  before the first CLI call so JDK prompts do not hang. After `bubblewrap update`,
+  re-apply widget sources under `android-twa/app/src/main/`.
+- `/manifest.webmanifest` and `/.well-known` must stay public (middleware allowlist).
