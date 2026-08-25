@@ -23,6 +23,22 @@ export default function manifest(): MetadataRoute.Manifest {
     theme_color: GARDEN_TOKENS.sage,
     orientation: "portrait-primary",
     categories: ["productivity", "lifestyle", "social"],
+    shortcuts: [
+      {
+        name: "New Event",
+        short_name: "New Event",
+        description: "Open the New Event composer",
+        url: "/feed?compose=event",
+        icons: [{ src: "/icons/icon-192.png", sizes: "192x192", type: "image/png" }],
+      },
+      {
+        name: "Natural language add",
+        short_name: "NLP Event",
+        description: "Open the New Event (NLP Input) composer",
+        url: "/feed?compose=nlp",
+        icons: [{ src: "/icons/icon-192.png", sizes: "192x192", type: "image/png" }],
+      },
+    ],
     icons: [
       {
         src: "/icons/icon-192.png",

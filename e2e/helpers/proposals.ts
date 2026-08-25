@@ -2,6 +2,7 @@ import { type Locator, type Page, expect } from "@playwright/test";
 
 import { fillProposalDateTimeField, fillProposalDateRange, selectDraftScheduleMode } from "./datePickers";
 import { goToProposals, openProposalCard, selectProposalTab } from "./navigation";
+import { dismissBlockingDialogsIfOpen } from "./motd";
 import { activeMainPanel } from "./tab-swipe";
 import { expectToast } from "./toast";
 
@@ -77,6 +78,26 @@ export async function openNlpEventComposer(page: Page): Promise<Locator> {
     dialog.getByRole("heading", { name: "New Event (NLP Input)", exact: true }),
   ).toBeVisible({
     timeout: 15_000,
+  });
+  return dialog;
+}
+
+/** Opens a composer from a TWA / PWA compose deep-link on /feed (PC-476). */
+export async function openComposerFromFeedQuery(
+  page: Page,
+  intent: { compose: "event"; title?: string } | { compose: "nlp"; q?: string },
+): Promise<Locator> {
+  const params = new URLSearchParams({ compose: intent.compose });
+  if (intent.compose === "event" && intent.title) params.set("title", intent.title);
+  if (intent.compose === "nlp" && intent.q) params.set("q", intent.q);
+  await page.goto(`/feed?${params.toString()}`);
+  await dismissBlockingDialogsIfOpen(page);
+  const heading = intent.compose === "nlp" ? "New Event (NLP Input)" : "New Event";
+  const dialog = page.getByRole("dialog").filter({
+    has: page.getByRole("heading", { name: heading, exact: true }),
+  });
+  await expect(dialog.getByRole("heading", { name: heading, exact: true })).toBeVisible({
+    timeout: 20_000,
   });
   return dialog;
 }

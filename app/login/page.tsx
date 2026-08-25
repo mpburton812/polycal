@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 
 import { requestEmailLoginAction } from "@/actions/email-login";
 import { auth, signIn } from "@/lib/auth";
+import { safeInternalCallbackPath } from "@/lib/auth/callback-url";
 import { getLiveUserStatus } from "@/lib/auth-session";
 import { getDb } from "@/lib/db/client";
 import { ensureDbReady } from "@/lib/db/ensure-ready";
@@ -23,6 +24,9 @@ interface LoginPageProps {
  * Credentials login — persistent session until logout or admin termination (spec §1).
  */
 export default async function LoginPage({ searchParams }: LoginPageProps) {
+  const params = await searchParams;
+  const callbackUrl = safeInternalCallbackPath(params.callbackUrl);
+
   const session = await auth();
   if (session?.user?.id) {
     const liveStatus = await getLiveUserStatus(session.user.id);
@@ -32,17 +36,16 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
     if (liveStatus === "banned") {
       redirect("/banned");
     }
-    redirect("/feed");
+    redirect(callbackUrl);
   }
 
-  const params = await searchParams;
   const loginHint = getNonProductionLoginHint();
 
   async function loginAction(formData: FormData) {
     "use server";
     const username = String(formData.get("username") ?? "").trim().toLowerCase();
     const password = String(formData.get("password") ?? "");
-    let redirectTo = String(formData.get("callbackUrl") ?? "/feed");
+    let redirectTo = safeInternalCallbackPath(String(formData.get("callbackUrl") ?? "/feed"));
 
     await ensureDbReady();
     const db = getDb();
@@ -63,8 +66,20 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
         password,
         redirectTo,
       });
-    } catch {
-      redirect("/login?error=CredentialsSignin");
+    } catch (error) {
+      // Auth.js successful sign-in throws NEXT_REDIRECT; rethrow so the compose callback survives.
+      if (
+        typeof error === "object" &&
+        error !== null &&
+        "digest" in error &&
+        String((error as { digest?: string }).digest).startsWith("NEXT_REDIRECT")
+      ) {
+        throw error;
+      }
+      const retry = new URLSearchParams();
+      retry.set("error", "CredentialsSignin");
+      retry.set("callbackUrl", redirectTo);
+      redirect(`/login?${retry.toString()}`);
     }
   }
 
@@ -126,7 +141,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
           <input
             type="hidden"
             name="callbackUrl"
-            value={params.callbackUrl ?? "/feed"}
+            value={callbackUrl}
           />
           <TextField
             name="username"

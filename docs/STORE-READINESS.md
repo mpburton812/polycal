@@ -9,12 +9,11 @@ Tracks what PolyCal must satisfy to be distributed to end users. Epic **PC-352**
 install it from the browser ("Add to Home Screen" / "Install app"), and it runs
 standalone from the web manifest with a service worker for offline shell and push.
 
-**Deferred: native wrappers.** Capacitor (iOS/Android app-store binaries) and TWA
-(Trusted Web Activity for Google Play) are **not** in scope for Phase 1. They are viable
-later because the app is already a compliant PWA, but each adds a store account, review
-cycle, signing infrastructure, and release process that the current alpha group does not
-need. Revisit when the product needs push on iOS Safari older than 16.4, deep OS
-integration, or store discovery.
+**Deferred: Play listing and iOS wrappers.** Capacitor and the App Store are
+**not** in this epic. Android TWA + home-screen compose widgets (PC-475) live in
+`android-twa/` as a sideloadable package with Digital Asset Links. Revisit Play
+Console, IARC **Mature 17+**, Data safety, and Play App Signing when listing.
+iPhone/iPad keep Safari “Add to Home Screen”; they do not get the type-in widget.
 
 Consequences of the web/PWA path:
 
@@ -83,7 +82,9 @@ Only relevant if Capacitor or TWA is revisited. None are Phase 1 blockers.
 - [ ] Account deletion reachable **inside the app** and, for iOS, an additional
       web-accessible deletion URL (App Store Review Guideline 5.1.1(v)) — the current
       Profile & Settings flow already satisfies the in-app half
-- [ ] Signing keys and CI release pipeline; TWA Digital Asset Links (`assetlinks.json`)
+- [x] TWA Digital Asset Links (`public/.well-known/assetlinks.json`) for `app.polycal`
+      sideload cert (add Play App Signing SHA-256 before listing)
+- [ ] Signing keys and CI release pipeline for Play uploads
 - [ ] Store listing assets: screenshots per device class, feature graphic, description
 - [ ] Native push credentials (APNs / FCM) if web push is replaced
 

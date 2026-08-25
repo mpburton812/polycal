@@ -1,0 +1,33 @@
+{
+  "id": "/",
+  "name": "PolyCal Group Scheduling",
+  "short_name": "PolyCal",
+  "description": "Private-group scheduling for polyamorous households: proposals, sleeping arrangements, shared feed, and optional calendar sync.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#F7F2EA",
+  "theme_color": "#6B8F71",
+  "orientation": "portrait-primary",
+  "categories": ["productivity", "lifestyle", "social"],
+  "icons": [
+    {
+      "src": "https://polycal-ebon.vercel.app/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "https://polycal-ebon.vercel.app/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "https://polycal-ebon.vercel.app/icons/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}
