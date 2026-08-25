@@ -9,7 +9,8 @@ import android.widget.RemoteViews;
 
 /**
  * Shared binder: header opens the TWA composer empty; field/send open the IME sheet
- * because launcher widget EditTexts rarely deliver typed text (PC-479).
+ * (PC-479). Layouts use TextView + shape ImageView so AppWidgetHost can inflate
+ * (vectors/EditText in RemoteViews cause "Can't load widget" on many launchers).
  */
 public abstract class ComposeAppWidget extends AppWidgetProvider {
     abstract String mode();

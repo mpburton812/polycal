@@ -16,8 +16,11 @@ Apple users keep the Safari PWA. iOS has no type-in home-screen bar in this pack
 Empty send still opens the matching empty composer. Prefill is query-only; submit
 stays `createDraftProposalAction` + `submitProposalAction`.
 
-Launcher widget `EditText` IMEs are unreliable, so the field/send control opens a
-one-line native sheet, then the TWA.
+Launcher widget IMEs are unreliable, so tapping the field/send control opens a
+one-line native sheet, then the TWA. Widget layouts must stay **RemoteViews-safe**
+(TextView + simple shape drawables — no `EditText` or vector `ImageView` src);
+otherwise many launchers show **Can't load widget**. Release minify uses
+`app/proguard-rules.pro` to keep `app.polycal.widgets.**` and `UpdateChecker`.
 
 ## Permanent constraints (do not reverse)
 

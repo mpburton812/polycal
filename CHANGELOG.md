@@ -4,6 +4,12 @@ All notable changes to PolyCal are documented here.
 
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [2026.08.25c] - 2026-08-25
+
+### Fixed
+
+- PC-486: Android home-screen widgets no longer show "Can't load widget" on the release APK. RemoteViews layouts use TextView + shape drawables (no EditText/vector), and release R8 keeps widget/UpdateChecker classes. Change control: `2026.08.25c`.
+
 ## [2026.08.25b] - 2026-08-25
 
 ### Added

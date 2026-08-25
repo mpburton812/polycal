@@ -28,6 +28,19 @@ import { CHANGELOG_ARCHIVE } from "./entries.archive";
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "2026.08.25c",
+    date: "2026-08-25",
+    summary:
+      "Fix Android home-screen widgets failing to load on the release APK (PC-486).",
+    changes: [
+      {
+        type: "fixed",
+        description:
+          "TWA widgets use RemoteViews-safe layouts (TextView + shape) and R8 keep rules so launchers no longer show Can't load widget (PC-486).",
+      },
+    ],
+  },
+  {
     version: "2026.08.25b",
     date: "2026-08-25",
     summary:
