@@ -39,7 +39,8 @@
     "jira:sync-progress": "tsx scripts/jira-transition-issues.ts --status \"In Progress\"",
     "merge-feature": "tsx scripts/merge-feature.ts",
     "tracker:build": "npm --prefix apps/alpha-feedback-tracker run build",
-    "twa:ensure": "node scripts/ensure-bubblewrap.mjs"
+    "twa:ensure": "node scripts/ensure-bubblewrap.mjs",
+    "android:release-meta": "node scripts/android-release-meta.mjs"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.5",

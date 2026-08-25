@@ -105,6 +105,8 @@ This enforces PR-only promotion at the platform level.
 | `dev` → `test` | Green CI on promotion PR | **Optional** — only when the request includes **`user test`** |
 | `test` → `production` | Full CI chain | **Mandatory** — run before opening or merging the production PR |
 
+After merge to `production`, [`.github/workflows/android-release.yml`](../.github/workflows/android-release.yml) publishes a signed PolyCal APK GitHub Release (`android-v{CHANGELOG version}`). The top change-control entry becomes the Release notes and in-TWA update dialog. Ensure GitHub secrets for the Android keystore are set (see `android-twa/README.md`).
+
 Before production promotion, complete [SECURITY-CHECKLIST.md](./SECURITY-CHECKLIST.md) and document user journey pass status in the PR test plan.
 
 Local journey failures that **reproduce** on isolated retry must be fixed on `feature/*` and promoted through `dev` and `test` before production. Failures that **pass** on isolated retry and already passed CI e2e may be documented as flakes (spec name, error, retry result). Do not merge production with an unexplained red local suite.

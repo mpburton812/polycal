@@ -40,6 +40,8 @@ public class LauncherActivity
         } else {
             setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED);
         }
+        // Sideload APK update prompt (GitHub Releases) — fail-soft if offline (PC-483).
+        UpdateChecker.checkAsync(this);
     }
 
     @Override

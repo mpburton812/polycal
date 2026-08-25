@@ -16,6 +16,7 @@ node_modules/
 out/
 dist/
 build/
+android-release.json
 
 # Local libSQL database
 local.db

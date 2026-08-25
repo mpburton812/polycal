@@ -4,6 +4,12 @@ All notable changes to PolyCal are documented here.
 
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [2026.08.25b] - 2026-08-25
+
+### Added
+
+- PC-481–PC-485: Production CI publishes signed PolyCal Android GitHub Releases (`android-v*` / `PolyCal-{version}.apk`). TWA prompts for APK updates with changelog. Profile documents Android system notifications via Web Push delegation. Change control: `2026.08.25b`.
+
 ## [2026.08.25a] - 2026-08-25
 
 ### Added

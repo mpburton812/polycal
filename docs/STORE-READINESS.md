@@ -11,9 +11,13 @@ standalone from the web manifest with a service worker for offline shell and pus
 
 **Deferred: Play listing and iOS wrappers.** Capacitor and the App Store are
 **not** in this epic. Android TWA + home-screen compose widgets (PC-475) live in
-`android-twa/` as a sideloadable package with Digital Asset Links. Revisit Play
-Console, IARC **Mature 17+**, Data safety, and Play App Signing when listing.
-iPhone/iPad keep Safari “Add to Home Screen”; they do not get the type-in widget.
+`android-twa/` as a sideloadable package with Digital Asset Links. Production
+merges publish GitHub Releases (`android-v*`) with `PolyCal-{version}.apk` and an
+in-TWA update prompt (PC-481). Web Push + TWA notification delegation delivers
+Android system notifications when VAPID is configured and the user opts in.
+Revisit Play Console, IARC **Mature 17+**, Data safety, and Play App Signing when
+listing. iPhone/iPad keep Safari “Add to Home Screen”; they do not get the type-in
+widget.
 
 Consequences of the web/PWA path:
 
