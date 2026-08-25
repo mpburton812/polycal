@@ -28,6 +28,29 @@ import { CHANGELOG_ARCHIVE } from "./entries.archive";
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "2026.08.25a",
+    date: "2026-08-25",
+    summary:
+      "Android TWA NLP compose bar and /feed?compose= deep-links (PC-475–PC-480).",
+    changes: [
+      {
+        type: "added",
+        description:
+          "Bubblewrap TWA package app.polycal with Natural language and New Event home-screen bars that open the PWA composer inside the TWA (PC-478, PC-479).",
+      },
+      {
+        type: "added",
+        description:
+          "/feed?compose=nlp&q= and compose=event&title= open the matching composers and strip the query; login keeps the compose callback (PC-476, PC-477).",
+      },
+      {
+        type: "added",
+        description:
+          "Public Digital Asset Links and PWA shortcuts; manifest.webmanifest is reachable without sign-in so TWA/PWA install works (PC-478, PC-480).",
+      },
+    ],
+  },
+  {
     version: "2026.08.24a",
     date: "2026-08-24",
     summary:

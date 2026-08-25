@@ -7,6 +7,7 @@ High-level structure for the PolyCal PWA (Next.js on Vercel, TypeScript, Turso/l
 ```
 polycal/
 ├── app/                    # Next.js App Router (pages, API routes, layouts)
+├── android-twa/            # Bubblewrap TWA (app.polycal) + home-screen compose widgets
 ├── src/
 │   ├── actions/            # Server actions (default mutation/read entry point)
 │   ├── components/         # React UI
@@ -26,6 +27,15 @@ GitLab CI (`.gitlab-ci.yml`) is a **secondary/legacy mirror** of a subset of gat
 ### Companion app: alpha-feedback-tracker
 
 `apps/alpha-feedback-tracker` is intentionally **outside** the Next.js TypeScript project (`tsconfig.json` excludes `apps/`) and is **not** an npm workspace member. Root Next (Vite 8 for Vitest) and the tracker’s Vite 6 toolchain must not hoist together. Keep separate `package-lock.json` files; align React/MUI majors manually when bumping. Path-filtered CI (`.github/workflows/alpha-feedback-tracker.yml`) runs `npm run build` (tsc + Vite). Full Tauri installer builds remain local (Windows + Rust). The tracker talks only to PolyCal admin HTTP APIs — never to Turso directly.
+
+### Android TWA (`android-twa/`)
+
+Bubblewrap Trusted Web Activity for **Play-shaped** Android packaging of the same
+PWA (`applicationId` `app.polycal`, origin `https://polycal-ebon.vercel.app`).
+Home-screen NLP / New Event bars live in that package and open
+`/feed?compose=` inside the TWA (not a Custom Tab). Digital Asset Links:
+`public/.well-known/assetlinks.json`. Apple users stay on the Safari PWA.
+See `android-twa/README.md`. Play Console listing remains a later epic.
 
 ## Layer model
 

@@ -15,6 +15,8 @@ PolyCal uses a **Jira-first, git-audited** workflow:
 
 **Full documentation:** [docs/REQUIREMENTS-WORKFLOW.md](docs/REQUIREMENTS-WORKFLOW.md)
 
+**Android TWA + widgets:** [android-twa/README.md](android-twa/README.md) — Bubblewrap package `app.polycal`, sideload first; Play listing later. Apple stays on the PWA.
+
 **Submitting requirements:** use [docs/requirements-intake-template.md](docs/requirements-intake-template.md)
 
 ## Quick reference
