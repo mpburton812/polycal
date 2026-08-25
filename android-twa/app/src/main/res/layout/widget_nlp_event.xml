@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- RemoteViews-safe: TextView + ImageView with shape drawable (no EditText / vector). -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/widget_root"
     android:layout_width="match_parent"
@@ -25,35 +26,30 @@
         android:gravity="center_vertical"
         android:orientation="horizontal">
 
-        <EditText
+        <TextView
             android:id="@+id/widget_input"
             android:layout_width="0dp"
             android:layout_height="40dp"
             android:layout_weight="1"
             android:background="@drawable/widget_field_background"
-            android:clickable="true"
             android:contentDescription="@string/widget_nlp_hint"
-            android:cursorVisible="false"
-            android:focusable="false"
             android:gravity="center_vertical"
-            android:hint="@string/widget_nlp_hint"
-            android:imeOptions="actionSend"
-            android:inputType="textCapSentences"
-            android:maxLines="1"
             android:paddingStart="10dp"
             android:paddingEnd="10dp"
-            android:textColor="@color/garden_ink"
-            android:textColorHint="@color/garden_ink_muted"
+            android:text="@string/widget_nlp_hint"
+            android:textColor="@color/garden_ink_muted"
             android:textSize="14sp" />
 
-        <ImageButton
+        <TextView
             android:id="@+id/widget_send"
             android:layout_width="40dp"
             android:layout_height="40dp"
-            android:background="@android:color/transparent"
+            android:background="@drawable/widget_send_icon"
             android:contentDescription="@string/widget_send"
-            android:padding="8dp"
-            android:src="@drawable/ic_send"
-            android:tint="@color/garden_surface" />
+            android:gravity="center"
+            android:text="›"
+            android:textColor="@color/garden_ink"
+            android:textSize="22sp"
+            android:textStyle="bold" />
     </LinearLayout>
 </LinearLayout>
