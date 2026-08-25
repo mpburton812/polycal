@@ -3,8 +3,8 @@
 import AddIcon from "@mui/icons-material/Add";
 import { Fab, Menu, MenuItem } from "@mui/material";
 import dynamic from "next/dynamic";
-import { usePathname } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
   getProposalCreateBootstrapAction,
@@ -14,6 +14,11 @@ import {
 import type { DraftComposerSettings } from "@/actions/network-settings";
 import type { PersonSummary } from "@/actions/users";
 import type { PersonRankStat } from "@/lib/proposals/composer-people-rank";
+import {
+  parseComposeQuery,
+  stripComposeSearch,
+  type ComposeQueryIntent,
+} from "@/lib/proposals/compose-query";
 import {
   ProposalCreateContext,
   type ProposalCreateRequest,
@@ -74,6 +79,8 @@ export function ProposalCreateHost({
   const [peopleRank, setPeopleRank] = useState<PersonRankStat[]>([]);
   const [editDetail, setEditDetail] = useState<ProposalDetail | null>(null);
   const [composerMode, setComposerMode] = useState<"manual" | "nlp">("manual");
+  const [initialTitle, setInitialTitle] = useState("");
+  const [initialNlpText, setInitialNlpText] = useState("");
   const loadedAtRef = useRef(0);
   const pathname = usePathname();
   const hideFab = pathname === "/feed" || pathname === "/people-places";
@@ -107,18 +114,29 @@ export function ProposalCreateHost({
     (request?: ProposalCreateRequest) => {
       void loadCreateData(true).then(() => {
         setEditDetail(null);
-        if (request?.lockedType) {
-          setCreateProposalType(request.lockedType);
-          setLockCreateType(true);
-          setCreateInitialStartAt(request.initialStartAt ?? null);
-          setComposerMode("manual");
+        setLockCreateType(Boolean(request?.lockedType));
+        setCreateProposalType(request?.lockedType ?? "event");
+        setCreateInitialStartAt(request?.initialStartAt ?? null);
+        setComposerMode(request?.composerMode ?? "manual");
+        setInitialTitle(request?.initialTitle ?? "");
+        setInitialNlpText(request?.initialNlpText ?? "");
+        if (request) {
           setCreateOpen(true);
-          return;
         }
-        setCreateInitialStartAt(null);
       });
     },
     [loadCreateData],
+  );
+
+  const openFromComposeQuery = useCallback(
+    (intent: ComposeQueryIntent) => {
+      openCreate({
+        composerMode: intent.compose === "nlp" ? "nlp" : "manual",
+        initialTitle: intent.compose === "event" ? intent.title : "",
+        initialNlpText: intent.compose === "nlp" ? intent.nlpText : "",
+      });
+    },
+    [openCreate],
   );
 
   const openEdit = useCallback(
@@ -128,6 +146,8 @@ export function ProposalCreateHost({
         setLockCreateType(false);
         setCreateInitialStartAt(null);
         setComposerMode("manual");
+        setInitialTitle("");
+        setInitialNlpText("");
         setCreateOpen(true);
       });
     },
@@ -143,6 +163,9 @@ export function ProposalCreateHost({
 
   return (
     <ProposalCreateContext.Provider value={contextValue}>
+      <Suspense fallback={null}>
+        <ComposeDeepLinkOpener onIntent={openFromComposeQuery} />
+      </Suspense>
       {children}
       {hideFab ? null : (
         <>
@@ -184,6 +207,8 @@ export function ProposalCreateHost({
               setLockCreateType(false);
               setCreateInitialStartAt(null);
               setComposerMode("manual");
+              setInitialTitle("");
+              setInitialNlpText("");
               setCreateOpen(true);
             });
           }}
@@ -199,6 +224,8 @@ export function ProposalCreateHost({
               setLockCreateType(false);
               setCreateInitialStartAt(null);
               setComposerMode("nlp");
+              setInitialTitle("");
+              setInitialNlpText("");
               setCreateOpen(true);
             });
           }}
@@ -242,6 +269,8 @@ export function ProposalCreateHost({
           setCreateOpen(false);
           setCreateInitialStartAt(null);
           setEditDetail(null);
+          setInitialTitle("");
+          setInitialNlpText("");
         }}
         people={people}
         places={places}
@@ -252,6 +281,8 @@ export function ProposalCreateHost({
         composerSettings={composerSettings ?? undefined}
         peopleRank={peopleRank}
         composerMode={editDetail ? "manual" : composerMode}
+        initialTitle={editDetail ? "" : initialTitle}
+        initialNlpText={editDetail ? "" : initialNlpText}
       />
       ) : null}
       {partnerCreateOpen ? (
@@ -281,4 +312,32 @@ export function ProposalCreateHost({
       ) : null}
     </ProposalCreateContext.Provider>
   );
+}
+
+/**
+ * Consumes `/feed?compose=` once, opens the matching composer, then strips the query
+ * so refresh/back does not re-open the dialog (PC-476).
+ */
+function ComposeDeepLinkOpener({
+  onIntent,
+}: {
+  onIntent: (intent: ComposeQueryIntent) => void;
+}) {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
+  const consumedKeyRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    const key = searchParams.toString();
+    const intent = parseComposeQuery(searchParams);
+    if (!intent) return;
+    if (consumedKeyRef.current === key) return;
+    consumedKeyRef.current = key;
+    onIntent(intent);
+    const nextSearch = stripComposeSearch(new URLSearchParams(key));
+    router.replace(nextSearch ? `${pathname}?${nextSearch}` : pathname, { scroll: false });
+  }, [searchParams, pathname, router, onIntent]);
+
+  return null;
 }

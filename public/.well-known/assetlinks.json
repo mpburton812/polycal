@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "app.polycal",
+      "sha256_cert_fingerprints": [
+        "32:BC:8C:7F:B0:DF:B2:01:0F:01:71:81:C6:6C:53:5C:48:CD:19:B8:8C:9C:89:4D:1A:1B:06:2F:9D:F0:89:84"
+      ]
+    }
+  }
+]
