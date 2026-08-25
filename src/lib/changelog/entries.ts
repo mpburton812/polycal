@@ -48,6 +48,11 @@ export const CHANGELOG: ChangelogEntry[] = [
         description:
           "Public Digital Asset Links and PWA shortcuts; manifest.webmanifest is reachable without sign-in so TWA/PWA install works (PC-478, PC-480).",
       },
+      {
+        type: "changed",
+        description:
+          "Bubblewrap stays a global CLI (`npm run twa:ensure`); it is not a lockfile dependency because that fails npm audit (PC-478).",
+      },
     ],
   },
   {

@@ -35,7 +35,7 @@ PWA (`applicationId` `app.polycal`, origin `https://polycal-ebon.vercel.app`).
 Home-screen NLP / New Event bars live in that package and open
 `/feed?compose=` inside the TWA (not a Custom Tab). Digital Asset Links:
 `public/.well-known/assetlinks.json`. Apple users stay on the Safari PWA.
-See `android-twa/README.md`. Play Console listing remains a later epic.
+See `android-twa/README.md`. Bubblewrap is a **global** CLI (`npm run twa:ensure`); it is not a lockfile dependency. Play Console listing remains a later epic.
 
 ## Layer model
 

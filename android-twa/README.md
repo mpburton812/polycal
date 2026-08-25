@@ -21,7 +21,8 @@ one-line native sheet, then the TWA.
 
 ## Prerequisites
 
-- [Bubblewrap CLI](https://github.com/GoogleChromeLabs/bubblewrap) 1.25+ (`npm i -g @bubblewrap/cli`)
+- [Bubblewrap CLI](https://github.com/GoogleChromeLabs/bubblewrap) **1.25+ as a global install**. Do **not** add `@bubblewrap/cli` to the app `package.json` — it fails `npm audit` and blocks feature→dev.
+- From the repo root, `npm run twa:ensure` installs `@bubblewrap/cli@1.25.0` globally if `bubblewrap` is missing and puts `%AppData%\npm` on the Windows user PATH.
 - JDK 17+ (Android Studio JBR is fine) and Android SDK
 - Config: `%USERPROFILE%\.bubblewrap\config.json` with `jdkPath` and `androidSdkPath`
 
