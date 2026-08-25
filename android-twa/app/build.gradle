@@ -57,8 +57,13 @@ android {
         applicationId "app.polycal"
         minSdkVersion 21
         targetSdkVersion 36
-        versionCode 1
-        versionName "1"
+        // CI release injects -PpolycalVersionName / -PpolycalVersionCode (GitHub Releases).
+        versionCode (project.hasProperty("polycalVersionCode")
+                ? Integer.parseInt(project.property("polycalVersionCode").toString())
+                : 1)
+        versionName (project.hasProperty("polycalVersionName")
+                ? project.property("polycalVersionName").toString()
+                : "1")
 
         // The name for the application
         resValue "string", "appName", twaManifest.name
@@ -150,9 +155,23 @@ android {
 
         
     }
+    signingConfigs {
+        release {
+            def storeFilePath = System.getenv("POLYCAL_ANDROID_STORE_FILE")
+            if (storeFilePath != null && !storeFilePath.isEmpty()) {
+                storeFile file(storeFilePath)
+                storePassword System.getenv("POLYCAL_ANDROID_STORE_PASSWORD")
+                keyAlias System.getenv("POLYCAL_ANDROID_KEY_ALIAS")
+                keyPassword System.getenv("POLYCAL_ANDROID_KEY_PASSWORD")
+            }
+        }
+    }
     buildTypes {
         release {
             minifyEnabled true
+            if (signingConfigs.release.storeFile != null) {
+                signingConfig signingConfigs.release
+            }
         }
     }
     compileOptions {
