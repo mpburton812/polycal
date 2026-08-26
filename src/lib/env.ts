@@ -45,9 +45,9 @@ export function getEnvironmentBannerColors(): (typeof ENVIRONMENT_BANNER_COLORS)
  */
 export const ENVIRONMENT_APP_URLS: Record<AppEnvironment, string> = {
   feature: "http://localhost:3000",
-  dev: "https://polycal-git-dev-michael-burton-s-projects.vercel.app",
-  test: "https://polycal-git-test-michael-burton-s-projects.vercel.app",
-  production: "https://polycal-ebon.vercel.app",
+  dev: "https://dev.polycal.net",
+  test: "https://test.polycal.net",
+  production: "https://polycal.net",
 };
 
 /**

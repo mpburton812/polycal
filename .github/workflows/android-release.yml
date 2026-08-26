@@ -35,19 +35,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          set +e
+          # Always publish: tag is android-v{CHANGELOG}-b{versionCode} (unique per push).
           node scripts/android-release-meta.mjs
-          code=$?
-          set -e
-          if [ "$code" -eq 2 ]; then
-            echo "skip=true" >> "$GITHUB_OUTPUT"
-            echo "Tag already exists — skipping Android release"
-            exit 0
-          fi
-          if [ "$code" -ne 0 ]; then
-            exit "$code"
-          fi
-          echo "skip=false" >> "$GITHUB_OUTPUT"
           VERSION_NAME=$(node -p "JSON.parse(require('fs').readFileSync('android-release.json','utf8')).versionName")
           VERSION_CODE=$(node -p "JSON.parse(require('fs').readFileSync('android-release.json','utf8')).versionCode")
           TAG=$(node -p "JSON.parse(require('fs').readFileSync('android-release.json','utf8')).tag")
@@ -58,18 +47,15 @@ jobs:
           echo "apk_name=$APK_NAME" >> "$GITHUB_OUTPUT"
 
       - name: Set up JDK 17
-        if: steps.meta.outputs.skip != 'true'
         uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: "17"
 
       - name: Set up Android SDK
-        if: steps.meta.outputs.skip != 'true'
         uses: android-actions/setup-android@v3
 
       - name: Decode keystore
-        if: steps.meta.outputs.skip != 'true'
         env:
           POLYCAL_ANDROID_KEYSTORE_BASE64: ${{ secrets.POLYCAL_ANDROID_KEYSTORE_BASE64 }}
         run: |
@@ -82,7 +68,6 @@ jobs:
           ls -la android-twa/android.keystore
 
       - name: Assemble release APK
-        if: steps.meta.outputs.skip != 'true'
         working-directory: android-twa
         env:
           POLYCAL_ANDROID_STORE_FILE: ${{ github.workspace }}/android-twa/android.keystore
@@ -97,7 +82,6 @@ jobs:
             -PpolycalVersionCode="${{ steps.meta.outputs.version_code }}"
 
       - name: Stage APK and meta
-        if: steps.meta.outputs.skip != 'true'
         run: |
           set -euo pipefail
           mkdir -p dist-android
@@ -107,7 +91,6 @@ jobs:
           ls -la dist-android
 
       - name: Create GitHub Release
-        if: steps.meta.outputs.skip != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |

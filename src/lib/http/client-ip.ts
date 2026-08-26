@@ -6,7 +6,7 @@ interface HeaderReader {
 /**
  * Derives the caller's IP for rate-limit keys from proxy headers (PC-353).
  *
- * Vercel/Render terminate TLS in front of the app, so the socket address is the
+ * Vercel terminates TLS in front of the app, so the socket address is the
  * proxy. `x-forwarded-for` is a client-controlled header in general, but behind
  * these platforms the edge rewrites the left-most entry, so the first hop is the
  * trustworthy one. Never accept an IP supplied in a request body — a caller

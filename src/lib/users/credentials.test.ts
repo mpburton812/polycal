@@ -51,14 +51,15 @@ describe("buildLoginInstructions", () => {
       expect(text).toContain(
         "Sign in: https://polycal-git-test-example.vercel.app/login",
       );
-      expect(text).not.toContain("polycal-ebon.vercel.app");
+      expect(text).not.toContain("polycal.net/login");
+      expect(text).not.toContain("https://polycal.net");
     });
 
     it("falls back to the tier URL from NEXT_PUBLIC_APP_ENV", () => {
       process.env.NEXT_PUBLIC_APP_ENV = "test";
       const text = buildLoginInstructions({ username: "u", password: "p" });
       expect(text).toContain(
-        "Sign in: https://polycal-git-test-michael-burton-s-projects.vercel.app/login",
+        "Sign in: https://test.polycal.net/login",
       );
     });
   });

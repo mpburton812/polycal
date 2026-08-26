@@ -7,7 +7,7 @@ import { runProposalEnforcement } from "@/lib/proposals/enforcement";
 import { runEventReminders } from "@/lib/proposals/event-reminders";
 
 /**
- * Scheduled enforcement runner for Render cron / external schedulers (PC-48).
+ * Scheduled enforcement runner for external schedulers / e2e (PC-48).
  * Protect with `Authorization: Bearer <CRON_SECRET>`.
  */
 export async function GET(request: Request): Promise<NextResponse> {
