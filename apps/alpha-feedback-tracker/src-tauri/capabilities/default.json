@@ -11,7 +11,8 @@
       "allow": [
         { "url": "http://localhost:*" },
         { "url": "https://*.vercel.app" },
-        { "url": "https://polycal-ebon.vercel.app" }
+        { "url": "https://polycal.net" },
+        { "url": "https://*.polycal.net" }
       ]
     }
   ]

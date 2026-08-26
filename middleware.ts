@@ -36,6 +36,7 @@ export default edgeAuth((request) => {
     "/manifest",
     "/api/auth",
     "/api/cron",
+    "/api/webhooks/telnyx",
     "/api/admin/alpha-feedback",
   ];
   const isPublic =

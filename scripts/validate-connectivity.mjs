@@ -27,7 +27,7 @@ const deployments = {
     vercelEnv: "preview",
     gitBranch: "dev",
     expectedDb: "polycal-dev",
-    url: "https://polycal-git-dev-michael-burton-s-projects.vercel.app",
+    url: "https://dev.polycal.net",
   },
   test: {
     label: "Test",
@@ -41,7 +41,7 @@ const deployments = {
     vercelEnv: "production",
     gitBranch: null,
     expectedDb: "polycal-prod",
-    url: "https://polycal-ebon.vercel.app",
+    url: "https://polycal.net",
   },
 };
 

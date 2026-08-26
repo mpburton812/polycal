@@ -38,7 +38,7 @@ for (const row of admins.rows) {
   console.log(`  - ${row.username} (${row.role}, ${row.status})`);
 }
 
-const prodUrl = "https://polycal-ebon.vercel.app";
+const prodUrl = "https://polycal.net";
 const loginRes = await fetch(`${prodUrl}/login`, { redirect: "manual" });
 console.log(`PASS production /login → HTTP ${loginRes.status}`);
 

@@ -31,7 +31,7 @@ GitLab CI (`.gitlab-ci.yml`) is a **secondary/legacy mirror** of a subset of gat
 ### Android TWA (`android-twa/`)
 
 Bubblewrap Trusted Web Activity for **Play-shaped** Android packaging of the same
-PWA (`applicationId` `app.polycal`, origin `https://polycal-ebon.vercel.app`).
+PWA (`applicationId` `app.polycal`, origin `https://polycal.net`).
 Home-screen NLP / New Event bars live in that package and open
 `/feed?compose=` inside the TWA (not a Custom Tab). Digital Asset Links:
 `public/.well-known/assetlinks.json`. Apple users stay on the Safari PWA.
@@ -74,7 +74,7 @@ Shared helpers: `src/lib/actions/context.ts` (`requireSession`, `requireAdminAcc
 | Auth | Auth.js credentials provider, HttpOnly JWT cookies, `sessionVersion` invalidation |
 | External calendars | Google Calendar API (OAuth connect, not login) + ICS download/email (Option B); tokens encrypted with `CALENDAR_TOKEN_ENCRYPTION_KEY`. See [GOOGLE-CALENDAR-SYNC.md](./GOOGLE-CALENDAR-SYNC.md) for sync notifications, triage, and recovery. |
 | Database | libSQL — `file:local.db` (local), Turso (`polycal-dev` / `polycal-test` / `polycal-prod`) |
-| Hosting | Vercel (+ Render cron for dev/test enforcement) |
+| Hosting | Vercel |
 | Identity roles | **Sponsor** (one per network; maps to legacy admin), Network Admin, User (active), Proxy (schedulable, upgrade path to User; DB role `passive`). Platform Admin is an account flag, not a network membership. |
 
 ## Admin capability matrix

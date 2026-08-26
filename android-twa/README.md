@@ -9,7 +9,7 @@ Apple users keep the Safari PWA. iOS has no type-in home-screen bar in this pack
 
 | Surface | Opens |
 | --- | --- |
-| App icon | `https://polycal-ebon.vercel.app/` in the TWA |
+| App icon | `https://polycal.net/` in the TWA |
 | **PolyCal: Natural language** widget | `/feed?compose=nlp&q=` |
 | **PolyCal: New Event** widget | `/feed?compose=event&title=` |
 
@@ -56,14 +56,16 @@ If `bubblewrap --version` still prompts to install a JDK, the config is missing,
 Every merge to `production` runs [`.github/workflows/android-release.yml`](../.github/workflows/android-release.yml):
 
 1. Reads the newest change-control version from `src/lib/changelog/entries.ts` (e.g. `2026.08.25b`).
-2. Builds a **signed** `assembleRelease` APK with that `versionName` and the next `versionCode`.
-3. Creates GitHub Release tag `android-v{version}` with assets:
-   - `PolyCal-{version}.apk` — install this
+2. Builds a **signed** `assembleRelease` APK with that `versionName` and the next monotonic `versionCode`.
+3. Creates a GitHub Release tag `android-v{version}-b{versionCode}` (unique every production push) with assets:
+   - `PolyCal-{version}-b{versionCode}.apk` — install this
    - `release-meta.json` — used by the in-app update prompt
 
 **Download URL pattern:**  
-`https://github.com/mpburton812/polycal/releases/download/android-v{version}/PolyCal-{version}.apk`  
+`https://github.com/mpburton812/polycal/releases/download/android-v{version}-b{versionCode}/PolyCal-{version}-b{versionCode}.apk`  
 Latest list: https://github.com/mpburton812/polycal/releases
+
+Duplicate CHANGELOG versions still publish a new APK (tag includes `versionCode`). The TWA update prompt compares `versionCode` and offers the newest `android-v*` release.
 
 ### Required GitHub Actions secrets
 
@@ -122,7 +124,7 @@ bubblewrap update --skipVersionUpgrade
 ```
 
 Then re-apply widget Java/XML under `app/src/main/` (update overwrites generated files).
-Keep `webManifestUrl` on production `https://polycal-ebon.vercel.app/manifest.webmanifest`
+Keep `webManifestUrl` on production `https://polycal.net/manifest.webmanifest`
 (that path is public; do not point it at a login-gated URL).
 
 ## Sideload

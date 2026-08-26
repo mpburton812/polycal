@@ -20,8 +20,13 @@ const tursoHost = "mpburton.aws-us-east-2.turso.io";
 const sourceFiles = [process.argv[2], ".env.vercel-setup"].filter(Boolean);
 
 const PREVIEW_URLS = {
-  dev: "https://polycal-git-dev-michael-burton-s-projects.vercel.app",
-  test: "https://polycal-git-test-michael-burton-s-projects.vercel.app",
+  dev: "https://dev.polycal.net",
+  test: "https://test.polycal.net",
+};
+
+const GOOGLE_REDIRECT_URIS = {
+  dev: `${PREVIEW_URLS.dev}/api/calendar/google/callback`,
+  test: `${PREVIEW_URLS.test}/api/calendar/google/callback`,
 };
 
 function parseEnv(file) {
@@ -127,6 +132,11 @@ for (const { gitBranch, appEnv, database, authUrl, tokenKeys } of branches) {
   upsertBranchVar("NEXT_PUBLIC_APP_ENV", appEnv, gitBranch);
   upsertBranchVar("AUTH_SECRET", authSecret, gitBranch);
   upsertBranchVar("AUTH_URL", authUrl, gitBranch);
+  upsertBranchVar(
+    "GOOGLE_REDIRECT_URI",
+    GOOGLE_REDIRECT_URIS[gitBranch],
+    gitBranch,
+  );
 
   const vapidPublic = vapidEnv.VAPID_PUBLIC_KEY;
   const vapidPrivate = vapidEnv.VAPID_PRIVATE_KEY;
