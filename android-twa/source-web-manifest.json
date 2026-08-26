@@ -12,19 +12,19 @@
   "categories": ["productivity", "lifestyle", "social"],
   "icons": [
     {
-      "src": "https://polycal-ebon.vercel.app/icons/icon-192.png",
+      "src": "https://polycal.net/icons/icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "https://polycal-ebon.vercel.app/icons/icon-512.png",
+      "src": "https://polycal.net/icons/icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "https://polycal-ebon.vercel.app/icons/icon-maskable-512.png",
+      "src": "https://polycal.net/icons/icon-maskable-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"

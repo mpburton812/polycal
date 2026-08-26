@@ -10,7 +10,8 @@ import { existsSync, readFileSync } from "node:fs";
 const scope = "michael-burton-s-projects";
 const tursoHost = "mpburton.aws-us-east-2.turso.io";
 const sourceFiles = [process.argv[2], ".env.vercel-setup"].filter(Boolean);
-const PRODUCTION_URL = "https://polycal-ebon.vercel.app";
+const PRODUCTION_URL = "https://polycal.net";
+const GOOGLE_REDIRECT_URI = `${PRODUCTION_URL}/api/calendar/google/callback`;
 
 function parseEnv(file) {
   if (!file || !existsSync(file)) return {};
@@ -82,5 +83,6 @@ upsertProductionVar("TURSO_AUTH_TOKEN", token);
 upsertProductionVar("NEXT_PUBLIC_APP_ENV", "production");
 upsertProductionVar("AUTH_SECRET", authSecret);
 upsertProductionVar("AUTH_URL", PRODUCTION_URL);
+upsertProductionVar("GOOGLE_REDIRECT_URI", GOOGLE_REDIRECT_URI);
 
 console.log("Done. Redeploy production to pick up env changes.");

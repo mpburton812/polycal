@@ -11,7 +11,7 @@ import android.net.Uri;
 public final class WidgetUrls {
     public static final String MODE_EVENT = "event";
     public static final String MODE_NLP = "nlp";
-    public static final String HOST_ORIGIN = "https://polycal-ebon.vercel.app";
+    public static final String HOST_ORIGIN = "https://polycal.net";
 
     private static final int TITLE_MAX = 256;
     private static final int NLP_MAX = 1024;

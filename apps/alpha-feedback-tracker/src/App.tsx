@@ -48,15 +48,9 @@ type SortKey = keyof FeedbackListItem;
 
 const ENV_PRESETS = [
   { label: "Local", value: "http://localhost:3000" },
-  {
-    label: "Dev",
-    value: "https://polycal-git-dev-michael-burton-s-projects.vercel.app",
-  },
-  {
-    label: "Test",
-    value: "https://polycal-git-test-michael-burton-s-projects.vercel.app",
-  },
-  { label: "Production", value: "https://polycal-ebon.vercel.app" },
+  { label: "Dev", value: "https://dev.polycal.net" },
+  { label: "Test", value: "https://test.polycal.net" },
+  { label: "Production", value: "https://polycal.net" },
 ];
 
 const COLUMNS: { key: SortKey | "actions"; label: string }[] = [

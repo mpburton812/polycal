@@ -28,6 +28,34 @@ import { CHANGELOG_ARCHIVE } from "./entries.archive";
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "2026.08.26a",
+    date: "2026-08-26",
+    summary:
+      "Canonical hosts on polycal.net, always-on Android APK releases, remove Render crons.",
+    changes: [
+      {
+        type: "changed",
+        description:
+          "Production/dev/test public URLs use polycal.net / dev.polycal.net / test.polycal.net (AUTH_URL, env fallbacks, TWA host, ops scripts).",
+      },
+      {
+        type: "changed",
+        description:
+          "Every production merge publishes a signed APK (android-v{version}-b{versionCode}); duplicate changelog versions no longer skip the release.",
+      },
+      {
+        type: "changed",
+        description:
+          "Removed Render Blueprint cron jobs; /api/cron/enforcement remains for e2e and external schedulers.",
+      },
+      {
+        type: "fixed",
+        description:
+          "Middleware allows /api/webhooks/telnyx without a login redirect so Telnyx can reach production.",
+      },
+    ],
+  },
+  {
     version: "2026.08.25c",
     date: "2026-08-25",
     summary:

@@ -49,7 +49,7 @@ public class LauncherActivity
         Uri intentUri = getIntent() != null ? getIntent().getData() : null;
         if (intentUri != null
                 && "https".equals(intentUri.getScheme())
-                && "polycal-ebon.vercel.app".equals(intentUri.getHost())) {
+                && "polycal.net".equals(intentUri.getHost())) {
             return intentUri;
         }
         return super.getLaunchingUrl();
