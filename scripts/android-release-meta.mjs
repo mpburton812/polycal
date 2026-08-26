@@ -2,8 +2,12 @@
 /**
  * Build Android GitHub Release metadata from the latest change-control entry.
  *
+ * Every production push publishes a new APK: tag includes a monotonic
+ * versionCode so duplicate CHANGELOG versions still release (domain cutovers,
+ * hotfix rebuilds). UpdateChecker prefers the newest android-v* release and
+ * compares versionCode.
+ *
  * Outputs android-twa/release-meta.json (APK updater) and android-release.json (workflow).
- * Exit 0 = create release; exit 2 = skip (tag already exists).
  *
  * Usage: node scripts/android-release-meta.mjs
  */
@@ -108,31 +112,11 @@ function nextVersionCode() {
   }
 }
 
-/**
- * @param {string} tag
- * @returns {boolean}
- */
-function tagExists(tag) {
-  try {
-    execFileSync("gh", ["release", "view", tag], {
-      encoding: "utf8",
-      stdio: ["ignore", "pipe", "pipe"],
-    });
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 const entry = parseLatestChangelogEntry();
-const tag = `android-v${entry.version}`;
 const versionCode = nextVersionCode();
-const apkAssetName = `PolyCal-${entry.version}.apk`;
-
-if (tagExists(tag)) {
-  console.log(`SKIP tag ${tag} already exists`);
-  process.exit(2);
-}
+/** Unique per production push — still matches UpdateChecker `android-v*` filter. */
+const tag = `android-v${entry.version}-b${versionCode}`;
+const apkAssetName = `PolyCal-${entry.version}-b${versionCode}.apk`;
 
 const releaseMeta = {
   versionName: entry.version,
@@ -164,7 +148,6 @@ const workflowMeta = {
   title: `PolyCal Android ${entry.version}`,
   bodyMarkdown: bodyLines.join("\n"),
   apkAssetName,
-  skip: false,
 };
 
 fs.mkdirSync(OUT_DIR, { recursive: true });

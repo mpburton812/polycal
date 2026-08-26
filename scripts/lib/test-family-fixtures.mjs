@@ -25,7 +25,6 @@ export const TEST_FAMILY_FIXTURE = {
   },
 };
 
-export const TEST_VERCEL_URL =
-  "https://polycal-git-test-michael-burton-s-projects.vercel.app";
+export const TEST_VERCEL_URL = "https://test.polycal.net";
 
 export const TEST_TURSO_DATABASE = "polycal-test";
