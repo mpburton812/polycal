@@ -4,14 +4,20 @@ import { login } from "./helpers/auth";
 import { USERS } from "./helpers/constants";
 import { resetE2eDatabase } from "./helpers/db";
 import { goToSchedule } from "./helpers/navigation";
-import { createAndSubmitAllDaySpan, dateOffsetIso, selectScheduleTwoWeekView, waitForScheduleReady } from "./helpers/schedule";
+import {
+  createAndSubmitAllDaySpan,
+  dateOffsetIso,
+  navigateScheduleUntilDateInRange,
+  selectScheduleOneWeekView,
+  waitForScheduleReady,
+} from "./helpers/schedule";
 import { activeMainPanel } from "./helpers/tab-swipe";
 
 /**
- * Friday–Sunday of the second week in a 2-week view that starts this Monday.
- * Those days sit outside the SSR current-week payload (PC-474).
+ * Friday–Sunday of the week after this Monday (outside the SSR current-week payload).
+ * Retargeted from 2-week view after PC-488 removed that mode.
  */
-function secondWeekFridaySunday(): { startDate: string; endDate: string } {
+function nextWeekFridaySunday(): { startDate: string; endDate: string } {
   const today = dateOffsetIso(0);
   const [year, month, day] = today.split("-").map(Number) as [number, number, number];
   const noon = new Date(Date.UTC(year, month - 1, day, 12));
@@ -24,7 +30,7 @@ function secondWeekFridaySunday(): { startDate: string; endDate: string } {
   };
 }
 
-test.describe("Overlapping multi-day events stay visible in 2-week view", () => {
+test.describe("Overlapping multi-day events stay visible across week navigation", () => {
   test.describe.configure({ mode: "serial" });
 
   test.beforeAll(async ({ request }) => {
@@ -35,13 +41,14 @@ test.describe("Overlapping multi-day events stay visible in 2-week view", () => 
     page,
   }) => {
     test.setTimeout(240_000);
-    const { startDate, endDate } = secondWeekFridaySunday();
+    const { startDate, endDate } = nextWeekFridaySunday();
     const firstTitle = `E2E Overlap Con ${Date.now()}`;
     const secondTitle = `E2E Overlap Libertine ${Date.now()}`;
 
     await login(page, USERS.luke.username);
     await goToSchedule(page);
-    await selectScheduleTwoWeekView(page);
+    await selectScheduleOneWeekView(page);
+    await navigateScheduleUntilDateInRange(page, startDate);
     await waitForScheduleReady(page);
 
     await createAndSubmitAllDaySpan(page, {

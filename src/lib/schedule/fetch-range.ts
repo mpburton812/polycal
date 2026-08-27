@@ -10,13 +10,12 @@ export interface ScheduleFetchRange {
 }
 
 /**
- * Computes the inclusive API fetch window for day, week, or month layouts (PC-77 / PC-204 / PC-376).
+ * Computes the inclusive API fetch window for day, week, or month layouts (PC-77 / PC-204 / PC-376 / PC-488).
  * Week bounds use viewer-TZ midnight→EOD so Monday morning events are not clipped by noon anchors.
  */
 export function computeScheduleFetchRange(
   anchorDate: Date,
   layout: ScheduleCalendarLayout,
-  compact: boolean,
   timeZone: string = DEFAULT_VIEWER_TIMEZONE,
 ): ScheduleFetchRange {
   if (layout === "month") {
@@ -36,7 +35,7 @@ export function computeScheduleFetchRange(
   const mondayNoon = startOfWeekMonday(anchorDate, timeZone);
   const mondayKey = localDateKey(mondayNoon.toISOString(), timeZone);
   const rangeStart = startOfCivilDayInZone(mondayKey, timeZone);
-  const endNoon = addDays(mondayNoon, compact ? 13 : 6);
+  const endNoon = addDays(mondayNoon, 6);
   const endKey = localDateKey(endNoon.toISOString(), timeZone);
   return {
     rangeStart,

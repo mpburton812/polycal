@@ -4,7 +4,6 @@ import { DEFAULT_VIEWER_TIMEZONE } from "@/lib/schedule/timezone";
 
 export interface SsrWeekCoverageInput {
   layout: ScheduleCalendarLayout;
-  compact: boolean;
   visibleAnchor: Date;
   ssrWeekStart: Date;
   timeZone?: string;
@@ -12,10 +11,10 @@ export interface SsrWeekCoverageInput {
 
 /**
  * True when the SSR current-week payload is the same window the client is showing.
- * 2-week, month, day, and a week that is not the SSR Monday must refetch (PC-474).
+ * Month, day, and a week that is not the SSR Monday must refetch (PC-474 / PC-488).
  */
 export function ssrWeekCoversVisibleRange(input: SsrWeekCoverageInput): boolean {
-  if (input.layout !== "week" || input.compact) return false;
+  if (input.layout !== "week") return false;
   const timeZone = input.timeZone ?? DEFAULT_VIEWER_TIMEZONE;
   const visibleMonday = startOfWeekMonday(input.visibleAnchor, timeZone);
   const ssrMonday = startOfWeekMonday(input.ssrWeekStart, timeZone);

@@ -139,32 +139,31 @@ export async function assertEventOnCalendarDays(
   }
 }
 
-/** Forces day hour-grid layout (PC-204). */
+/** Forces day hour-grid layout (PC-204 / PC-488). */
 export async function selectScheduleDayView(page: Page): Promise<void> {
-  await page.getByLabel("Calendar period").getByRole("button", { name: "Day", exact: true }).click();
+  await page.getByLabel("Calendar period").getByRole("button", { name: "Daily", exact: true }).click();
   await waitForScheduleReady(page);
 }
 
-/** Forces one-week layout (week calendar, not 2-week or month). */
+/** Forces one-week layout (week calendar, not month). */
 export async function selectScheduleOneWeekView(page: Page): Promise<void> {
-  await page.getByLabel("Calendar period").getByRole("button", { name: "Week", exact: true }).click();
+  await page.getByLabel("Calendar period").getByRole("button", { name: "Weekly", exact: true }).click();
   await waitForScheduleReady(page);
 }
 
-/** Forces two-week density. */
+/** @deprecated Prefer selectScheduleOneWeekView — 2-week mode removed (PC-488). */
 export async function selectScheduleTwoWeekView(page: Page): Promise<void> {
-  await page.getByLabel("Calendar period").getByRole("button", { name: "2 weeks" }).click();
-  await waitForScheduleReady(page);
+  await selectScheduleOneWeekView(page);
 }
 
 /** Switches to month layout. */
 export async function selectScheduleMonthView(page: Page): Promise<void> {
-  await page.getByLabel("Calendar period").getByRole("button", { name: "Month" }).click();
+  await page.getByLabel("Calendar period").getByRole("button", { name: "Monthly" }).click();
   await waitForScheduleReady(page);
 }
 
 /**
- * Asserts a resolved event title is visible in one-week, two-week, and month schedule views.
+ * Asserts a resolved event title is visible in weekly and monthly schedule views.
  */
 export async function assertEventVisibleInAllScheduleViews(
   page: Page,
@@ -178,11 +177,7 @@ export async function assertEventVisibleInAllScheduleViews(
   await page.reload();
   await waitForScheduleReady(page);
 
-  for (const selectView of [
-    selectScheduleOneWeekView,
-    selectScheduleTwoWeekView,
-    selectScheduleMonthView,
-  ]) {
+  for (const selectView of [selectScheduleOneWeekView, selectScheduleMonthView]) {
     await expectEventVisibleInView(page, titlePattern, targetDateIso, selectView);
   }
 }
@@ -231,7 +226,7 @@ export async function waitForScheduleReady(page: Page): Promise<void> {
 export async function forceWeekLayout(page: Page): Promise<void> {
   const layoutWeek = activeMainPanel(page)
     .getByLabel("Calendar period")
-    .getByRole("button", { name: "Week", exact: true });
+    .getByRole("button", { name: "Weekly", exact: true });
   if (await layoutWeek.isVisible().catch(() => false)) {
     const selected = await layoutWeek.getAttribute("aria-pressed");
     if (selected !== "true") {

@@ -17,8 +17,8 @@ test.describe("Schedule calendar", () => {
     await expect(root.getByLabel("Previous period")).toBeVisible();
     await expect(root.getByLabel("Next period")).toBeVisible();
     await expect(root.getByRole("button", { name: "Jump to today" })).toBeVisible();
-    await expect(root.getByLabel("Calendar period").getByRole("button", { name: "Day", exact: true })).toBeVisible();
-    await expect(root.getByLabel("Calendar period").getByRole("button", { name: "Week", exact: true })).toHaveAttribute(
+    await expect(root.getByLabel("Calendar period").getByRole("button", { name: "Daily", exact: true })).toBeVisible();
+    await expect(root.getByLabel("Calendar period").getByRole("button", { name: "Weekly", exact: true })).toHaveAttribute(
       "aria-pressed",
       "true",
     );
@@ -36,11 +36,11 @@ test.describe("Schedule calendar", () => {
 
   test("switches to day hour grid", async ({ page }) => {
     const root = activeMainPanel(page);
-    await root.getByLabel("Calendar period").getByRole("button", { name: "Day", exact: true }).click();
+    await root.getByLabel("Calendar period").getByRole("button", { name: "Daily", exact: true }).click();
     await expect(
-      root.getByLabel("Calendar period").getByRole("button", { name: "Day", exact: true }),
+      root.getByLabel("Calendar period").getByRole("button", { name: "Daily", exact: true }),
     ).toHaveAttribute("aria-pressed", "true");
-    await expect(root.getByTestId("schedule-day-view")).toBeVisible();
+    await expect(root.getByTestId("schedule-day-view").first()).toBeVisible();
     await expect(root.getByText("All day", { exact: true })).toBeVisible();
   });
 
@@ -79,9 +79,9 @@ test.describe("Schedule calendar", () => {
 
   test("switches to month view and opens day sheet from overflow", async ({ page }) => {
     const root = activeMainPanel(page);
-    await root.getByLabel("Calendar period").getByRole("button", { name: "Month" }).click();
+    await root.getByLabel("Calendar period").getByRole("button", { name: "Monthly" }).click();
     await expect(
-      root.getByLabel("Calendar period").getByRole("button", { name: "Month" }),
+      root.getByLabel("Calendar period").getByRole("button", { name: "Monthly" }),
     ).toHaveAttribute("aria-pressed", "true");
     await expect(root.getByText("Mon", { exact: true })).toBeVisible();
 
