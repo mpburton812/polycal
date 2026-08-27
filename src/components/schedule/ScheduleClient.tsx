@@ -6,6 +6,7 @@ import {
   Box,
   Button,
   Chip,
+  CircularProgress,
   FormControl,
   IconButton,
   InputLabel,
@@ -71,8 +72,8 @@ import { parseScheduleNlDate } from "@/lib/schedule/parse-nl-date";
 import {
   buildScheduleSegment,
   normalizeSegmentAnchor,
-  SCHEDULE_MAX_SEGMENTS,
   SCHEDULE_VIEWPORT_FILL_MAX,
+  scheduleMaxSegments,
   shiftSegmentAnchor,
   type ScheduleSegment,
   trimScheduleSegments,
@@ -289,7 +290,7 @@ export function ScheduleClient({
     [fetchSegmentEvents, timeZone, viewState.calendarLayout],
   );
 
-  /** Size the schedule column to fill viewport below app chrome and above bottom nav (PC-493). */
+  /** Size the schedule column to fill viewport below app chrome and above bottom nav (PC-493 / PC-494). */
   useLayoutEffect(() => {
     function measure() {
       const root = scheduleRootRef.current;
@@ -297,12 +298,32 @@ export function ScheduleClient({
       const top = root?.getBoundingClientRect().top ?? 80;
       const bottom =
         bottomNav instanceof HTMLElement ? bottomNav.getBoundingClientRect().height : 56;
-      setViewportHeightPx(Math.max(240, Math.round(window.innerHeight - top - bottom)));
+      const viewportHeight = window.visualViewport?.height ?? window.innerHeight;
+      setViewportHeightPx(Math.max(240, Math.round(viewportHeight - top - bottom)));
     }
     measure();
     window.addEventListener("resize", measure);
-    return () => window.removeEventListener("resize", measure);
+    window.visualViewport?.addEventListener("resize", measure);
+    return () => {
+      window.removeEventListener("resize", measure);
+      window.visualViewport?.removeEventListener("resize", measure);
+    };
   }, []);
+
+  /** Prevent document scroll so Schedule chrome stays fixed (PC-494). */
+  useEffect(() => {
+    if (pathname !== "/schedule") return;
+    const html = document.documentElement;
+    const body = document.body;
+    const prevHtml = html.style.overflow;
+    const prevBody = body.style.overflow;
+    html.style.overflow = "hidden";
+    body.style.overflow = "hidden";
+    return () => {
+      html.style.overflow = prevHtml;
+      body.style.overflow = prevBody;
+    };
+  }, [pathname]);
 
   /** After rebuild, scroll the calendar region to the top (PC-493). */
   useEffect(() => {
@@ -322,11 +343,12 @@ export function ScheduleClient({
   const appendFutureSegment = useCallback(async () => {
     if (loadingFutureRef.current || pending) return;
     const current = segmentsRef.current;
-    if (current.length === 0 || current.length >= SCHEDULE_MAX_SEGMENTS) return;
+    if (current.length === 0) return;
     const last = current[current.length - 1];
     if (!last) return;
 
     const layout = viewState.calendarLayout;
+    const maxSegments = scheduleMaxSegments(layout);
     const nextAnchor = shiftSegmentAnchor(new Date(last.anchorIso), layout, 1, timeZone);
     const nextId = nextAnchor.toISOString();
     if (current.some((segment) => segment.id === nextId)) return;
@@ -342,6 +364,7 @@ export function ScheduleClient({
         return trimScheduleSegments(
           [...prev, buildScheduleSegment(nextAnchor, layout, events, timeZone)],
           "future",
+          maxSegments,
         );
       });
     } finally {
@@ -353,11 +376,12 @@ export function ScheduleClient({
   const prependPastSegment = useCallback(async () => {
     if (loadingPastRef.current || pending) return;
     const current = segmentsRef.current;
-    if (current.length === 0 || current.length >= SCHEDULE_MAX_SEGMENTS) return;
+    if (current.length === 0) return;
     const first = current[0];
     if (!first) return;
 
     const layout = viewState.calendarLayout;
+    const maxSegments = scheduleMaxSegments(layout);
     const prevAnchor = shiftSegmentAnchor(new Date(first.anchorIso), layout, -1, timeZone);
     const prevId = prevAnchor.toISOString();
     if (current.some((segment) => segment.id === prevId)) return;
@@ -376,6 +400,7 @@ export function ScheduleClient({
         return trimScheduleSegments(
           [buildScheduleSegment(prevAnchor, layout, events, timeZone), ...prev],
           "past",
+          maxSegments,
         );
       });
       // Preserve viewport after prepend (PC-489 / PC-493).
@@ -738,7 +763,10 @@ export function ScheduleClient({
         display: "flex",
         flexDirection: "column",
         minHeight: 0,
-        ...(viewportHeightPx != null ? { height: viewportHeightPx } : {}),
+        overflow: "hidden",
+        ...(viewportHeightPx != null
+          ? { height: viewportHeightPx, maxHeight: viewportHeightPx }
+          : {}),
       }}
       data-testid="schedule-ready"
       data-ready={pending ? "false" : "true"}
@@ -765,6 +793,7 @@ export function ScheduleClient({
           pb: 0.5,
           borderBottom: `1px solid ${GARDEN_TOKENS.outlineSoft}`,
           mb: 0.5,
+          touchAction: "none",
         }}
       >
         <Typography variant="h5" component="h1" sx={{ ...brutalPageTitleSx, mb: 0.5 }}>
@@ -811,12 +840,12 @@ export function ScheduleClient({
               <ChevronRightIcon />
             </IconButton>
             <Chip
-              label="Today"
+              label="Goto Today"
               size="small"
               clickable
               onClick={goToday}
               disabled={pending}
-              aria-label="Jump to today"
+              aria-label="Goto today"
               color="primary"
               variant="outlined"
             />
@@ -938,6 +967,8 @@ export function ScheduleClient({
           flex: 1,
           minHeight: 0,
           overflowY: "auto",
+          overscrollBehavior: "contain",
+          WebkitOverflowScrolling: "touch",
           opacity: pending ? 0.72 : 1,
           transition: "opacity 120ms ease",
         }}
@@ -950,6 +981,11 @@ export function ScheduleClient({
           layout={isMonthLayout ? "month" : isDayLayout ? "day" : "week"}
         />
 
+        {loadingPast ? (
+          <Box sx={{ display: "flex", justifyContent: "center", py: 1 }} aria-live="polite">
+            <CircularProgress size={20} aria-label="Loading earlier dates" />
+          </Box>
+        ) : null}
         <Box
           ref={topSentinelRef}
           data-testid="schedule-scroll-top"
@@ -1022,6 +1058,11 @@ export function ScheduleClient({
           aria-hidden
           sx={{ height: 1 }}
         />
+        {loadingFuture ? (
+          <Box sx={{ display: "flex", justifyContent: "center", py: 1 }} aria-live="polite">
+            <CircularProgress size={20} aria-label="Loading later dates" />
+          </Box>
+        ) : null}
       </Box>
 
       <ScheduleDaySheet

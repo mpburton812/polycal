@@ -5,6 +5,7 @@ import {
   buildScheduleSegment,
   mergeScheduleEvents,
   normalizeSegmentAnchor,
+  scheduleMaxSegments,
   shiftSegmentAnchor,
   trimScheduleSegments,
 } from "./segments";
@@ -60,5 +61,33 @@ describe("schedule segments", () => {
     }));
     expect(trimScheduleSegments(segments, "future", 3).map((s) => s.id)).toEqual(["2", "3", "4"]);
     expect(trimScheduleSegments(segments, "past", 3).map((s) => s.id)).toEqual(["1", "2", "3"]);
+  });
+
+  it("exposes per-layout segment caps", () => {
+    expect(scheduleMaxSegments("day")).toBe(21);
+    expect(scheduleMaxSegments("week")).toBe(16);
+    expect(scheduleMaxSegments("month")).toBe(12);
+  });
+
+  it("slides the window when appending at cap", () => {
+    const segments = [1, 2, 3].map((n) => ({
+      id: String(n),
+      anchorIso: String(n),
+      rangeStartIso: String(n),
+      rangeEndIso: String(n),
+      events: [] as ScheduleEvent[],
+    }));
+    const next = {
+      id: "4",
+      anchorIso: "4",
+      rangeStartIso: "4",
+      rangeEndIso: "4",
+      events: [] as ScheduleEvent[],
+    };
+    expect(trimScheduleSegments([...segments, next], "future", 3).map((s) => s.id)).toEqual([
+      "2",
+      "3",
+      "4",
+    ]);
   });
 });

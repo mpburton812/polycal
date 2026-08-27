@@ -10,8 +10,22 @@ import { computeScheduleFetchRange, type ScheduleFetchRange } from "@/lib/schedu
 import { startOfMonth } from "@/lib/schedule/month-grid";
 import { DEFAULT_VIEWER_TIMEZONE } from "@/lib/schedule/timezone";
 
-/** Soft cap so bi-directional scroll cannot grow without bound (PC-489). */
+/** Default soft cap when layout is unknown (PC-489). */
 export const SCHEDULE_MAX_SEGMENTS = 12;
+
+/** Per-layout sliding-window caps for infinite scroll (PC-494). */
+export const SCHEDULE_MAX_SEGMENTS_BY_LAYOUT: Record<ScheduleCalendarLayout, number> = {
+  day: 21,
+  week: 16,
+  month: 12,
+};
+
+/**
+ * Returns the segment stack cap for the active calendar layout (PC-494).
+ */
+export function scheduleMaxSegments(layout: ScheduleCalendarLayout): number {
+  return SCHEDULE_MAX_SEGMENTS_BY_LAYOUT[layout] ?? SCHEDULE_MAX_SEGMENTS;
+}
 
 /** Max segments to prefetch while filling the first viewport (PC-489). */
 export const SCHEDULE_VIEWPORT_FILL_MAX = 5;
