@@ -41,7 +41,7 @@ test.describe("Schedule calendar", () => {
       root.getByLabel("Calendar period").getByRole("button", { name: "Daily", exact: true }),
     ).toHaveAttribute("aria-pressed", "true");
     await expect(root.getByTestId("schedule-day-view").first()).toBeVisible();
-    await expect(root.getByText("All day", { exact: true })).toBeVisible();
+    await expect(root.getByText("All day", { exact: true }).first()).toBeVisible();
   });
 
   test("shows resolved and proposed seed events for invitee", async ({ page }) => {
@@ -73,7 +73,7 @@ test.describe("Schedule calendar", () => {
     const fmt: Intl.DateTimeFormatOptions = { month: "short", day: "numeric" };
     const expectedStart = monday.toLocaleDateString(undefined, fmt);
     await expect(
-      root.getByText(new RegExp(expectedStart.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))),
+      root.getByText(new RegExp(expectedStart.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))).first(),
     ).toBeVisible();
   });
 
@@ -83,7 +83,7 @@ test.describe("Schedule calendar", () => {
     await expect(
       root.getByLabel("Calendar period").getByRole("button", { name: "Monthly" }),
     ).toHaveAttribute("aria-pressed", "true");
-    await expect(root.getByText("Mon", { exact: true })).toBeVisible();
+    await expect(root.getByText("Mon", { exact: true }).first()).toBeVisible();
 
     const rangeStart = await root.getByTestId("schedule-range-start").getAttribute("data-value");
     const rangeEnd = await root.getByTestId("schedule-range-end").getAttribute("data-value");
