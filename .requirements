@@ -444,3 +444,4 @@
 2026-08-27 | 7176761 | PC-489 | Daily/Weekly/Monthly with infinite segment scroll | src/components/schedule/ScheduleClient.tsx
 2026-08-27 | da08467 | PC-490 | tolerate multi-segment schedule locators | e2e/schedule.spec.ts
 2026-08-27 | e2a576b | PC-492 | sticky chrome, Today chip, inline filter, NL date | src/components/layout/MainTabCarousel.tsx
+2026-08-27 | 01539df | PC-493 | : Pin schedule chrome and match Feed top spacing. | src/components/schedule/ScheduleClient.tsx

@@ -28,6 +28,24 @@ import { CHANGELOG_ARCHIVE } from "./entries.archive";
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "2026.08.27c",
+    date: "2026-08-27",
+    summary:
+      "Schedule chrome stays pinned; calendar scrolls in a dedicated region with Feed-matching top spacing.",
+    changes: [
+      {
+        type: "fixed",
+        description:
+          "Schedule title through Network filter stays fixed while only the calendar grid scrolls (contained scroll region).",
+      },
+      {
+        type: "changed",
+        description:
+          "Reduced top spacing above the Schedule heading to match the Feed tab title row.",
+      },
+    ],
+  },
+  {
     version: "2026.08.27b",
     date: "2026-08-27",
     summary:
