@@ -28,6 +28,28 @@ import { CHANGELOG_ARCHIVE } from "./entries.archive";
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "2026.08.27d",
+    date: "2026-08-27",
+    summary:
+      "Schedule infinite scroll sliding window, locked chrome, and Goto Today chip label.",
+    changes: [
+      {
+        type: "fixed",
+        description:
+          "Infinite scroll no longer stops at 12 segments; day/week/month use sliding-window caps (21/16/12) so scrolling past Mar 2026 or Feb 2027 keeps loading.",
+      },
+      {
+        type: "fixed",
+        description:
+          "Schedule header chrome is locked — document scroll disabled on Schedule so title and filters cannot scroll away.",
+      },
+      {
+        type: "changed",
+        description: "Today chip renamed to Goto Today.",
+      },
+    ],
+  },
+  {
     version: "2026.08.27c",
     date: "2026-08-27",
     summary:

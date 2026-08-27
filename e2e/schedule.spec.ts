@@ -17,7 +17,7 @@ test.describe("Schedule calendar", () => {
     await expect(root.getByTestId("schedule-sticky-chrome")).toBeVisible();
     await expect(root.getByLabel("Previous period")).toBeVisible();
     await expect(root.getByLabel("Next period")).toBeVisible();
-    await expect(root.getByRole("button", { name: "Jump to today" })).toBeVisible();
+    await expect(root.getByRole("button", { name: "Goto today" })).toBeVisible();
     await expect(root.getByTestId("schedule-network-filter")).toBeVisible();
     await expect(root.getByLabel("Calendar period").getByRole("button", { name: "Daily", exact: true })).toBeVisible();
     await expect(root.getByLabel("Calendar period").getByRole("button", { name: "Weekly", exact: true })).toHaveAttribute(
@@ -77,7 +77,7 @@ test.describe("Schedule calendar", () => {
   test("can jump to today", async ({ page }) => {
     const root = activeMainPanel(page);
     await root.getByLabel("Next period").click();
-    await root.getByRole("button", { name: "Jump to today" }).click();
+    await root.getByRole("button", { name: "Goto today" }).click();
     const monday = new Date();
     const day = monday.getDay();
     const diff = day === 0 ? -6 : 1 - day;
