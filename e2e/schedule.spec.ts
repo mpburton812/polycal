@@ -14,34 +14,47 @@ test.describe("Schedule calendar", () => {
   test("shows weekly schedule view with period controls", async ({ page }) => {
     const root = activeMainPanel(page);
     await expect(root.getByRole("heading", { name: "Schedule", level: 1 })).toBeVisible();
+    await expect(root.getByTestId("schedule-sticky-chrome")).toBeVisible();
     await expect(root.getByLabel("Previous period")).toBeVisible();
     await expect(root.getByLabel("Next period")).toBeVisible();
-    await expect(root.getByRole("button", { name: "Jump to today" })).toBeVisible();
-    await expect(root.getByLabel("Calendar period").getByRole("button", { name: "Day", exact: true })).toBeVisible();
-    await expect(root.getByLabel("Calendar period").getByRole("button", { name: "Week", exact: true })).toHaveAttribute(
+    await expect(root.getByRole("button", { name: "Goto today" })).toBeVisible();
+    await expect(root.getByTestId("schedule-network-filter")).toBeVisible();
+    await expect(root.getByLabel("Calendar period").getByRole("button", { name: "Daily", exact: true })).toBeVisible();
+    await expect(root.getByLabel("Calendar period").getByRole("button", { name: "Weekly", exact: true })).toHaveAttribute(
       "aria-pressed",
       "true",
     );
   });
 
+  test("jumps via natural-language date on period label", async ({ page }) => {
+    const root = activeMainPanel(page);
+    await root.getByLabel(/Jump to date/i).click();
+    await page.getByLabel("Natural language date").fill("2026-09-15");
+    await page.getByRole("button", { name: "Go", exact: true }).click();
+    await expect(root.getByTestId("schedule-ready")).toHaveAttribute("data-ready", "true", {
+      timeout: 30_000,
+    });
+    await expect(root.getByLabel(/Jump to date/i)).toContainText(/Sep/i);
+  });
+
   test("view options has network filter without status legend", async ({ page }) => {
-    await activeMainPanel(page).getByLabel("View options").click();
-    const drawer = page.locator(".MuiDrawer-paper");
-    await expect(drawer.getByLabel("Network filter")).toBeVisible();
-    await expect(drawer.getByText(/Approved events/i)).toHaveCount(0);
-    await expect(drawer.getByText(/At risk \/ tentative/i)).toHaveCount(0);
-    await expect(drawer.getByText(/Archived/i)).toHaveCount(0);
-    await expect(drawer.getByText(/Masked/i)).toHaveCount(0);
+    const root = activeMainPanel(page);
+    await expect(root.getByTestId("schedule-network-filter")).toBeVisible();
+    await root.getByLabel("Network filter").click();
+    const listbox = page.getByRole("listbox");
+    await expect(listbox.getByRole("option", { name: "Whole Network" })).toBeVisible();
+    await expect(listbox.getByRole("option", { name: "Solo" })).toBeVisible();
+    await expect(page.getByText(/Approved events/i)).toHaveCount(0);
   });
 
   test("switches to day hour grid", async ({ page }) => {
     const root = activeMainPanel(page);
-    await root.getByLabel("Calendar period").getByRole("button", { name: "Day", exact: true }).click();
+    await root.getByLabel("Calendar period").getByRole("button", { name: "Daily", exact: true }).click();
     await expect(
-      root.getByLabel("Calendar period").getByRole("button", { name: "Day", exact: true }),
+      root.getByLabel("Calendar period").getByRole("button", { name: "Daily", exact: true }),
     ).toHaveAttribute("aria-pressed", "true");
-    await expect(root.getByTestId("schedule-day-view")).toBeVisible();
-    await expect(root.getByText("All day", { exact: true })).toBeVisible();
+    await expect(root.getByTestId("schedule-day-view").first()).toBeVisible();
+    await expect(root.getByText("All day", { exact: true }).first()).toBeVisible();
   });
 
   test("shows resolved and proposed seed events for invitee", async ({ page }) => {
@@ -64,7 +77,7 @@ test.describe("Schedule calendar", () => {
   test("can jump to today", async ({ page }) => {
     const root = activeMainPanel(page);
     await root.getByLabel("Next period").click();
-    await root.getByRole("button", { name: "Jump to today" }).click();
+    await root.getByRole("button", { name: "Goto today" }).click();
     const monday = new Date();
     const day = monday.getDay();
     const diff = day === 0 ? -6 : 1 - day;
@@ -73,17 +86,34 @@ test.describe("Schedule calendar", () => {
     const fmt: Intl.DateTimeFormatOptions = { month: "short", day: "numeric" };
     const expectedStart = monday.toLocaleDateString(undefined, fmt);
     await expect(
-      root.getByText(new RegExp(expectedStart.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))),
+      root.getByText(new RegExp(expectedStart.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))).first(),
     ).toBeVisible();
+  });
+
+
+  test("keeps schedule chrome pinned while calendar scrolls", async ({ page }) => {
+    const root = activeMainPanel(page);
+    await root.getByLabel("Calendar period").getByRole("button", { name: "Monthly" }).click();
+    const chrome = root.getByTestId("schedule-sticky-chrome");
+    const scrollRoot = root.getByTestId("schedule-scroll-root");
+    await expect(scrollRoot).toBeVisible();
+    const before = await chrome.boundingBox();
+    await scrollRoot.evaluate((el) => {
+      el.scrollTop = el.scrollHeight;
+    });
+    const after = await chrome.boundingBox();
+    expect(before).toBeTruthy();
+    expect(after).toBeTruthy();
+    expect(Math.abs((before?.y ?? 0) - (after?.y ?? 0))).toBeLessThan(4);
   });
 
   test("switches to month view and opens day sheet from overflow", async ({ page }) => {
     const root = activeMainPanel(page);
-    await root.getByLabel("Calendar period").getByRole("button", { name: "Month" }).click();
+    await root.getByLabel("Calendar period").getByRole("button", { name: "Monthly" }).click();
     await expect(
-      root.getByLabel("Calendar period").getByRole("button", { name: "Month" }),
+      root.getByLabel("Calendar period").getByRole("button", { name: "Monthly" }),
     ).toHaveAttribute("aria-pressed", "true");
-    await expect(root.getByText("Mon", { exact: true })).toBeVisible();
+    await expect(root.getByText("Mon", { exact: true }).first()).toBeVisible();
 
     const rangeStart = await root.getByTestId("schedule-range-start").getAttribute("data-value");
     const rangeEnd = await root.getByTestId("schedule-range-end").getAttribute("data-value");

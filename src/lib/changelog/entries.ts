@@ -28,6 +28,82 @@ import { CHANGELOG_ARCHIVE } from "./entries.archive";
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "2026.08.27d",
+    date: "2026-08-27",
+    summary:
+      "Schedule infinite scroll sliding window, locked chrome, and Goto Today chip label.",
+    changes: [
+      {
+        type: "fixed",
+        description:
+          "Infinite scroll no longer stops at 12 segments; day/week/month use sliding-window caps (21/16/12) so scrolling past Mar 2026 or Feb 2027 keeps loading.",
+      },
+      {
+        type: "fixed",
+        description:
+          "Schedule header chrome is locked — document scroll disabled on Schedule so title and filters cannot scroll away.",
+      },
+      {
+        type: "changed",
+        description: "Today chip renamed to Goto Today.",
+      },
+    ],
+  },
+  {
+    version: "2026.08.27c",
+    date: "2026-08-27",
+    summary:
+      "Schedule chrome stays pinned; calendar scrolls in a dedicated region with Feed-matching top spacing.",
+    changes: [
+      {
+        type: "fixed",
+        description:
+          "Schedule title through Network filter stays fixed while only the calendar grid scrolls (contained scroll region).",
+      },
+      {
+        type: "changed",
+        description:
+          "Reduced top spacing above the Schedule heading to match the Feed tab title row.",
+      },
+    ],
+  },
+  {
+    version: "2026.08.27b",
+    date: "2026-08-27",
+    summary:
+      "Schedule sticky chrome with Today chip, inline network filter, and NL date jump.",
+    changes: [
+      {
+        type: "changed",
+        description:
+          "Schedule title + period controls stay sticky while segments scroll; Today is a chip that recenters the stack.",
+      },
+      {
+        type: "changed",
+        description:
+          "Network filter is an inline Whole Network pulldown (drawer removed); click the period label to jump via natural-language date.",
+      },
+    ],
+  },
+  {
+    version: "2026.08.27a",
+    date: "2026-08-27",
+    summary:
+      "Schedule Daily/Weekly/Monthly only with bi-directional infinite period scroll.",
+    changes: [
+      {
+        type: "changed",
+        description:
+          "Calendar period control is Daily / Weekly / Monthly; 2-week mode removed (legacy ?layout=twoWeek maps to Weekly).",
+      },
+      {
+        type: "added",
+        description:
+          "Schedule stacks period segments and loads past/future as you scroll; opens by filling the viewport around today.",
+      },
+    ],
+  },
+  {
     version: "2026.08.26a",
     date: "2026-08-26",
     summary:

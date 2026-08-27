@@ -140,7 +140,7 @@ export function MainTabCarousel({
       onPointerDown={onPointerDown}
       onPointerUp={onPointerUp}
       onPointerCancel={onPointerCancel}
-      style={{ minHeight: "inherit", touchAction: "pan-y", overflow: "hidden" }}
+      style={{ minHeight: "inherit", touchAction: "pan-y", overflowX: "hidden", overflowY: "visible" }}
       data-testid="main-tab-carousel"
     >
       <div
