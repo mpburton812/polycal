@@ -441,3 +441,5 @@
 2026-08-25 | 34b6da4 | PC-478 | keep Bubblewrap globally on PATH | src/lib/changelog/entries.ts
 2026-08-25 | 773b3a6 | PC-481 | GitHub Releases, update prompt, TWA push docs | src/components/profile/ProfileSettings.tsx
 2026-08-25 | 02e0fa5 | PC-486 | RemoteViews-safe widgets stop Can't load widget | src/lib/changelog/entries.ts
+2026-08-27 | 7176761 | PC-489 | Daily/Weekly/Monthly with infinite segment scroll | src/components/schedule/ScheduleClient.tsx
+2026-08-27 | da08467 | PC-490 | tolerate multi-segment schedule locators | e2e/schedule.spec.ts

@@ -17,7 +17,7 @@ import { GARDEN_TOKENS, HEATMAP_LEVEL_COLORS } from "@/theme/tokens";
 
 const LEVEL_COLORS = [...HEATMAP_LEVEL_COLORS];
 
-export type HeatmapLayout = "day" | "week" | "twoWeek" | "month";
+export type HeatmapLayout = "day" | "week" | "month";
 
 /** Formats a day label as MM/DD for heatmap cells in the viewer timezone. */
 function formatHeatmapDate(day: Date, timeZone: string = DEFAULT_VIEWER_TIMEZONE): string {
@@ -134,8 +134,7 @@ export function ScheduleHeatmap({
     return null;
   }
 
-  const columns = layout === "twoWeek" ? 7 : dayCount;
-  const rows = layout === "twoWeek" ? 2 : 1;
+  const columns = dayCount;
 
   return (
     <Box sx={{ mb: 1.5 }}>
@@ -145,34 +144,23 @@ export function ScheduleHeatmap({
       <Box
         role="img"
         aria-label="Network busyness heatmap"
-        sx={{ display: "flex", flexDirection: "column", gap: 0.5 }}
+        sx={{
+          display: "grid",
+          gridTemplateColumns: `repeat(${columns}, 1fr)`,
+          gap: 0.5,
+        }}
       >
-        {Array.from({ length: rows }, (_, rowIndex) => (
-          <Box
-            key={`heatmap-row-${rowIndex}`}
-            sx={{
-              display: "grid",
-              gridTemplateColumns: `repeat(${columns}, 1fr)`,
-              gap: 0.5,
-            }}
-          >
-            {levels
-              .slice(rowIndex * columns, rowIndex * columns + columns)
-              .map((level, colIndex) => {
-                const dayIndex = rowIndex * columns + colIndex;
-                const day = addDays(weekStart, dayIndex);
-                return (
-                  <HeatmapCell
-                    key={`${dayIndex}-${formatHeatmapDate(day, timeZone ?? DEFAULT_VIEWER_TIMEZONE)}`}
-                    level={level}
-                    day={day}
-                    compact={layout === "twoWeek"}
-                    timeZone={timeZone}
-                  />
-                );
-              })}
-          </Box>
-        ))}
+        {levels.map((level, dayIndex) => {
+          const day = addDays(weekStart, dayIndex);
+          return (
+            <HeatmapCell
+              key={`${dayIndex}-${formatHeatmapDate(day, timeZone ?? DEFAULT_VIEWER_TIMEZONE)}`}
+              level={level}
+              day={day}
+              timeZone={timeZone}
+            />
+          );
+        })}
       </Box>
     </Box>
   );

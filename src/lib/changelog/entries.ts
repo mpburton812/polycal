@@ -28,6 +28,24 @@ import { CHANGELOG_ARCHIVE } from "./entries.archive";
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "2026.08.27a",
+    date: "2026-08-27",
+    summary:
+      "Schedule Daily/Weekly/Monthly only with bi-directional infinite period scroll.",
+    changes: [
+      {
+        type: "changed",
+        description:
+          "Calendar period control is Daily / Weekly / Monthly; 2-week mode removed (legacy ?layout=twoWeek maps to Weekly).",
+      },
+      {
+        type: "added",
+        description:
+          "Schedule stacks period segments and loads past/future as you scroll; opens by filling the viewport around today.",
+      },
+    ],
+  },
+  {
     version: "2026.08.26a",
     date: "2026-08-26",
     summary:
