@@ -189,7 +189,8 @@ export function ScheduleClient({
   const [dateAnchorEl, setDateAnchorEl] = useState<HTMLElement | null>(null);
   const [nlDateText, setNlDateText] = useState("");
   const [nlDateError, setNlDateError] = useState<string | null>(null);
-  const [stickyTopPx, setStickyTopPx] = useState(64);
+  const scheduleRootRef = useRef<HTMLDivElement | null>(null);
+  const [viewportHeightPx, setViewportHeightPx] = useState<number | null>(null);
   const scrollTargetAnchorRef = useRef<string | null>(null);
   const { openCreate, openEdit } = useProposalCreate();
   const {
@@ -288,31 +289,29 @@ export function ScheduleClient({
     [fetchSegmentEvents, timeZone, viewState.calendarLayout],
   );
 
-  /** Pin schedule chrome under AppShell sticky header (PC-492). */
+  /** Size the schedule column to fill viewport below app chrome and above bottom nav (PC-493). */
   useLayoutEffect(() => {
     function measure() {
-      const banner = document.querySelector('[aria-label="Environment banner"]');
-      const appBar = document.querySelector(".MuiAppBar-root");
-      const bannerH = banner instanceof HTMLElement ? banner.getBoundingClientRect().height : 0;
-      const appBarH = appBar instanceof HTMLElement ? appBar.getBoundingClientRect().height : 56;
-      setStickyTopPx(Math.round(bannerH + appBarH));
+      const root = scheduleRootRef.current;
+      const bottomNav = document.querySelector('[aria-label="Main navigation"]');
+      const top = root?.getBoundingClientRect().top ?? 80;
+      const bottom =
+        bottomNav instanceof HTMLElement ? bottomNav.getBoundingClientRect().height : 56;
+      setViewportHeightPx(Math.max(240, Math.round(window.innerHeight - top - bottom)));
     }
     measure();
     window.addEventListener("resize", measure);
     return () => window.removeEventListener("resize", measure);
   }, []);
 
-  /** After rebuild, pin the target segment under the sticky chrome (PC-492). */
+  /** After rebuild, scroll the calendar region to the top (PC-493). */
   useEffect(() => {
     const target = scrollTargetAnchorRef.current;
     if (!target || pending || segments.length === 0) return;
     if (!segments.some((segment) => segment.id === target)) return;
     scrollTargetAnchorRef.current = null;
     requestAnimationFrame(() => {
-      const el = document.querySelector(
-        `[data-testid="schedule-segment"][data-segment-anchor="${CSS.escape(target)}"]`,
-      );
-      el?.scrollIntoView({ block: "start", behavior: "smooth" });
+      scrollRootRef.current?.scrollTo({ top: 0, behavior: "smooth" });
     });
   }, [pending, segments]);
 
@@ -366,8 +365,9 @@ export function ScheduleClient({
     loadingPastRef.current = true;
     setLoadingPast(true);
     const seq = stackSeqRef.current;
-    const prevScrollHeight = document.documentElement.scrollHeight;
-    const prevScrollTop = window.scrollY;
+    const scrollRoot = scrollRootRef.current;
+    const prevScrollHeight = scrollRoot?.scrollHeight ?? 0;
+    const prevScrollTop = scrollRoot?.scrollTop ?? 0;
     try {
       const events = await fetchSegmentEvents(prevAnchor, layout);
       if (seq !== stackSeqRef.current) return;
@@ -378,10 +378,12 @@ export function ScheduleClient({
           "past",
         );
       });
-      // Preserve viewport after prepend (PC-489).
+      // Preserve viewport after prepend (PC-489 / PC-493).
       requestAnimationFrame(() => {
-        const delta = document.documentElement.scrollHeight - prevScrollHeight;
-        window.scrollTo(0, prevScrollTop + delta);
+        const root = scrollRootRef.current;
+        if (!root) return;
+        const delta = root.scrollHeight - prevScrollHeight;
+        root.scrollTo(0, prevScrollTop + delta);
       });
     } finally {
       loadingPastRef.current = false;
@@ -501,8 +503,9 @@ export function ScheduleClient({
     if (pending || segments.length === 0 || fillRunningRef.current) return;
     if (segments.length >= SCHEDULE_VIEWPORT_FILL_MAX) return;
 
-    const doc = document.documentElement;
-    const overflows = doc.scrollHeight > window.innerHeight + 48;
+    const root = scrollRootRef.current;
+    if (!root) return;
+    const overflows = root.scrollHeight > root.clientHeight + 48;
     if (overflows) return;
 
     fillRunningRef.current = true;
@@ -517,11 +520,12 @@ export function ScheduleClient({
     })();
   }, [appendFutureSegment, pending, prependPastSegment, segments.length]);
 
-  /** Bi-directional infinite scroll sentinels (PC-489). */
+  /** Bi-directional infinite scroll sentinels (PC-489 / PC-493). */
   useEffect(() => {
+    const root = scrollRootRef.current;
     const top = topSentinelRef.current;
     const bottom = bottomSentinelRef.current;
-    if (!top || !bottom) return;
+    if (!root || !top || !bottom) return;
 
     const observer = new IntersectionObserver(
       (entries) => {
@@ -531,12 +535,12 @@ export function ScheduleClient({
           if (entry.target === top) void prependPastSegment();
         }
       },
-      { root: null, rootMargin: "240px 0px", threshold: 0 },
+      { root, rootMargin: "240px 0px", threshold: 0 },
     );
     observer.observe(top);
     observer.observe(bottom);
     return () => observer.disconnect();
-  }, [appendFutureSegment, prependPastSegment, segments.length]);
+  }, [appendFutureSegment, prependPastSegment, segments.length, viewportHeightPx]);
 
   const allEvents = useMemo(() => {
     const byId = new Map<string, ScheduleEvent>();
@@ -728,7 +732,14 @@ export function ScheduleClient({
 
   return (
     <Box
-      sx={{ pb: 10 }}
+      ref={scheduleRootRef}
+      sx={{
+        pb: 2,
+        display: "flex",
+        flexDirection: "column",
+        minHeight: 0,
+        ...(viewportHeightPx != null ? { height: viewportHeightPx } : {}),
+      }}
       data-testid="schedule-ready"
       data-ready={pending ? "false" : "true"}
       data-range-start={rangeStartIso}
@@ -749,22 +760,14 @@ export function ScheduleClient({
       <Box
         data-testid="schedule-sticky-chrome"
         sx={{
-          position: "sticky",
-          top: stickyTopPx,
-          zIndex: 10,
+          flexShrink: 0,
           bgcolor: "background.default",
-          pt: 0.5,
-          pb: 1,
+          pb: 0.5,
           borderBottom: `1px solid ${GARDEN_TOKENS.outlineSoft}`,
-          mb: 1,
+          mb: 0.5,
         }}
       >
-        <Typography
-          variant="h5"
-          component="h1"
-          gutterBottom
-          sx={{ ...brutalPageTitleSx, mb: 1 }}
-        >
+        <Typography variant="h5" component="h1" sx={{ ...brutalPageTitleSx, mb: 0.5 }}>
           Schedule
         </Typography>
         <Stack
@@ -930,7 +933,14 @@ export function ScheduleClient({
 
       <Box
         ref={scrollRootRef}
-        sx={{ opacity: pending ? 0.72 : 1, transition: "opacity 120ms ease" }}
+        data-testid="schedule-scroll-root"
+        sx={{
+          flex: 1,
+          minHeight: 0,
+          overflowY: "auto",
+          opacity: pending ? 0.72 : 1,
+          transition: "opacity 120ms ease",
+        }}
       >
         <ScheduleHeatmap
           events={primaryFiltered}
@@ -957,7 +967,7 @@ export function ScheduleClient({
                 key={segment.id}
                 data-testid="schedule-segment"
                 data-segment-anchor={segment.anchorIso}
-                sx={{ scrollMarginTop: stickyTopPx + 96 }}
+                sx={{ scrollMarginTop: 8 }}
               >
                 <Typography
                   variant="subtitle2"

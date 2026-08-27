@@ -90,6 +90,23 @@ test.describe("Schedule calendar", () => {
     ).toBeVisible();
   });
 
+
+  test("keeps schedule chrome pinned while calendar scrolls", async ({ page }) => {
+    const root = activeMainPanel(page);
+    await root.getByLabel("Calendar period").getByRole("button", { name: "Monthly" }).click();
+    const chrome = root.getByTestId("schedule-sticky-chrome");
+    const scrollRoot = root.getByTestId("schedule-scroll-root");
+    await expect(scrollRoot).toBeVisible();
+    const before = await chrome.boundingBox();
+    await scrollRoot.evaluate((el) => {
+      el.scrollTop = el.scrollHeight;
+    });
+    const after = await chrome.boundingBox();
+    expect(before).toBeTruthy();
+    expect(after).toBeTruthy();
+    expect(Math.abs((before?.y ?? 0) - (after?.y ?? 0))).toBeLessThan(4);
+  });
+
   test("switches to month view and opens day sheet from overflow", async ({ page }) => {
     const root = activeMainPanel(page);
     await root.getByLabel("Calendar period").getByRole("button", { name: "Monthly" }).click();
