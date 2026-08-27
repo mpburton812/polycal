@@ -14,9 +14,11 @@ test.describe("Schedule calendar", () => {
   test("shows weekly schedule view with period controls", async ({ page }) => {
     const root = activeMainPanel(page);
     await expect(root.getByRole("heading", { name: "Schedule", level: 1 })).toBeVisible();
+    await expect(root.getByTestId("schedule-sticky-chrome")).toBeVisible();
     await expect(root.getByLabel("Previous period")).toBeVisible();
     await expect(root.getByLabel("Next period")).toBeVisible();
     await expect(root.getByRole("button", { name: "Jump to today" })).toBeVisible();
+    await expect(root.getByTestId("schedule-network-filter")).toBeVisible();
     await expect(root.getByLabel("Calendar period").getByRole("button", { name: "Daily", exact: true })).toBeVisible();
     await expect(root.getByLabel("Calendar period").getByRole("button", { name: "Weekly", exact: true })).toHaveAttribute(
       "aria-pressed",
@@ -24,14 +26,25 @@ test.describe("Schedule calendar", () => {
     );
   });
 
+  test("jumps via natural-language date on period label", async ({ page }) => {
+    const root = activeMainPanel(page);
+    await root.getByLabel(/Jump to date/i).click();
+    await page.getByLabel("Natural language date").fill("2026-09-15");
+    await page.getByRole("button", { name: "Go", exact: true }).click();
+    await expect(root.getByTestId("schedule-ready")).toHaveAttribute("data-ready", "true", {
+      timeout: 30_000,
+    });
+    await expect(root.getByLabel(/Jump to date/i)).toContainText(/Sep/i);
+  });
+
   test("view options has network filter without status legend", async ({ page }) => {
-    await activeMainPanel(page).getByLabel("View options").click();
-    const drawer = page.locator(".MuiDrawer-paper");
-    await expect(drawer.getByLabel("Network filter")).toBeVisible();
-    await expect(drawer.getByText(/Approved events/i)).toHaveCount(0);
-    await expect(drawer.getByText(/At risk \/ tentative/i)).toHaveCount(0);
-    await expect(drawer.getByText(/Archived/i)).toHaveCount(0);
-    await expect(drawer.getByText(/Masked/i)).toHaveCount(0);
+    const root = activeMainPanel(page);
+    await expect(root.getByTestId("schedule-network-filter")).toBeVisible();
+    await root.getByLabel("Network filter").click();
+    const listbox = page.getByRole("listbox");
+    await expect(listbox.getByRole("option", { name: "Whole Network" })).toBeVisible();
+    await expect(listbox.getByRole("option", { name: "Solo" })).toBeVisible();
+    await expect(page.getByText(/Approved events/i)).toHaveCount(0);
   });
 
   test("switches to day hour grid", async ({ page }) => {

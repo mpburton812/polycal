@@ -28,6 +28,24 @@ import { CHANGELOG_ARCHIVE } from "./entries.archive";
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "2026.08.27b",
+    date: "2026-08-27",
+    summary:
+      "Schedule sticky chrome with Today chip, inline network filter, and NL date jump.",
+    changes: [
+      {
+        type: "changed",
+        description:
+          "Schedule title + period controls stay sticky while segments scroll; Today is a chip that recenters the stack.",
+      },
+      {
+        type: "changed",
+        description:
+          "Network filter is an inline Whole Network pulldown (drawer removed); click the period label to jump via natural-language date.",
+      },
+    ],
+  },
+  {
     version: "2026.08.27a",
     date: "2026-08-27",
     summary:

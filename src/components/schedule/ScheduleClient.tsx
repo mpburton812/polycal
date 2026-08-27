@@ -2,19 +2,18 @@
 
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
-import FilterListIcon from "@mui/icons-material/FilterList";
-import TodayIcon from "@mui/icons-material/Today";
 import {
   Box,
   Button,
   Chip,
-  Drawer,
   FormControl,
   IconButton,
   InputLabel,
   MenuItem,
+  Popover,
   Select,
   Stack,
+  TextField,
   ToggleButton,
   ToggleButtonGroup,
   Typography,
@@ -68,6 +67,7 @@ import {
 } from "@/lib/schedule/dates";
 import { startOfMonth } from "@/lib/schedule/month-grid";
 import { SCHEDULE_INVALIDATE_EVENT } from "@/lib/schedule/invalidate";
+import { parseScheduleNlDate } from "@/lib/schedule/parse-nl-date";
 import {
   buildScheduleSegment,
   normalizeSegmentAnchor,
@@ -78,6 +78,7 @@ import {
   trimScheduleSegments,
 } from "@/lib/schedule/segments";
 import { ssrWeekCoversVisibleRange } from "@/lib/schedule/visible-payload";
+import { brutalPageTitleSx, brutalPopoverPaperSx } from "@/theme/brutalUi";
 import { GARDEN_TOKENS } from "@/theme/tokens";
 
 /** Heavy dialogs load on demand so the calendar paints sooner (PC-145). */
@@ -184,8 +185,12 @@ export function ScheduleClient({
   const [pending, setPending] = useState(false);
   const [loadingPast, setLoadingPast] = useState(false);
   const [loadingFuture, setLoadingFuture] = useState(false);
-  const [optionsOpen, setOptionsOpen] = useState(false);
   const [daySheetDay, setDaySheetDay] = useState<Date | null>(null);
+  const [dateAnchorEl, setDateAnchorEl] = useState<HTMLElement | null>(null);
+  const [nlDateText, setNlDateText] = useState("");
+  const [nlDateError, setNlDateError] = useState<string | null>(null);
+  const [stickyTopPx, setStickyTopPx] = useState(64);
+  const scrollTargetAnchorRef = useRef<string | null>(null);
   const { openCreate, openEdit } = useProposalCreate();
   const {
     state: dialogState,
@@ -246,15 +251,22 @@ export function ScheduleClient({
   );
 
   /**
-   * Rebuilds the stack around a seed anchor, then viewport-fill is handled by layout effect (PC-489).
+   * Rebuilds the stack around a seed anchor, then viewport-fill is handled by layout effect (PC-489 / PC-492).
    */
   const rebuildStack = useCallback(
     (
       anchorDate: Date,
-      opts?: { layout?: ScheduleCalendarLayout; seedEvents?: ScheduleEvent[] },
+      opts?: {
+        layout?: ScheduleCalendarLayout;
+        seedEvents?: ScheduleEvent[];
+        scrollToTop?: boolean;
+      },
     ) => {
       const layout = opts?.layout ?? viewState.calendarLayout;
       const normalized = normalizeSegmentAnchor(anchorDate, layout, timeZone);
+      if (opts?.scrollToTop) {
+        scrollTargetAnchorRef.current = normalized.toISOString();
+      }
       const seq = ++stackSeqRef.current;
       setPending(true);
       loadingPastRef.current = false;
@@ -275,6 +287,34 @@ export function ScheduleClient({
     },
     [fetchSegmentEvents, timeZone, viewState.calendarLayout],
   );
+
+  /** Pin schedule chrome under AppShell sticky header (PC-492). */
+  useLayoutEffect(() => {
+    function measure() {
+      const banner = document.querySelector('[aria-label="Environment banner"]');
+      const appBar = document.querySelector(".MuiAppBar-root");
+      const bannerH = banner instanceof HTMLElement ? banner.getBoundingClientRect().height : 0;
+      const appBarH = appBar instanceof HTMLElement ? appBar.getBoundingClientRect().height : 56;
+      setStickyTopPx(Math.round(bannerH + appBarH));
+    }
+    measure();
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, []);
+
+  /** After rebuild, pin the target segment under the sticky chrome (PC-492). */
+  useEffect(() => {
+    const target = scrollTargetAnchorRef.current;
+    if (!target || pending || segments.length === 0) return;
+    if (!segments.some((segment) => segment.id === target)) return;
+    scrollTargetAnchorRef.current = null;
+    requestAnimationFrame(() => {
+      const el = document.querySelector(
+        `[data-testid="schedule-segment"][data-segment-anchor="${CSS.escape(target)}"]`,
+      );
+      el?.scrollIntoView({ block: "start", behavior: "smooth" });
+    });
+  }, [pending, segments]);
 
   const refreshCurrentView = useCallback(() => {
     rebuildStack(primaryAnchor, { layout: viewState.calendarLayout });
@@ -566,7 +606,7 @@ export function ScheduleClient({
         weekStartIso: day.toISOString(),
         monthAnchorIso: anchors.monthAnchorIso,
       }));
-      rebuildStack(day, { layout: "day" });
+      rebuildStack(day, { layout: "day", scrollToTop: true });
       return;
     }
     setViewState((current) => ({ ...current, ...anchors }));
@@ -574,7 +614,50 @@ export function ScheduleClient({
       viewState.calendarLayout === "month"
         ? new Date(anchors.monthAnchorIso)
         : new Date(anchors.weekStartIso);
-    rebuildStack(anchor, { layout: viewState.calendarLayout });
+    rebuildStack(anchor, { layout: viewState.calendarLayout, scrollToTop: true });
+  }
+
+  function jumpToParsedDate(date: Date) {
+    const layout = viewState.calendarLayout;
+    if (layout === "day") {
+      const day = startOfLocalDayNoon(date, timeZone);
+      setViewState((current) => ({
+        ...current,
+        weekStartIso: day.toISOString(),
+        monthAnchorIso: startOfMonth(day, timeZone).toISOString(),
+      }));
+      rebuildStack(day, { layout: "day", scrollToTop: true });
+      return;
+    }
+    if (layout === "month") {
+      const month = startOfMonth(date, timeZone);
+      setViewState((current) => ({
+        ...current,
+        weekStartIso: startOfWeekMonday(date, timeZone).toISOString(),
+        monthAnchorIso: month.toISOString(),
+      }));
+      rebuildStack(month, { layout: "month", scrollToTop: true });
+      return;
+    }
+    const monday = startOfWeekMonday(date, timeZone);
+    setViewState((current) => ({
+      ...current,
+      weekStartIso: monday.toISOString(),
+      monthAnchorIso: startOfMonth(date, timeZone).toISOString(),
+    }));
+    rebuildStack(monday, { layout: "week", scrollToTop: true });
+  }
+
+  function submitNlDate() {
+    const parsed = parseScheduleNlDate(nlDateText);
+    if (!parsed) {
+      setNlDateError("Could not understand that date. Try “next Tuesday” or YYYY-MM-DD.");
+      return;
+    }
+    setNlDateError(null);
+    setDateAnchorEl(null);
+    setNlDateText("");
+    jumpToParsedDate(parsed);
   }
 
   function handlePeriodModeChange(mode: SchedulePeriodMode) {
@@ -627,20 +710,21 @@ export function ScheduleClient({
 
   const showAgenda = !isMonthLayout && !isDayLayout && isMobile;
 
-  const filterActive = viewState.filterMode !== "whole";
   const filterLabel = (() => {
     if (viewState.filterMode === "solo") return "Solo";
     if (viewState.filterMode === "sleeping_network") return "Sleeping network";
     if (viewState.filterMode === "person") {
       const person = people.find((p) => p.id === viewState.filterPersonId);
-      return person?.displayName ? `Person: ${person.displayName}` : "Person";
+      return person?.displayName ? person.displayName : "Person";
     }
-    return "Whole network";
+    return "Whole Network";
   })();
 
   const primaryFiltered = primarySegment
     ? filterSegmentEvents(primarySegment.events)
     : filteredAllEvents;
+
+  const datePopoverOpen = Boolean(dateAnchorEl);
 
   return (
     <Box
@@ -663,10 +747,11 @@ export function ScheduleClient({
         data-value={rangeEndIso}
       />
       <Box
+        data-testid="schedule-sticky-chrome"
         sx={{
           position: "sticky",
-          top: 0,
-          zIndex: 2,
+          top: stickyTopPx,
+          zIndex: 10,
           bgcolor: "background.default",
           pt: 0.5,
           pb: 1,
@@ -674,14 +759,21 @@ export function ScheduleClient({
           mb: 1,
         }}
       >
+        <Typography
+          variant="h5"
+          component="h1"
+          gutterBottom
+          sx={{ ...brutalPageTitleSx, mb: 1 }}
+        >
+          Schedule
+        </Typography>
         <Stack
           direction={{ xs: "column", sm: "row" }}
           spacing={1}
           alignItems={{ sm: "center" }}
           justifyContent="space-between"
-          sx={{ mb: 1 }}
         >
-          <Stack direction="row" alignItems="center" spacing={0.5}>
+          <Stack direction="row" alignItems="center" spacing={0.5} flexWrap="wrap" useFlexGap>
             <IconButton
               aria-label="Previous period"
               onClick={() => shiftPeriod(-1)}
@@ -689,9 +781,25 @@ export function ScheduleClient({
             >
               <ChevronLeftIcon />
             </IconButton>
-            <Typography variant="subtitle1" fontWeight={600}>
+            <Button
+              variant="text"
+              color="inherit"
+              onClick={(event) => {
+                setNlDateError(null);
+                setNlDateText("");
+                setDateAnchorEl(event.currentTarget);
+              }}
+              aria-label={`Jump to date, currently ${rangeLabel}`}
+              sx={{
+                textTransform: "none",
+                fontWeight: 600,
+                fontSize: "1rem",
+                px: 0.75,
+                minWidth: 0,
+              }}
+            >
               {rangeLabel}
-            </Typography>
+            </Button>
             <IconButton
               aria-label="Next period"
               onClick={() => shiftPeriod(1)}
@@ -699,14 +807,16 @@ export function ScheduleClient({
             >
               <ChevronRightIcon />
             </IconButton>
-            <IconButton
-              aria-label="Jump to today"
+            <Chip
+              label="Today"
+              size="small"
+              clickable
               onClick={goToday}
               disabled={pending}
-              size="small"
-            >
-              <TodayIcon fontSize="small" />
-            </IconButton>
+              aria-label="Jump to today"
+              color="primary"
+              variant="outlined"
+            />
           </Stack>
 
           <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
@@ -725,97 +835,98 @@ export function ScheduleClient({
               <ToggleButton value="month">Monthly</ToggleButton>
             </ToggleButtonGroup>
 
-            <IconButton
-              aria-label={
-                filterActive ? `View options, filter active: ${filterLabel}` : "View options"
-              }
-              aria-expanded={optionsOpen}
-              onClick={() => setOptionsOpen(true)}
-              size="small"
-              color={filterActive ? "primary" : "default"}
-            >
-              <FilterListIcon />
-            </IconButton>
-            {filterActive && (
-              <Chip
-                size="small"
-                color="primary"
-                variant="outlined"
-                label={filterLabel}
-                onClick={() => setOptionsOpen(true)}
-                onDelete={() =>
+            <FormControl size="small" sx={{ minWidth: 148 }}>
+              <InputLabel id="schedule-filter-inline-label">Network</InputLabel>
+              <Select
+                labelId="schedule-filter-inline-label"
+                label="Network"
+                value={viewState.filterMode}
+                onChange={(event) => {
+                  const mode = event.target.value as ScheduleFilterMode;
                   setViewState((current) => ({
                     ...current,
-                    filterMode: "whole",
-                    filterPersonId: "",
-                  }))
-                }
-              />
+                    filterMode: mode,
+                    filterPersonId: mode === "person" ? current.filterPersonId : "",
+                  }));
+                }}
+                renderValue={() => filterLabel}
+                data-testid="schedule-network-filter"
+                aria-label="Network filter"
+              >
+                <MenuItem value="whole">Whole Network</MenuItem>
+                <MenuItem value="solo">Solo</MenuItem>
+                <MenuItem value="sleeping_network">Sleeping network</MenuItem>
+                <MenuItem value="person">Specific person</MenuItem>
+              </Select>
+            </FormControl>
+
+            {viewState.filterMode === "person" && (
+              <FormControl size="small" sx={{ minWidth: 140 }}>
+                <InputLabel id="schedule-person-inline-label">Person</InputLabel>
+                <Select
+                  labelId="schedule-person-inline-label"
+                  label="Person"
+                  value={viewState.filterPersonId}
+                  onChange={(event) =>
+                    setViewState((current) => ({
+                      ...current,
+                      filterPersonId: event.target.value,
+                    }))
+                  }
+                  data-testid="schedule-person-filter"
+                  aria-label="Person filter"
+                >
+                  {people
+                    .filter((person) => person.id !== currentUserId && person.status === "active")
+                    .map((person) => (
+                      <MenuItem key={person.id} value={person.id}>
+                        {person.displayName}
+                      </MenuItem>
+                    ))}
+                </Select>
+              </FormControl>
             )}
           </Stack>
         </Stack>
       </Box>
 
-      <Drawer
-        anchor="right"
-        open={optionsOpen}
-        onClose={() => setOptionsOpen(false)}
-        PaperProps={{ sx: { width: { xs: "100%", sm: 320 }, p: 2 } }}
+      <Popover
+        open={datePopoverOpen}
+        anchorEl={dateAnchorEl}
+        onClose={() => setDateAnchorEl(null)}
+        anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
+        slotProps={{ paper: { sx: { ...brutalPopoverPaperSx, p: 2, width: 320 } } }}
       >
-        <Typography variant="h6" sx={{ mb: 2 }}>
-          View options
+        <Typography variant="subtitle2" sx={{ mb: 1 }}>
+          Go to date
         </Typography>
-        <Stack spacing={2}>
-          <FormControl size="small" fullWidth>
-            <InputLabel id="schedule-filter-label">Network filter</InputLabel>
-            <Select
-              labelId="schedule-filter-label"
-              label="Network filter"
-              value={viewState.filterMode}
-              onChange={(event) =>
-                setViewState((current) => ({
-                  ...current,
-                  filterMode: event.target.value as ScheduleFilterMode,
-                }))
+        <Stack spacing={1.5}>
+          <TextField
+            autoFocus
+            size="small"
+            fullWidth
+            label="Natural language date"
+            placeholder="next Tuesday or 2026-09-15"
+            value={nlDateText}
+            onChange={(event) => {
+              setNlDateText(event.target.value);
+              setNlDateError(null);
+            }}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                event.preventDefault();
+                submitNlDate();
               }
-            >
-              <MenuItem value="whole">Whole network</MenuItem>
-              <MenuItem value="solo">Solo</MenuItem>
-              <MenuItem value="sleeping_network">Sleeping network</MenuItem>
-              <MenuItem value="person">Specific person</MenuItem>
-            </Select>
-          </FormControl>
-
-          {viewState.filterMode === "person" && (
-            <FormControl size="small" fullWidth>
-              <InputLabel id="schedule-person-label">Person</InputLabel>
-              <Select
-                labelId="schedule-person-label"
-                label="Person"
-                value={viewState.filterPersonId}
-                onChange={(event) =>
-                  setViewState((current) => ({
-                    ...current,
-                    filterPersonId: event.target.value,
-                  }))
-                }
-              >
-                {people
-                  .filter((person) => person.id !== currentUserId && person.status === "active")
-                  .map((person) => (
-                    <MenuItem key={person.id} value={person.id}>
-                      {person.displayName}
-                    </MenuItem>
-                  ))}
-              </Select>
-            </FormControl>
-          )}
-
-          <Button variant="contained" onClick={() => setOptionsOpen(false)}>
-            Done
+            }}
+            error={Boolean(nlDateError)}
+            helperText={nlDateError ?? "Jump the current Daily / Weekly / Monthly view."}
+            inputProps={{ "aria-label": "Natural language date" }}
+          />
+          <Button variant="contained" onClick={submitNlDate}>
+            Go
           </Button>
         </Stack>
-      </Drawer>
+      </Popover>
 
       <Box
         ref={scrollRootRef}
@@ -846,6 +957,7 @@ export function ScheduleClient({
                 key={segment.id}
                 data-testid="schedule-segment"
                 data-segment-anchor={segment.anchorIso}
+                sx={{ scrollMarginTop: stickyTopPx + 96 }}
               >
                 <Typography
                   variant="subtitle2"

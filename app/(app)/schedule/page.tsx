@@ -1,4 +1,3 @@
-import { Typography } from "@mui/material";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 
@@ -14,7 +13,6 @@ import { users } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { getDb } from "@/lib/db/client";
 import { ensureDbReady } from "@/lib/db/ensure-ready";
-import { brutalPageTitleSx } from "@/theme/brutalUi";
 
 export default async function SchedulePage() {
   const session = await auth();
@@ -48,20 +46,15 @@ export default async function SchedulePage() {
     .map((row) => row.partnerId);
 
   return (
-    <>
-      <Typography variant="h5" component="h1" gutterBottom sx={brutalPageTitleSx}>
-        Schedule
-      </Typography>
-      <Suspense fallback={<BrandedLoading label="Loading schedule…" />}>
-        <ScheduleClient
-          initialPayload={scheduleResult.payload}
-          initialWeekStartIso={weekStart.toISOString()}
-          people={people}
-          currentUserId={session.user.id}
-          acceptedPartnerIds={acceptedPartnerIds}
-          timeZone={timeZone}
-        />
-      </Suspense>
-    </>
+    <Suspense fallback={<BrandedLoading label="Loading schedule…" />}>
+      <ScheduleClient
+        initialPayload={scheduleResult.payload}
+        initialWeekStartIso={weekStart.toISOString()}
+        people={people}
+        currentUserId={session.user.id}
+        acceptedPartnerIds={acceptedPartnerIds}
+        timeZone={timeZone}
+      />
+    </Suspense>
   );
 }
