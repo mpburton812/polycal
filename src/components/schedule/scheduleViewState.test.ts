@@ -10,11 +10,10 @@ import {
 } from "@/components/schedule/scheduleViewState";
 
 describe("scheduleViewState period mode", () => {
-  it("maps day / week / twoWeek / month", () => {
-    expect(periodModeFromState({ calendarLayout: "day", compact: false })).toBe("day");
-    expect(periodModeFromState({ calendarLayout: "week", compact: false })).toBe("week");
-    expect(periodModeFromState({ calendarLayout: "week", compact: true })).toBe("twoWeek");
-    expect(periodModeFromState({ calendarLayout: "month", compact: false })).toBe("month");
+  it("maps day / week / month", () => {
+    expect(periodModeFromState({ calendarLayout: "day" })).toBe("day");
+    expect(periodModeFromState({ calendarLayout: "week" })).toBe("week");
+    expect(periodModeFromState({ calendarLayout: "month" })).toBe("month");
   });
 
   it("applies period mode onto state", () => {
@@ -22,13 +21,12 @@ describe("scheduleViewState period mode", () => {
       weekStartIso: "2026-07-06T00:00:00.000Z",
       monthAnchorIso: "2026-07-01T00:00:00.000Z",
       calendarLayout: "week" as const,
-      compact: false,
       filterMode: "whole" as const,
       filterPersonId: "",
     };
-    expect(applyPeriodMode(base, "twoWeek").compact).toBe(true);
     expect(applyPeriodMode(base, "month").calendarLayout).toBe("month");
     expect(applyPeriodMode(base, "day").calendarLayout).toBe("day");
+    expect(applyPeriodMode(base, "week").calendarLayout).toBe("week");
   });
 });
 
@@ -40,7 +38,7 @@ describe("schedule URL helpers", () => {
       open: "p1",
     });
     expect(parseScheduleUrlParams("layout=twoWeek&anchor=2026-07-11&open=p1")).toEqual({
-      layout: "twoWeek",
+      layout: "week",
       anchor: "2026-07-11",
       open: "p1",
     });
@@ -52,13 +50,12 @@ describe("schedule URL helpers", () => {
         weekStartIso: "2026-07-06T12:00:00.000Z",
         monthAnchorIso: "2026-07-01T12:00:00.000Z",
         calendarLayout: "week",
-        compact: true,
         filterMode: "whole",
         filterPersonId: "",
       },
       "abc",
     );
-    expect(search).toContain("layout=twoWeek");
+    expect(search).toContain("layout=week");
     expect(search).toContain("open=abc");
     expect(search).toMatch(/anchor=\d{4}-\d{2}-\d{2}/);
   });
@@ -68,7 +65,6 @@ describe("schedule URL helpers", () => {
       weekStartIso: "2026-07-13T12:00:00.000Z",
       monthAnchorIso: "2026-07-01T12:00:00.000Z",
       calendarLayout: "day",
-      compact: false,
       filterMode: "whole",
       filterPersonId: "",
     });

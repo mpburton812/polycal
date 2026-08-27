@@ -9,24 +9,23 @@ const STORAGE_KEY = "polycal.schedule.view";
 
 export type ScheduleCalendarLayout = "day" | "week" | "month";
 
-/** Unified chrome control: Day | Week | 2 weeks | Month (PC-164 / PC-204). */
-export type SchedulePeriodMode = "day" | "week" | "twoWeek" | "month";
+/** Unified chrome control: Daily | Weekly | Monthly (PC-488). */
+export type SchedulePeriodMode = "day" | "week" | "month";
 
 export interface ScheduleViewState {
   weekStartIso: string;
   monthAnchorIso: string;
   calendarLayout: ScheduleCalendarLayout;
-  compact: boolean;
   filterMode: ScheduleFilterMode;
   filterPersonId: string;
 }
 
 export function periodModeFromState(
-  state: Pick<ScheduleViewState, "calendarLayout" | "compact">,
+  state: Pick<ScheduleViewState, "calendarLayout">,
 ): SchedulePeriodMode {
   if (state.calendarLayout === "month") return "month";
   if (state.calendarLayout === "day") return "day";
-  return state.compact ? "twoWeek" : "week";
+  return "week";
 }
 
 export function applyPeriodMode(
@@ -34,16 +33,12 @@ export function applyPeriodMode(
   mode: SchedulePeriodMode,
 ): ScheduleViewState {
   if (mode === "month") {
-    return { ...state, calendarLayout: "month", compact: false };
+    return { ...state, calendarLayout: "month" };
   }
   if (mode === "day") {
-    return { ...state, calendarLayout: "day", compact: false };
+    return { ...state, calendarLayout: "day" };
   }
-  return {
-    ...state,
-    calendarLayout: "week",
-    compact: mode === "twoWeek",
-  };
+  return { ...state, calendarLayout: "week" };
 }
 
 const DEFAULT_STATE = (): ScheduleViewState => {
@@ -53,15 +48,15 @@ const DEFAULT_STATE = (): ScheduleViewState => {
     weekStartIso: monday.toISOString(),
     monthAnchorIso: startOfMonth(now).toISOString(),
     calendarLayout: "week",
-    compact: false,
     filterMode: "whole",
     filterPersonId: "",
   };
 };
 
 /**
- * Reads persisted schedule UI preferences from localStorage (PC-42 / PC-164 / PC-411).
+ * Reads persisted schedule UI preferences from localStorage (PC-42 / PC-164 / PC-411 / PC-488).
  * Layout + filters restore; week/month anchors are NOT restored so Schedule opens on today.
+ * Legacy `compact` / twoWeek storage is ignored.
  */
 export function loadScheduleViewState(): ScheduleViewState {
   const defaults = DEFAULT_STATE();
@@ -69,7 +64,7 @@ export function loadScheduleViewState(): ScheduleViewState {
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (!raw) return defaults;
-    const parsed = JSON.parse(raw) as Partial<ScheduleViewState>;
+    const parsed = JSON.parse(raw) as Partial<ScheduleViewState> & { compact?: boolean };
     const layout = parsed.calendarLayout;
     const calendarLayout: ScheduleCalendarLayout =
       layout === "day" || layout === "week" || layout === "month"
@@ -77,7 +72,6 @@ export function loadScheduleViewState(): ScheduleViewState {
         : defaults.calendarLayout;
     return {
       ...defaults,
-      compact: parsed.compact ?? defaults.compact,
       calendarLayout,
       filterMode: parsed.filterMode ?? defaults.filterMode,
       filterPersonId: parsed.filterPersonId ?? defaults.filterPersonId,
@@ -103,18 +97,18 @@ export interface ScheduleUrlParams {
 }
 
 /**
- * Parses schedule URL query params (PC-167).
+ * Parses schedule URL query params (PC-167 / PC-488).
+ * Legacy `layout=twoWeek` coerces to weekly.
  */
 export function parseScheduleUrlParams(search: string): ScheduleUrlParams {
   const params = new URLSearchParams(search.startsWith("?") ? search.slice(1) : search);
   const layoutRaw = params.get("layout");
-  const layout =
-    layoutRaw === "day" ||
-    layoutRaw === "week" ||
-    layoutRaw === "twoWeek" ||
-    layoutRaw === "month"
-      ? layoutRaw
-      : undefined;
+  let layout: SchedulePeriodMode | undefined;
+  if (layoutRaw === "twoWeek") {
+    layout = "week";
+  } else if (layoutRaw === "day" || layoutRaw === "week" || layoutRaw === "month") {
+    layout = layoutRaw;
+  }
   const anchor = params.get("anchor") ?? undefined;
   const open = params.get("open") ?? undefined;
   return { layout, anchor, open };

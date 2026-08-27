@@ -12,7 +12,6 @@ describe("ssrWeekCoversVisibleRange", () => {
     expect(
       ssrWeekCoversVisibleRange({
         layout: "week",
-        compact: false,
         visibleAnchor: monday,
         ssrWeekStart: monday,
         timeZone: TZ,
@@ -20,23 +19,10 @@ describe("ssrWeekCoversVisibleRange", () => {
     ).toBe(true);
   });
 
-  it("rejects compact 2-week view even on the SSR Monday", () => {
-    expect(
-      ssrWeekCoversVisibleRange({
-        layout: "week",
-        compact: true,
-        visibleAnchor: monday,
-        ssrWeekStart: monday,
-        timeZone: TZ,
-      }),
-    ).toBe(false);
-  });
-
   it("rejects month layout", () => {
     expect(
       ssrWeekCoversVisibleRange({
         layout: "month",
-        compact: false,
         visibleAnchor: monday,
         ssrWeekStart: monday,
         timeZone: TZ,
@@ -48,7 +34,6 @@ describe("ssrWeekCoversVisibleRange", () => {
     expect(
       ssrWeekCoversVisibleRange({
         layout: "day",
-        compact: false,
         visibleAnchor: monday,
         ssrWeekStart: monday,
         timeZone: TZ,
@@ -60,7 +45,6 @@ describe("ssrWeekCoversVisibleRange", () => {
     expect(
       ssrWeekCoversVisibleRange({
         layout: "week",
-        compact: false,
         visibleAnchor: nextMonday,
         ssrWeekStart: monday,
         timeZone: TZ,
