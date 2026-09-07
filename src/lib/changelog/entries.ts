@@ -28,6 +28,44 @@ import { CHANGELOG_ARCHIVE } from "./entries.archive";
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "2026.09.07a",
+    date: "2026-09-07",
+    summary:
+      "NLP title/date fixes, Booking-for default, 12h slider, US holidays, schedule Today top, APK link.",
+    changes: [
+      {
+        type: "fixed",
+        description:
+          "NLP Description strips relative date phrases from the title and keeps person names like Morgan (PC-493).",
+      },
+      {
+        type: "changed",
+        description:
+          "Booking for defaults to Myself with the logged-in display name; time slider labels use 12-hour AM/PM (PC-493).",
+      },
+      {
+        type: "fixed",
+        description:
+          "Editing End day after picking a start day no longer overwrites the start date (PC-493).",
+      },
+      {
+        type: "added",
+        description:
+          "Network Admin can show standard US Holidays as non-conflicting all-day calendar items (PC-493).",
+      },
+      {
+        type: "added",
+        description:
+          "Login page links Privacy Policy and Terms; Code Status / change-log link Check Latest APK (PC-493).",
+      },
+      {
+        type: "fixed",
+        description:
+          "Schedule viewport fill keeps Today at the top; Goto Today and schedule entry scroll to the top (PC-493).",
+      },
+    ],
+  },
+  {
     version: "2026.08.27d",
     date: "2026-08-27",
     summary:

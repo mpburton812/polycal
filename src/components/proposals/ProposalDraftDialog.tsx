@@ -1312,7 +1312,7 @@ export function ProposalDraftDialog({
                 value={onBehalfOfUserId}
                 onChange={(event) => setOnBehalfOfUserId(String(event.target.value))}
               >
-                <MenuItem value="">Myself</MenuItem>
+                <MenuItem value="">{proposerName} (Myself)</MenuItem>
                 {proxyPeople.map((person) => (
                   <MenuItem key={person.id} value={person.id}>
                     {person.displayName}

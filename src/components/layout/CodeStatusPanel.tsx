@@ -203,7 +203,7 @@ export function CodeStatusPanel({
           </>
         )}
 
-        <Stack direction="row" spacing={2} sx={{ mt: 1 }}>
+        <Stack direction="row" spacing={2} sx={{ mt: 1 }} flexWrap="wrap" useFlexGap>
           <Button
             variant="contained"
             startIcon={<RefreshIcon />}
@@ -211,6 +211,16 @@ export function CodeStatusPanel({
             disabled={pending}
           >
             {pending ? "Checking…" : "Check for Update"}
+          </Button>
+          <Button
+            variant="outlined"
+            component="a"
+            href="https://github.com/mpburton812/polycal/releases/latest"
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="Check latest APK on GitHub Releases"
+          >
+            Check Latest APK
           </Button>
         </Stack>
       </Stack>
@@ -237,6 +247,15 @@ export function CodeStatusPanel({
         </DialogTitle>
         <DialogContent dividers>
           <Stack spacing={2.5}>
+            <Link
+              href="https://github.com/mpburton812/polycal/releases/latest"
+              target="_blank"
+              rel="noopener noreferrer"
+              underline="always"
+              sx={{ fontWeight: 600 }}
+            >
+              Check Latest APK
+            </Link>
             {changelog.map((entry) => (
               <ChangelogEntryView key={entry.version} entry={entry} />
             ))}

@@ -4,6 +4,20 @@ All notable changes to PolyCal are documented here.
 
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [2026.09.07a] - 2026-09-07
+
+### Fixed
+
+- PC-493: NLP title keeps person names and strips relative date phrases; End day edits no longer clobber start; schedule Today stays at top of viewport.
+
+### Added
+
+- PC-493: Network Admin US Holidays toggle (non-conflicting all-day); login Privacy/Terms links; Check Latest APK in Code Status / change-log. Change control: `2026.09.07a`.
+
+### Changed
+
+- PC-493: Booking for defaults to Myself with display name; time slider uses 12-hour AM/PM labels.
+
 ## [2026.08.25c] - 2026-08-25
 
 ### Fixed
