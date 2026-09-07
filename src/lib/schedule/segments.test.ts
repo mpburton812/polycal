@@ -13,10 +13,10 @@ import {
 const TZ = "America/New_York";
 
 describe("schedule segments", () => {
-  it("normalizes week anchors to Monday", () => {
+  it("normalizes week anchors to Sunday", () => {
     const wed = new Date("2026-07-15T15:00:00.000Z");
-    const monday = normalizeSegmentAnchor(wed, "week", TZ);
-    expect(monday.getUTCDay()).toBe(1);
+    const sunday = normalizeSegmentAnchor(wed, "week", TZ);
+    expect(sunday.getUTCDay()).toBe(0);
   });
 
   it("shifts day / week / month anchors", () => {

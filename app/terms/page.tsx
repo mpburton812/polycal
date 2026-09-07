@@ -178,8 +178,11 @@ export default function TermsOfServicePage() {
 
         <Section title="12. Contact">
           <Typography paragraph>
-            For questions about these terms, contact your PolyCal group administrator, or the
-            contact channels published for your deployment.
+            For questions about these terms, contact your PolyCal group administrator, or email{" "}
+            <MuiLink href="mailto:support@polycal.net" underline="hover">
+              support@polycal.net
+            </MuiLink>
+            .
           </Typography>
         </Section>
 

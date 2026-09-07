@@ -22,11 +22,11 @@ test.describe("Alert preferences journey", () => {
     await expect(page.getByRole("checkbox", { name: "Sleeping proposals" })).not.toBeChecked();
     await expect(page.getByRole("checkbox", { name: "Event proposals" })).not.toBeChecked();
     await expect(page.getByRole("checkbox", { name: "Sleeping partner proposals" })).toBeChecked();
-    await expect(page.getByRole("checkbox", { name: "Reminders" })).not.toBeChecked();
+    await expect(page.getByRole("checkbox", { name: "Event reminders", exact: true })).not.toBeChecked();
     await expect(page.getByRole("checkbox", { name: "In-app inbox" })).toBeChecked();
 
     await page.getByRole("checkbox", { name: "Event proposals" }).check();
-    await page.getByRole("checkbox", { name: "Reminders" }).check();
+    await page.getByRole("checkbox", { name: "Event reminders", exact: true }).check();
     await page.getByRole("button", { name: "Save notification preferences" }).click();
     await expect(page.getByText(/Notification preferences saved/i)).toBeVisible({
       timeout: 15_000,
@@ -35,7 +35,7 @@ test.describe("Alert preferences journey", () => {
     await page.reload();
     await goToProfile(page);
     await expect(page.getByRole("checkbox", { name: "Event proposals" })).toBeChecked();
-    await expect(page.getByRole("checkbox", { name: "Reminders" })).toBeChecked();
+    await expect(page.getByRole("checkbox", { name: "Event reminders", exact: true })).toBeChecked();
     await expect(page.getByRole("checkbox", { name: "Sleeping proposals" })).not.toBeChecked();
   });
 });

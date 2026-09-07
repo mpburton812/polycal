@@ -182,6 +182,28 @@ describe("parseEventIntent (PC-442)", () => {
   it("returns empty chips for blank text", () => {
     expect(parseEventIntent({ text: "  " }).chips).toEqual([]);
     expect(parseEventIntent({ text: "  " }).proposalType).toBeNull();
+    expect(parseEventIntent({ text: "  " }).tentative).toBe(false);
+  });
+
+  it("detects tentative and strips the word from the title (PC-494)", () => {
+    const result = parseEventIntent({
+      text: "Tentative dinner with Katie tomorrow 7pm",
+      now: new Date("2026-08-18T12:00:00"),
+      people,
+      places,
+      viewerId: "luke",
+    });
+    expect(result.tentative).toBe(true);
+    expect(result.title.toLowerCase()).toContain("dinner");
+    expect(result.title.toLowerCase()).not.toContain("tentative");
+    expect(result.personIds).toContain("katie");
+  });
+
+  it("is case-insensitive for tentative detection (PC-494)", () => {
+    expect(
+      parseEventIntent({ text: "TENTATIVE coffee Friday" }).tentative,
+    ).toBe(true);
+    expect(parseEventIntent({ text: "coffee Friday" }).tentative).toBe(false);
   });
 
   it("strips relative date modifiers and preserves person names in event title", () => {

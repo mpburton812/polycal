@@ -28,6 +28,38 @@ import { CHANGELOG_ARCHIVE } from "./entries.archive";
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "2026.09.07b",
+    date: "2026-09-07",
+    summary:
+      "Brand/SMS age-gate, Sunday weeks, Tentative flag, day-click Daily, rename from detail.",
+    changes: [
+      {
+        type: "added",
+        description:
+          "Public About and SMS opt-in pages with 18+ birthdate age gate; Profile SMS phone + consent; support@polycal.net (PC-494).",
+      },
+      {
+        type: "changed",
+        description:
+          "Schedule weeks start Sunday; day taps open Daily layout; week uses agenda-first readable titles (PC-494).",
+      },
+      {
+        type: "added",
+        description:
+          "Independent Tentative flag (NLP + composer + detail toggle) with Tent: prefix and yellow hatch (PC-494).",
+      },
+      {
+        type: "fixed",
+        description:
+          "Recurring re-submit replaces children instead of duplicating; Booking-for re-scopes Who to the subject's partners (PC-494).",
+      },
+      {
+        type: "added",
+        description: "Rename proposal from detail with stakeholder notification (PC-494).",
+      },
+    ],
+  },
+  {
     version: "2026.09.07a",
     date: "2026-09-07",
     summary:

@@ -42,6 +42,9 @@ export interface ProposalDraftMoreOptionsProps {
   /** Post lifecycle milestones to Feed (PC-414). Default off. */
   postToFeed: boolean;
   onPostToFeedChange: (value: boolean) => void;
+  /** Soft Tentative flag (PC-494). */
+  tentative: boolean;
+  onTentativeChange: (value: boolean) => void;
   isPoll?: boolean;
   onPollChange?: (value: boolean) => void;
   hidePoll?: boolean;
@@ -73,6 +76,8 @@ export function ProposalDraftMoreOptions({
   onReminderUnitChange,
   postToFeed,
   onPostToFeedChange,
+  tentative,
+  onTentativeChange,
   isPoll = false,
   onPollChange,
   hidePoll = false,
@@ -101,6 +106,15 @@ export function ProposalDraftMoreOptions({
       </AccordionSummary>
       <AccordionDetails>
         <Stack spacing={2}>
+          <FormControlLabel
+            control={
+              <Checkbox
+                checked={tentative}
+                onChange={(event) => onTentativeChange(event.target.checked)}
+              />
+            }
+            label="Tentative"
+          />
           {proposalType === "event" && onPollChange && !hidePoll ? (
             <ToggleButton
               value="poll"

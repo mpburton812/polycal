@@ -55,7 +55,9 @@ import { APPROVING_VOTES } from "@/lib/proposals/constants";
 import {
   attendeeUpdateResponseSchema,
   attendeeUpdateSchema,
+  renameProposalSchema,
   rescheduleProposalSchema,
+  setProposalTentativeSchema,
 } from "./schemas";
 
 /**
@@ -995,4 +997,172 @@ export async function postProposalToFeedAction(
   revalidatePath("/schedule");
   revalidatePath("/feed");
   return { ok: true, message: "Posted to Feed." };
+}
+
+/**
+ * Renames a proposal from detail — host, involved invitee, or admin (PC-494).
+ * Stores the raw title (without Tent: display prefix) and notifies stakeholders.
+ */
+export async function renameProposalAction(
+  input: z.infer<typeof renameProposalSchema>,
+): Promise<{ ok: boolean; message: string }> {
+  const session = await auth();
+  if (!session?.user) {
+    return { ok: false, message: "Sign in required." };
+  }
+
+  const parsed = renameProposalSchema.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, message: parsed.error.issues[0]?.message ?? "Invalid title." };
+  }
+
+  await ensureDbReady();
+  const db = getDb();
+  const [proposal] = await db
+    .select()
+    .from(proposals)
+    .where(eq(proposals.id, parsed.data.proposalId))
+    .limit(1);
+
+  if (!proposal || proposal.state === "archived") {
+    return { ok: false, message: "Proposal not found." };
+  }
+
+  const isAdmin = await userHasAdminAccess(adminAccessFromSessionUser(session.user));
+  const isProposer = proposal.proposerId === session.user.id;
+  const [invitee] = await db
+    .select({ userId: proposalInvitees.userId })
+    .from(proposalInvitees)
+    .where(
+      and(
+        eq(proposalInvitees.proposalId, proposal.id),
+        eq(proposalInvitees.userId, session.user.id),
+      ),
+    )
+    .limit(1);
+  if (!isProposer && !invitee && !isAdmin) {
+    return { ok: false, message: "You cannot rename this proposal." };
+  }
+
+  // Strip display-only Tent: prefix so the flag remains the source of truth.
+  const nextTitle = parsed.data.title.replace(/^Tent:\s*/i, "").trim();
+  if (!nextTitle) {
+    return { ok: false, message: "Title is required." };
+  }
+  if (nextTitle === proposal.title) {
+    return { ok: true, message: "Title unchanged." };
+  }
+
+  const previousTitle = proposal.title;
+  const now = new Date().toISOString();
+  await db
+    .update(proposals)
+    .set({ title: nextTitle, updatedAt: now })
+    .where(eq(proposals.id, proposal.id));
+
+  await logProposalTransition(
+    db,
+    proposal.id,
+    session.user.id,
+    "proposal.renamed",
+    JSON.stringify({ previousTitle, title: nextTitle }),
+  );
+
+  const actor = actorNotifyFields(session.user);
+  await notifyProposalStakeholders(
+    db,
+    { ...proposal, title: nextTitle },
+    "proposal_renamed",
+    `${actor.actorDisplayName} renamed "${previousTitle}" to "${nextTitle}".`,
+    actor,
+  );
+
+  revalidatePath("/proposals");
+  revalidatePath("/schedule");
+  if (proposal.state === "resolved") {
+    const { scheduleCalendarSync } = await import("@/lib/calendar/sync");
+    await scheduleCalendarSync(proposal.id, "upsert");
+  }
+  return { ok: true, message: "Title updated." };
+}
+
+/**
+ * Toggles the soft Tentative flag without requiring a redraft (PC-494).
+ */
+export async function setProposalTentativeAction(
+  input: z.infer<typeof setProposalTentativeSchema>,
+): Promise<{ ok: boolean; message: string }> {
+  const session = await auth();
+  if (!session?.user) {
+    return { ok: false, message: "Sign in required." };
+  }
+
+  const parsed = setProposalTentativeSchema.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, message: "Invalid input." };
+  }
+
+  await ensureDbReady();
+  const db = getDb();
+  const [proposal] = await db
+    .select()
+    .from(proposals)
+    .where(eq(proposals.id, parsed.data.proposalId))
+    .limit(1);
+
+  if (!proposal || proposal.state === "archived") {
+    return { ok: false, message: "Proposal not found." };
+  }
+
+  const isAdmin = await userHasAdminAccess(adminAccessFromSessionUser(session.user));
+  const isProposer = proposal.proposerId === session.user.id;
+  const [invitee] = await db
+    .select({ userId: proposalInvitees.userId })
+    .from(proposalInvitees)
+    .where(
+      and(
+        eq(proposalInvitees.proposalId, proposal.id),
+        eq(proposalInvitees.userId, session.user.id),
+      ),
+    )
+    .limit(1);
+  if (!isProposer && !invitee && !isAdmin) {
+    return { ok: false, message: "You cannot update Tentative for this proposal." };
+  }
+
+  if (Boolean(proposal.tentative) === parsed.data.tentative) {
+    return { ok: true, message: "Tentative unchanged." };
+  }
+
+  const now = new Date().toISOString();
+  await db
+    .update(proposals)
+    .set({ tentative: parsed.data.tentative, updatedAt: now })
+    .where(eq(proposals.id, proposal.id));
+
+  await logProposalTransition(
+    db,
+    proposal.id,
+    session.user.id,
+    parsed.data.tentative ? "proposal.tentative_set" : "proposal.tentative_cleared",
+    JSON.stringify({ tentative: parsed.data.tentative }),
+  );
+
+  const actor = actorNotifyFields(session.user);
+  await notifyProposalStakeholders(
+    db,
+    proposal,
+    "proposal_tentative",
+    parsed.data.tentative
+      ? `${actor.actorDisplayName} marked "${proposal.title}" as Tentative.`
+      : `${actor.actorDisplayName} cleared Tentative on "${proposal.title}".`,
+    actor,
+  );
+
+  revalidatePath("/proposals");
+  revalidatePath("/schedule");
+  return {
+    ok: true,
+    message: parsed.data.tentative ? "Marked Tentative." : "Tentative cleared.",
+  };
 }

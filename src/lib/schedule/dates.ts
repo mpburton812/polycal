@@ -1,4 +1,4 @@
-/** Monday-based week boundaries for the schedule tab (PC-42 / PC-376). */
+/** Sunday–Saturday week boundaries for the schedule tab (PC-42 / PC-376 / PC-494). */
 
 import { GARDEN_TOKENS } from "@/theme/tokens";
 import { DEFAULT_VIEWER_TIMEZONE } from "@/lib/schedule/timezone";
@@ -29,20 +29,19 @@ function weekdayInTimeZone(date: Date, timeZone: string): number {
 }
 
 /**
- * Returns noon-UTC on the Monday (viewer TZ) that starts the week containing `date`.
- * Host-local midnight Mondays shift back a day when formatted in US zones (PC-376).
+ * Returns noon-UTC on the Sunday (viewer TZ) that starts the week containing `date`.
+ * Host-local midnight Sundays shift back a day when formatted in US zones (PC-376 / PC-494).
  */
-export function startOfWeekMonday(
+export function startOfWeekSunday(
   date: Date,
   timeZone: string = DEFAULT_VIEWER_TIMEZONE,
 ): Date {
   const dayKey = localDateKey(date.toISOString(), timeZone);
   const noon = civilDateAtNoonUtc(dayKey);
   const day = weekdayInTimeZone(noon, timeZone);
-  const diff = day === 0 ? -6 : 1 - day;
-  const monday = new Date(noon);
-  monday.setUTCDate(monday.getUTCDate() + diff);
-  return monday;
+  const sunday = new Date(noon);
+  sunday.setUTCDate(sunday.getUTCDate() - day);
+  return sunday;
 }
 
 /** True when two dates fall on the same local calendar day (PC-141). */
@@ -55,15 +54,15 @@ export function isSameLocalCalendarDay(a: Date, b: Date): boolean {
 }
 
 /**
- * Inclusive range end at Sunday end-of-day in `timeZone` for a noon-UTC Monday anchor (PC-376).
+ * Inclusive range end at Saturday end-of-day in `timeZone` for a noon-UTC Sunday anchor (PC-494).
  */
-export function endOfWeekSunday(
+export function endOfWeekSaturday(
   weekStart: Date,
   timeZone: string = DEFAULT_VIEWER_TIMEZONE,
 ): Date {
-  const sundayNoon = addDays(weekStart, 6);
-  const sundayKey = localDateKey(sundayNoon.toISOString(), timeZone);
-  return endOfCivilDayInZone(sundayKey, timeZone);
+  const saturdayNoon = addDays(weekStart, 6);
+  const saturdayKey = localDateKey(saturdayNoon.toISOString(), timeZone);
+  return endOfCivilDayInZone(saturdayKey, timeZone);
 }
 
 /** Adds `days` on the UTC calendar (matches noon-UTC civil anchors). */
@@ -75,7 +74,7 @@ export function addDays(date: Date, days: number): Date {
 
 /**
  * Builds dayCount civil days starting at today (viewer TZ), used when callers
- * want a forward-looking window without Mon-based wrapping (PC-400).
+ * want a forward-looking window without week wrapping (PC-400).
  */
 export function scheduleDaysStartingToday(
   weekStart: Date,
@@ -83,13 +82,13 @@ export function scheduleDaysStartingToday(
   timeZone: string = DEFAULT_VIEWER_TIMEZONE,
   now: Date = new Date(),
 ): Date[] {
-  const monday = startOfWeekMonday(weekStart, timeZone);
-  const days = Array.from({ length: dayCount }, (_, index) => addDays(monday, index));
+  const sunday = startOfWeekSunday(weekStart, timeZone);
+  const days = Array.from({ length: dayCount }, (_, index) => addDays(sunday, index));
   const todayKey = localDateKey(now.toISOString(), timeZone);
   const todayIndex = days.findIndex(
     (day) => localDateKey(day.toISOString(), timeZone) === todayKey,
   );
-  // Agenda/week views keep Mon→… order and scroll Today into view; this helper
+  // Agenda/week views keep Sun→Sat order and scroll Today into view; this helper
   // remains for forward-only windows and unit coverage.
   if (todayIndex <= 0) return days;
   const fromToday = days.slice(todayIndex);

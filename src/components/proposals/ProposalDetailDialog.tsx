@@ -50,9 +50,11 @@ import {
   getProposalDetailAction,
   postProposalToFeedAction,
   redraftProposalAction,
+  renameProposalAction,
   rescheduleProposalAction,
   returnProposedToDraftAction,
   revokeResolvedAcceptanceAction,
+  setProposalTentativeAction,
   submitProposalAction,
   updateResolvedAttendeesAction,
   type ProposalConflictWarning,
@@ -176,6 +178,8 @@ export function ProposalDetailDialog({
   const [rescheduleOpen, setRescheduleOpen] = useState(false);
   const [rescheduleStart, setRescheduleStart] = useState("");
   const [rescheduleEnd, setRescheduleEnd] = useState("");
+  const [titleEditing, setTitleEditing] = useState(false);
+  const [titleDraft, setTitleDraft] = useState("");
   const [pending, startTransition] = useTransition();
   /** True while the initial detail fetch for the open dialog is in flight (PC-138). */
   const [detailLoading, setDetailLoading] = useState(false);
@@ -232,9 +236,50 @@ export function ProposalDetailDialog({
       return;
     }
     setDetail(null);
+    setTitleEditing(false);
+    setTitleDraft("");
     reloadDetail(proposalId, { isInitial: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- reload when proposal changes
   }, [open, proposalId]);
+
+  const canRenameOrTentative = Boolean(
+    detail &&
+      (detail.canEdit ||
+        isAdmin ||
+        detail.proposerId === currentUserId ||
+        detail.invitees.some((invitee) => invitee.userId === currentUserId)),
+  );
+
+  function handleSaveTitle() {
+    if (!detail) return;
+    const next = titleDraft.trim();
+    if (!next) {
+      showToast("Title is required.", "error");
+      return;
+    }
+    startTransition(async () => {
+      const result = await renameProposalAction({ proposalId: detail.id, title: next });
+      notifyResult(result);
+      if (!result.ok) return;
+      setTitleEditing(false);
+      reloadDetail(detail.id);
+      router.refresh();
+    });
+  }
+
+  function handleToggleTentative() {
+    if (!detail) return;
+    startTransition(async () => {
+      const result = await setProposalTentativeAction({
+        proposalId: detail.id,
+        tentative: !detail.tentative,
+      });
+      notifyResult(result);
+      if (!result.ok) return;
+      reloadDetail(detail.id);
+      router.refresh();
+    });
+  }
 
   function handleOverlapResponse(response: "acknowledge" | "decline") {
     if (!proposalId) return;
@@ -694,9 +739,32 @@ export function ProposalDetailDialog({
                   size={22}
                 />
                 <Box sx={{ flex: 1, minWidth: 0 }}>
-                  <Typography variant="h6" component="h2" sx={{ fontSize: "1.1rem", fontWeight: 600 }}>
-                    {detail.title}
-                  </Typography>
+                  {titleEditing ? (
+                    <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 0.5 }}>
+                      <TextField
+                        size="small"
+                        fullWidth
+                        value={titleDraft}
+                        onChange={(e) => setTitleDraft(e.target.value)}
+                        inputProps={{ "aria-label": "Proposal title", maxLength: LONG_TEXT_MAX }}
+                      />
+                      <Button size="small" variant="contained" onClick={handleSaveTitle} disabled={pending}>
+                        Save
+                      </Button>
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        onClick={() => setTitleEditing(false)}
+                        disabled={pending}
+                      >
+                        Cancel
+                      </Button>
+                    </Stack>
+                  ) : (
+                    <Typography variant="h6" component="h2" sx={{ fontSize: "1.1rem", fontWeight: 600 }}>
+                      {detail.title}
+                    </Typography>
+                  )}
                   <Stack direction="row" spacing={0.75} alignItems="center" flexWrap="wrap" sx={{ mt: 0.5 }}>
                     <Chip
                       label={typeBadgeLabel(detail.proposalType)}
@@ -710,6 +778,19 @@ export function ProposalDetailDialog({
                     <Typography variant="caption" color="text.secondary">
                       by {detail.proposerName}
                     </Typography>
+                    {canRenameOrTentative && !titleEditing ? (
+                      <Button
+                        size="small"
+                        variant="text"
+                        onClick={() => {
+                          setTitleDraft(detail.title.replace(/^Tent:\s*/i, ""));
+                          setTitleEditing(true);
+                        }}
+                        sx={{ minWidth: 0, px: 0.5, fontSize: "0.7rem" }}
+                      >
+                        Rename
+                      </Button>
+                    ) : null}
                   </Stack>
                 </Box>
               </Stack>
@@ -722,6 +803,20 @@ export function ProposalDetailDialog({
                   sx={{ fontWeight: 600, fontSize: "0.65rem" }}
                 />
                 {detail.atRisk && <Chip size="small" label="At risk" color="warning" />}
+                {detail.tentative && (
+                  <Chip size="small" label="Tentative" color="warning" variant="outlined" />
+                )}
+                {canRenameOrTentative && (
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    onClick={handleToggleTentative}
+                    disabled={pending}
+                    sx={{ ...outlinedButtonSx, py: 0, minHeight: 24, fontSize: "0.7rem" }}
+                  >
+                    {detail.tentative ? "Clear Tentative" : "Mark Tentative"}
+                  </Button>
+                )}
                 {detail.isPoll && (
                   <Chip
                     icon={<PollOutlinedIcon sx={{ fontSize: "14px !important" }} />}

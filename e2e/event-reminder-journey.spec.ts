@@ -44,7 +44,7 @@ test.describe("Event reminder journey", () => {
     await dismissMotdDialogIfOpen(page);
     await page.goto("/profile");
     await dismissMotdDialogIfOpen(page);
-    await page.getByRole("checkbox", { name: "Reminders" }).uncheck();
+    await page.getByRole("checkbox", { name: "Event reminders", exact: true }).uncheck();
     await page.getByRole("button", { name: "Save notification preferences" }).click();
     await expect(page.getByText(/Notification preferences saved/i)).toBeVisible({
       timeout: 15_000,

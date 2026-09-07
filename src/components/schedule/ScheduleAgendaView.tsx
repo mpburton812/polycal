@@ -12,7 +12,7 @@ import {
   isTodayDate,
   localDateKey,
   scheduleDayCellSx,
-  startOfWeekMonday,
+  startOfWeekSunday,
 } from "@/lib/schedule/dates";
 import { sortDayEvents } from "@/lib/schedule/sort-day-events";
 import { DEFAULT_VIEWER_TIMEZONE } from "@/lib/schedule/timezone";
@@ -31,7 +31,7 @@ interface ScheduleAgendaViewProps {
 }
 
 /**
- * Mobile-friendly agenda list grouped by day (PC-166).
+ * Agenda list grouped by day for week layout on all breakpoints (PC-166 / PC-494).
  * Scrolls so Today is the first visible day section (PC-400).
  */
 export function ScheduleAgendaView({
@@ -45,8 +45,8 @@ export function ScheduleAgendaView({
   onDayOverflowClick,
 }: ScheduleAgendaViewProps) {
   const days = useMemo(() => {
-    const monday = startOfWeekMonday(weekStart, timeZone);
-    return Array.from({ length: dayCount }, (_, index) => addDays(monday, index));
+    const sunday = startOfWeekSunday(weekStart, timeZone);
+    return Array.from({ length: dayCount }, (_, index) => addDays(sunday, index));
   }, [weekStart, dayCount, timeZone]);
 
   const todayRef = useRef<HTMLDivElement | null>(null);

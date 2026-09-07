@@ -206,6 +206,12 @@ export interface ProposalDetail {
   postingKind?: "proposal" | "booking";
   /** Proxy subject when scheduling on behalf of someone else (PC-425). */
   onBehalfOfUserId?: string | null;
+  /** Soft Tentative flag independent of workflow state (PC-494). */
+  tentative: boolean;
+  /** Host, involved invitee, or admin may rename without redraft (PC-494). */
+  canRename: boolean;
+  /** Host, involved invitee, or admin may toggle Tentative without redraft (PC-494). */
+  canToggleTentative: boolean;
   specialKind?: "residency";
   /**
    * Latest non-dismissed ICS pending id for the current viewer (PC-345).

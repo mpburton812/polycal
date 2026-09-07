@@ -4,7 +4,7 @@ import {
   endOfCivilDayInZone,
   localDateKey,
   startOfCivilDayInZone,
-  startOfWeekMonday,
+  startOfWeekSunday,
 } from "./dates";
 import { DEFAULT_VIEWER_TIMEZONE } from "./timezone";
 
@@ -28,13 +28,13 @@ export function endOfMonth(
   return new Date(nextMonth.getTime() - 1);
 }
 
-/** Monday-aligned 6-week grid covering the month (42 cells). */
+/** Sunday-aligned 6-week grid covering the month (42 cells) (PC-494). */
 export function buildMonthGrid(
   monthAnchor: Date,
   timeZone: string = DEFAULT_VIEWER_TIMEZONE,
 ): Date[] {
   const monthStart = startOfMonth(monthAnchor, timeZone);
-  const gridStart = startOfWeekMonday(monthStart, timeZone);
+  const gridStart = startOfWeekSunday(monthStart, timeZone);
   const monthEnd = endOfMonth(monthAnchor, timeZone);
 
   const days: Date[] = [];
@@ -48,7 +48,8 @@ export function buildMonthGrid(
       timeZone,
       weekday: "short",
     }).format(cursor);
-    if (days.length >= 35 && cursorKey > endKey && cursorWeekday === "Mon") break;
+    // Stop before the next Sunday week once the month is covered.
+    if (days.length >= 35 && cursorKey > endKey && cursorWeekday === "Sun") break;
   }
   while (days.length < 42) {
     days.push(addDays(days[days.length - 1]!, 1));
