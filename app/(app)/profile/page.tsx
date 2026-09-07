@@ -29,6 +29,7 @@ export default async function ProfilePage() {
       mustChangePassword: users.mustChangePassword,
       displayName: users.displayName,
       profileBio: users.profileBio,
+      notificationPhone: users.notificationPhone,
     })
     .from(users)
     .where(eq(users.id, session.user.id))
@@ -53,6 +54,7 @@ export default async function ProfilePage() {
         initialTimezone={resolveTimezone(row?.timezone)}
         initialNotificationPrefs={notificationPrefs}
         initialNotificationEmail={notificationEmail.email}
+        initialNotificationPhone={row?.notificationPhone ?? null}
         initialEmailVerified={notificationEmail.verified}
         mustChangePassword={row?.mustChangePassword ?? false}
         vapidPublicKey={getVapidPublicKey()}

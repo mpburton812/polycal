@@ -1,7 +1,7 @@
 "use client";
 
 import type { ScheduleFilterMode } from "@/actions/schedule";
-import { civilDateAtNoonUtc, localDateKey, startOfWeekMonday } from "@/lib/schedule/dates";
+import { civilDateAtNoonUtc, localDateKey, startOfWeekSunday } from "@/lib/schedule/dates";
 import { startOfMonth } from "@/lib/schedule/month-grid";
 import { DEFAULT_VIEWER_TIMEZONE } from "@/lib/schedule/timezone";
 
@@ -43,9 +43,9 @@ export function applyPeriodMode(
 
 const DEFAULT_STATE = (): ScheduleViewState => {
   const now = new Date();
-  const monday = startOfWeekMonday(now);
+  const sunday = startOfWeekSunday(now);
   return {
-    weekStartIso: monday.toISOString(),
+    weekStartIso: sunday.toISOString(),
     monthAnchorIso: startOfMonth(now).toISOString(),
     calendarLayout: "week",
     filterMode: "whole",
@@ -140,14 +140,14 @@ export function localCalendarDateKey(date: Date): string {
 }
 
 /**
- * Anchors “Today” — Monday of current week + current month (PC-164).
+ * Anchors “Today” — Sunday of current week + current month (PC-164 / PC-494).
  * Day mode overrides weekStartIso to local noon of today in ScheduleClient.
  */
 export function todayAnchors(
   now = new Date(),
 ): Pick<ScheduleViewState, "weekStartIso" | "monthAnchorIso"> {
   return {
-    weekStartIso: startOfWeekMonday(now).toISOString(),
+    weekStartIso: startOfWeekSunday(now).toISOString(),
     monthAnchorIso: startOfMonth(now).toISOString(),
   };
 }

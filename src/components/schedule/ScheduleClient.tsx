@@ -18,8 +18,6 @@ import {
   ToggleButton,
   ToggleButtonGroup,
   Typography,
-  useMediaQuery,
-  useTheme,
 } from "@mui/material";
 import dynamic from "next/dynamic";
 import { usePathname } from "next/navigation";
@@ -45,7 +43,6 @@ import { ScheduleDaySheet } from "@/components/schedule/ScheduleDaySheet";
 import { ScheduleDayView } from "@/components/schedule/ScheduleDayView";
 import { ScheduleHeatmap } from "@/components/schedule/ScheduleHeatmap";
 import { ScheduleMonthView } from "@/components/schedule/ScheduleMonthView";
-import { ScheduleWeekView } from "@/components/schedule/ScheduleWeekView";
 import {
   applyPeriodMode,
   buildScheduleUrlSearch,
@@ -64,7 +61,7 @@ import { filterScheduleEvents } from "@/lib/schedule/filters";
 import {
   addDays,
   isSameLocalCalendarDay,
-  startOfWeekMonday,
+  startOfWeekSunday,
 } from "@/lib/schedule/dates";
 import { startOfMonth } from "@/lib/schedule/month-grid";
 import { SCHEDULE_INVALIDATE_EVENT } from "@/lib/schedule/invalidate";
@@ -152,8 +149,6 @@ export function ScheduleClient({
   timeZone,
 }: ScheduleClientProps) {
   const pathname = usePathname();
-  const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const previousPathRef = useRef<string | null>(null);
   const stackSeqRef = useRef(0);
   const urlHydratedRef = useRef(false);
@@ -206,7 +201,7 @@ export function ScheduleClient({
   } = useScheduleTapRouter();
 
   const weekStart = useMemo(
-    () => startOfWeekMonday(new Date(viewState.weekStartIso), timeZone),
+    () => startOfWeekSunday(new Date(viewState.weekStartIso), timeZone),
     [viewState.weekStartIso, timeZone],
   );
   const dayAnchor = useMemo(
@@ -467,7 +462,7 @@ export function ScheduleClient({
             weekStartIso:
               nextLayout === "day"
                 ? startOfLocalDayNoon(anchorDate, timeZone).toISOString()
-                : startOfWeekMonday(anchorDate, timeZone).toISOString(),
+                : startOfWeekSunday(anchorDate, timeZone).toISOString(),
             monthAnchorIso: startOfMonth(anchorDate, timeZone).toISOString(),
           };
         }
@@ -515,9 +510,9 @@ export function ScheduleClient({
         : viewState.calendarLayout === "day"
           ? startOfLocalDayNoon(new Date(viewState.weekStartIso), timeZone)
           : new Date(viewState.weekStartIso);
-    const initialMonday = startOfWeekMonday(new Date(initialWeekStartIso), timeZone);
-    const viewMonday = startOfWeekMonday(anchor, timeZone);
-    const sameWeek = isSameLocalCalendarDay(viewMonday, initialMonday);
+    const initialSunday = startOfWeekSunday(new Date(initialWeekStartIso), timeZone);
+    const viewSunday = startOfWeekSunday(anchor, timeZone);
+    const sameWeek = isSameLocalCalendarDay(viewSunday, initialSunday);
     if (!sameWeek || viewState.calendarLayout === "month" || viewState.calendarLayout === "day") {
       rebuildStack(anchor, { layout: viewState.calendarLayout });
     }
@@ -661,19 +656,19 @@ export function ScheduleClient({
       const month = startOfMonth(date, timeZone);
       setViewState((current) => ({
         ...current,
-        weekStartIso: startOfWeekMonday(date, timeZone).toISOString(),
+        weekStartIso: startOfWeekSunday(date, timeZone).toISOString(),
         monthAnchorIso: month.toISOString(),
       }));
       rebuildStack(month, { layout: "month", scrollToTop: true });
       return;
     }
-    const monday = startOfWeekMonday(date, timeZone);
+    const sunday = startOfWeekSunday(date, timeZone);
     setViewState((current) => ({
       ...current,
-      weekStartIso: monday.toISOString(),
+      weekStartIso: sunday.toISOString(),
       monthAnchorIso: startOfMonth(date, timeZone).toISOString(),
     }));
-    rebuildStack(monday, { layout: "week", scrollToTop: true });
+    rebuildStack(sunday, { layout: "week", scrollToTop: true });
   }
 
   function submitNlDate() {
@@ -708,25 +703,39 @@ export function ScheduleClient({
       return;
     }
     setViewState(next);
-    rebuildStack(startOfWeekMonday(new Date(next.weekStartIso), timeZone), {
+    rebuildStack(startOfWeekSunday(new Date(next.weekStartIso), timeZone), {
       layout: "week",
     });
   }
 
+  /** Opens full Daily layout for the civil day (PC-494). */
+  function openDayLayout(day: Date) {
+    const noon = startOfLocalDayNoon(day, timeZone);
+    setDaySheetDay(null);
+    setViewState((current) => ({
+      ...current,
+      calendarLayout: "day",
+      weekStartIso: noon.toISOString(),
+      monthAnchorIso: startOfMonth(day, timeZone).toISOString(),
+    }));
+    rebuildStack(noon, { layout: "day", scrollToTop: true });
+  }
+
+  /** Overflow sheet only — primary day taps use openDayLayout (PC-494). */
   function openDaySheet(day: Date) {
     setDaySheetDay(day);
   }
 
   function openWeekForDay(day: Date) {
-    const monday = startOfWeekMonday(day, timeZone);
+    const sunday = startOfWeekSunday(day, timeZone);
     setDaySheetDay(null);
     setViewState((current) => ({
       ...current,
       calendarLayout: "week",
-      weekStartIso: monday.toISOString(),
+      weekStartIso: sunday.toISOString(),
       monthAnchorIso: day.toISOString(),
     }));
-    rebuildStack(monday, { layout: "week" });
+    rebuildStack(sunday, { layout: "week" });
   }
 
   function createForDay(day: Date, lockedType: "event" | "sleeping") {
@@ -735,8 +744,6 @@ export function ScheduleClient({
     setDaySheetDay(null);
     openCreate({ lockedType, initialStartAt: start.toISOString() });
   }
-
-  const showAgenda = !isMonthLayout && !isDayLayout && isMobile;
 
   const filterLabel = (() => {
     if (viewState.filterMode === "solo") return "Solo";
@@ -1018,7 +1025,7 @@ export function ScheduleClient({
                     events={events}
                     timeZone={timeZone}
                     onEventClick={openScheduleEvent}
-                    onDayClick={openDaySheet}
+                    onDayClick={openDayLayout}
                   />
                 ) : isDayLayout ? (
                   <ScheduleDayView
@@ -1027,24 +1034,15 @@ export function ScheduleClient({
                     timeZone={timeZone}
                     onEventClick={openScheduleEvent}
                   />
-                ) : showAgenda ? (
+                ) : (
                   <ScheduleAgendaView
                     weekStart={anchor}
                     dayCount={7}
                     events={events}
                     timeZone={timeZone}
                     onEventClick={openScheduleEvent}
-                    onDayHeaderClick={openDaySheet}
+                    onDayHeaderClick={openDayLayout}
                     onDayOverflowClick={openDaySheet}
-                  />
-                ) : (
-                  <ScheduleWeekView
-                    weekStart={anchor}
-                    dayCount={7}
-                    events={events}
-                    compact={false}
-                    timeZone={timeZone}
-                    onEventClick={openScheduleEvent}
                   />
                 )}
               </Box>

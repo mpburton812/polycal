@@ -78,6 +78,11 @@ export const proposals = sqliteTable("proposals", {
   postingKind: text("posting_kind", { enum: postingKinds }).notNull().default("proposal"),
   /** Subject when Booking for posts on behalf of someone else (PC-428). */
   onBehalfOfUserId: text("on_behalf_of_user_id").references(() => users.id),
+  /**
+   * Soft tentative marker independent of workflow state (PC-494).
+   * Displayed as `Tent:` + yellow hatch on schedule blocks when true.
+   */
+  tentative: integer("tentative", { mode: "boolean" }).notNull().default(false),
   /** Parent proposal when this row was detached from a batch night or span day slice. */
   detachedFromParentId: text("detached_from_parent_id"),
   detachedFromSlotId: text("detached_from_slot_id"),

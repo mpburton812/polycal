@@ -41,6 +41,8 @@ export interface EventIntentParseResult {
   hostUserId: string | null;
   intentionalSolo: boolean;
   needsBookingFor: boolean;
+  /** Soft Tentative flag from the word "tentative" (PC-494). */
+  tentative: boolean;
   chips: EventIntentChip[];
 }
 
@@ -50,6 +52,7 @@ const ALONE_RE = /\b(alone|solo|by themselves|by themself|by himself|by herself)
 const WEEKEND_RE = /\b(?:this|the)\s+weekend\b/i;
 const THEIR_PLACE_RE = /\bat\s+their\s+(?:place|house|apartment|home)\b/i;
 const MY_PLACE_RE = /\b(my place|my apartment|my house|at mine)\b/i;
+const TENTATIVE_RE = /\btentative\b/i;
 const SLEEPER_VERB_RE =
   /^(.+?)\s+(?:sleeps|is sleeping|sleeping|stays|is staying|stay(?:ing)? at|spend(?:ing)? the night)\b/i;
 
@@ -139,6 +142,7 @@ function emptyResult(): EventIntentParseResult {
     hostUserId: null,
     intentionalSolo: false,
     needsBookingFor: false,
+    tentative: false,
     chips: [],
   };
 }
@@ -304,11 +308,14 @@ export function parseEventIntent(input: EventIntentParseInput): EventIntentParse
     }
   }
 
+  const tentative = TENTATIVE_RE.test(text);
+
   remainder = remainder
     .replace(SLEEPING_RE, " ")
     .replace(ALONE_RE, " ")
     .replace(WEEKEND_RE, " ")
-    .replace(THEIR_PLACE_RE, " ");
+    .replace(THEIR_PLACE_RE, " ")
+    .replace(TENTATIVE_RE, " ");
 
   if (sleeping) {
     remainder = remainder
@@ -322,7 +329,7 @@ export function parseEventIntent(input: EventIntentParseInput): EventIntentParse
     .replace(/^[,.\-–—]+|[,.\-–—]+$/g, "")
     .trim();
 
-  const title = sleeping ? remainder : remainder || text;
+  const title = sleeping ? remainder : remainder || text.replace(TENTATIVE_RE, " ").replace(/\s+/g, " ").trim();
   const needsBookingFor = Boolean(
     sleeping && sleeperUserId && input.viewerId && sleeperUserId !== input.viewerId,
   );
@@ -357,6 +364,7 @@ export function parseEventIntent(input: EventIntentParseInput): EventIntentParse
     hostUserId,
     intentionalSolo: solo,
     needsBookingFor,
+    tentative,
     chips,
   };
 }

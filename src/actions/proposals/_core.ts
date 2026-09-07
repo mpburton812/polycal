@@ -266,11 +266,12 @@ async function enrichPlaceOptionsWithMembers(
 }
 
 /**
- * Sleeping proposals may only invite accepted sleeping partners (or be solo).
+ * Sleeping proposals may only invite accepted sleeping partners of the subject
+ * (proposer, or Booking-for target) — or be solo (PC-494).
  */
 async function assertSleepingInviteesAllowed(
   db: ReturnType<typeof getDb>,
-  proposerId: string,
+  subjectUserId: string,
   proposalType: ProposalType,
   intentionalSolo: boolean,
   invitees: { userId: string }[],
@@ -278,7 +279,7 @@ async function assertSleepingInviteesAllowed(
   if (proposalType !== "sleeping") return { ok: true };
   if (intentionalSolo || invitees.length === 0) return { ok: true };
 
-  const partners = await loadAcceptedSleepingPartnerIds(db, proposerId);
+  const partners = await loadAcceptedSleepingPartnerIds(db, subjectUserId);
   for (const invitee of invitees) {
     if (!partners.has(invitee.userId)) {
       return {
@@ -292,14 +293,34 @@ async function assertSleepingInviteesAllowed(
 }
 
 /**
- * Public list of accepted sleeping partner ids for the signed-in user (proposal UI).
+ * Public list of accepted sleeping partner ids for the signed-in user, or for a
+ * Booking-for subject the actor is allowed to proxy (PC-494).
  */
-export async function listAcceptedSleepingPartnerIdsAction(): Promise<string[]> {
+export async function listAcceptedSleepingPartnerIdsAction(
+  forUserId?: string,
+): Promise<string[]> {
   await ensureDbReady();
   const session = await auth();
   if (!session?.user) return [];
   const db = getDb();
-  return [...(await loadAcceptedSleepingPartnerIds(db, session.user.id))];
+  const targetId = forUserId?.trim() || session.user.id;
+  if (targetId !== session.user.id) {
+    const networkId = session.user.activeNetworkId;
+    if (!networkId) return [];
+    const isAdmin = await userHasAdminAccess(adminAccessFromSessionUser(session.user));
+    if (!isAdmin) {
+      const settings = await loadNetworkSettings(networkId, db);
+      if (!settings?.proxySchedulingEnabled) return [];
+      const allowed = await loadAllowedProxyUserIds(
+        db,
+        session.user.id,
+        networkId,
+        settings.proxySchedulingScope ?? "sleeping_partners",
+      );
+      if (!allowed.has(targetId)) return [];
+    }
+  }
+  return [...(await loadAcceptedSleepingPartnerIds(db, targetId))];
 }
 
 /**
@@ -539,6 +560,45 @@ async function replaceTimeSlots(
 }
 
 /**
+ * Deletes non-parent recurrence children (and their invitees/slots/votes) so a
+ * re-submit can recreate the series without duplicates (PC-494).
+ */
+async function deleteRecurringChildProposals(
+  db: ReturnType<typeof getDb>,
+  parentProposalId: string,
+): Promise<void> {
+  const children = await db
+    .select({ id: proposals.id })
+    .from(proposals)
+    .where(eq(proposals.parentProposalId, parentProposalId));
+  if (children.length === 0) return;
+
+  const childIds = children.map((row) => row.id);
+  const { calendarEventLinks, calendarIcsPending, proposalCommentImages } = await import(
+    "@/lib/db/schema"
+  );
+  await db.delete(calendarEventLinks).where(inArray(calendarEventLinks.proposalId, childIds));
+  await db.delete(calendarIcsPending).where(inArray(calendarIcsPending.proposalId, childIds));
+  await db.delete(proposalSlotVotes).where(inArray(proposalSlotVotes.proposalId, childIds));
+  await db.delete(proposalTimeSlots).where(inArray(proposalTimeSlots.proposalId, childIds));
+  await db.delete(proposalInvitees).where(inArray(proposalInvitees.proposalId, childIds));
+  const commentIds = (
+    await db
+      .select({ id: proposalComments.id })
+      .from(proposalComments)
+      .where(inArray(proposalComments.proposalId, childIds))
+  ).map((row) => row.id);
+  if (commentIds.length > 0) {
+    await db
+      .delete(proposalCommentImages)
+      .where(inArray(proposalCommentImages.commentId, commentIds));
+  }
+  await db.delete(proposalComments).where(inArray(proposalComments.proposalId, childIds));
+  await db.delete(proposalStateLog).where(inArray(proposalStateLog.proposalId, childIds));
+  await db.delete(proposals).where(inArray(proposals.id, childIds));
+}
+
+/**
  * Creates child proposal drafts for recurring series occurrences after the parent (PC-40).
  */
 async function createRecurringChildProposals(
@@ -578,6 +638,9 @@ async function createRecurringChildProposals(
       bedroomIndex: parent.bedroomIndex,
       notes: parent.notes,
       eventIconKey: parent.eventIconKey,
+      postingKind: parent.postingKind,
+      onBehalfOfUserId: parent.onBehalfOfUserId,
+      tentative: parent.tentative ?? false,
       createdAt: now,
       updatedAt: now,
     });
@@ -819,9 +882,14 @@ export async function createDraftProposalAction(
     return { ok: false, message: locationCheck.error };
   }
 
+  const postingKind = parsed.data.postingKind === "booking" ? "booking" : "proposal";
+  const partnerSubjectId =
+    postingKind === "booking" && parsed.data.onBehalfOfUserId
+      ? parsed.data.onBehalfOfUserId
+      : session.user.id;
   const inviteeCheck = await assertSleepingInviteesAllowed(
     db,
-    session.user.id,
+    partnerSubjectId,
     parsed.data.proposalType,
     Boolean(parsed.data.intentionalSolo),
     parsed.data.invitees ?? [],
@@ -830,7 +898,6 @@ export async function createDraftProposalAction(
     return { ok: false, message: inviteeCheck.error };
   }
 
-  const postingKind = parsed.data.postingKind === "booking" ? "booking" : "proposal";
   const isPoll =
     postingKind === "booking"
       ? false
@@ -915,6 +982,7 @@ export async function createDraftProposalAction(
       postingKind === "booking" && parsed.data.onBehalfOfUserId
         ? parsed.data.onBehalfOfUserId
         : null,
+    tentative: Boolean(parsed.data.tentative),
     createdAt: now,
     updatedAt: now,
   });
@@ -1040,9 +1108,15 @@ export async function updateDraftProposalAction(
     return { ok: false, message: locationCheck.error };
   }
 
+  const now = new Date().toISOString();
+  const postingKind = parsed.data.postingKind === "booking" ? "booking" : "proposal";
+  const partnerSubjectId =
+    postingKind === "booking" && parsed.data.onBehalfOfUserId
+      ? parsed.data.onBehalfOfUserId
+      : subjectUserId;
   const inviteeCheck = await assertSleepingInviteesAllowed(
     db,
-    subjectUserId,
+    partnerSubjectId,
     parsed.data.proposalType,
     Boolean(parsed.data.intentionalSolo),
     parsed.data.invitees ?? [],
@@ -1051,8 +1125,6 @@ export async function updateDraftProposalAction(
     return { ok: false, message: inviteeCheck.error };
   }
 
-  const now = new Date().toISOString();
-  const postingKind = parsed.data.postingKind === "booking" ? "booking" : "proposal";
   const isPoll =
     postingKind === "booking"
       ? false
@@ -1165,6 +1237,7 @@ export async function updateDraftProposalAction(
         postingKind === "booking" && parsed.data.onBehalfOfUserId
           ? parsed.data.onBehalfOfUserId
           : null,
+      tentative: Boolean(parsed.data.tentative),
       updatedAt: now,
     })
     .where(eq(proposals.id, proposal.id));
@@ -1373,6 +1446,8 @@ export async function submitProposalAction(
       .where(eq(proposals.id, proposalId))
       .limit(1);
     if (updatedParent) {
+      // Re-submit must not stack duplicate child rows for the same series (PC-494).
+      await deleteRecurringChildProposals(db, updatedParent.id);
       await createRecurringChildProposals(db, updatedParent, occurrences, inviteeRows);
     }
   }
@@ -1506,6 +1581,7 @@ export async function getProposalDetailAction(
       postToFeed: proposals.postToFeed,
       postingKind: proposals.postingKind,
       onBehalfOfUserId: proposals.onBehalfOfUserId,
+      tentative: proposals.tentative,
       networkId: proposals.networkId,
       locationBedroomNames: locations.bedroomNames,
       locationBedroomCount: locations.bedroomCount,
@@ -1723,6 +1799,10 @@ export async function getProposalDetailAction(
       batchEntries: batchEntries.length > 0 ? batchEntries : undefined,
     });
   }
+  const { formatTentativeTitle } = await import("@/lib/proposals/tentative-title");
+  detailTitle = formatTentativeTitle(detailTitle, Boolean(row.tentative));
+  const canRenameOrTentative =
+    row.state !== "archived" && (isProposer || isInvitee || isAdmin);
 
   return {
     ok: true,
@@ -1884,6 +1964,9 @@ export async function getProposalDetailAction(
       postToFeed: Boolean(row.postToFeed),
       postingKind: row.postingKind === "booking" ? "booking" : "proposal",
       onBehalfOfUserId: row.onBehalfOfUserId ?? null,
+      tentative: Boolean(row.tentative),
+      canRename: canRenameOrTentative,
+      canToggleTentative: canRenameOrTentative,
       specialKind: getProposalSpecialKind(row.description) ?? undefined,
       pendingIcsId: (
         await latestIcsPendingIdsByProposal(db, session.user.id, [row.id])

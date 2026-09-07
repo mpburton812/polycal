@@ -7,7 +7,7 @@ import { listPeopleAction } from "@/actions/users";
 import { ScheduleClient } from "@/components/schedule/ScheduleClient";
 import { BrandedLoading } from "@/components/ui/BrandedLoading";
 import { auth } from "@/lib/auth";
-import { endOfWeekSunday, startOfWeekMonday } from "@/lib/schedule/dates";
+import { endOfWeekSaturday, startOfWeekSunday } from "@/lib/schedule/dates";
 import { resolveTimezone } from "@/lib/schedule/timezone";
 import { users } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
@@ -20,8 +20,8 @@ export default async function SchedulePage() {
     redirect("/login");
   }
 
-  const weekStart = startOfWeekMonday(new Date());
-  const rangeEnd = endOfWeekSunday(weekStart);
+  const weekStart = startOfWeekSunday(new Date());
+  const rangeEnd = endOfWeekSaturday(weekStart);
 
   await ensureDbReady();
   const db = getDb();
