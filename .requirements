@@ -448,3 +448,4 @@
 2026-08-27 | 467b5a6 | PC-494 | : Fix schedule infinite scroll and lock chrome header. | src/components/schedule/ScheduleClient.tsx
 2026-09-07 | d5c278e | PC-493 | : Fix NLP titles, schedule Today top, US holidays, and APK link. | src/actions/network-settings.ts
 2026-09-07 | 65a0ee0 | PC-493 | : Fix NLP titles, schedule Today top, US holidays, and APK link. | src/actions/network-settings.ts
+2026-09-07 | c60aac5 | PC-493 | : Document promotion pipeline canvas workflow in AGENTS.md. | AGENTS.md
