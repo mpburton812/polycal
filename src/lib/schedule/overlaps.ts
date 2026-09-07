@@ -1,8 +1,10 @@
 import { intervalsOverlap } from "@/lib/schedule/dates";
 import { sleepingCalendarDayEnd } from "@/lib/proposals/sleeping-schedule";
 import { isSleepingLikeType } from "@/lib/proposals/sleeping-like";
+import { isUsHolidayEventId } from "@/lib/schedule/us-holidays";
 
 export interface OverlapCandidate {
+  id?: string;
   proposalType: "event" | "sleeping" | "fast_sleep" | string;
   startAt: string;
   endAt: string | null;
@@ -60,7 +62,10 @@ function overlapDayKeys(event: Pick<OverlapCandidate, "proposalType" | "startAt"
 }
 
 /** True when two candidates conflict on type, time, and shared participant. */
+/** True when two candidates conflict on type, time, and shared participant. */
 function pairOverlaps(a: OverlapCandidate, b: OverlapCandidate): boolean {
+  // US holiday markers never create conflict chips (PC-493).
+  if (isUsHolidayEventId(a.id) || isUsHolidayEventId(b.id)) return false;
   if (a.proposalType !== b.proposalType) return false;
   return (
     intervalsOverlap(a.startAt, overlapEndBound(a), b.startAt, overlapEndBound(b)) &&

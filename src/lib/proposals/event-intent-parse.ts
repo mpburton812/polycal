@@ -168,7 +168,22 @@ export function parseEventIntent(input: EventIntentParseInput): EventIntentParse
   let allDay = true;
 
   if (first) {
-    remainder = `${text.slice(0, first.index)}${text.slice(first.index + first.text.length)}`;
+    let matchStart = first.index;
+    let matchEnd = first.index + first.text.length;
+
+    const beforeText = text.slice(0, matchStart);
+    const leadingMatch = /\b(this\s+next|this\s+coming|this|next|coming|on\s+this|on|for|the)\s+$/i.exec(beforeText);
+    if (leadingMatch) {
+      matchStart -= leadingMatch[0].length;
+    }
+
+    const afterText = text.slice(matchEnd);
+    const trailingMatch = /^\s+(at|from|to|on)\b/i.exec(afterText);
+    if (trailingMatch) {
+      matchEnd += trailingMatch[0].length;
+    }
+
+    remainder = `${text.slice(0, matchStart)}${text.slice(matchEnd)}`;
     const start = first.start.date();
     startDate = toDateKey(start);
     if (
@@ -231,7 +246,9 @@ export function parseEventIntent(input: EventIntentParseInput): EventIntentParse
   const sortedPeople = [...people].sort((a, b) => b.displayName.length - a.displayName.length);
   for (const person of sortedPeople) {
     if (!personPattern(person).test(text)) continue;
-    remainder = remainder.replace(personPattern(person), " ");
+    if (sleeping) {
+      remainder = remainder.replace(personPattern(person), " ");
+    }
     if (sleeping) {
       if (person.id === sleeperUserId) continue;
       if (person.id === hostUserId && solo) continue;
@@ -291,10 +308,16 @@ export function parseEventIntent(input: EventIntentParseInput): EventIntentParse
     .replace(SLEEPING_RE, " ")
     .replace(ALONE_RE, " ")
     .replace(WEEKEND_RE, " ")
-    .replace(THEIR_PLACE_RE, " ")
-    .replace(/\bat\b/gi, " ")
-    .replace(/\bwith\b/gi, " ")
-    .replace(/\bto\b/gi, " ")
+    .replace(THEIR_PLACE_RE, " ");
+
+  if (sleeping) {
+    remainder = remainder
+      .replace(/\bat\b/gi, " ")
+      .replace(/\bwith\b/gi, " ")
+      .replace(/\bto\b/gi, " ");
+  }
+
+  remainder = remainder
     .replace(/\s+/g, " ")
     .replace(/^[,.\-–—]+|[,.\-–—]+$/g, "")
     .trim();

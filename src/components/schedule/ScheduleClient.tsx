@@ -432,10 +432,11 @@ export function ScheduleClient({
       rebuildStack(primaryAnchor, {
         layout: "week",
         seedEvents: initialPayload.events,
+        scrollToTop: true,
       });
       return;
     }
-    rebuildStack(primaryAnchor, { layout: viewState.calendarLayout });
+    rebuildStack(primaryAnchor, { layout: viewState.calendarLayout, scrollToTop: true });
     // Mount / layout identity only — avoid thrashing on every primaryAnchor identity churn.
     // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional seed once per layout change via handlers
   }, []);
@@ -523,7 +524,7 @@ export function ScheduleClient({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- one-shot per schedule visit
   }, [pathname, rebuildStack, initialWeekStartIso]);
 
-  /** Fill viewport with adjacent segments after seed paint (PC-489). */
+  /** Fill viewport with future segments only so Today stays at the top (PC-493). */
   useLayoutEffect(() => {
     if (pending || segments.length === 0 || fillRunningRef.current) return;
     if (segments.length >= SCHEDULE_VIEWPORT_FILL_MAX) return;
@@ -534,16 +535,14 @@ export function ScheduleClient({
     if (overflows) return;
 
     fillRunningRef.current = true;
-    const preferFuture = segments.length % 2 === 1;
     void (async () => {
       try {
-        if (preferFuture) await appendFutureSegment();
-        else await prependPastSegment();
+        await appendFutureSegment();
       } finally {
         fillRunningRef.current = false;
       }
     })();
-  }, [appendFutureSegment, pending, prependPastSegment, segments.length]);
+  }, [appendFutureSegment, pending, segments.length]);
 
   /** Bi-directional infinite scroll sentinels (PC-489 / PC-493). */
   useEffect(() => {
@@ -969,6 +968,7 @@ export function ScheduleClient({
           overflowY: "auto",
           overscrollBehavior: "contain",
           WebkitOverflowScrolling: "touch",
+          scrollBehavior: "smooth",
           opacity: pending ? 0.72 : 1,
           transition: "opacity 120ms ease",
         }}
