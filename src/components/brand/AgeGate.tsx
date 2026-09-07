@@ -35,6 +35,12 @@ export function AgeGate({ children }: { children: React.ReactNode }) {
   const [denied, setDenied] = useState(false);
 
   useEffect(() => {
+    // Playwright sets NEXT_PUBLIC_E2E_TEST_MODE so public pages stay assertable (PC-494).
+    if (process.env.NEXT_PUBLIC_E2E_TEST_MODE === "1") {
+      setAllowed(true);
+      setReady(true);
+      return;
+    }
     const ok = readAgeCookie();
     setAllowed(ok);
     setReady(true);
