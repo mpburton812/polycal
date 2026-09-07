@@ -10,7 +10,7 @@ import { useMemo, useRef, useState } from "react";
 import { GARDEN_TOKENS } from "@/theme/tokens";
 
 import { POLY_GREEN } from "./proposalCardTheme";
-import { orderDateRangeInputs } from "./proposalDateRangeUtils";
+import { isStrictIsoDate, orderDateRangeInputs } from "./proposalDateRangeUtils";
 
 dayjs.extend(customParseFormat);
 
@@ -71,13 +71,21 @@ export function ProposalDateRangeField({
       return;
     }
     const iso = day.format("YYYY-MM-DD");
-    if (!anchor) {
-      setAnchor(day);
-      onRangeChange(iso, iso);
+    if (anchor) {
+      applyOrderedRange(anchor.format("YYYY-MM-DD"), iso);
+      setAnchor(null);
       return;
     }
-    applyOrderedRange(anchor.format("YYYY-MM-DD"), iso);
-    setAnchor(null);
+    if (startValue && isStrictIsoDate(startValue)) {
+      if (iso < startValue) {
+        applyOrderedRange(iso, endValue && isStrictIsoDate(endValue) ? endValue : startValue);
+      } else {
+        applyOrderedRange(startValue, iso);
+      }
+      return;
+    }
+    setAnchor(day);
+    onRangeChange(iso, iso);
   }
 
   function DayButton(props: PickersDayProps<Dayjs>) {
@@ -104,9 +112,12 @@ export function ProposalDateRangeField({
         onPointerDown={(event) => {
           if (disabled || outsideCurrentMonth) return;
           skipClickRef.current = true;
-          dragRef.current = { origin: iso };
-          onRangeChange(iso, iso);
-          setAnchor(day);
+          const originIso = anchor
+            ? anchor.format("YYYY-MM-DD")
+            : startValue && isStrictIsoDate(startValue)
+              ? startValue
+              : iso;
+          dragRef.current = { origin: originIso };
           (event.currentTarget as HTMLElement).setPointerCapture?.(event.pointerId);
         }}
         onPointerEnter={() => {

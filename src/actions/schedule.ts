@@ -17,10 +17,11 @@ import {
 } from "@/lib/db/schema";
 import { eventInRange } from "@/lib/schedule/dates";
 import { markOverlaps } from "@/lib/schedule/overlaps";
+import { getUsHolidayScheduleEvents } from "@/lib/schedule/us-holidays";
+import { loadNetworkSettings } from "@/lib/networks/settings";
 import { buildScheduleWindows } from "@/lib/schedule/schedule-slices";
 import { resolveTimezone } from "@/lib/schedule/timezone";
 import type { ScheduleSliceKind } from "@/lib/schedule/slice-types";
-import { loadNetworkSettings } from "@/lib/networks/settings";
 import { parseBatchSlotMeta } from "@/lib/proposals/batch-sleeping";
 import { formatSleepingDisplayTitle } from "@/lib/proposals/sleeping-display";
 import { isSleepingLikeType } from "@/lib/proposals/sleeping-like";
@@ -482,6 +483,11 @@ export async function listScheduleEventsAction(
         isPartnerOnlySleeping,
       });
     }
+  }
+
+  const settings = await loadNetworkSettings(networkId, db);
+  if (settings?.usHolidaysEnabled) {
+    events.push(...getUsHolidayScheduleEvents(rangeStart, rangeEnd));
   }
 
   return {

@@ -92,6 +92,10 @@ export const networks = sqliteTable("networks", {
   sleepingPartnerProposalMaxDays: integer("sleeping_partner_proposal_max_days")
     .notNull()
     .default(5),
+  /** When true, standard US Holidays are added to the calendar as non-conflicting all-day events. */
+  usHolidaysEnabled: integer("us_holidays_enabled", { mode: "boolean" })
+    .notNull()
+    .default(false),
   createdAt: text("created_at").notNull(),
   updatedAt: text("updated_at").notNull(),
 });

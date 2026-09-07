@@ -51,6 +51,7 @@ function toNetworkSettings(row: {
   archiveGraceHours: number;
   redraftDeadlineHours: number;
   sleepingPartnerProposalMaxDays: number;
+  usHolidaysEnabled: boolean;
 }): NetworkSettings {
   return {
     name: row.name,
@@ -73,6 +74,7 @@ function toNetworkSettings(row: {
     archiveGraceHours: row.archiveGraceHours,
     redraftDeadlineHours: row.redraftDeadlineHours,
     sleepingPartnerProposalMaxDays: row.sleepingPartnerProposalMaxDays,
+    usHolidaysEnabled: row.usHolidaysEnabled,
   };
 }
 

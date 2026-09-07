@@ -71,6 +71,8 @@ export interface NetworkSettings {
   redraftDeadlineHours: number;
   /** Days before unanswered sleeping-partner proposals are deleted (PC-273). */
   sleepingPartnerProposalMaxDays: number;
+  /** When true, display standard US Holidays on calendar as non-conflicting all-day events. */
+  usHolidaysEnabled: boolean;
 }
 
 export const DEFAULT_ONBOARDING_WELCOME_MESSAGE =

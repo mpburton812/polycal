@@ -183,4 +183,19 @@ describe("parseEventIntent (PC-442)", () => {
     expect(parseEventIntent({ text: "  " }).chips).toEqual([]);
     expect(parseEventIntent({ text: "  " }).proposalType).toBeNull();
   });
+
+  it("strips relative date modifiers and preserves person names in event title", () => {
+    const now = new Date("2026-08-18T12:00:00");
+    const result = parseEventIntent({
+      text: "Katie and morgan counseling this next Wednesday at",
+      now,
+      people,
+      places,
+      viewerId: "luke",
+    });
+    expect(result.proposalType).toBe("event");
+    expect(result.title).toBe("Katie and morgan counseling");
+    expect(result.startDate).toBe("2026-08-26");
+    expect(result.personIds).toEqual(expect.arrayContaining(["katie", "morgan"]));
+  });
 });

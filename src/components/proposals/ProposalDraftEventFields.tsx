@@ -79,6 +79,16 @@ function hhmmFromMinutes(total: number): string {
   return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
 }
 
+function format12HourFromMinutes(total: number): string {
+  const clamped = Math.max(0, Math.min(23 * 60 + 45, total));
+  const hours24 = Math.floor(clamped / 60);
+  const minutes = clamped % 60;
+  const ampm = hours24 >= 12 ? "PM" : "AM";
+  const hours12 = hours24 % 12 === 0 ? 12 : hours24 % 12;
+  const minuteStr = String(minutes).padStart(2, "0");
+  return `${hours12}:${minuteStr} ${ampm}`;
+}
+
 /**
  * Event fields: calendar + optional times, Who chips, Where homes (PC-433–436).
  */
@@ -304,7 +314,7 @@ export function ProposalDraftEventFields({
                 max={23 * 60 + 45}
                 step={15}
                 valueLabelDisplay="auto"
-                valueLabelFormat={(value) => hhmmFromMinutes(value)}
+                valueLabelFormat={(value) => format12HourFromMinutes(value)}
                 sx={{ color: POLY_GREEN, mx: 1 }}
               />
               <ProposalScheduleField

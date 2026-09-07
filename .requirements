@@ -446,3 +446,5 @@
 2026-08-27 | e2a576b | PC-492 | sticky chrome, Today chip, inline filter, NL date | src/components/layout/MainTabCarousel.tsx
 2026-08-27 | 01539df | PC-493 | : Pin schedule chrome and match Feed top spacing. | src/components/schedule/ScheduleClient.tsx
 2026-08-27 | 467b5a6 | PC-494 | : Fix schedule infinite scroll and lock chrome header. | src/components/schedule/ScheduleClient.tsx
+2026-09-07 | d5c278e | PC-493 | : Fix NLP titles, schedule Today top, US holidays, and APK link. | src/actions/network-settings.ts
+2026-09-07 | 65a0ee0 | PC-493 | : Fix NLP titles, schedule Today top, US holidays, and APK link. | src/actions/network-settings.ts

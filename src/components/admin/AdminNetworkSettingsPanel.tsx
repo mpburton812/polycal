@@ -226,6 +226,19 @@ export function AdminNetworkSettingsPanel({
             When on, members can auto-schedule up to 14 nights for themselves and their sleeping
             partners&apos; arrangements without voting (FastSleep Proposal, PC-378).
           </Typography>
+          <FormControlLabel
+            control={
+              <Switch
+                checked={settings.usHolidaysEnabled}
+                onChange={(e) => persistImmediate("usHolidaysEnabled", e.target.checked)}
+              />
+            }
+            label="Show standard US Holidays"
+          />
+          <Typography variant="caption" color="text.secondary" sx={{ mt: -1, display: "block" }}>
+            When on, federal US holidays appear as all-day calendar items and do not create schedule
+            conflicts with other events (PC-493).
+          </Typography>
           <FormControl fullWidth>
             <InputLabel id="places-map-visibility-label">
               Sleeping partner tab visibility

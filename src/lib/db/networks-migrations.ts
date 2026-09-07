@@ -190,6 +190,7 @@ export async function applyNetworksMigrations(sql: Client): Promise<void> {
   await grantDefaultPlatformAdmins(sql);
   await backfillBookingEnums(sql);
   await applySponsorAndPendingDeleteColumns(sql);
+  await ensureColumn(sql, "networks", "us_holidays_enabled", "INTEGER NOT NULL DEFAULT 0");
 }
 
 /**
