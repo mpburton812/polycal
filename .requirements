@@ -452,3 +452,4 @@
 2026-09-07 | 3e92ac6 | PC-494 | : Brand/SMS age-gate, Sunday schedule, Tentative, and detail rename. | src/actions/proposals.ts
 2026-09-07 | f103607 | PC-494 | : Avoid SMS consent colliding with Reminders e2e locator. | src/components/profile/ProfileSettings.tsx
 2026-09-07 | 4dd3799 | PC-494 | : Fix e2e for age-gate bypass, Sunday week, Reminders locators. | src/components/brand/AgeGate.tsx
+2026-09-07 | 4f61fdb | PC-494 | : Bypass age gate in E2E via server E2E_TEST_MODE prop. | src/components/brand/AgeGate.tsx
