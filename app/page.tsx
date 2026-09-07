@@ -21,5 +21,5 @@ export default async function HomePage() {
     redirect((await isFeedEnabledForActiveNetwork()) ? "/feed" : "/schedule");
   }
 
-  return <HomeMarketing />;
+  return <HomeMarketing bypassAgeGate={process.env.E2E_TEST_MODE === "1"} />;
 }

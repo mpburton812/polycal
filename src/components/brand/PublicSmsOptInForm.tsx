@@ -30,7 +30,7 @@ import { GARDEN_TOKENS } from "@/theme/tokens";
 /**
  * Public Telnyx-style SMS opt-in form (PC-494). Age-gated; consent unchecked by default.
  */
-export function PublicSmsOptInForm() {
+export function PublicSmsOptInForm({ bypassAgeGate = false }: { bypassAgeGate?: boolean }) {
   const [phone, setPhone] = useState("");
   const [consent, setConsent] = useState(false);
   const [month, setMonth] = useState("");
@@ -79,7 +79,7 @@ export function PublicSmsOptInForm() {
   }
 
   return (
-    <AgeGate>
+    <AgeGate bypass={bypassAgeGate}>
       <Box
         sx={{
           minHeight: "100vh",

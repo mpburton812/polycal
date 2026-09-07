@@ -24,10 +24,18 @@ function writeAgeCookie(): void {
 /**
  * Birthdate age gate for public marketing / SMS pages (PC-494).
  * Stores only a verification cookie — never the birthdate.
+ * `bypass` is set from the server when `E2E_TEST_MODE=1` so Playwright can assert
+ * public marketing copy without baking NEXT_PUBLIC flags into the client bundle.
  */
-export function AgeGate({ children }: { children: React.ReactNode }) {
+export function AgeGate({
+  children,
+  bypass = false,
+}: {
+  children: React.ReactNode;
+  bypass?: boolean;
+}) {
   const [ready, setReady] = useState(false);
-  const [allowed, setAllowed] = useState(false);
+  const [allowed, setAllowed] = useState(bypass);
   const [month, setMonth] = useState("");
   const [day, setDay] = useState("");
   const [year, setYear] = useState("");
@@ -35,8 +43,7 @@ export function AgeGate({ children }: { children: React.ReactNode }) {
   const [denied, setDenied] = useState(false);
 
   useEffect(() => {
-    // Playwright sets NEXT_PUBLIC_E2E_TEST_MODE so public pages stay assertable (PC-494).
-    if (process.env.NEXT_PUBLIC_E2E_TEST_MODE === "1") {
+    if (bypass) {
       setAllowed(true);
       setReady(true);
       return;
@@ -44,7 +51,7 @@ export function AgeGate({ children }: { children: React.ReactNode }) {
     const ok = readAgeCookie();
     setAllowed(ok);
     setReady(true);
-  }, []);
+  }, [bypass]);
 
   function submit() {
     setError(null);

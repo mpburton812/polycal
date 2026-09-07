@@ -10,5 +10,5 @@ export const metadata: Metadata = {
 
 /** Public SMS opt-in URL for 10DLC / Telnyx brand verification (PC-494). */
 export default function SmsOptInPage() {
-  return <PublicSmsOptInForm />;
+  return <PublicSmsOptInForm bypassAgeGate={process.env.E2E_TEST_MODE === "1"} />;
 }

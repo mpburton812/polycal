@@ -22,7 +22,7 @@ export const metadata: Metadata = {
  */
 export default function AboutPage() {
   return (
-    <AgeGate>
+    <AgeGate bypass={process.env.E2E_TEST_MODE === "1"}>
       <Box
         sx={{
           minHeight: "100vh",

@@ -18,9 +18,9 @@ import { GARDEN_TOKENS } from "@/theme/tokens";
 /**
  * Public homepage content behind the age gate (PC-494 / carrier brand verification).
  */
-export function HomeMarketing() {
+export function HomeMarketing({ bypassAgeGate = false }: { bypassAgeGate?: boolean }) {
   return (
-    <AgeGate>
+    <AgeGate bypass={bypassAgeGate}>
       <Box
         sx={{
           minHeight: "100vh",
