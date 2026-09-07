@@ -6,6 +6,16 @@ PolyCal is a single Next.js 15 (App Router) + React 19 PWA — the whole product
 web service. Standard commands and the seeded login live in `README.md`; the workflow
 rules live in `.cursorrules`. Only the non-obvious, environment-specific gotchas are below.
 
+### Promotion batches (dev / test)
+- For multi-item implement+promote requests, open/update the live canvas
+  `pipeline-tracker.canvas.tsx` under the Cursor project `canvases/` folder (silent
+  30s refresh, no notification bells). Local always-apply rule:
+  `.cursor/rules/pipeline-tracker.mdc` (gitignored with `.cursor/` — keep a copy of
+  the intent in this section so Cloud agents still see it).
+- Cut `feature/*` from `origin/dev`, run `npm run test:unit` + `npm audit`, commit with
+  `PC-xxx`, agent opens PR → `dev`, then PR `dev` → `test`. Production + APK only when
+  explicitly requested (journeys mandatory for production).
+
 ### Branches: the code is NOT on `main`
 - `main` contains only `README.md`. All application code lives on `dev` (the integration
   branch); `feature/*` branches are cut from `dev` and PR back into `dev`.
