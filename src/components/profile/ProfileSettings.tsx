@@ -595,7 +595,7 @@ export function ProfileSettings({
           SMS (optional)
         </Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-          Account alerts and calendar reminders only — not marketing. You can use PolyCal without
+          Account alerts and calendar notices only — not marketing. You can use PolyCal without
           SMS.{" "}
           <MuiLink component={NextLink} href="/sms-opt-in" underline="hover">
             Public SMS opt-in page
@@ -636,7 +636,7 @@ export function ProfileSettings({
               disabled={!notificationPrefs.channels.sms}
             />
           }
-          label="I agree to receive SMS account alerts and calendar reminders from PolyCal."
+          label="I agree to receive SMS account alerts and calendar notices from PolyCal."
         />
         <Typography variant="caption" display="block" color="text.secondary" sx={{ mb: 1 }}>
           {brandSmsDisclaimerText()}
