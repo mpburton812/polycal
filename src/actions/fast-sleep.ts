@@ -49,6 +49,7 @@ export interface CreateFastSleepResult {
   message: string;
   warnings?: ProposalConflictWarning[];
   proposalId?: string;
+  errorEntryId?: string;
 }
 
 async function deleteDraftProposal(
@@ -116,7 +117,11 @@ export async function createFastSleepProposalAction(
       networkId,
     });
     if (!validation.ok) {
-      return { ok: false, message: validation.error };
+      return {
+        ok: false,
+        message: validation.error,
+        errorEntryId: validation.errorEntryId,
+      };
     }
 
     const { proposalId } = await createBatchSleepingDraft(db, {

@@ -83,6 +83,22 @@ describe("fastSleepingRowHasContent", () => {
       fastSleepingRowHasContent({
         nightDate: "2099-07-01",
         inviteeUserIds: [],
+        intentionalSolo: true,
+        isConfigured: false,
+      }),
+    ).toBe(false);
+    expect(
+      fastSleepingRowHasContent({
+        nightDate: "2099-07-01",
+        inviteeUserIds: [],
+        intentionalSolo: true,
+        isConfigured: true,
+      }),
+    ).toBe(true);
+    expect(
+      fastSleepingRowHasContent({
+        nightDate: "2099-07-01",
+        inviteeUserIds: [],
         locationText: "  Away  ",
       }),
     ).toBe(true);
@@ -165,7 +181,9 @@ describe("buildEmptyGridRows", () => {
     const rows = buildEmptyGridRows();
     expect(rows).toHaveLength(14);
     expect(rows[0]?.inviteeUserIds).toEqual([]);
-    expect(rows[0]?.intentionalSolo).toBe(false);
+    expect(rows[0]?.intentionalSolo).toBe(true);
+    expect(rows[0]?.isConfigured).toBe(false);
+    expect(fastSleepingRowHasContent(rows[0]!)).toBe(false);
     expect(rows[0]?.id).toBeTruthy();
   });
 });
@@ -227,6 +245,8 @@ describe("createEmptyFastSleepingRow", () => {
     const row = createEmptyFastSleepingRow("2099-08-01", "user-1");
     expect(row.nightDate).toBe("2099-08-01");
     expect(row.subjectUserId).toBe("user-1");
+    expect(row.intentionalSolo).toBe(true);
+    expect(row.isConfigured).toBe(false);
     expect(row.id).toMatch(/^bse-/);
   });
 });
