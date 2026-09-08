@@ -6,6 +6,7 @@ import { applyProposalsMigrations } from "./proposals-migrations";
 import { applyAlphaFeedbackMigrations } from "./alpha-feedback-migrations";
 import { applyFeedMigrations } from "./feed-migrations";
 import { applyPc280Migrations } from "./pc280-migrations";
+import { applyPc503Migrations } from "./pc503-migrations";
 import { applyRateLimitMigrations } from "./rate-limit-migrations";
 import { applyCalendarMigrations } from "./calendar-migrations";
 import { applyPerformanceIndexMigrations } from "./performance-index-migrations";
@@ -14,7 +15,7 @@ import { applyMotdMigrations } from "./motd-migrations";
 import { applyPlatformLogMigrations } from "./platform-log-migrations";
 
 /** Bump whenever bootstrap DDL or *-migrations.ts modules change (PC-143). */
-export const SCHEMA_VERSION = "54";
+export const SCHEMA_VERSION = "55";
 
 /**
  * True when the stored schema version already matches the app target — skip
@@ -64,6 +65,7 @@ export async function runMigrations(): Promise<void> {
   await applyAlphaFeedbackMigrations(sql);
   await applyFeedMigrations(sql);
   await applyPc280Migrations(sql);
+  await applyPc503Migrations(sql);
   await applyRateLimitMigrations(sql);
   await applyCalendarMigrations(sql);
   await applyNetworksMigrations(sql);

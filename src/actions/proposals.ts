@@ -31,7 +31,6 @@ export {
   listAcceptedSleepingPartnerIdsAction,
   listComposerPeopleRankAction,
   listProposalPlaceOptionsAction,
-  listResidencyPlaceOptionsAction,
   listSleepingLocationOptionsAction,
   submitProposalAction,
   updateDraftProposalAction,

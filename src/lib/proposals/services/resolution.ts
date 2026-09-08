@@ -3,15 +3,13 @@
  * transitions, and per-slot aggregate sync.
  *
  * Carved out of `src/actions/proposals/_core.ts` (Epic 4 core carve) with no
- * behavior change — the scheduling math, poll matrix rules (PC-40), residency
- * side-effects (PC-56/PC-190), and notification copy (PC-49/PC-278/PC-322) are
- * byte-for-byte the same. On-resolve collision handling is delegated to
- * {@link autoDeclineCollidingProposals} in the sibling conflicts module.
+ * behavior change — the scheduling math, poll matrix rules (PC-40), and
+ * notification copy (PC-49/PC-278/PC-322) are byte-for-byte the same. On-resolve
+ * collision handling is delegated to {@link autoDeclineCollidingProposals} in
+ * the sibling conflicts module.
  */
 import { and, asc, eq, inArray } from "drizzle-orm";
-import { revalidatePath } from "next/cache";
 
-import { logUserActivity } from "@/lib/audit";
 import { getDb } from "@/lib/db/client";
 import {
   locations,
@@ -28,15 +26,6 @@ import { logProposalTransition } from "@/lib/proposals/services/state-log";
 import { resetInviteeVotes } from "@/lib/proposals/services/votes";
 import { notifyProposalParticipants } from "@/lib/proposals/services/notify-participants";
 import { enterAtRiskProposedState } from "@/lib/proposals/services/at-risk";
-import {
-  getProposalSpecialKind,
-  isNonScheduleProposal,
-  parseResidencyProposalMeta,
-} from "@/lib/proposals/special-proposals";
-import {
-  applyResidencyProposalResolution,
-  cleanupResidencyProposalLinkage,
-} from "@/actions/residency-proposals";
 import { sleepingScheduleFromSlotRows } from "@/lib/proposals/sleeping-schedule";
 import { isSleepingLikeType } from "@/lib/proposals/sleeping-like";
 import {
@@ -215,16 +204,6 @@ export async function revertProposalToDraft(
   await resetInviteeVotes(db, proposal.id);
   await logProposalTransition(db, proposal.id, actorUserId, "proposal.reverted_to_draft", reason);
 
-  if (parseResidencyProposalMeta(proposal.description)) {
-    await cleanupResidencyProposalLinkage(db, proposal, true);
-    await logUserActivity(
-      actorUserId,
-      "places.decline_residency",
-      JSON.stringify({ proposalId: proposal.id, reason }),
-    );
-    revalidatePath("/people-places");
-  }
-
   await dismissAllNotificationsForProposal(proposal.id);
 
   await notifyProposalParticipants(db, {
@@ -360,13 +339,7 @@ export async function resolveProposal(
     options?.stateLogAction ?? "proposal.resolved",
   );
 
-  const residencyMeta = parseResidencyProposalMeta(proposal.description);
-  if (residencyMeta) {
-    await applyResidencyProposalResolution(db, proposal, actorUserId);
-  }
-
   const pollMatrix = proposal.isPoll && slots.length > 1;
-  const specialKind = getProposalSpecialKind(proposal.description);
   // Optional invitees still owe an RSVP after required attendees resolve, so they
   // get an actionable variant (message + vote deep-link) while everyone else gets
   // the plain "approved and scheduled" copy — behavior identical to the prior loop
@@ -378,9 +351,6 @@ export async function resolveProposal(
     metadata: { proposalType: proposal.proposalType },
     message: ({ role, voteStatus }) => {
       const optionalStillVoting = role === "optional" && voteStatus === "not_seen";
-      if (specialKind === "residency") {
-        return `Residency proposal "${proposal.title}" was accepted.`;
-      }
       if (optionalStillVoting) {
         return pollMatrix
           ? `Proposal "${proposal.title}" was approved by all required attendees and scheduled. Please complete your poll votes.`
@@ -392,9 +362,7 @@ export async function resolveProposal(
       role === "optional" && voteStatus === "not_seen" ? { action: "vote" } : {},
   });
 
-  if (!isNonScheduleProposal(proposal.description)) {
-    await autoDeclineCollidingProposals(db, proposal, scheduleStart, scheduleEnd, actorUserId);
-  }
+  await autoDeclineCollidingProposals(db, proposal, scheduleStart, scheduleEnd, actorUserId);
 
   // External calendar sync (Option B) — after() on Vercel; awaited in E2E / admin Fast add.
   const { scheduleCalendarSync } = await import("@/lib/calendar/sync");

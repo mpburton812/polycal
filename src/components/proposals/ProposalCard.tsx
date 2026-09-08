@@ -165,10 +165,7 @@ export function ProposalCard({
   }
 
   const typeAccent =
-    isSleepingLikeType(proposal.proposalType) &&
-    proposal.cardKind !== "partnership" &&
-    proposal.specialKind !== "residency" &&
-    proposal.cardKind !== "residency"
+    isSleepingLikeType(proposal.proposalType) && proposal.cardKind !== "partnership"
       ? "#C4B5E8"
       : "#F5D76E";
 
@@ -228,14 +225,6 @@ export function ProposalCard({
             Visible only to proposer, invitee, and admins.
           </Typography>
         )}
-        {(proposal.specialKind === "residency" || proposal.cardKind === "residency") && (
-          <Typography
-            variant="caption"
-            sx={{ display: "block", mb: 0.5, color: GARDEN_TOKENS.inkMuted }}
-          >
-            Place residency — no date or time required.
-          </Typography>
-        )}
         {/* What */}
         <Stack direction="row" spacing={0.75} alignItems="flex-start" sx={{ mb: 0.5 }}>
           <Box sx={{ flex: 1, minWidth: 0 }}>
@@ -255,14 +244,10 @@ export function ProposalCard({
             </Typography>
             <Stack direction="row" spacing={0.75} alignItems="center" flexWrap="wrap" sx={{ mt: 0.5 }}>
               <Chip
-                label={typeBadgeLabel(proposal.proposalType, proposal.cardKind, proposal.specialKind)}
+                label={typeBadgeLabel(proposal.proposalType, proposal.cardKind)}
                 size="small"
                 sx={{
-                  ...typeChipSxForProposal(
-                    proposal.proposalType,
-                    proposal.cardKind,
-                    proposal.specialKind,
-                  ),
+                  ...typeChipSxForProposal(proposal.proposalType, proposal.cardKind),
                   height: 20,
                   fontSize: "0.6rem",
                   "& .MuiChip-label": { px: 0.75 },
@@ -306,10 +291,7 @@ export function ProposalCard({
         </Stack>
 
         {/* When */}
-        {timeLabel &&
-          !proposal.isContentMasked &&
-          proposal.specialKind !== "residency" &&
-          proposal.cardKind !== "residency" && (
+        {timeLabel && !proposal.isContentMasked && (
             <Stack direction="row" spacing={0.5} alignItems="flex-start" sx={{ mt: 0.75 }}>
               <AccessTimeIcon sx={{ fontSize: 16, color: GARDEN_TOKENS.inkMuted, mt: 0.25, flexShrink: 0 }} />
               <Typography
@@ -321,10 +303,7 @@ export function ProposalCard({
             </Stack>
           )}
 
-        {!proposal.isContentMasked &&
-          proposal.cardKind !== "partnership" &&
-          proposal.specialKind !== "residency" &&
-          proposal.cardKind !== "residency" && (
+        {!proposal.isContentMasked && proposal.cardKind !== "partnership" && (
             <ProposalExpiryCountdown
               proposedExpiresAt={proposal.proposedExpiresAt}
               atRisk={proposal.atRisk}

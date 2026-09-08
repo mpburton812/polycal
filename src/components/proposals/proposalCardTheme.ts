@@ -79,12 +79,7 @@ export function formatDateRange(
   return `${startLabel} – ${new Date(end).toLocaleDateString(undefined, dateOpts)}`;
 }
 
-export function typeBadgeLabel(
-  type: string,
-  cardKind?: string,
-  specialKind?: "residency",
-): string {
-  if (specialKind === "residency" || cardKind === "residency") return "RESIDENCY PROPOSAL";
+export function typeBadgeLabel(type: string, cardKind?: string): string {
   if (cardKind === "partnership") return "RELATIONSHIP PROPOSAL";
   if (type === "fast_sleep") return "FASTSLEEP PROPOSAL";
   return type === "sleeping" ? "SLEEPING PROPOSAL" : "EVENT PROPOSAL";
@@ -144,12 +139,8 @@ export const brutalPressSx = {
   },
 } as const;
 
-export function typeChipSxForProposal(
-  proposalType: string,
-  cardKind?: string,
-  specialKind?: "residency",
-) {
-  if (specialKind === "residency" || cardKind === "residency" || cardKind === "partnership") {
+export function typeChipSxForProposal(proposalType: string, cardKind?: string) {
+  if (cardKind === "partnership") {
     return {
       bgcolor: "#F5D76E",
       color: GARDEN_TOKENS.ink,

@@ -43,13 +43,6 @@ const AdminNetworkSettingsPanel = dynamic(
     })),
   { loading: () => <AdminPanelFallback /> },
 );
-const AdminFastSleepingPlanPanel = dynamic(
-  () =>
-    import("@/components/admin/AdminFastSleepingPlanPanel").then((mod) => ({
-      default: mod.AdminFastSleepingPlanPanel,
-    })),
-  { loading: () => <AdminPanelFallback /> },
-);
 const AdminUserManagementPanel = dynamic(
   () =>
     import("@/components/admin/AdminUserManagementPanel").then((mod) => ({
@@ -154,7 +147,6 @@ export default async function AdminPage() {
               networkStatus={networkDashboard?.status ?? "active"}
               pendingDeleteAt={networkDashboard?.pendingDeleteAt ?? null}
             />
-            <AdminFastSleepingPlanPanel users={adminUsers} />
             <AdminUserManagementPanel
               users={adminUsers}
               currentUserId={session.user.id}

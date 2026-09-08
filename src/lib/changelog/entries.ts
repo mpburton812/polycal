@@ -28,6 +28,49 @@ import { CHANGELOG_ARCHIVE } from "./entries.archive";
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "2026.09.08a",
+    date: "2026-09-08",
+    summary:
+      "Admin UX batch: network-scoped users, platform alert detail, onboarding Email+Password, NLP New Event, residency cut, Goto Today fix.",
+    changes: [
+      {
+        type: "fixed",
+        description:
+          "Admin User management lists only active network members after remove (PC-507).",
+      },
+      {
+        type: "added",
+        description:
+          "Platform alerts show By Who, When, and optional target user; system log Target column (PC-508).",
+      },
+      {
+        type: "changed",
+        description:
+          "Add person uses User/Proxy selector then form segments; First Login Email and Password with Back/clickable steps (PC-509, PC-510).",
+      },
+      {
+        type: "changed",
+        description:
+          "Hide Proposal enforcement when Just Bookings; remove Admin Fast sleeping plan panel (PC-511, PC-512).",
+      },
+      {
+        type: "changed",
+        description:
+          "FAB New Event is NLP (top); Legacy New Event is manual composer (PC-513).",
+      },
+      {
+        type: "changed",
+        description:
+          "Remove residency proposals; Owner/Resident assigned only via People & Places; cleanup migration (PC-514).",
+      },
+      {
+        type: "fixed",
+        description:
+          "Goto Today no longer bounces (stable week ISO, pin gate, prepend suppress) (PC-515).",
+      },
+    ],
+  },
+  {
     version: "2026.09.07b",
     date: "2026-09-07",
     summary:

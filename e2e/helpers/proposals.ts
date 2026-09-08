@@ -58,24 +58,24 @@ export async function openNewProposalFabMenu(page: Page): Promise<void> {
   await fab.click();
 }
 
-/** Opens the New Event composer without locking Social or Sleeping (PC-429). */
+/** Opens the Legacy New Event (manual) composer without locking Social or Sleeping (PC-429 / PC-513). */
 export async function openNewEventComposer(page: Page): Promise<Locator> {
   await openNewProposalFabMenu(page);
-  await page.getByRole("menuitem", { name: "New Event", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Legacy New Event", exact: true }).click();
   const dialog = page.getByRole("dialog");
-  await expect(dialog.getByRole("heading", { name: "New Event", exact: true })).toBeVisible({
+  await expect(dialog.getByRole("heading", { name: "Legacy New Event", exact: true })).toBeVisible({
     timeout: 15_000,
   });
   return dialog;
 }
 
-/** Opens the Description-first NLP composer (PC-439). */
+/** Opens the Description-first NLP composer labeled New Event (PC-439 / PC-513). */
 export async function openNlpEventComposer(page: Page): Promise<Locator> {
   await openNewProposalFabMenu(page);
-  await page.getByRole("menuitem", { name: "New Event (NLP Input)", exact: true }).click();
+  await page.getByRole("menuitem", { name: "New Event", exact: true }).click();
   const dialog = page.getByRole("dialog");
   await expect(
-    dialog.getByRole("heading", { name: "New Event (NLP Input)", exact: true }),
+    dialog.getByRole("heading", { name: "New Event", exact: true }),
   ).toBeVisible({
     timeout: 15_000,
   });
@@ -92,7 +92,7 @@ export async function openComposerFromFeedQuery(
   if (intent.compose === "nlp" && intent.q) params.set("q", intent.q);
   await page.goto(`/feed?${params.toString()}`);
   await dismissBlockingDialogsIfOpen(page);
-  const heading = intent.compose === "nlp" ? "New Event (NLP Input)" : "New Event";
+  const heading = intent.compose === "nlp" ? "New Event" : "Legacy New Event";
   const dialog = page.getByRole("dialog").filter({
     has: page.getByRole("heading", { name: heading, exact: true }),
   });
@@ -112,9 +112,9 @@ export async function openEventProposalDraft(page: Page): Promise<Locator> {
 /** Opens the sleeping proposal draft dialog from the FAB menu. */
 export async function openSleepingProposalDraft(page: Page): Promise<Locator> {
   await openNewProposalFabMenu(page);
-  await page.getByRole("menuitem", { name: "New Event", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Legacy New Event", exact: true }).click();
   const dialog = page.getByRole("dialog");
-  await expect(dialog.getByRole("heading", { name: "New Event", exact: true })).toBeVisible({
+  await expect(dialog.getByRole("heading", { name: "Legacy New Event", exact: true })).toBeVisible({
     timeout: 15_000,
   });
   await dialog.getByRole("button", { name: "Sleeping", exact: true }).click();

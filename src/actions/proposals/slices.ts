@@ -31,7 +31,6 @@ import {
   getAdminCanSeeUninvolved,
 } from "@/lib/proposals/access";
 import { formatSleepingDisplayTitle } from "@/lib/proposals/sleeping-display";
-import { proposalDescriptionForDisplay } from "@/lib/proposals/special-proposals";
 import { getAcceptedSleepingPartnerIds } from "@/lib/proposals/partners";
 import {
   allDayBoundsForDateKey,
@@ -368,7 +367,7 @@ export async function getProposalSliceDetailAction(
       sliceKey,
       sliceTag,
       title: sliceTitle,
-      description: isContentMasked ? null : proposalDescriptionForDisplay(row.description),
+      description: isContentMasked ? null : row.description,
       locationName: isContentMasked ? null : locationName,
       startAt,
       endAt,

@@ -23,7 +23,7 @@ test.describe("New Event composer journey", () => {
     await goToProposals(page);
 
     const dialog = await openNewEventComposer(page);
-    await expect(dialog.getByRole("heading", { name: "New Event", exact: true })).toBeVisible();
+    await expect(dialog.getByRole("heading", { name: "Legacy New Event", exact: true })).toBeVisible();
     await expect(dialog.getByLabel("Description")).toHaveCount(0);
     await expect(dialog.getByText("or", { exact: true })).toHaveCount(0);
     await expect(dialog.getByLabel("Title")).toBeVisible();
