@@ -64,6 +64,7 @@ export function FastSleepDialog({
     Record<string, PersonSummary[]>
   >({});
   const [error, setError] = useState<string | null>(null);
+  const [errorEntryId, setErrorEntryId] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const [confirming, setConfirming] = useState(false);
@@ -72,6 +73,7 @@ export function FastSleepDialog({
   useEffect(() => {
     if (!open) return;
     setError(null);
+    setErrorEntryId(null);
     setLoadError(null);
     setConfirming(false);
     setPendingWarnings(null);
@@ -98,6 +100,7 @@ export function FastSleepDialog({
 
   function submit(confirm: boolean) {
     setError(null);
+    setErrorEntryId(null);
     setPendingWarnings(null);
     startTransition(async () => {
       const result = await createFastSleepProposalAction({ rows, confirm });
@@ -108,6 +111,7 @@ export function FastSleepDialog({
           return;
         }
         setError(result.message);
+        if (result.errorEntryId) setErrorEntryId(result.errorEntryId);
         setConfirming(false);
         return;
       }
@@ -144,10 +148,14 @@ export function FastSleepDialog({
           )}
           <FastSleepingPlanGrid
             rows={rows}
-            onChange={setRows}
+            onChange={(next) => {
+              setErrorEntryId(null);
+              setRows(next);
+            }}
             partnerPeople={[]}
             locationOptions={places}
             disabled={pending || Boolean(loadError)}
+            errorEntryId={errorEntryId}
             subjectPeople={reachable}
             partnersBySubjectId={partnersBySubjectId}
             defaultSubjectUserId={currentUserId}
