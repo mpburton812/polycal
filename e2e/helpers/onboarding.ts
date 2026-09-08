@@ -16,7 +16,15 @@ export async function completeFirstLoginOnboarding(
   await page.getByRole("textbox", { name: "New password", exact: true }).fill(newPassword);
   await page.getByRole("textbox", { name: "Confirm new password" }).fill(newPassword);
   await page.getByRole("button", { name: "Continue" }).click();
-  await expect(page.getByText("Accent theme")).toBeVisible({ timeout: 30_000 });
+  // Surface wizard errors instead of hanging on the next step.
+  const wizardError = page.getByRole("alert").filter({ hasText: /.+/ });
+  await Promise.race([
+    page.getByText("Accent theme").waitFor({ state: "visible", timeout: 30_000 }),
+    wizardError.waitFor({ state: "visible", timeout: 30_000 }).then(async () => {
+      throw new Error(`Onboarding Email/Password failed: ${await wizardError.first().innerText()}`);
+    }),
+  ]);
+  await expect(page.getByText("Accent theme")).toBeVisible();
   await page.getByRole("button", { name: "Blue bird" }).click();
   // Timezone defaults to US Eastern (PC-194).
   await expect(page.getByLabel("Time zone")).toContainText(/America\/New[_ ]York/);

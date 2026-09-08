@@ -180,9 +180,19 @@ function FirstLoginWizardInner({
 
   /**
    * Continue / skip — raises maxUnlocked so the destination becomes clickable.
+   * Persist to sessionStorage synchronously so a remount cannot restore an older step.
    */
   function advanceTo(next: number) {
-    setMaxUnlocked((prev) => Math.max(prev, next));
+    setMaxUnlocked((prev) => {
+      const unlocked = Math.max(prev, next);
+      try {
+        window.sessionStorage.setItem(ONBOARDING_STEP_STORAGE_KEY, String(next));
+        window.sessionStorage.setItem(ONBOARDING_MAX_UNLOCKED_STORAGE_KEY, String(unlocked));
+      } catch {
+        // sessionStorage may be unavailable in private mode — ignore.
+      }
+      return unlocked;
+    });
     setActiveStep(next);
   }
 
@@ -220,7 +230,8 @@ function FirstLoginWizardInner({
       setEmailStatus(
         "Verification link sent (when email delivery is configured). You can finish setup now and verify later.",
       );
-      // Advance before session update so remount restore does not re-read step 0 (PC-510).
+      // Advance + sync storage before session update. Do not router.refresh() here —
+      // a server remount can still see mustChangePassword=true and force step 0 (PC-510).
       advanceTo(1);
       await update({
         user: {
@@ -228,7 +239,6 @@ function FirstLoginWizardInner({
           sessionVersion: result.sessionVersion,
         },
       });
-      router.refresh();
     });
   }
 
