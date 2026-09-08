@@ -454,3 +454,4 @@
 2026-09-07 | 4dd3799 | PC-494 | : Fix e2e for age-gate bypass, Sunday week, Reminders locators. | src/components/brand/AgeGate.tsx
 2026-09-07 | 4f61fdb | PC-494 | : Bypass age gate in E2E via server E2E_TEST_MODE prop. | src/components/brand/AgeGate.tsx
 2026-09-08 | 563fcc9 | PC-506 | Admin UX batch — scope, alerts, onboarding, NLP, residency cut, Goto Today | src/actions/notifications.ts
+2026-09-08 | 1d43536 | PC-509 | adapt Add person and onboarding helpers to Admin UX batch | e2e/admin-create-user.spec.ts
