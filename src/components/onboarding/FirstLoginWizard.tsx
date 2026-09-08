@@ -17,7 +17,7 @@ import {
   Select,
   Stack,
   Step,
-  StepLabel,
+  StepButton,
   Stepper,
   TextField,
   Typography,
@@ -52,7 +52,10 @@ import {
   type NotificationPrefs,
 } from "@/types/notification-prefs";
 import {
+  canSelectOnboardingStep,
+  ONBOARDING_MAX_UNLOCKED_STORAGE_KEY,
   ONBOARDING_STEP_STORAGE_KEY,
+  resolveOnboardingMaxUnlocked,
   resolveOnboardingStartStep,
 } from "@/lib/onboarding/wizard-step";
 
@@ -62,7 +65,7 @@ interface PartnerOption {
 }
 
 const STEPS = [
-  "Password",
+  "Email and Password",
   "Avatar & theme",
   "Sleeping partners",
   "Notifications",
@@ -109,6 +112,7 @@ function FirstLoginWizardInner({
   const { update } = useSession();
   // SSR-safe default; OAuth remount restores Calendar via effect + sessionStorage (PC-348).
   const [activeStep, setActiveStep] = useState(mustChangePassword ? 0 : 1);
+  const [maxUnlocked, setMaxUnlocked] = useState(mustChangePassword ? 0 : 1);
   const [stepRestored, setStepRestored] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [avatarKey, setAvatarKey] = useState(initialAvatarKey ?? "bird_blue");
@@ -125,10 +129,13 @@ function FirstLoginWizardInner({
   useEffect(() => {
     if (stepRestored) return;
     let storedStep: string | null = null;
+    let storedMaxUnlocked: string | null = null;
     try {
       storedStep = window.sessionStorage.getItem(ONBOARDING_STEP_STORAGE_KEY);
+      storedMaxUnlocked = window.sessionStorage.getItem(ONBOARDING_MAX_UNLOCKED_STORAGE_KEY);
     } catch {
       storedStep = null;
+      storedMaxUnlocked = null;
     }
     const queryStep = searchParams.get("onboardingStep");
     const next = resolveOnboardingStartStep({
@@ -136,7 +143,13 @@ function FirstLoginWizardInner({
       queryStep,
       storedStep,
     });
+    const unlocked = resolveOnboardingMaxUnlocked({
+      mustChangePassword,
+      storedMaxUnlocked,
+      activeStep: next,
+    });
     setActiveStep(next);
+    setMaxUnlocked(unlocked);
     setStepRestored(true);
     // Drop one-shot query after restore so refresh does not stick on Calendar.
     if (queryStep) {
@@ -151,15 +164,43 @@ function FirstLoginWizardInner({
     if (!stepRestored) return;
     try {
       window.sessionStorage.setItem(ONBOARDING_STEP_STORAGE_KEY, String(activeStep));
+      window.sessionStorage.setItem(ONBOARDING_MAX_UNLOCKED_STORAGE_KEY, String(maxUnlocked));
     } catch {
       // sessionStorage may be unavailable in private mode — ignore.
     }
-  }, [activeStep, stepRestored]);
+  }, [activeStep, maxUnlocked, stepRestored]);
+
+  /**
+   * Stepper click — only unlocked indices (passed + next).
+   */
+  function selectUnlockedStep(next: number) {
+    if (!canSelectOnboardingStep(next, maxUnlocked)) return;
+    setActiveStep(next);
+  }
+
+  /**
+   * Continue / skip — raises maxUnlocked so the destination becomes clickable.
+   */
+  function advanceTo(next: number) {
+    setMaxUnlocked((prev) => Math.max(prev, next));
+    setActiveStep(next);
+  }
+
+  function handleBack() {
+    if (activeStep <= 0) return;
+    setActiveStep(activeStep - 1);
+  }
 
   function handlePasswordSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
+    setEmailStatus(null);
     const formData = new FormData(event.currentTarget);
+    const email = notificationEmail.trim();
+    if (!email) {
+      setError("Enter an email to continue. You can verify it later from the link we send.");
+      return;
+    }
 
     startTransition(async () => {
       const result = mustChangePassword
@@ -169,13 +210,21 @@ function FirstLoginWizardInner({
         setError(result.message);
         return;
       }
+      const emailResult = await updateNotificationEmailAction(email);
+      if (!emailResult.ok) {
+        setError(emailResult.message);
+        return;
+      }
+      setEmailStatus(
+        "Verification link sent (when email delivery is configured). You can finish setup now and verify later.",
+      );
       await update({
         user: {
           mustChangePassword: false,
           sessionVersion: result.sessionVersion,
         },
       });
-      setActiveStep(1);
+      advanceTo(1);
       router.refresh();
     });
   }
@@ -194,7 +243,7 @@ function FirstLoginWizardInner({
         return;
       }
       await update({ user: { avatarKey, theme } });
-      setActiveStep(2);
+      advanceTo(2);
     });
   }
 
@@ -204,35 +253,19 @@ function FirstLoginWizardInner({
       for (const partnerId of selectedPartners) {
         await proposePartnershipAction(partnerId);
       }
-      setActiveStep(3);
+      advanceTo(3);
     });
   }
 
   function saveNotifications() {
     setError(null);
-    setEmailStatus(null);
-    const email = notificationEmail.trim();
-    if (!email) {
-      setError("Enter a notification email to continue. You can verify it later from the link we send.");
-      return;
-    }
-
     startTransition(async () => {
-      const emailResult = await updateNotificationEmailAction(email);
-      if (!emailResult.ok) {
-        setError(emailResult.message);
-        return;
-      }
-      setEmailStatus(
-        "Verification link sent (when email delivery is configured). You can finish setup now and verify later.",
-      );
-
       const prefsResult = await updateNotificationPrefsAction(prefs);
       if (!prefsResult.ok) {
         setError(prefsResult.message);
         return;
       }
-      setActiveStep(4);
+      advanceTo(4);
     });
   }
 
@@ -245,7 +278,7 @@ function FirstLoginWizardInner({
         return;
       }
       setWelcomeMessage(result.welcomeMessage ?? null);
-      setActiveStep(5);
+      advanceTo(5);
     });
   }
 
@@ -258,6 +291,7 @@ function FirstLoginWizardInner({
       }
       try {
         window.sessionStorage.removeItem(ONBOARDING_STEP_STORAGE_KEY);
+        window.sessionStorage.removeItem(ONBOARDING_MAX_UNLOCKED_STORAGE_KEY);
       } catch {
         // ignore
       }
@@ -318,6 +352,7 @@ function FirstLoginWizardInner({
         .
       </Typography>
       <Stepper
+        nonLinear
         activeStep={activeStep}
         alternativeLabel
         sx={{
@@ -333,9 +368,15 @@ function FirstLoginWizardInner({
           "& .MuiStepConnector-root": { top: 10 },
         }}
       >
-        {STEPS.map((label) => (
-          <Step key={label}>
-            <StepLabel>{label}</StepLabel>
+        {STEPS.map((label, index) => (
+          <Step key={label} completed={index < activeStep}>
+            <StepButton
+              disabled={!canSelectOnboardingStep(index, maxUnlocked)}
+              onClick={() => selectUnlockedStep(index)}
+              aria-label={label}
+            >
+              {label}
+            </StepButton>
           </Step>
         ))}
       </Stepper>
@@ -348,6 +389,40 @@ function FirstLoginWizardInner({
       {activeStep === 0 && (
         <Box component="form" onSubmit={handlePasswordSubmit}>
           <Stack spacing={2}>
+            <TextField
+              label="Email"
+              type="email"
+              value={notificationEmail}
+              onChange={(event) => setNotificationEmail(event.target.value)}
+              required
+              fullWidth
+              helperText="Used only for notifications, verification, password reset, or signing in with email."
+              autoComplete="email"
+            />
+            <Typography variant="body2" color="text.secondary">
+              See our{" "}
+              <MuiLink
+                component={NextLink}
+                href="/privacy"
+                underline="hover"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Privacy Policy
+              </MuiLink>{" "}
+              and{" "}
+              <MuiLink
+                component={NextLink}
+                href="/terms"
+                underline="hover"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Terms of Service
+              </MuiLink>
+              .
+            </Typography>
+            {emailStatus && <Alert severity="info">{emailStatus}</Alert>}
             {!mustChangePassword && (
               <TextField
                 name="currentPassword"
@@ -425,9 +500,14 @@ function FirstLoginWizardInner({
             inputProps={{ maxLength: PROFILE_BIO_MAX_LENGTH }}
             helperText={`Shown under your name on People & Places. ${profileBio.length}/${PROFILE_BIO_MAX_LENGTH} characters.`}
           />
-          <Button variant="contained" onClick={saveAvatarAndTheme} disabled={pending}>
-            Continue
-          </Button>
+          <Stack direction="row" spacing={1}>
+            <Button variant="outlined" onClick={handleBack} disabled={pending}>
+              Back
+            </Button>
+            <Button variant="contained" onClick={saveAvatarAndTheme} disabled={pending}>
+              Continue
+            </Button>
+          </Stack>
         </Stack>
       )}
 
@@ -462,27 +542,19 @@ function FirstLoginWizardInner({
               No other users yet — you can add partners later in People &amp; Places.
             </Typography>
           )}
-          <Button variant="contained" onClick={savePartners} disabled={pending}>
-            Continue
-          </Button>
+          <Stack direction="row" spacing={1}>
+            <Button variant="outlined" onClick={handleBack} disabled={pending}>
+              Back
+            </Button>
+            <Button variant="contained" onClick={savePartners} disabled={pending}>
+              Continue
+            </Button>
+          </Stack>
         </Stack>
       )}
 
       {activeStep === 3 && (
         <Stack spacing={2}>
-          <TextField
-            label="Notification email"
-            type="email"
-            value={notificationEmail}
-            onChange={(event) => setNotificationEmail(event.target.value)}
-            required
-            fullWidth
-            helperText="We send a verification link. You can finish setup before clicking it — email delivery waits until verified."
-            autoComplete="email"
-          />
-          {emailStatus && (
-            <Alert severity="info">{emailStatus}</Alert>
-          )}
           <FormControlLabel
             control={
               <Checkbox
@@ -520,7 +592,7 @@ function FirstLoginWizardInner({
                   }
                 />
               }
-              label="Email (after you verify the address above)"
+              label="Email (after you verify your address)"
             />
           </FormGroup>
           <Typography variant="subtitle2">Alert types</Typography>
@@ -550,9 +622,14 @@ function FirstLoginWizardInner({
               />
             ))}
           </FormGroup>
-          <Button variant="contained" onClick={saveNotifications} disabled={pending}>
-            Continue
-          </Button>
+          <Stack direction="row" spacing={1}>
+            <Button variant="outlined" onClick={handleBack} disabled={pending}>
+              Back
+            </Button>
+            <Button variant="contained" onClick={saveNotifications} disabled={pending}>
+              Continue
+            </Button>
+          </Stack>
         </Stack>
       )}
 
@@ -565,12 +642,17 @@ function FirstLoginWizardInner({
           <Suspense fallback={<Typography variant="body2">Loading calendar options…</Typography>}>
             <CalendarIntegrationSettings compact />
           </Suspense>
-          <Button variant="contained" onClick={continueFromCalendar} disabled={pending}>
-            {pending ? "Loading…" : "Continue"}
-          </Button>
-          <Button variant="text" onClick={continueFromCalendar} disabled={pending}>
-            Skip for now
-          </Button>
+          <Stack direction="row" spacing={1} flexWrap="wrap">
+            <Button variant="outlined" onClick={handleBack} disabled={pending}>
+              Back
+            </Button>
+            <Button variant="contained" onClick={continueFromCalendar} disabled={pending}>
+              {pending ? "Loading…" : "Continue"}
+            </Button>
+            <Button variant="text" onClick={continueFromCalendar} disabled={pending}>
+              Skip for now
+            </Button>
+          </Stack>
         </Stack>
       )}
     </Paper>

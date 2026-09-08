@@ -188,6 +188,8 @@ export function ScheduleClient({
   const scheduleRootRef = useRef<HTMLDivElement | null>(null);
   const [viewportHeightPx, setViewportHeightPx] = useState<number | null>(null);
   const scrollTargetAnchorRef = useRef<string | null>(null);
+  /** Ignore top-sentinel prepend briefly after Goto Today / scroll-to-top (PC-515). */
+  const suppressPrependUntilRef = useRef(0);
   const { openCreate, openEdit } = useProposalCreate();
   const {
     state: dialogState,
@@ -263,6 +265,8 @@ export function ScheduleClient({
       const normalized = normalizeSegmentAnchor(anchorDate, layout, timeZone);
       if (opts?.scrollToTop) {
         scrollTargetAnchorRef.current = normalized.toISOString();
+        // Top sentinel is visible at scrollTop 0 — suppress prepend while settling (PC-515).
+        suppressPrependUntilRef.current = Date.now() + 400;
       }
       const seq = ++stackSeqRef.current;
       setPending(true);
@@ -320,14 +324,18 @@ export function ScheduleClient({
     };
   }, [pathname]);
 
-  /** After rebuild, scroll the calendar region to the top (PC-493). */
+  /** After rebuild, scroll the calendar region to the top (PC-493 / PC-515). */
   useEffect(() => {
     const target = scrollTargetAnchorRef.current;
     if (!target || pending || segments.length === 0) return;
     if (!segments.some((segment) => segment.id === target)) return;
     scrollTargetAnchorRef.current = null;
     requestAnimationFrame(() => {
-      scrollRootRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+      // Instant jump — smooth scroll fights Today pin + top-sentinel prepend (PC-515).
+      scrollRootRef.current?.scrollTo({
+        top: 0,
+        behavior: "instant" in window ? "instant" : "auto",
+      });
     });
   }, [pending, segments]);
 
@@ -369,6 +377,7 @@ export function ScheduleClient({
   }, [fetchSegmentEvents, pending, setSegments, timeZone, viewState.calendarLayout]);
 
   const prependPastSegment = useCallback(async () => {
+    if (Date.now() < suppressPrependUntilRef.current) return;
     if (loadingPastRef.current || pending) return;
     const current = segmentsRef.current;
     if (current.length === 0) return;
@@ -620,6 +629,8 @@ export function ScheduleClient({
   }
 
   function goToday() {
+    // Suppress top-sentinel prepend while Goto Today settles at scrollTop 0 (PC-515).
+    suppressPrependUntilRef.current = Date.now() + 400;
     const anchors = todayAnchors();
     const now = new Date();
     if (viewState.calendarLayout === "day") {
@@ -1036,13 +1047,14 @@ export function ScheduleClient({
                   />
                 ) : (
                   <ScheduleAgendaView
-                    weekStart={anchor}
+                    weekStartIso={segment.anchorIso}
                     dayCount={7}
                     events={events}
                     timeZone={timeZone}
                     onEventClick={openScheduleEvent}
                     onDayHeaderClick={openDayLayout}
                     onDayOverflowClick={openDaySheet}
+                    pinToday={false}
                   />
                 )}
               </Box>

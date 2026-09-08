@@ -20,7 +20,8 @@ import { fontFamilies } from "@/theme/fonts";
 import { GARDEN_TOKENS, ORGANIC_RADIUS } from "@/theme/tokens";
 
 interface ScheduleAgendaViewProps {
-  weekStart: Date;
+  /** Stable ISO anchor — avoid `new Date(iso)` every parent render (PC-515). */
+  weekStartIso: string;
   dayCount: number;
   events: ScheduleEvent[];
   timeZone?: string;
@@ -28,14 +29,19 @@ interface ScheduleAgendaViewProps {
   onDayHeaderClick?: (day: Date) => void;
   compactOverflowLimit?: number;
   onDayOverflowClick?: (day: Date) => void;
+  /**
+   * When true, pin Today into view once per weekStartIso change (PC-400).
+   * ScheduleClient infinite scroll passes false so the week stays at the top (PC-493 / PC-515).
+   */
+  pinToday?: boolean;
 }
 
 /**
  * Agenda list grouped by day for week layout on all breakpoints (PC-166 / PC-494).
- * Scrolls so Today is the first visible day section (PC-400).
+ * Optionally scrolls so Today is the first visible day section (PC-400 / PC-515).
  */
 export function ScheduleAgendaView({
-  weekStart,
+  weekStartIso,
   dayCount,
   events,
   timeZone = DEFAULT_VIEWER_TIMEZONE,
@@ -43,19 +49,26 @@ export function ScheduleAgendaView({
   onDayHeaderClick,
   compactOverflowLimit = 4,
   onDayOverflowClick,
+  pinToday = true,
 }: ScheduleAgendaViewProps) {
   const days = useMemo(() => {
-    const sunday = startOfWeekSunday(weekStart, timeZone);
+    const sunday = startOfWeekSunday(new Date(weekStartIso), timeZone);
     return Array.from({ length: dayCount }, (_, index) => addDays(sunday, index));
-  }, [weekStart, dayCount, timeZone]);
+  }, [weekStartIso, dayCount, timeZone]);
 
   const todayRef = useRef<HTMLDivElement | null>(null);
+  const pinnedWeekIsoRef = useRef<string | null>(null);
 
   useEffect(() => {
-    // Pin Today at the top of the scrollable agenda without dropping earlier weekdays (PC-400).
-    todayRef.current?.scrollIntoView({ block: "start", behavior: "instant" in window ? "instant" : "auto" });
-  }, [days, timeZone]);
-
+    if (!pinToday) return;
+    // Gate pin to once per weekStartIso so parent re-renders do not re-fire scrollIntoView (PC-515).
+    if (pinnedWeekIsoRef.current === weekStartIso) return;
+    pinnedWeekIsoRef.current = weekStartIso;
+    todayRef.current?.scrollIntoView({
+      block: "start",
+      behavior: "instant" in window ? "instant" : "auto",
+    });
+  }, [weekStartIso, pinToday, timeZone]);
   const eventsByDay = useMemo(() => {
     const map = new Map<string, ScheduleEvent[]>();
     for (const day of days) {

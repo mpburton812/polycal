@@ -6,7 +6,7 @@ import type {
 } from "@/lib/db/schema";
 import type { BatchSleepingEntry } from "@/lib/proposals/batch-sleeping";
 
-export type ProposalCardKind = "proposal" | "partnership" | "residency";
+export type ProposalCardKind = "proposal" | "partnership";
 
 export interface ProposalCard {
   id: string;
@@ -45,13 +45,8 @@ export interface ProposalCard {
   cardKind?: ProposalCardKind;
   partnershipId?: string;
   partnerName?: string;
-  residencyId?: string;
-  residencyPlaceName?: string;
-  residencyInviteeName?: string;
-  /** Residency/partnership workflow status when Kanban state is mapped for display. */
+  /** Partnership workflow status when Kanban state is mapped for display. */
   workflowStatus?: "proposed" | "declined";
-  /** Residency proposals using standard draft workflow (PC-60). */
-  specialKind?: "residency";
   /** Category icon key; null when masked or unset (PC-116). */
   eventIconKey?: string | null;
   /** True when the current viewer is an invitee on this proposal (PC-274). */
@@ -212,7 +207,6 @@ export interface ProposalDetail {
   canRename: boolean;
   /** Host, involved invitee, or admin may toggle Tentative without redraft (PC-494). */
   canToggleTentative: boolean;
-  specialKind?: "residency";
   /**
    * Latest non-dismissed ICS pending id for the current viewer (PC-345).
    * Present after download so Download ICS remains available.

@@ -55,7 +55,6 @@ Source of truth for SAFE list: `SAFE_PARALLEL_SPECS` in [`e2e/parallel.ts`](../e
 | `proposals-solo-comment-journey.spec.ts` | luke, han | No | SAFE_PARALLEL | Yes |
 | `proposals-week-network-journey.spec.ts` | luke, leia, han | No | SERIAL_ONLY | Yes |
 | `recurrence-slice-journey.spec.ts` | luke | No | SAFE_PARALLEL | Yes |
-| `residency-proposal-journey.spec.ts` | luke, leia, han | No | SERIAL_ONLY | Yes |
 | `sleeping-event-conflict-journey.spec.ts` | luke, leia | No | SAFE_PARALLEL | Yes |
 | `sleeping-partner-weekend-journey.spec.ts` | luke, leia | No | SERIAL_ONLY | Yes |
 | `sleeping-partnership-journey.spec.ts` | han, chewie, anakin | No | SERIAL_ONLY | Yes |

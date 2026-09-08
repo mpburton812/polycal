@@ -8,7 +8,6 @@ import {
 import {
   listComposerPeopleRankAction,
   listProposalPlaceOptionsAction,
-  listResidencyPlaceOptionsAction,
 } from "@/actions/proposals/_core";
 import { listPeopleAction, type PersonSummary } from "@/actions/users";
 import type { PersonRankStat } from "@/lib/proposals/composer-people-rank";
@@ -17,7 +16,6 @@ import type { ProposalPlaceOption } from "./types";
 export interface ProposalCreateBootstrap {
   people: PersonSummary[];
   places: ProposalPlaceOption[];
-  residencyPlaces: ProposalPlaceOption[];
   fastSleepEnabled: boolean;
   composer: DraftComposerSettings;
   peopleRank: PersonRankStat[];
@@ -26,7 +24,6 @@ export interface ProposalCreateBootstrap {
 const EMPTY_BOOTSTRAP: ProposalCreateBootstrap = {
   people: [],
   places: [],
-  residencyPlaces: [],
   fastSleepEnabled: true,
   composer: {
     pollEnabled: true,
@@ -43,16 +40,14 @@ const EMPTY_BOOTSTRAP: ProposalCreateBootstrap = {
  */
 export async function getProposalCreateBootstrapAction(): Promise<ProposalCreateBootstrap> {
   try {
-    const [people, places, residencyPlaces, fastSleepEnabled, composer, peopleRank] =
-      await Promise.all([
-        listPeopleAction(),
-        listProposalPlaceOptionsAction(),
-        listResidencyPlaceOptionsAction(),
-        getFastSleepEnabledAction(),
-        getDraftComposerSettingsAction(),
-        listComposerPeopleRankAction(),
-      ]);
-    return { people, places, residencyPlaces, fastSleepEnabled, composer, peopleRank };
+    const [people, places, fastSleepEnabled, composer, peopleRank] = await Promise.all([
+      listPeopleAction(),
+      listProposalPlaceOptionsAction(),
+      getFastSleepEnabledAction(),
+      getDraftComposerSettingsAction(),
+      listComposerPeopleRankAction(),
+    ]);
+    return { people, places, fastSleepEnabled, composer, peopleRank };
   } catch {
     return EMPTY_BOOTSTRAP;
   }

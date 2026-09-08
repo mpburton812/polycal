@@ -68,12 +68,9 @@ const TAB_EMPTY: Record<
   },
 };
 
-/** Event/sleeping drafts edited via the shared create host — not residency. */
+/** Event/sleeping drafts edited via the shared create host. */
 function isStandardDraftProposal(proposal: ProposalCardData): boolean {
   if (proposal.state !== "draft") return false;
-  if (proposal.specialKind === "residency") {
-    return false;
-  }
   const kind = proposal.cardKind ?? "proposal";
   return kind === "proposal";
 }

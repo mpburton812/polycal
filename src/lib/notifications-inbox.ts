@@ -47,25 +47,9 @@ export function partnershipIdFromNotificationMetadata(
 }
 
 /**
- * Extracts residencyId from notification metadata when present.
- */
-export function residencyIdFromNotificationMetadata(
-  metadata: Record<string, unknown>,
-): string | null {
-  return typeof metadata.residencyId === "string" ? metadata.residencyId : null;
-}
-
-/**
  * True when a partnership_proposed row should still appear as actionable (PC-349).
  */
 export function isPartnershipStillActionable(status: string | null | undefined): boolean {
-  return status === "proposed";
-}
-
-/**
- * True when a residency_proposed row should still appear as actionable (PC-349).
- */
-export function isResidencyStillActionable(status: string | null | undefined): boolean {
   return status === "proposed";
 }
 

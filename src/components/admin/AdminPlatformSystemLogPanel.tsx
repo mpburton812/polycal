@@ -42,6 +42,7 @@ export function AdminPlatformSystemLogPanel({
                 <TableCell>Day</TableCell>
                 <TableCell>Network</TableCell>
                 <TableCell>Admin</TableCell>
+                <TableCell>Target</TableCell>
                 <TableCell>Description</TableCell>
               </TableRow>
             </TableHead>
@@ -58,6 +59,7 @@ export function AdminPlatformSystemLogPanel({
                   <TableCell>{weekday(entry.createdAt)}</TableCell>
                   <TableCell>{entry.networkName ?? "—"}</TableCell>
                   <TableCell>{entry.actorDisplayName ?? "—"}</TableCell>
+                  <TableCell>{entry.targetDisplayName ?? "—"}</TableCell>
                   <TableCell sx={{ fontWeight: entry.emphasized ? 700 : 400 }}>
                     {entry.summary}
                   </TableCell>

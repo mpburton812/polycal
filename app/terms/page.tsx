@@ -104,10 +104,12 @@ export default function TermsOfServicePage() {
 
         <Section title="5. Consent-based features">
           <Typography paragraph>
-            Sleeping partnerships and residency at a place are proposed and then accepted by the
-            other party. Do not use proxy (passive) profiles to represent someone who has not
-            agreed to be scheduled in the group. Scheduling features are coordination tools, not
-            a substitute for consent conversations between people.
+            Sleeping partnerships are proposed and then accepted by the other party. Place
+            residency (Owner or Resident) is assigned by place owners or administrators — not
+            via a propose-and-accept proposal flow. Do not use proxy (passive) profiles to
+            represent someone who has not agreed to be scheduled in the group. Scheduling
+            features are coordination tools, not a substitute for consent conversations between
+            people.
           </Typography>
         </Section>
 

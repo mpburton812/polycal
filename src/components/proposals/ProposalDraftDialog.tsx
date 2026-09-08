@@ -1046,8 +1046,8 @@ export function ProposalDraftDialog({
                 {isEdit
                   ? "Edit draft"
                   : isNlp
-                    ? "New Event (NLP Input)"
-                    : "New Event"}
+                    ? "New Event"
+                    : "Legacy New Event"}
               </Typography>
               <Stack direction="row" spacing={0.75} alignItems="center" flexWrap="wrap" sx={{ mt: 0.5 }}>
                 {batchMode && <Chip label="Batch" size="small" variant="outlined" />}

@@ -81,12 +81,12 @@ test.describe("App navigation (admin)", () => {
         timeout: 2_000,
       });
       await expect(
-        page.getByRole("menuitem", { name: "New Event (NLP Input)", exact: true }),
+        page.getByRole("menuitem", { name: "Legacy New Event", exact: true }),
       ).toBeVisible();
       await expect(page.getByRole("menuitem", { name: "Sleeping proposal" })).toHaveCount(0);
       await expect(page.getByRole("menuitem", { name: "Bulk Sleep Booking" })).toBeVisible();
       await expect(page.getByRole("menuitem", { name: "Sleeping partner proposal" })).toBeVisible();
-      await expect(page.getByRole("menuitem", { name: "Residency Proposal" })).toBeVisible();
+      await expect(page.getByRole("menuitem", { name: "Residency Proposal" })).toHaveCount(0);
       await page.keyboard.press("Escape");
       await expect(page.getByRole("menuitem", { name: "New Event", exact: true })).toBeHidden();
     }

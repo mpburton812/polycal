@@ -31,6 +31,7 @@ import {
   placesMapVisibilityLevels,
   proxySchedulingScopes,
   schedulingPostingModes,
+  schedulingProposalsEnabled,
 } from "@/types/network-settings";
 
 const AUDIT_LABELS: Record<string, string> = {
@@ -348,6 +349,7 @@ export function AdminNetworkSettingsPanel({
           </FormControl>
         </SettingsSubsection>
 
+        {schedulingProposalsEnabled(settings.schedulingPosting) ? (
         <SettingsSubsection title="Proposal enforcement">
           <TextField
             label="Max days in proposed"
@@ -451,6 +453,7 @@ export function AdminNetworkSettingsPanel({
             helperText="At-risk resolved events return to proposed within this window"
           />
         </SettingsSubsection>
+        ) : null}
 
         <SettingsSubsection title="Members & privacy">
           <FormControlLabel

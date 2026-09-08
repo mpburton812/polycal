@@ -23,10 +23,6 @@ import {
   loadEnforcementSettings,
 } from "@/lib/proposals/enforcement";
 import {
-  getProposalSpecialKind,
-  proposalDescriptionForDisplay,
-} from "@/lib/proposals/special-proposals";
-import {
   getAdminCanSeeUninvolved,
   viewerCanSeeProposalWithSleepingGate,
 } from "@/lib/proposals/access";
@@ -81,8 +77,6 @@ export async function listProposalBoardAction(): Promise<ProposalBoard> {
   }
 
   const db = getDb();
-  const { bridgeLegacyResidencyProposals } = await import("@/actions/residency-proposals");
-  await bridgeLegacyResidencyProposals(db);
   const viewerId = networkSession.user.id;
   const networkId = networkSession.user.activeNetworkId;
   const isAdmin =
@@ -267,8 +261,7 @@ export async function listProposalBoardAction(): Promise<ProposalBoard> {
     const canNudge =
       nudgeEligibleState &&
       pendingVoteCount > 0 &&
-      (isAdmin || row.proposerId === viewerId) &&
-      getProposalSpecialKind(row.description) !== "residency";
+      (isAdmin || row.proposerId === viewerId);
 
     const slotStarts = (slotsByProposal.get(row.id) ?? [])
       .filter((slot) => !slot.isDetached)
@@ -312,7 +305,7 @@ export async function listProposalBoardAction(): Promise<ProposalBoard> {
     const card: ProposalCard = {
       id: row.id,
       title: cardTitle,
-      description: proposalDescriptionForDisplay(row.description),
+      description: row.description,
       proposalType: row.proposalType,
       state: optionalRsvpPending ? "proposed" : row.state,
       proposerId: row.proposerId,
@@ -363,7 +356,6 @@ export async function listProposalBoardAction(): Promise<ProposalBoard> {
           },
           slotsByProposal.get(row.id) ?? [],
         ),
-      specialKind: getProposalSpecialKind(row.description) ?? undefined,
     };
 
     const column: keyof ProposalBoard = optionalRsvpPending
