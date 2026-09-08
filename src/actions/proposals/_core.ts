@@ -788,7 +788,7 @@ async function validateComposerPosting(
  */
 export async function createDraftProposalAction(
   input: z.infer<typeof draftProposalSchema>,
-): Promise<{ ok: boolean; message: string; proposalId?: string }> {
+): Promise<{ ok: boolean; message: string; proposalId?: string; errorEntryId?: string }> {
   const networkSession = await requireNetworkSession();
   if (!networkSession.ok) {
     return { ok: false, message: networkSession.message };
@@ -822,7 +822,7 @@ export async function createDraftProposalAction(
       locationPolicy: "network",
     });
     if (!validation.ok) {
-      return { ok: false, message: validation.error };
+      return { ok: false, message: validation.error, errorEntryId: validation.errorEntryId };
     }
 
     const created = await createBatchSleepingDraft(db, {
@@ -976,7 +976,7 @@ export async function createDraftProposalAction(
  */
 export async function updateDraftProposalAction(
   input: z.infer<typeof draftProposalSchema> & { proposalId: string },
-): Promise<{ ok: boolean; message: string }> {
+): Promise<{ ok: boolean; message: string; errorEntryId?: string }> {
   const networkSession = await requireNetworkSession();
   if (!networkSession.ok) {
     return { ok: false, message: networkSession.message };
@@ -1028,7 +1028,7 @@ export async function updateDraftProposalAction(
       locationPolicy: "network",
     });
     if (!validation.ok) {
-      return { ok: false, message: validation.error };
+      return { ok: false, message: validation.error, errorEntryId: validation.errorEntryId };
     }
 
     const [proposerRow] = await db

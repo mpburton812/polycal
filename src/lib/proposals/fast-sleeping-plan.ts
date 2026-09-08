@@ -31,6 +31,7 @@ export const fastSleepingRowSchema = z.object({
   intentionalSolo: z.boolean().optional(),
   /** Optional per-slot note → BatchSleepingEntry.comment. */
   comment: limitedString("Comment", LONG_TEXT_MAX).optional(),
+  isConfigured: z.boolean().optional(),
 });
 
 export type FastSleepingRow = z.infer<typeof fastSleepingRowSchema>;
@@ -63,7 +64,8 @@ export function createEmptyFastSleepingRow(
     subjectUserId,
     inviteeUserIds: [],
     inviteeRoles: {},
-    intentionalSolo: false,
+    intentionalSolo: true,
+    isConfigured: false,
   };
 }
 
@@ -92,8 +94,11 @@ export function formatFastSleepingDayLabel(dateValue: string): string {
 
 /** Returns true when a grid row has sleeping plan content configured. */
 export function fastSleepingRowHasContent(row: FastSleepingRow): boolean {
+  // Explicit false means untouched default grid row (solo UI default, not submitted).
+  if (row.isConfigured === false) return false;
   return Boolean(
-    row.intentionalSolo ||
+    row.isConfigured ||
+      row.intentionalSolo ||
       row.inviteeUserIds.length > 0 ||
       row.locationId ||
       row.locationText?.trim() ||
@@ -186,5 +191,6 @@ function entryToRow(entry: BatchSleepingEntry): FastSleepingRow {
     locationText: entry.locationText,
     intentionalSolo: Boolean(entry.intentionalSolo),
     comment: entry.comment,
+    isConfigured: true,
   };
 }

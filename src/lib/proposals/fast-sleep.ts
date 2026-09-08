@@ -150,7 +150,7 @@ export async function validateFastSleepEntries(
     locationPolicy: BatchLocationPolicy;
     networkId?: string;
   },
-): Promise<{ ok: true } | { ok: false; error: string }> {
+): Promise<{ ok: true } | { ok: false; error: string; errorEntryId?: string }> {
   if (input.entries.length === 0) {
     return { ok: false, error: "Configure at least one night before submitting." };
   }
@@ -174,7 +174,9 @@ export async function validateFastSleepEntries(
       reachable,
       networkId: input.networkId,
     });
-    if (!nightCheck.ok) return nightCheck;
+    if (!nightCheck.ok) {
+      return { ...nightCheck, errorEntryId: entry.id };
+    }
 
     const subjectUserId = entry.subjectUserId ?? input.schedulerId;
     if (entry.locationId || entry.locationText) {
@@ -186,7 +188,9 @@ export async function validateFastSleepEntries(
         entry.locationId,
         entry.locationText,
       );
-      if (!locationCheck.ok) return locationCheck;
+      if (!locationCheck.ok) {
+        return { ...locationCheck, errorEntryId: entry.id };
+      }
     }
   }
 

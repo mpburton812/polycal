@@ -111,7 +111,7 @@ export async function validateBatchSleepingEntries(
     entries: BatchSleepingEntry[];
     locationPolicy: BatchLocationPolicy;
   },
-): Promise<{ ok: true } | { ok: false; error: string }> {
+): Promise<{ ok: true } | { ok: false; error: string; errorEntryId?: string }> {
   if (input.entries.length === 0) {
     return { ok: false, error: "Configure at least one night before submitting." };
   }
@@ -124,13 +124,14 @@ export async function validateBatchSleepingEntries(
       entry.invitees,
     );
     if (!inviteeCheck.ok) {
-      return inviteeCheck;
+      return { ...inviteeCheck, errorEntryId: entry.id };
     }
 
     if (!entry.intentionalSolo && entry.invitees.length === 0) {
       return {
         ok: false,
         error: "Each configured night needs partners or intentional solo.",
+        errorEntryId: entry.id,
       };
     }
 
@@ -144,7 +145,7 @@ export async function validateBatchSleepingEntries(
         entry.locationText,
       );
       if (!locationCheck.ok) {
-        return locationCheck;
+        return { ...locationCheck, errorEntryId: entry.id };
       }
     }
   }
