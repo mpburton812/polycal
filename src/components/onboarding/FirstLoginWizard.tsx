@@ -220,13 +220,14 @@ function FirstLoginWizardInner({
       setEmailStatus(
         "Verification link sent (when email delivery is configured). You can finish setup now and verify later.",
       );
+      // Advance before session update so remount restore does not re-read step 0 (PC-510).
+      advanceTo(1);
       await update({
         user: {
           mustChangePassword: false,
           sessionVersion: result.sessionVersion,
         },
       });
-      advanceTo(1);
       router.refresh();
     });
   }

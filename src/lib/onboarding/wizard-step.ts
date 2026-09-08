@@ -29,6 +29,9 @@ export function resolveOnboardingStartStep(options: {
     if (n < 0 || n >= ONBOARDING_STEP_COUNT) continue;
     // Cannot skip password while mustChangePassword is still required.
     if (options.mustChangePassword && n > 0) continue;
+    // Password already satisfied — never restore Email and Password (step 0) or a
+    // remount after setInitialPassword will bounce the user back and stall e2e (PC-510).
+    if (!options.mustChangePassword && n < 1) continue;
     return n;
   }
   return fallback;

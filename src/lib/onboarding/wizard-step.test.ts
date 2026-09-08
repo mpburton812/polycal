@@ -67,6 +67,16 @@ describe("resolveOnboardingStartStep", () => {
       }),
     ).toBe(1);
   });
+
+  it("ignores stored Email and Password step after password is set", () => {
+    expect(
+      resolveOnboardingStartStep({
+        mustChangePassword: false,
+        queryStep: null,
+        storedStep: "0",
+      }),
+    ).toBe(1);
+  });
 });
 
 describe("resolveOnboardingMaxUnlocked", () => {
