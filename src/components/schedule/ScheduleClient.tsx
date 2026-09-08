@@ -266,7 +266,7 @@ export function ScheduleClient({
       if (opts?.scrollToTop) {
         scrollTargetAnchorRef.current = normalized.toISOString();
         // Top sentinel is visible at scrollTop 0 — suppress prepend while settling (PC-515).
-        suppressPrependUntilRef.current = Date.now() + 400;
+        suppressPrependUntilRef.current = Date.now() + 1500;
       }
       const seq = ++stackSeqRef.current;
       setPending(true);
@@ -280,7 +280,11 @@ export function ScheduleClient({
           const events =
             opts?.seedEvents ?? (await fetchSegmentEvents(normalized, layout));
           if (seq !== stackSeqRef.current) return;
-          setSegments([buildScheduleSegment(normalized, layout, events, timeZone)]);
+          const built = buildScheduleSegment(normalized, layout, events, timeZone);
+          if (opts?.scrollToTop) {
+            suppressPrependUntilRef.current = Date.now() + 1500;
+          }
+          setSegments([built]);
         } finally {
           if (seq === stackSeqRef.current) setPending(false);
         }
@@ -325,18 +329,18 @@ export function ScheduleClient({
   }, [pathname]);
 
   /** After rebuild, scroll the calendar region to the top (PC-493 / PC-515). */
-  useEffect(() => {
+  useLayoutEffect(() => {
     const target = scrollTargetAnchorRef.current;
     if (!target || pending || segments.length === 0) return;
     if (!segments.some((segment) => segment.id === target)) return;
     scrollTargetAnchorRef.current = null;
-    requestAnimationFrame(() => {
-      // Instant jump — smooth scroll fights Today pin + top-sentinel prepend (PC-515).
-      scrollRootRef.current?.scrollTo({
-        top: 0,
-        behavior: "instant" in window ? "instant" : "auto",
-      });
-    });
+
+    // Synchronous scroll reset before paint prevents blank flashes and invalid scroll offsets (PC-515).
+    if (scrollRootRef.current) {
+      scrollRootRef.current.scrollTop = 0;
+    }
+    // Re-arm top-sentinel suppression so immediate observer callback does not prepend past segment.
+    suppressPrependUntilRef.current = Date.now() + 1000;
   }, [pending, segments]);
 
   const refreshCurrentView = useCallback(() => {
@@ -377,12 +381,19 @@ export function ScheduleClient({
   }, [fetchSegmentEvents, pending, setSegments, timeZone, viewState.calendarLayout]);
 
   const prependPastSegment = useCallback(async () => {
-    if (Date.now() < suppressPrependUntilRef.current) return;
+    const isSuppressed = Date.now() < suppressPrependUntilRef.current;
+    if (isSuppressed) return;
     if (loadingPastRef.current || pending) return;
     const current = segmentsRef.current;
     if (current.length === 0) return;
     const first = current[0];
     if (!first) return;
+
+    // Do not auto-prepend when user is sitting at scrollTop 0 unless they actually scroll up or suppression has passed.
+    const scrollRoot = scrollRootRef.current;
+    if (scrollRoot && scrollRoot.scrollTop <= 5 && Date.now() < suppressPrependUntilRef.current) {
+      return;
+    }
 
     const layout = viewState.calendarLayout;
     const maxSegments = scheduleMaxSegments(layout);
@@ -393,9 +404,9 @@ export function ScheduleClient({
     loadingPastRef.current = true;
     setLoadingPast(true);
     const seq = stackSeqRef.current;
-    const scrollRoot = scrollRootRef.current;
-    const prevScrollHeight = scrollRoot?.scrollHeight ?? 0;
-    const prevScrollTop = scrollRoot?.scrollTop ?? 0;
+    const scrollRootEl = scrollRootRef.current;
+    const prevScrollHeight = scrollRootEl?.scrollHeight ?? 0;
+    const prevScrollTop = scrollRootEl?.scrollTop ?? 0;
     try {
       const events = await fetchSegmentEvents(prevAnchor, layout);
       if (seq !== stackSeqRef.current) return;
@@ -432,6 +443,9 @@ export function ScheduleClient({
       ssrWeekStart: new Date(initialWeekStartIso),
       timeZone,
     });
+    // #region agent log
+    fetch('http://127.0.0.1:7877/ingest/a7fec596-db87-48de-bdd6-4f205ff93d1f',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'183aad'},body:JSON.stringify({sessionId:'183aad',runId:'run1',hypothesisId:'C',location:'ScheduleClient.tsx:initialSeedEffect',message:'initialSeedEffect executing',data:{covers,layout:viewState.calendarLayout,primaryAnchorIso:primaryAnchor.toISOString()},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
     if (covers) {
       rebuildStack(primaryAnchor, {
         layout: "week",
@@ -604,7 +618,7 @@ export function ScheduleClient({
     if (isMonthLayout) {
       const next = shiftSegmentAnchor(monthAnchor, "month", delta, timeZone);
       setViewState((current) => ({ ...current, monthAnchorIso: next.toISOString() }));
-      rebuildStack(next, { layout: "month" });
+      rebuildStack(next, { layout: "month", scrollToTop: true });
       return;
     }
 
@@ -615,7 +629,7 @@ export function ScheduleClient({
         weekStartIso: next.toISOString(),
         monthAnchorIso: startOfMonth(next, timeZone).toISOString(),
       }));
-      rebuildStack(next, { layout: "day" });
+      rebuildStack(next, { layout: "day", scrollToTop: true });
       return;
     }
 
@@ -625,12 +639,15 @@ export function ScheduleClient({
       weekStartIso: next.toISOString(),
       monthAnchorIso: startOfMonth(next, timeZone).toISOString(),
     }));
-    rebuildStack(next, { layout: "week" });
+    rebuildStack(next, { layout: "week", scrollToTop: true });
   }
 
   function goToday() {
     // Suppress top-sentinel prepend while Goto Today settles at scrollTop 0 (PC-515).
     suppressPrependUntilRef.current = Date.now() + 400;
+    // #region agent log
+    fetch('http://127.0.0.1:7877/ingest/a7fec596-db87-48de-bdd6-4f205ff93d1f',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'183aad'},body:JSON.stringify({sessionId:'183aad',runId:'run1',hypothesisId:'A',location:'ScheduleClient.tsx:goToday',message:'goToday clicked',data:{suppressUntil:suppressPrependUntilRef.current,now:Date.now()},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
     const anchors = todayAnchors();
     const now = new Date();
     if (viewState.calendarLayout === "day") {
