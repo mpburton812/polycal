@@ -458,3 +458,4 @@
 2026-09-08 | 136ad30 | PC-510 | harden Email and Password step for e2e FormData | src/components/onboarding/FirstLoginWizard.tsx
 2026-09-08 | 99e87b7 | PC-510 | prevent step-0 restore after password clears mustChangePassword | src/components/onboarding/FirstLoginWizard.tsx
 2026-09-08 | 51d7a0e | PC-510 | skip refresh after Email/Password so remount cannot reset step | src/components/onboarding/FirstLoginWizard.tsx
+2026-09-08 | b1b5cec | PC-510 | use uncontrolled email field so Continue is not blocked | src/components/onboarding/FirstLoginWizard.tsx
