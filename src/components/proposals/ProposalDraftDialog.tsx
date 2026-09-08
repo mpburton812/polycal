@@ -205,7 +205,6 @@ export function ProposalDraftDialog({
   const [batchMode, setBatchMode] = useState(false);
   const [fastPlanRows, setFastPlanRows] = useState<FastSleepingRow[]>(() => buildEmptyGridRows());
   const [batchLocationOptions, setBatchLocationOptions] = useState<ProposalPlaceOption[]>([]);
-  const [acceptedPartnerIds, setAcceptedPartnerIds] = useState<string[]>([]);
   const [sleepingLocationOptions, setSleepingLocationOptions] = useState<ProposalPlaceOption[]>(
     [],
   );
@@ -219,33 +218,19 @@ export function ProposalDraftDialog({
   const [reminderValue, setReminderValue] = useState(1);
   const [reminderUnit, setReminderUnit] = useState<"days" | "hours" | "minutes">("hours");
   const [postToFeed, setPostToFeed] = useState(false);
+  const [tentative, setTentative] = useState(false);
   const [slots, setSlots] = useState<SlotDraft[]>([{ startAt: "", endAt: "", label: "" }]);
   const [inviteeMode, setInviteeMode] = useState<Record<string, InviteeSelection>>({});
+  /** Logged-in user's partners — Booking-for picker (PC-494). */
+  const [viewerPartnerIds, setViewerPartnerIds] = useState<string[]>([]);
+  /** Who-chip partners for the booking subject (self or on-behalf) (PC-494). */
+  const [acceptedPartnerIds, setAcceptedPartnerIds] = useState<string[]>([]);
   const { showToast } = useToast();
   const [conflictWarnings, setConflictWarnings] = useState<ProposalConflictWarning[]>([]);
   const [showConflictConfirm, setShowConflictConfirm] = useState(false);
   const [conflictDialogOpen, setConflictDialogOpen] = useState(false);
   const [pending, startTransition] = useTransition();
   const contentRef = useRef<HTMLDivElement>(null);
-
-  const eventCandidates = useMemo(() => {
-    const raw = people.filter(
-      (person) => person.id !== currentUserId && person.status === "active",
-    );
-    return rankPeople(raw, peopleRank);
-  }, [people, currentUserId, peopleRank]);
-
-  const sleepingCandidates = useMemo(() => {
-    const raw = people.filter(
-      (person) =>
-        person.id !== currentUserId &&
-        person.status === "active" &&
-        acceptedPartnerIds.includes(person.id),
-    );
-    return rankPeople(raw, peopleRank, { partnerIds: acceptedPartnerIds });
-  }, [people, currentUserId, acceptedPartnerIds, peopleRank]);
-
-  const candidates = proposalType === "sleeping" ? sleepingCandidates : eventCandidates;
 
   const hasSelectedInvitees = Object.values(inviteeMode).some(inviteeIsSelected);
   const isSoloProposal = !hasSelectedInvitees;
@@ -267,15 +252,48 @@ export function ProposalDraftDialog({
     bookingsOn &&
     effectivePostingKind === "booking";
   const showTypeBody = typePicked && postingChosen;
+
+  /** Subject whose sleeping partners drive Who chips (self or Booking-for) (PC-494). */
+  const whoSubjectUserId =
+    effectivePostingKind === "booking" && onBehalfOfUserId
+      ? onBehalfOfUserId
+      : currentUserId;
+
+  const eventCandidates = useMemo(() => {
+    const raw = people.filter(
+      (person) =>
+        person.id !== whoSubjectUserId &&
+        person.status === "active",
+    );
+    // Booking-for scopes Who to the subject's sleeping partners (PC-494).
+    const scoped =
+      whoSubjectUserId !== currentUserId
+        ? raw.filter((person) => acceptedPartnerIds.includes(person.id))
+        : raw;
+    return rankPeople(scoped, peopleRank);
+  }, [people, currentUserId, whoSubjectUserId, acceptedPartnerIds, peopleRank]);
+
+  const sleepingCandidates = useMemo(() => {
+    const raw = people.filter(
+      (person) =>
+        person.id !== whoSubjectUserId &&
+        person.status === "active" &&
+        acceptedPartnerIds.includes(person.id),
+    );
+    return rankPeople(raw, peopleRank, { partnerIds: acceptedPartnerIds });
+  }, [people, whoSubjectUserId, acceptedPartnerIds, peopleRank]);
+
+  const candidates = proposalType === "sleeping" ? sleepingCandidates : eventCandidates;
+
   const proxyPeople = useMemo(() => {
     const others = people.filter(
       (person) => person.id !== currentUserId && person.status === "active",
     );
     if (composer.proxySchedulingScope === "sleeping_partners") {
-      return others.filter((person) => acceptedPartnerIds.includes(person.id));
+      return others.filter((person) => viewerPartnerIds.includes(person.id));
     }
     return others;
-  }, [people, currentUserId, composer.proxySchedulingScope, acceptedPartnerIds]);
+  }, [people, currentUserId, composer.proxySchedulingScope, viewerPartnerIds]);
 
   const locationOptions =
     proposalType === "sleeping" && batchMode
@@ -339,13 +357,45 @@ export function ProposalDraftDialog({
 
   useEffect(() => {
     if (!open) return;
-    void listAcceptedSleepingPartnerIdsAction().then(setAcceptedPartnerIds);
+    void listAcceptedSleepingPartnerIdsAction().then((ids) => {
+      setViewerPartnerIds(ids);
+      setAcceptedPartnerIds(ids);
+    });
     if (composerSettings) {
       setComposer(composerSettings);
       return;
     }
     void getDraftComposerSettingsAction().then(setComposer);
   }, [open, composerSettings]);
+
+  /** Re-scope Who partners when Booking-for subject changes (PC-494). */
+  useEffect(() => {
+    if (!open) return;
+    const subjectId =
+      effectivePostingKind === "booking" && onBehalfOfUserId
+        ? onBehalfOfUserId
+        : currentUserId;
+    void listAcceptedSleepingPartnerIdsAction(
+      subjectId === currentUserId ? undefined : subjectId,
+    ).then((ids) => {
+      setAcceptedPartnerIds(ids);
+      setInviteeMode((current) => {
+        const next: Record<string, InviteeSelection> = {};
+        for (const [userId, role] of Object.entries(current)) {
+          if (!inviteeIsSelected(role)) continue;
+          if (userId === subjectId) continue;
+          if (subjectId !== currentUserId && !ids.includes(userId)) continue;
+          if (subjectId === currentUserId) {
+            next[userId] = role;
+            continue;
+          }
+          // Keep only partners of the new subject.
+          if (ids.includes(userId)) next[userId] = role;
+        }
+        return next;
+      });
+    });
+  }, [open, effectivePostingKind, onBehalfOfUserId, currentUserId]);
 
   useEffect(() => {
     if (!open || proposalType !== "sleeping" || batchMode) {
@@ -445,6 +495,7 @@ export function ProposalDraftDialog({
       }
 
       if (!touched.has("title") && parsed.title) setTitle(parsed.title);
+      if (parsed.tentative) setTentative(true);
       if (!touched.has("type") && parsed.proposalType) {
         setProposalType(parsed.proposalType);
         setTypePicked(true);
@@ -556,6 +607,7 @@ export function ProposalDraftDialog({
       );
       setPostingKind(initialDetail.postingKind === "booking" ? "booking" : "proposal");
       setOnBehalfOfUserId(initialDetail.onBehalfOfUserId ?? "");
+      setTentative(Boolean(initialDetail.tentative));
       setEventIconKey(
         isEventIconKey(initialDetail.eventIconKey) ? initialDetail.eventIconKey : null,
       );
@@ -645,6 +697,7 @@ export function ProposalDraftDialog({
       setReminderValue(1);
       setReminderUnit("hours");
       setPostToFeed(false);
+      setTentative(false);
     }
   }, [open, initialDetail, lockedProposalType, savedDraftId, initialStartAt, initialTitle, initialNlpText]);
 
@@ -693,6 +746,7 @@ export function ProposalDraftDialog({
     );
     setPostingKind(detail.postingKind === "booking" ? "booking" : "proposal");
     setOnBehalfOfUserId(detail.onBehalfOfUserId ?? "");
+    setTentative(Boolean(detail.tentative));
     setEventIconKey(isEventIconKey(detail.eventIconKey) ? detail.eventIconKey : null);
     setIsRecurring(detail.isRecurrenceParent);
     if (detail.recurrenceRule) {
@@ -862,6 +916,7 @@ export function ProposalDraftDialog({
           ? reminderOffsetToMinutes(reminderValue, reminderUnit)
           : null,
       postToFeed,
+      tentative,
     };
   }
 
@@ -1312,7 +1367,7 @@ export function ProposalDraftDialog({
                 value={onBehalfOfUserId}
                 onChange={(event) => setOnBehalfOfUserId(String(event.target.value))}
               >
-                <MenuItem value="">Myself</MenuItem>
+                <MenuItem value="">{proposerName} (Myself)</MenuItem>
                 {proxyPeople.map((person) => (
                   <MenuItem key={person.id} value={person.id}>
                     {person.displayName}
@@ -1429,6 +1484,8 @@ export function ProposalDraftDialog({
             onReminderUnitChange={setReminderUnit}
             postToFeed={postToFeed}
             onPostToFeedChange={setPostToFeed}
+            tentative={tentative}
+            onTentativeChange={setTentative}
             isPoll={isPoll}
             hidePoll={hidePoll}
             onPollChange={(value) => {

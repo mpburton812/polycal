@@ -28,6 +28,8 @@ export const users = sqliteTable("users", {
   lastLoginAt: text("last_login_at"),
   gender: text("gender"),
   notificationEmail: text("notification_email"),
+  /** E.164-ish mobile for optional SMS alerts (PC-494). */
+  notificationPhone: text("notification_phone"),
   emailVerifiedAt: text("email_verified_at"),
   /** SHA-256 digest of the emailed verification token — never the raw value (PC-353). */
   emailVerificationToken: text("email_verification_token"),

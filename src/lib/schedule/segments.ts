@@ -4,7 +4,7 @@ import {
   addDays,
   civilDateAtNoonUtc,
   localDateKey,
-  startOfWeekMonday,
+  startOfWeekSunday,
 } from "@/lib/schedule/dates";
 import { computeScheduleFetchRange, type ScheduleFetchRange } from "@/lib/schedule/fetch-range";
 import { startOfMonth } from "@/lib/schedule/month-grid";
@@ -52,7 +52,7 @@ export function normalizeSegmentAnchor(
     const key = localDateKey(date.toISOString(), timeZone);
     return civilDateAtNoonUtc(key);
   }
-  return startOfWeekMonday(date, timeZone);
+  return startOfWeekSunday(date, timeZone);
 }
 
 /**

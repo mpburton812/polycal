@@ -34,6 +34,7 @@ export type NetworkSettings = {
   archiveGraceHours: number;
   redraftDeadlineHours: number;
   sleepingPartnerProposalMaxDays: number;
+  usHolidaysEnabled: boolean;
 };
 
 type NetworkSettingsRow = {
@@ -58,6 +59,7 @@ type NetworkSettingsRow = {
   archiveGraceHours: number;
   redraftDeadlineHours: number;
   sleepingPartnerProposalMaxDays: number;
+  usHolidaysEnabled: boolean | null;
 };
 
 function parseSchedulingPosting(value: string | null): SchedulingPostingMode {
@@ -94,6 +96,7 @@ function mapNetworkRow(row: NetworkSettingsRow): NetworkSettings {
     archiveGraceHours: row.archiveGraceHours,
     redraftDeadlineHours: row.redraftDeadlineHours,
     sleepingPartnerProposalMaxDays: row.sleepingPartnerProposalMaxDays,
+    usHolidaysEnabled: row.usHolidaysEnabled ?? false,
   };
 }
 
@@ -126,6 +129,7 @@ const loadNetworkSettingsMemo = cache(async (networkId: string): Promise<Network
       archiveGraceHours: networks.archiveGraceHours,
       redraftDeadlineHours: networks.redraftDeadlineHours,
       sleepingPartnerProposalMaxDays: networks.sleepingPartnerProposalMaxDays,
+      usHolidaysEnabled: networks.usHolidaysEnabled,
     })
     .from(networks)
     .where(eq(networks.id, networkId))
@@ -168,6 +172,7 @@ export async function loadNetworkSettings(
       archiveGraceHours: networks.archiveGraceHours,
       redraftDeadlineHours: networks.redraftDeadlineHours,
       sleepingPartnerProposalMaxDays: networks.sleepingPartnerProposalMaxDays,
+      usHolidaysEnabled: networks.usHolidaysEnabled,
     })
     .from(networks)
     .where(eq(networks.id, networkId))

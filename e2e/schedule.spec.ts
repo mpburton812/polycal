@@ -78,13 +78,13 @@ test.describe("Schedule calendar", () => {
     const root = activeMainPanel(page);
     await root.getByLabel("Next period").click();
     await root.getByRole("button", { name: "Goto today" }).click();
-    const monday = new Date();
-    const day = monday.getDay();
-    const diff = day === 0 ? -6 : 1 - day;
-    monday.setDate(monday.getDate() + diff);
-    monday.setHours(0, 0, 0, 0);
+    // Week starts Sunday (PC-494).
+    const sunday = new Date();
+    const day = sunday.getDay();
+    sunday.setDate(sunday.getDate() - day);
+    sunday.setHours(0, 0, 0, 0);
     const fmt: Intl.DateTimeFormatOptions = { month: "short", day: "numeric" };
-    const expectedStart = monday.toLocaleDateString(undefined, fmt);
+    const expectedStart = sunday.toLocaleDateString(undefined, fmt);
     await expect(
       root.getByText(new RegExp(expectedStart.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))).first(),
     ).toBeVisible();

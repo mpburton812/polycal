@@ -12,7 +12,7 @@ import {
   isTodayDate,
   localDateKey,
   scheduleDayCellSx,
-  startOfWeekMonday,
+  startOfWeekSunday,
 } from "@/lib/schedule/dates";
 import { sortDayEvents } from "@/lib/schedule/sort-day-events";
 import { DEFAULT_VIEWER_TIMEZONE } from "@/lib/schedule/timezone";
@@ -23,42 +23,42 @@ interface ScheduleWeekViewProps {
   weekStart: Date;
   dayCount: number;
   events: ScheduleEvent[];
-  compact: boolean;
   timeZone?: string;
   onEventClick: (event: ScheduleEvent) => void;
-  /** Opens day sheet when compact overflow exceeds the visible chip cap (PC-165). */
+  /** Opens daily view when a day header is clicked (PC-494). */
+  onDayHeaderClick?: (day: Date) => void;
+  /** Opens day sheet when overflow exceeds the visible chip cap (PC-165). */
   onDayOverflowClick?: (day: Date) => void;
 }
 
 const COMPACT_VISIBLE = 3;
 
 /**
- * Renders a multi-day column grid with events grouped by local day (PC-42).
- * Compact list scrolls so Today is first visible (PC-400).
+ * Compact agenda-style week list (Sun–Sat) so event titles stay readable (PC-42 / PC-494).
+ * Scrolls so Today is first visible (PC-400).
  */
 export function ScheduleWeekView({
   weekStart,
   dayCount,
   events,
-  compact,
   timeZone = DEFAULT_VIEWER_TIMEZONE,
   onEventClick,
+  onDayHeaderClick,
   onDayOverflowClick,
 }: ScheduleWeekViewProps) {
   const days = useMemo(() => {
-    const monday = startOfWeekMonday(weekStart, timeZone);
-    return Array.from({ length: dayCount }, (_, index) => addDays(monday, index));
+    const sunday = startOfWeekSunday(weekStart, timeZone);
+    return Array.from({ length: dayCount }, (_, index) => addDays(sunday, index));
   }, [weekStart, dayCount, timeZone]);
 
   const todayRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    if (!compact) return;
     todayRef.current?.scrollIntoView({
       block: "start",
       behavior: "instant" in window ? "instant" : "auto",
     });
-  }, [compact, days, timeZone]);
+  }, [days, timeZone]);
 
   const eventsByDay = useMemo(() => {
     const map = new Map<string, ScheduleEvent[]>();
@@ -86,145 +86,48 @@ export function ScheduleWeekView({
     return map;
   }, [days, events, timeZone]);
 
-  if (compact) {
-    return (
-      <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
-        {days.map((day) => {
-          const key = localDateKey(day.toISOString(), timeZone);
-          const dayEvents = eventsByDay.get(key) ?? [];
-          const daySx = scheduleDayCellSx(day, timeZone);
-          const isToday = isTodayDate(day, timeZone);
-          return (
-            <Box
-              key={key}
-              ref={isToday ? todayRef : undefined}
-              sx={{
-                display: "flex",
-                alignItems: "flex-start",
-                gap: 1,
-                py: 0.5,
-                borderBottom: 1,
-                borderColor: isToday ? "primary.main" : "divider",
-                width: "100%",
-                minWidth: 0,
-                opacity: daySx.opacity,
-                bgcolor: daySx.bgcolor,
-                borderRadius: 0.5,
-                px: 0.5,
-              }}
-            >
-              <Typography
-                variant="caption"
-                sx={{
-                  flexShrink: 0,
-                  minWidth: 72,
-                  fontWeight: isToday ? 700 : 600,
-                  color: isToday ? "primary.main" : "text.secondary",
-                }}
-              >
-                {formatDayHeader(day, timeZone)}
-              </Typography>
-              <Box
-                sx={{
-                  flex: 1,
-                  minWidth: 0,
-                  display: "flex",
-                  gap: 0.5,
-                  overflow: "hidden",
-                  alignItems: "center",
-                }}
-              >
-                {dayEvents.length === 0 ? (
-                  <Typography variant="caption" sx={{ color: GARDEN_TOKENS.inkMuted }}>
-                    Quiet day
-                  </Typography>
-                ) : (
-                  <>
-                    {dayEvents.slice(0, COMPACT_VISIBLE).map((event, index) => (
-                      <Box key={event.id} sx={{ flex: 1, minWidth: 0 }}>
-                        <ScheduleEventBlock
-                          event={event}
-                          compact
-                          timeZone={timeZone}
-                          rotationIndex={index}
-                          onClick={() => onEventClick(event)}
-                        />
-                      </Box>
-                    ))}
-                    {dayEvents.length > COMPACT_VISIBLE && onDayOverflowClick && (
-                      <Typography
-                        component="button"
-                        type="button"
-                        variant="caption"
-                        aria-label={`Show ${dayEvents.length - COMPACT_VISIBLE} more events`}
-                        onClick={() => onDayOverflowClick(day)}
-                        sx={{
-                          flexShrink: 0,
-                          border: "none",
-                          background: "none",
-                          color: GARDEN_TOKENS.sage,
-                          fontWeight: 700,
-                          cursor: "pointer",
-                          whiteSpace: "nowrap",
-                        }}
-                      >
-                        +{dayEvents.length - COMPACT_VISIBLE}
-                      </Typography>
-                    )}
-                  </>
-                )}
-              </Box>
-            </Box>
-          );
-        })}
-      </Box>
-    );
-  }
-
   return (
-    <Box
-      sx={{
-        display: "grid",
-        gridTemplateColumns: {
-          xs: "1fr",
-          sm: "repeat(2, 1fr)",
-          md: `repeat(${Math.min(dayCount, 7)}, 1fr)`,
-        },
-        gap: 1,
-      }}
-    >
-      {days.map((day, dayIndex) => {
+    <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
+      {days.map((day) => {
         const key = localDateKey(day.toISOString(), timeZone);
         const dayEvents = eventsByDay.get(key) ?? [];
         const daySx = scheduleDayCellSx(day, timeZone);
         const isToday = isTodayDate(day, timeZone);
-        const stagger = dayIndex % 2 === 1 ? { mt: 0.75 } : undefined;
+        const overflow = Math.max(0, dayEvents.length - COMPACT_VISIBLE);
+        const visible = overflow > 0 ? dayEvents.slice(0, COMPACT_VISIBLE) : dayEvents;
         return (
           <Box
             key={key}
+            ref={isToday ? todayRef : undefined}
             sx={{
-              minHeight: 120,
-              minWidth: 0,
               border: `2px solid ${GARDEN_TOKENS.ink}`,
               borderRadius: ORGANIC_RADIUS,
-              p: 1,
-              bgcolor: daySx.bgcolor ?? GARDEN_TOKENS.surface,
+              bgcolor: daySx.bgcolor,
               opacity: daySx.opacity,
-              overflow: "hidden",
-              boxShadow: "none",
-              ...stagger,
+              p: 1.25,
+              borderColor: isToday ? GARDEN_TOKENS.sage : GARDEN_TOKENS.ink,
             }}
           >
             <Typography
+              component={onDayHeaderClick ? "button" : "h3"}
+              type={onDayHeaderClick ? "button" : undefined}
+              onClick={onDayHeaderClick ? () => onDayHeaderClick(day) : undefined}
               variant="subtitle2"
-              fontWeight={isToday ? 800 : 700}
               sx={{
-                mb: 1,
                 fontFamily: fontFamilies.label,
+                fontWeight: isToday ? 800 : 700,
+                mb: 1,
+                border: "none",
+                background: "none",
+                p: 0,
+                cursor: onDayHeaderClick ? "pointer" : "default",
                 color: isToday ? GARDEN_TOKENS.sage : GARDEN_TOKENS.ink,
+                textAlign: "left",
+                width: "100%",
               }}
             >
               {formatDayHeader(day, timeZone)}
+              {isToday ? " · Today" : ""}
             </Typography>
             {dayEvents.length === 0 ? (
               <EmptyState
@@ -235,15 +138,37 @@ export function ScheduleWeekView({
                 data-testid="schedule-day-empty"
               />
             ) : (
-              dayEvents.map((event, index) => (
-                <ScheduleEventBlock
-                  key={event.id}
-                  event={event}
-                  timeZone={timeZone}
-                  rotationIndex={index}
-                  onClick={() => onEventClick(event)}
-                />
-              ))
+              <Box sx={{ display: "flex", flexDirection: "column", gap: 0.75 }}>
+                {visible.map((event, index) => (
+                  <ScheduleEventBlock
+                    key={event.id}
+                    event={event}
+                    timeZone={timeZone}
+                    rotationIndex={index}
+                    onClick={() => onEventClick(event)}
+                  />
+                ))}
+                {overflow > 0 && onDayOverflowClick && (
+                  <Typography
+                    component="button"
+                    type="button"
+                    variant="caption"
+                    aria-label={`Show ${overflow} more events`}
+                    onClick={() => onDayOverflowClick(day)}
+                    sx={{
+                      border: "none",
+                      background: "none",
+                      color: GARDEN_TOKENS.sage,
+                      fontWeight: 700,
+                      cursor: "pointer",
+                      textAlign: "left",
+                      p: 0,
+                    }}
+                  >
+                    +{overflow} more
+                  </Typography>
+                )}
+              </Box>
             )}
           </Box>
         );

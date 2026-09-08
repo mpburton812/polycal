@@ -11,6 +11,7 @@ import { isSleepingLikeType } from "@/lib/proposals/sleeping-like";
 import { scheduleBlockSx, scheduleBlockVariant } from "@/lib/schedule/colors";
 import { formatEventTime } from "@/lib/schedule/dates";
 import { DEFAULT_VIEWER_TIMEZONE } from "@/lib/schedule/timezone";
+import { TENTATIVE_HATCH_BACKGROUND } from "@/lib/proposals/tentative-title";
 import { fontFamilies } from "@/theme/fonts";
 import { GARDEN_TOKENS } from "@/theme/tokens";
 
@@ -35,7 +36,7 @@ function formatStakeholders(event: ScheduleEvent): string | null {
 /** Status fragment for line-one event card format (PC-56). Approved events omit Confirmed. */
 function formatStatusLabel(event: ScheduleEvent): string {
   const parts: string[] = [];
-  if (event.isTentative) parts.push("Tentative");
+  // Tentative flag already prefixes the title with Tent: (PC-494) — avoid duplicate status.
   if (event.atRisk) parts.push("At risk");
   if (event.hasOverlap) parts.push("Conflict");
   return parts.join(", ");
@@ -120,7 +121,9 @@ export function ScheduleEventBlock({
         border: colors.border,
         borderRadius: colors.borderRadius,
         transform: colors.transform,
-        backgroundImage: colors.backgroundImage,
+        backgroundImage: event.isTentative
+          ? TENTATIVE_HATCH_BACKGROUND
+          : colors.backgroundImage,
         boxShadow: "none",
         transition: "transform 0.12s ease, filter 0.12s ease",
         "&:hover": {
@@ -167,11 +170,21 @@ export function ScheduleEventBlock({
         <Typography
           variant={compact ? "caption" : "body2"}
           fontWeight={600}
-          noWrap
+          noWrap={compact}
           sx={{
             fontFamily: fontFamilies.label,
             overflow: "hidden",
             textOverflow: "ellipsis",
+            ...(compact
+              ? undefined
+              : {
+                  display: "-webkit-box",
+                  WebkitLineClamp: 2,
+                  WebkitBoxOrient: "vertical",
+                  whiteSpace: "normal",
+                  fontSize: "0.9rem",
+                  lineHeight: 1.3,
+                }),
           }}
         >
           {lineOne}
@@ -179,11 +192,21 @@ export function ScheduleEventBlock({
         <Typography
           variant="caption"
           display="block"
-          noWrap
+          noWrap={compact}
           sx={{
             fontFamily: fontFamilies.body,
             overflow: "hidden",
             textOverflow: "ellipsis",
+            ...(compact
+              ? undefined
+              : {
+                  display: "-webkit-box",
+                  WebkitLineClamp: 2,
+                  WebkitBoxOrient: "vertical",
+                  whiteSpace: "normal",
+                  fontSize: "0.8rem",
+                  lineHeight: 1.3,
+                }),
           }}
         >
           {lineTwo}

@@ -1,6 +1,6 @@
 import type { ScheduleCalendarLayout } from "@/components/schedule/scheduleViewState";
 
-import { addDays, endOfCivilDayInZone, localDateKey, startOfCivilDayInZone, startOfWeekMonday } from "@/lib/schedule/dates";
+import { addDays, endOfCivilDayInZone, localDateKey, startOfCivilDayInZone, startOfWeekSunday } from "@/lib/schedule/dates";
 import { monthGridRange, startOfMonth } from "@/lib/schedule/month-grid";
 import { DEFAULT_VIEWER_TIMEZONE } from "@/lib/schedule/timezone";
 
@@ -10,8 +10,8 @@ export interface ScheduleFetchRange {
 }
 
 /**
- * Computes the inclusive API fetch window for day, week, or month layouts (PC-77 / PC-204 / PC-376 / PC-488).
- * Week bounds use viewer-TZ midnight→EOD so Monday morning events are not clipped by noon anchors.
+ * Computes the inclusive API fetch window for day, week, or month layouts (PC-77 / PC-204 / PC-376 / PC-488 / PC-494).
+ * Week bounds use viewer-TZ midnight→EOD so Sunday morning events are not clipped by noon anchors.
  */
 export function computeScheduleFetchRange(
   anchorDate: Date,
@@ -32,10 +32,10 @@ export function computeScheduleFetchRange(
     return { rangeStart, rangeEnd };
   }
 
-  const mondayNoon = startOfWeekMonday(anchorDate, timeZone);
-  const mondayKey = localDateKey(mondayNoon.toISOString(), timeZone);
-  const rangeStart = startOfCivilDayInZone(mondayKey, timeZone);
-  const endNoon = addDays(mondayNoon, 6);
+  const sundayNoon = startOfWeekSunday(anchorDate, timeZone);
+  const sundayKey = localDateKey(sundayNoon.toISOString(), timeZone);
+  const rangeStart = startOfCivilDayInZone(sundayKey, timeZone);
+  const endNoon = addDays(sundayNoon, 6);
   const endKey = localDateKey(endNoon.toISOString(), timeZone);
   return {
     rangeStart,

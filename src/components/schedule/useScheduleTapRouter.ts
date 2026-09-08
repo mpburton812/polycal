@@ -49,6 +49,10 @@ export function useScheduleTapRouter() {
   }, []);
 
   const openScheduleEvent = useCallback((event: ScheduleEvent) => {
+    // Synthetic US holidays are display-only (PC-493).
+    if (event.proposalId.startsWith("us-holiday-") || event.id.startsWith("us-holiday-")) {
+      return;
+    }
     // Recurrence: open the occurrence directly; series edit lives in detail (PC-166).
     if (event.sliceKind === "recurrence_occurrence" && event.occurrenceProposalId) {
       openProposal(event.occurrenceProposalId);

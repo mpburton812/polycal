@@ -41,6 +41,7 @@ export const networkSettingsSchema = z.object({
   archiveGraceHours: z.number().int().min(0).max(8760),
   redraftDeadlineHours: z.number().int().min(1).max(168),
   sleepingPartnerProposalMaxDays: z.number().int().min(1).max(365),
+  usHolidaysEnabled: z.boolean().optional(),
 });
 
 /** Partial patch for autosave — at least one known key required (PC-461). */

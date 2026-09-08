@@ -29,11 +29,11 @@ interface ScheduleMonthViewProps {
   events: ScheduleEvent[];
   timeZone?: string;
   onEventClick: (event: ScheduleEvent) => void;
-  /** Switches to week view anchored on the clicked day (PC-56). */
+  /** Opens daily view when a day cell is clicked (PC-494). */
   onDayClick?: (day: Date) => void;
 }
 
-const WEEKDAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+const WEEKDAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const DATE_HEADER_HEIGHT = 22;
 const LANE_HEIGHT = 18;
 const ICON_ROW_HEIGHT = 22;
@@ -250,6 +250,7 @@ export function ScheduleMonthView({
                   isStartSegment={segment.isStartSegment}
                   isEndSegment={segment.isEndSegment}
                   isArchived={segment.event.state === "archived"}
+                  isTentative={segment.event.isTentative}
                   onClick={() => onEventClick(segment.event)}
                 />
               </Box>

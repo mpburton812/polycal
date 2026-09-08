@@ -26,6 +26,8 @@ export default edgeAuth((request) => {
     "/setup-network",
     "/privacy",
     "/terms",
+    "/about",
+    "/sms-opt-in",
     "/paused",
     "/banned",
     "/network-closed",

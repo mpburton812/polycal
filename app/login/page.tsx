@@ -198,6 +198,32 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
         >
           Create new network
         </Button>
+        <Box
+          sx={{
+            mt: 2.5,
+            display: "flex",
+            justifyContent: "center",
+            gap: 2,
+            flexWrap: "wrap",
+          }}
+        >
+          <Button
+            component={Link}
+            href="/privacy"
+            size="small"
+            sx={{ color: GARDEN_TOKENS.inkMuted, textTransform: "none" }}
+          >
+            Privacy Policy
+          </Button>
+          <Button
+            component={Link}
+            href="/terms"
+            size="small"
+            sx={{ color: GARDEN_TOKENS.inkMuted, textTransform: "none" }}
+          >
+            Terms of Service
+          </Button>
+        </Box>
         {loginHint && (
           <Typography variant="caption" display="block" sx={{ mt: 2, color: GARDEN_TOKENS.inkMuted }}>
             {loginHint}

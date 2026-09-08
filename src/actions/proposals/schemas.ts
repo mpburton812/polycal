@@ -52,6 +52,8 @@ export const draftProposalSchema = z.object({
   postToFeed: z.boolean().optional(),
   postingKind: z.enum(["proposal", "booking"]).optional(),
   onBehalfOfUserId: z.string().min(1).nullable().optional(),
+  /** Soft Tentative flag independent of workflow state (PC-494). */
+  tentative: z.boolean().optional(),
 });
 
 export const commentSchema = z
@@ -103,4 +105,14 @@ export const rescheduleProposalSchema = z.object({
   scheduledStartAt: z.string().min(1),
   scheduledEndAt: z.string().optional(),
   isAllDay: z.boolean().optional(),
+});
+
+export const renameProposalSchema = z.object({
+  proposalId: z.string().min(1),
+  title: requiredLimitedString("Title", LONG_TEXT_MAX),
+});
+
+export const setProposalTentativeSchema = z.object({
+  proposalId: z.string().min(1),
+  tentative: z.boolean(),
 });

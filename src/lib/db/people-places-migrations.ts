@@ -5,6 +5,7 @@ import type { Client } from "@libsql/client";
  */
 export async function applyPeoplePlacesMigrations(sql: Client): Promise<void> {
   await ensureColumn(sql, "users", "profile_bio", "TEXT");
+  await ensureColumn(sql, "users", "notification_phone", "TEXT");
   await ensureColumn(sql, "poly_group", "allow_user_provisioning", "INTEGER NOT NULL DEFAULT 0");
   await ensureColumn(sql, "locations", "address", "TEXT");
   await ensureColumn(sql, "locations", "bedroom_count", "INTEGER NOT NULL DEFAULT 0");

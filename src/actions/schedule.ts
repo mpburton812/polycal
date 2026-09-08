@@ -17,13 +17,15 @@ import {
 } from "@/lib/db/schema";
 import { eventInRange } from "@/lib/schedule/dates";
 import { markOverlaps } from "@/lib/schedule/overlaps";
+import { getUsHolidayScheduleEvents } from "@/lib/schedule/us-holidays";
+import { loadNetworkSettings } from "@/lib/networks/settings";
 import { buildScheduleWindows } from "@/lib/schedule/schedule-slices";
 import { resolveTimezone } from "@/lib/schedule/timezone";
 import type { ScheduleSliceKind } from "@/lib/schedule/slice-types";
-import { loadNetworkSettings } from "@/lib/networks/settings";
 import { parseBatchSlotMeta } from "@/lib/proposals/batch-sleeping";
 import { formatSleepingDisplayTitle } from "@/lib/proposals/sleeping-display";
 import { isSleepingLikeType } from "@/lib/proposals/sleeping-like";
+import { formatTentativeTitle } from "@/lib/proposals/tentative-title";
 import {
   MASKED_TITLE,
   canViewProposalContent,
@@ -222,6 +224,7 @@ export async function listScheduleEventsAction(
       parentProposalId: proposals.parentProposalId,
       isRecurrenceParent: proposals.isRecurrenceParent,
       eventIconKey: proposals.eventIconKey,
+      tentative: proposals.tentative,
     })
     .from(proposals)
     .innerJoin(users, eq(proposals.proposerId, users.id))
@@ -454,7 +457,9 @@ export async function listScheduleEventsAction(
       events.push({
         id: window.key,
         proposalId: row.id,
-        title: isContentMasked ? maskedTitle : windowTitle,
+        title: isContentMasked
+          ? maskedTitle
+          : formatTentativeTitle(windowTitle, Boolean(row.tentative)),
         startAt: window.startAt,
         endAt: window.endAt,
         proposalType: row.proposalType,
@@ -466,7 +471,7 @@ export async function listScheduleEventsAction(
         participantNames: isContentMasked ? [] : windowParticipantNames,
         intentionalSolo: windowIntentionalSolo,
         isContentMasked,
-        isTentative: row.state === "proposed",
+        isTentative: Boolean(row.tentative),
         atRisk: row.atRisk,
         hasOverlap: false,
         isPoll: row.isPoll,
@@ -482,6 +487,11 @@ export async function listScheduleEventsAction(
         isPartnerOnlySleeping,
       });
     }
+  }
+
+  const settings = await loadNetworkSettings(networkId, db);
+  if (settings?.usHolidaysEnabled) {
+    events.push(...getUsHolidayScheduleEvents(rangeStart, rangeEnd));
   }
 
   return {
