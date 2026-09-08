@@ -24,6 +24,7 @@ test.describe("Admin user provisioning", () => {
 
     await page.getByRole("button", { name: "Add person" }).click();
     const dialog = page.getByRole("dialog", { name: "Add person" });
+    await dialog.getByRole("button", { name: "User", exact: true }).click();
 
     await dialog.getByLabel("Username").fill(username);
     await dialog.getByLabel("Username").blur();

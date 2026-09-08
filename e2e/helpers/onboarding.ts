@@ -11,6 +11,8 @@ export async function completeFirstLoginOnboarding(
 ): Promise<void> {
   await expect(page.getByRole("heading", { name: "Welcome to PolyCal" })).toBeVisible();
 
+  // Email and Password step (PC-510) — email required before Continue.
+  await page.getByRole("textbox", { name: "Email", exact: true }).fill("e2e-onboard@example.com");
   await page.getByRole("textbox", { name: "New password", exact: true }).fill(newPassword);
   await page.getByRole("textbox", { name: "Confirm new password" }).fill(newPassword);
   await page.getByRole("button", { name: "Continue" }).click();
@@ -27,7 +29,6 @@ export async function completeFirstLoginOnboarding(
   await page.getByRole("button", { name: "Continue" }).click();
 
   await expect(page.getByText("Enable notifications")).toBeVisible({ timeout: 15_000 });
-  await page.getByLabel("Notification email").fill("e2e-onboard@example.com");
   await page.getByRole("button", { name: "Continue" }).click();
 
   // Optional calendar integration step (PC-341) — skip for default e2e path.
