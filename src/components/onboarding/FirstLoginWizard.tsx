@@ -214,13 +214,8 @@ function FirstLoginWizardInner({
     }
 
     startTransition(async () => {
-      const result = mustChangePassword
-        ? await setInitialPasswordAction(formData)
-        : await changePasswordAction(formData);
-      if (!result.ok) {
-        setError(result.message);
-        return;
-      }
+      // Save email before password bump — setInitialPassword increments sessionVersion
+      // and can invalidate the JWT used by the next server action (PC-510).
       const emailResult = await updateNotificationEmailAction(email);
       if (!emailResult.ok) {
         setError(emailResult.message);
@@ -229,8 +224,16 @@ function FirstLoginWizardInner({
       setEmailStatus(
         "Verification link sent (when email delivery is configured). You can finish setup now and verify later.",
       );
-      // Advance + sync storage before session update. Do not router.refresh() here —
-      // a server remount can still see mustChangePassword=true and force step 0 (PC-510).
+
+      const result = mustChangePassword
+        ? await setInitialPasswordAction(formData)
+        : await changePasswordAction(formData);
+      if (!result.ok) {
+        setError(result.message);
+        return;
+      }
+
+      // Persist step before session update; avoid router.refresh (stale mustChangePassword remount).
       advanceTo(1);
       await update({
         user: {

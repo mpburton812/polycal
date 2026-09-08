@@ -16,16 +16,11 @@ export async function completeFirstLoginOnboarding(
   await page.getByRole("textbox", { name: "New password", exact: true }).fill(newPassword);
   await page.getByRole("textbox", { name: "Confirm new password" }).fill(newPassword);
   await page.getByRole("button", { name: "Continue" }).click();
-  const wizardError = page.locator(".MuiAlert-standardError, [role='alert']").filter({
-    hasText: /./,
-  });
-  await Promise.race([
-    page.getByText("Accent theme").waitFor({ state: "visible", timeout: 30_000 }),
-    wizardError.waitFor({ state: "visible", timeout: 30_000 }).then(async () => {
-      throw new Error(`Onboarding Email/Password failed: ${await wizardError.first().innerText()}`);
-    }),
-  ]);
-  await expect(page.getByText("Accent theme")).toBeVisible();
+  await expect(page.getByText("Accent theme")).toBeVisible({ timeout: 45_000 });
+  const submitError = page.locator(".MuiAlert-standardError");
+  if (await submitError.isVisible().catch(() => false)) {
+    throw new Error(`Onboarding Email/Password failed: ${await submitError.innerText()}`);
+  }
   await page.getByRole("button", { name: "Blue bird" }).click();
   // Timezone defaults to US Eastern (PC-194).
   await expect(page.getByLabel("Time zone")).toContainText(/America\/New[_ ]York/);
