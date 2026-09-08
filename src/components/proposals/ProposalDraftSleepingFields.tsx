@@ -37,6 +37,7 @@ export interface ProposalDraftSleepingFieldsProps {
   onBehalfOfUserId?: string;
   locationOptions: ProposalPlaceOption[];
   pending: boolean;
+  errorEntryId?: string | null;
   postingKind: "proposal" | "booking";
   showLocation?: boolean;
   showInvitees?: boolean;
@@ -69,6 +70,7 @@ export function ProposalDraftSleepingFields({
   onBehalfOfUserId,
   locationOptions,
   pending,
+  errorEntryId,
   postingKind,
   showLocation = true,
   showInvitees = true,
@@ -100,6 +102,7 @@ export function ProposalDraftSleepingFields({
             partnerPeople={sleepingCandidates}
             locationOptions={batchLocationOptions}
             disabled={pending}
+            errorEntryId={errorEntryId}
           />
           {configuredBatchEntries.length > 0 && (
             <Box sx={{ p: 1.5, bgcolor: POLY_GREEN_LIGHT, borderRadius: 1 }}>

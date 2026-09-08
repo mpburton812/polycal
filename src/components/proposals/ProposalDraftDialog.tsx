@@ -203,6 +203,7 @@ export function ProposalDraftDialog({
   const [isPoll, setIsPoll] = useState(false);
   const [allDay, setAllDay] = useState(false);
   const [batchMode, setBatchMode] = useState(false);
+  const [errorEntryId, setErrorEntryId] = useState<string | null>(null);
   const [fastPlanRows, setFastPlanRows] = useState<FastSleepingRow[]>(() => buildEmptyGridRows());
   const [batchLocationOptions, setBatchLocationOptions] = useState<ProposalPlaceOption[]>([]);
   const [sleepingLocationOptions, setSleepingLocationOptions] = useState<ProposalPlaceOption[]>(
@@ -922,6 +923,7 @@ export function ProposalDraftDialog({
 
   /** Persists the current form to the server; returns proposal id or null on failure (PC-59). */
   async function persistDraft(): Promise<string | null> {
+    setErrorEntryId(null);
     const payload = buildDraftPayload();
 
     if (batchMode && proposalType === "sleeping" && (payload.batchEntries?.length ?? 0) === 0) {
@@ -935,12 +937,14 @@ export function ProposalDraftDialog({
       const result = await updateDraftProposalAction({ ...payload, proposalId: editId });
       if (!result.ok) {
         showToast(result.message, "error");
+        if (result.errorEntryId) setErrorEntryId(result.errorEntryId);
         return null;
       }
     } else {
       const result = await createDraftProposalAction(payload);
       if (!result.ok) {
         showToast(result.message, "error");
+        if (result.errorEntryId) setErrorEntryId(result.errorEntryId);
         return null;
       }
       proposalId = result.proposalId ?? null;
@@ -1431,7 +1435,10 @@ export function ProposalDraftDialog({
             <ProposalDraftSleepingFields
               batchMode={batchMode}
               fastPlanRows={fastPlanRows}
-              onFastPlanRowsChange={setFastPlanRows}
+              onFastPlanRowsChange={(rows) => {
+                setErrorEntryId(null);
+                setFastPlanRows(rows);
+              }}
               sleepingCandidates={sleepingCandidates}
               batchLocationOptions={batchLocationOptions}
               configuredBatchEntries={configuredBatchEntries}
@@ -1440,6 +1447,7 @@ export function ProposalDraftDialog({
               onBehalfOfUserId={onBehalfOfUserId}
               locationOptions={locationOptions}
               pending={pending}
+              errorEntryId={errorEntryId}
               postingKind={effectivePostingKind === "booking" ? "booking" : "proposal"}
               showInvitees={showInvitees}
               showLocation={showLocation}

@@ -32,6 +32,7 @@ export interface FastSleepingPlanGridProps {
   partnerPeople: PersonSummary[];
   locationOptions: ProposalPlaceOption[];
   disabled?: boolean;
+  errorEntryId?: string | null;
   /**
    * FastSleep mode: per-night proposer picker + partners for the selected proposer.
    * When omitted, behaves as legacy admin/user batch grid (partners of one subject).
@@ -53,6 +54,7 @@ export function FastSleepingPlanGrid({
   partnerPeople,
   locationOptions,
   disabled = false,
+  errorEntryId,
   subjectPeople,
   partnersBySubjectId,
   defaultSubjectUserId,
@@ -62,7 +64,7 @@ export function FastSleepingPlanGrid({
 
   function updateRow(index: number, patch: Partial<FastSleepingRow>) {
     const next = [...rows];
-    next[index] = { ...next[index]!, ...patch };
+    next[index] = { ...next[index]!, ...patch, isConfigured: true };
     onChange(next);
   }
 
@@ -145,16 +147,18 @@ export function FastSleepingPlanGrid({
         const rowKey = row.id ?? `${row.nightDate}-${index}`;
         const slotN = slotIndexForDate(row, index);
         const multiOnDate = sameDateCount(row.nightDate) > 1;
+        const hasError = Boolean(errorEntryId && row.id === errorEntryId);
         return (
           <Box
             key={rowKey}
             data-testid={`fast-sleep-night-${row.nightDate}`}
             data-slot-index={slotN}
             sx={{
-              border: `1px solid ${GARDEN_TOKENS.outlineSoft}`,
+              border: `1px solid ${hasError ? "red" : GARDEN_TOKENS.outlineSoft}`,
               borderRadius: 1,
               p: 1.5,
-              bgcolor: GARDEN_TOKENS.surface,
+              bgcolor: hasError ? "rgba(211, 47, 47, 0.05)" : GARDEN_TOKENS.surface,
+              transition: "all 0.2s ease-in-out",
             }}
           >
             <Box
@@ -201,13 +205,19 @@ export function FastSleepingPlanGrid({
                   exclusive
                   value={row.intentionalSolo ? "solo" : "network"}
                   onChange={(_, value) => {
-                    if (!value || disabled) return;
+                    if (disabled) return;
+                    if (value === null) {
+                      updateRow(index, { isConfigured: true });
+                      return;
+                    }
                     const solo = value === "solo";
                     updateRow(index, {
                       intentionalSolo: solo,
                       inviteeUserIds: solo ? [] : row.inviteeUserIds,
+                      isConfigured: true,
                     });
                   }}
+                  color="primary"
                   size="small"
                   disabled={disabled}
                   sx={{ mb: 1 }}
