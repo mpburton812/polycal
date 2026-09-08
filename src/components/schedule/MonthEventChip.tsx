@@ -10,6 +10,7 @@ import { isEventIconKey } from "@/lib/event-icons/registry";
 import { MASKED_TITLE } from "@/lib/proposals/access";
 import { isSleepingLikeType } from "@/lib/proposals/sleeping-like";
 import { scheduleBlockSx, type ScheduleBlockVariant } from "@/lib/schedule/colors";
+import { TENTATIVE_HATCH_BACKGROUND } from "@/lib/proposals/tentative-title";
 import { GARDEN_TOKENS } from "@/theme/tokens";
 
 interface MonthEventChipProps {
@@ -102,7 +103,9 @@ export function MonthEventChip({ event, variant, onClick }: MonthEventChipProps)
         borderRadius: "4px",
         bgcolor: colors.bgcolor,
         color: colors.color,
-        backgroundImage: colors.backgroundImage,
+        backgroundImage: event.isTentative
+          ? TENTATIVE_HATCH_BACKGROUND
+          : colors.backgroundImage,
         px: 0.5,
         py: 0.125,
         fontSize: "0.6rem",
@@ -129,6 +132,8 @@ interface MonthSpanBarProps {
   isEndSegment: boolean;
   isArchived: boolean;
   onClick: () => void;
+  /** Soft Tentative hatch (PC-494). */
+  isTentative?: boolean;
 }
 
 /** Multi-day span segment in the week overlay row. */
@@ -140,6 +145,7 @@ export function MonthSpanBar({
   isEndSegment,
   isArchived,
   onClick,
+  isTentative = false,
 }: MonthSpanBarProps) {
   const colors = scheduleBlockSx(variant, 0);
   const radius = 4;
@@ -159,7 +165,9 @@ export function MonthSpanBar({
         borderRadius,
         bgcolor: colors.bgcolor,
         color: colors.color,
-        backgroundImage: colors.backgroundImage,
+        backgroundImage: isTentative
+          ? TENTATIVE_HATCH_BACKGROUND
+          : colors.backgroundImage,
         px: 0.5,
         py: 0.125,
         fontSize: "0.6rem",

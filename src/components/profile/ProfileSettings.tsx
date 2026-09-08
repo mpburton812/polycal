@@ -32,8 +32,10 @@ import {
   updateProfilePreferencesAction,
   uploadCustomAvatarAction,
 } from "@/actions/profile";
+import { updateSmsNotificationSettingsAction } from "@/actions/sms-opt-in";
 import { AccountDataSettings } from "@/components/profile/AccountDataSettings";
 import { CalendarIntegrationSettings } from "@/components/profile/CalendarIntegrationSettings";
+import { brandSmsDisclaimerText } from "@/lib/brand/public-identity";
 import { AVATAR_OPTIONS, avatarSrcForKey, isCustomAvatarKey } from "@/lib/constants/avatars";
 import { AvatarCropDialog } from "@/components/profile/AvatarCropDialog";
 import { ThemeAccentPicker } from "@/components/ui/ThemeAccentPicker";
@@ -65,6 +67,7 @@ export function ProfileSettings({
   initialTimezone,
   initialNotificationPrefs,
   initialNotificationEmail,
+  initialNotificationPhone,
   initialEmailVerified,
   mustChangePassword,
   vapidPublicKey,
@@ -76,6 +79,7 @@ export function ProfileSettings({
   initialTimezone: string;
   initialNotificationPrefs: NotificationPrefs;
   initialNotificationEmail: string | null;
+  initialNotificationPhone: string | null;
   initialEmailVerified: boolean;
   mustChangePassword: boolean;
   vapidPublicKey: string | null;
@@ -89,6 +93,8 @@ export function ProfileSettings({
   const [timezone, setTimezone] = useState(resolveTimezone(initialTimezone));
   const [notificationPrefs, setNotificationPrefs] = useState(initialNotificationPrefs);
   const [notificationEmail, setNotificationEmail] = useState(initialNotificationEmail ?? "");
+  const [notificationPhone, setNotificationPhone] = useState(initialNotificationPhone ?? "");
+  const [smsConsent, setSmsConsent] = useState(false);
   const [emailVerified, setEmailVerified] = useState(initialEmailVerified);
   const [emailMessage, setEmailMessage] = useState<string | null>(null);
   const [passwordMessage, setPasswordMessage] = useState<string | null>(null);
@@ -244,6 +250,30 @@ export function ProfileSettings({
           ? `Email provider unavailable — verification link: ${result.verificationUrl}`
           : "Verification email sent. Check your inbox.",
       );
+    });
+  }
+
+  function handleSmsSettingsSave() {
+    setNotifError(null);
+    setNotifMessage(null);
+    startNotifTransition(async () => {
+      const enabling = notificationPrefs.channels.sms;
+      const result = await updateSmsNotificationSettingsAction({
+        phone: notificationPhone,
+        smsEnabled: enabling,
+        // New enable requires an explicit checkbox; already-opted profiles may update phone.
+        consentChecked: enabling
+          ? smsConsent || initialNotificationPrefs.channels.sms
+          : true,
+      });
+      if (!result.ok) {
+        setNotifError(result.message ?? "Could not save SMS settings.");
+        return;
+      }
+      setNotifMessage("SMS settings saved.");
+      if (!enabling) {
+        setSmsConsent(false);
+      }
     });
   }
 
@@ -560,6 +590,66 @@ export function ProfileSettings({
             label="Email"
           />
         </FormGroup>
+
+        <Typography variant="subtitle2" sx={{ mt: 1 }}>
+          SMS (optional)
+        </Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+          Account alerts and calendar notices only — not marketing. You can use PolyCal without
+          SMS.{" "}
+          <MuiLink component={NextLink} href="/sms-opt-in" underline="hover">
+            Public SMS opt-in page
+          </MuiLink>
+        </Typography>
+        <TextField
+          label="Mobile phone number"
+          value={notificationPhone}
+          onChange={(e) => setNotificationPhone(e.target.value)}
+          fullWidth
+          size="small"
+          sx={{ mb: 1 }}
+          placeholder="+1 555 555 0100"
+          inputProps={{ autoComplete: "tel", "aria-label": "Mobile phone number for SMS" }}
+        />
+        <FormControlLabel
+          control={
+            <Checkbox
+              checked={notificationPrefs.channels.sms}
+              onChange={(e) => {
+                const enabled = e.target.checked;
+                setNotificationPrefs({
+                  ...notificationPrefs,
+                  channels: { ...notificationPrefs.channels, sms: enabled },
+                });
+                if (!enabled) setSmsConsent(false);
+              }}
+            />
+          }
+          label="Enable SMS alerts"
+        />
+        <FormControlLabel
+          sx={{ alignItems: "flex-start", mb: 1 }}
+          control={
+            <Checkbox
+              checked={smsConsent}
+              onChange={(e) => setSmsConsent(e.target.checked)}
+              disabled={!notificationPrefs.channels.sms}
+            />
+          }
+          label="I agree to receive SMS account alerts and calendar notices from PolyCal."
+        />
+        <Typography variant="caption" display="block" color="text.secondary" sx={{ mb: 1 }}>
+          {brandSmsDisclaimerText()}
+        </Typography>
+        <Button
+          variant="outlined"
+          onClick={handleSmsSettingsSave}
+          disabled={notifPending}
+          sx={{ mb: 2 }}
+        >
+          Save SMS settings
+        </Button>
+
         <Typography variant="subtitle2">Browser / Android push</Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
           Push requires explicit opt-in. On the PolyCal Android app (TWA), enabled push

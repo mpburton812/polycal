@@ -10,7 +10,7 @@ import {
   isPastDate,
   isTodayDate,
   localDateKey,
-  startOfWeekMonday,
+  startOfWeekSunday,
 } from "@/lib/schedule/dates";
 import { DEFAULT_VIEWER_TIMEZONE } from "@/lib/schedule/timezone";
 import { GARDEN_TOKENS, HEATMAP_LEVEL_COLORS } from "@/theme/tokens";
@@ -122,7 +122,7 @@ export function ScheduleHeatmap({
     if (layout === "day") {
       return civilDateAtNoonUtc(localDateKey(anchor.toISOString(), timeZone ?? DEFAULT_VIEWER_TIMEZONE));
     }
-    return startOfWeekMonday(anchor, timeZone);
+    return startOfWeekSunday(anchor, timeZone);
   }, [layout, weekStartIso, timeZone]);
 
   const levels = useMemo(

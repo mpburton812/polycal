@@ -22,7 +22,7 @@ test.describe("Profile settings", () => {
     await expect(page.getByRole("checkbox", { name: "Sleeping proposals" })).toBeVisible();
     await expect(page.getByRole("checkbox", { name: "Event proposals" })).toBeVisible();
     await expect(page.getByRole("checkbox", { name: "Sleeping partner proposals" })).toBeVisible();
-    await expect(page.getByRole("checkbox", { name: "Reminders" })).toBeVisible();
+    await expect(page.getByRole("checkbox", { name: "Event reminders", exact: true })).toBeVisible();
   });
 
   test("saves notification preferences", async ({ page }) => {

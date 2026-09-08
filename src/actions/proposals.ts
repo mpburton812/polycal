@@ -49,10 +49,12 @@ export {
   nudgePendingVotersAction,
   postProposalToFeedAction,
   redraftProposalAction,
+  renameProposalAction,
   rescheduleProposalAction,
   respondAttendeeUpdateAction,
   returnProposedToDraftAction,
   revokeResolvedAcceptanceAction,
+  setProposalTentativeAction,
   updateResolvedAttendeesAction,
 } from "./proposals/lifecycle";
 

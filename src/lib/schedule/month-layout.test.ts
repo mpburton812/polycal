@@ -71,7 +71,7 @@ describe("isMultiDayMonthSpan", () => {
 });
 
 describe("splitSpanAtWeekBoundaries", () => {
-  it("splits spans that cross a Sunday/Monday week boundary", () => {
+  it("splits spans that cross a Saturday/Sunday week boundary", () => {
     const segments = splitSpanAtWeekBoundaries({
       event: makeEvent(),
       startIndex: 5,

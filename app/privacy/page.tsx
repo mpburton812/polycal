@@ -340,8 +340,8 @@ export default function PrivacyPolicyPage() {
 
         <Section title="10. Children">
           <Typography paragraph>
-            PolyCal is intended for adults in a private group. It is not directed at children under
-            13, and we do not knowingly collect personal information from children.
+            PolyCal is intended for adults 18 years and older. It is not directed at anyone under
+            18, and we do not knowingly collect personal information from minors.
           </Typography>
         </Section>
 
@@ -354,10 +354,12 @@ export default function PrivacyPolicyPage() {
 
         <Section title="12. Contact">
           <Typography paragraph>
-            For privacy questions or data requests, contact your PolyCal group administrator.
-            Technical operators of a deployment can also be reached through the contact channels
-            published for that instance (for example the support email used on the Google OAuth
-            consent screen).
+            For privacy questions or data requests, contact your PolyCal group administrator, or
+            email{" "}
+            <MuiLink href="mailto:support@polycal.net" underline="hover">
+              support@polycal.net
+            </MuiLink>
+            .
           </Typography>
         </Section>
 
