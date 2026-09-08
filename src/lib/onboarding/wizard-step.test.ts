@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  canSelectOnboardingStep,
   ONBOARDING_CALENDAR_STEP,
+  resolveOnboardingMaxUnlocked,
   resolveOnboardingStartStep,
 } from "./wizard-step";
 
@@ -64,5 +66,45 @@ describe("resolveOnboardingStartStep", () => {
         storedStep: "-1",
       }),
     ).toBe(1);
+  });
+
+  it("ignores stored Email and Password step after password is set", () => {
+    expect(
+      resolveOnboardingStartStep({
+        mustChangePassword: false,
+        queryStep: null,
+        storedStep: "0",
+      }),
+    ).toBe(1);
+  });
+});
+
+describe("resolveOnboardingMaxUnlocked", () => {
+  it("stays on Email and Password while mustChangePassword", () => {
+    expect(
+      resolveOnboardingMaxUnlocked({
+        mustChangePassword: true,
+        storedMaxUnlocked: "4",
+        activeStep: 0,
+      }),
+    ).toBe(0);
+  });
+
+  it("uses the max of fallback, stored, and active step", () => {
+    expect(
+      resolveOnboardingMaxUnlocked({
+        mustChangePassword: false,
+        storedMaxUnlocked: "2",
+        activeStep: 3,
+      }),
+    ).toBe(3);
+  });
+});
+
+describe("canSelectOnboardingStep", () => {
+  it("allows only unlocked indices", () => {
+    expect(canSelectOnboardingStep(0, 2)).toBe(true);
+    expect(canSelectOnboardingStep(2, 2)).toBe(true);
+    expect(canSelectOnboardingStep(3, 2)).toBe(false);
   });
 });

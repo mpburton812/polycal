@@ -411,6 +411,8 @@ export async function setUserAccessLevelAction(
     action: "platform.set_access_level",
     summary: `Access level changed for ${user.displayName}`,
     severity: "major",
+    targetUserId: user.id,
+    targetDisplayName: user.displayName,
   });
 
   revalidatePath("/platform-admin");
@@ -474,6 +476,8 @@ async function applyModeration(
         ? `User paused: ${user.displayName}`
         : `User banned: ${user.displayName}`,
     severity: "major",
+    targetUserId: userId,
+    targetDisplayName: user.displayName,
   });
   revalidatePath("/platform-admin");
   revalidatePath("/admin");
@@ -551,6 +555,8 @@ export async function resumeUserPlatformAction(
     action: "platform.resume_user",
     summary: `User resumed: ${user.displayName}`,
     severity: "major",
+    targetUserId: userId,
+    targetDisplayName: user.displayName,
   });
   revalidatePath("/platform-admin");
   revalidatePath("/admin");

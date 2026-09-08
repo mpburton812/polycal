@@ -4,6 +4,18 @@ All notable changes to PolyCal are documented here.
 
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [2026.09.08a] - 2026-09-08
+
+### Fixed
+
+- PC-507 / PC-515: Admin User management drops removed network members; Goto Today calendar bounce fixed.
+- PC-508: Platform alerts include By Who, When, and target user.
+
+### Changed
+
+- PC-509–PC-513: Add person selector; First Login Email and Password with step navigation; hide proposal enforcement when Just Bookings; remove Admin Fast sleeping panel; NLP is primary New Event.
+- PC-514: Residency proposals removed; place roles via People & Places only. Change control: `2026.09.08a`.
+
 ## [2026.09.07a] - 2026-09-07
 
 ### Fixed

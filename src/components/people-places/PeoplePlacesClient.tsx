@@ -18,6 +18,8 @@ import {
   Tab,
   Tabs,
   TextField,
+  ToggleButton,
+  ToggleButtonGroup,
   Typography,
 } from "@mui/material";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -58,6 +60,7 @@ import { AVATAR_OPTIONS, avatarSrcForKey } from "@/lib/constants/avatars";
 import { formatUserRole } from "@/lib/users/role-labels";
 import { LONG_TEXT_MAX, SHORT_TEXT_MAX } from "@/lib/validation/string-limits";
 import { brutalPersonRowSx } from "@/theme/brutalUi";
+import { GARDEN_TOKENS } from "@/theme/tokens";
 
 interface PeoplePlacesClientProps {
   people: PersonSummary[];
@@ -110,7 +113,8 @@ function CreateUserDialog({
   isAdmin: boolean;
 }) {
   const router = useRouter();
-  const [mode, setMode] = useState<"active" | "passive">("active");
+  /** Progressive User vs Proxy selector — fields appear after a choice (PC-498). */
+  const [mode, setMode] = useState<"active" | "passive" | null>(null);
   const [username, setUsername] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [role, setRole] = useState<"user" | "admin">("user");
@@ -135,6 +139,7 @@ function CreateUserDialog({
   if (!canProvision) return null;
 
   function reset() {
+    setMode(null);
     setUsername("");
     setDisplayName("");
     setRole("user");
@@ -190,7 +195,7 @@ function CreateUserDialog({
   }
 
   function handleSubmit() {
-    if (creationComplete || showActiveCredentials) {
+    if (creationComplete || showActiveCredentials || !mode) {
       return;
     }
 
@@ -235,95 +240,129 @@ function CreateUserDialog({
       <DialogTitle>Add person</DialogTitle>
       <DialogContent>
         <Stack spacing={2} sx={{ mt: 1 }}>
-          <Tabs
-            value={mode}
-            onChange={(_, value) => {
-              if (formLocked) return;
-              setMode(value);
-              if (value === "passive") {
-                setInstructions(null);
-                setCreatedUserId(null);
-                setTemporaryPassword(null);
-              }
-            }}
-          >
-            <Tab label="Active user" value="active" />
-            <Tab label="Proxy profile" value="passive" />
-          </Tabs>
-          {mode === "active" && (
-            <TextField
-              label="Username"
-              value={username}
-              onChange={(event) => {
-                setUsername(event.target.value);
-                setUsernameStatus({ checked: false, available: false, message: "" });
+          <Box>
+            <Typography variant="subtitle2" sx={{ fontWeight: 600, color: GARDEN_TOKENS.sage, mb: 1 }}>
+              User or Proxy user
+            </Typography>
+            <ToggleButtonGroup
+              exclusive
+              value={mode}
+              onChange={(_, value: "active" | "passive" | null) => {
+                if (formLocked) return;
+                if (!value) return;
+                setMode(value);
+                setMessage(null);
+                if (value === "passive") {
+                  setInstructions(null);
+                  setCreatedUserId(null);
+                  setTemporaryPassword(null);
+                  setUsername("");
+                  setUsernameStatus({ checked: false, available: false, message: "" });
+                  setNotificationEmail("");
+                }
               }}
-              onBlur={() => checkUsername()}
-              required
-              fullWidth
+              size="small"
               disabled={formLocked}
-              error={usernameStatus.checked && !usernameStatus.available}
-              helperText={
-                usernameStatus.checked
-                  ? usernameStatus.message
-                  : "Availability is checked when you leave this field."
-              }
-            />
-          )}
-          <TextField
-            label="Display name"
-            value={displayName}
-            onChange={(event) => setDisplayName(event.target.value)}
-            required
-            fullWidth
-            disabled={formLocked}
-            inputProps={{ maxLength: LONG_TEXT_MAX }}
-          />
-          {mode === "active" && (
-            <TextField
-              label="Notification email (optional)"
-              type="email"
-              value={notificationEmail}
-              onChange={(event) => setNotificationEmail(event.target.value)}
-              fullWidth
-              disabled={formLocked}
-              helperText="If set, login instructions are emailed and email verification is started."
-            />
-          )}
-          {mode === "active" && isAdmin && (
-            <FormControl fullWidth disabled={formLocked}>
-              <InputLabel id="create-user-role">Role</InputLabel>
-              <Select
-                labelId="create-user-role"
-                label="Role"
-                value={role}
-                onChange={(event) => setRole(event.target.value as "user" | "admin")}
-              >
-                <MenuItem value="user">User</MenuItem>
-                <MenuItem value="admin">Admin</MenuItem>
-              </Select>
-            </FormControl>
-          )}
-          {mode === "active" && !isAdmin && (
-            <Typography variant="body2" color="text.secondary" sx={{ overflowWrap: "anywhere" }}>
-              New accounts are created with User access. Only administrators can assign Admin.
+              sx={{
+                "& .MuiToggleButton-root": {
+                  color: GARDEN_TOKENS.sage,
+                  borderColor: GARDEN_TOKENS.sage,
+                  bgcolor: "transparent",
+                  "&:hover": { bgcolor: "rgba(90, 125, 96, 0.08)" },
+                  "&.Mui-selected": {
+                    bgcolor: GARDEN_TOKENS.sage,
+                    color: "#fff",
+                    "&:hover": { bgcolor: GARDEN_TOKENS.sage },
+                  },
+                },
+              }}
+            >
+              <ToggleButton value="active">User</ToggleButton>
+              <ToggleButton value="passive">Proxy user</ToggleButton>
+            </ToggleButtonGroup>
+          </Box>
+          {mode ? (
+            <>
+              {mode === "active" && (
+                <TextField
+                  label="Username"
+                  value={username}
+                  onChange={(event) => {
+                    setUsername(event.target.value);
+                    setUsernameStatus({ checked: false, available: false, message: "" });
+                  }}
+                  onBlur={() => checkUsername()}
+                  required
+                  fullWidth
+                  disabled={formLocked}
+                  error={usernameStatus.checked && !usernameStatus.available}
+                  helperText={
+                    usernameStatus.checked
+                      ? usernameStatus.message
+                      : "Availability is checked when you leave this field."
+                  }
+                />
+              )}
+              <TextField
+                label="Display name"
+                value={displayName}
+                onChange={(event) => setDisplayName(event.target.value)}
+                required
+                fullWidth
+                disabled={formLocked}
+                inputProps={{ maxLength: LONG_TEXT_MAX }}
+              />
+              {mode === "active" && (
+                <TextField
+                  label="Notification email (optional)"
+                  type="email"
+                  value={notificationEmail}
+                  onChange={(event) => setNotificationEmail(event.target.value)}
+                  fullWidth
+                  disabled={formLocked}
+                  helperText="If set, login instructions are emailed and email verification is started."
+                />
+              )}
+              {mode === "active" && isAdmin && (
+                <FormControl fullWidth disabled={formLocked}>
+                  <InputLabel id="create-user-role">Role</InputLabel>
+                  <Select
+                    labelId="create-user-role"
+                    label="Role"
+                    value={role}
+                    onChange={(event) => setRole(event.target.value as "user" | "admin")}
+                  >
+                    <MenuItem value="user">User</MenuItem>
+                    <MenuItem value="admin">Admin</MenuItem>
+                  </Select>
+                </FormControl>
+              )}
+              {mode === "active" && !isAdmin && (
+                <Typography variant="body2" color="text.secondary" sx={{ overflowWrap: "anywhere" }}>
+                  New accounts are created with User access. Only administrators can assign Admin.
+                </Typography>
+              )}
+              <FormControl fullWidth disabled={formLocked}>
+                <InputLabel id="create-user-avatar">Avatar</InputLabel>
+                <Select
+                  labelId="create-user-avatar"
+                  label="Avatar"
+                  value={avatarKey}
+                  onChange={(event) => setAvatarKey(event.target.value)}
+                >
+                  {AVATAR_OPTIONS.map((option) => (
+                    <MenuItem key={option.key} value={option.key}>
+                      {option.label}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </>
+          ) : (
+            <Typography variant="body2" color="text.secondary">
+              Choose User or Proxy user to continue.
             </Typography>
           )}
-          <FormControl fullWidth disabled={formLocked}>
-            <InputLabel id="create-user-avatar">Avatar</InputLabel>
-            <Select
-              labelId="create-user-avatar"
-              label="Avatar"
-              value={avatarKey}
-              onChange={(event) => setAvatarKey(event.target.value)}
-            >
-              {AVATAR_OPTIONS.map((option) => (
-                <MenuItem key={option.key} value={option.key}>
-                  {option.label}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
           {message && (
             <Alert severity={message.includes("Created") ? "success" : "info"}>{message}</Alert>
           )}
@@ -358,7 +397,9 @@ function CreateUserDialog({
               variant="contained"
               onClick={handleSubmit}
               disabled={
-                pending || (mode === "active" && (!usernameStatus.checked || !usernameStatus.available))
+                pending ||
+                !mode ||
+                (mode === "active" && (!usernameStatus.checked || !usernameStatus.available))
               }
             >
               Create
@@ -702,11 +743,6 @@ function PlaceDetail({
             <Chip size="small" label={row.status} color={residentStatusColor(row.status)} />
           )}
           <Typography variant="body2">{row.displayName}</Typography>
-          {row.isIncoming && row.userId === currentUserId && row.status === "proposed" && (
-            <Typography variant="caption" color="text.secondary">
-              Owners approve in Proposals
-            </Typography>
-          )}
           {canManageMembers && row.status === "accepted" && (
             <Button
               size="small"
@@ -914,7 +950,7 @@ function PlaceDetail({
             )}
             {deleteImpact && deleteImpact.pendingResidencyCount > 0 && (
               <Alert severity="info">
-                {deleteImpact.pendingResidencyCount} pending residency proposal
+                {deleteImpact.pendingResidencyCount} pending place membership
                 {deleteImpact.pendingResidencyCount === 1 ? "" : "s"} will be cancelled.
               </Alert>
             )}

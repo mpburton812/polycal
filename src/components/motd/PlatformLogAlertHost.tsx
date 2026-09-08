@@ -6,6 +6,7 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
+  Stack,
   Typography,
 } from "@mui/material";
 import { useCallback, useEffect, useState } from "react";
@@ -20,8 +21,18 @@ import { GARDEN_TOKENS } from "@/theme/tokens";
 const POLL_MS = 45_000;
 
 /**
+ * Formats an ISO timestamp for the alert "When" line (PC-497).
+ */
+function formatAlertWhen(iso: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return iso;
+  return date.toLocaleString();
+}
+
+/**
  * Second MOTD-like queue: unacked major/emphasized platform log rows for
  * platform operators only. Dismiss records an acknowledgment (PC-463).
+ * Shows By / When / optional target for operator context (PC-497).
  */
 export function PlatformLogAlertHost() {
   const [queue, setQueue] = useState<PlatformLogAlert[]>([]);
@@ -66,6 +77,8 @@ export function PlatformLogAlertHost() {
 
   if (!current) return null;
 
+  const targetLabel = current.targetDisplayName?.trim() || null;
+
   return (
     <Dialog
       open
@@ -84,12 +97,25 @@ export function PlatformLogAlertHost() {
     >
       <DialogTitle id="platform-log-alert-title">Platform alert</DialogTitle>
       <DialogContent>
-        <Typography
-          variant="body1"
-          sx={{ whiteSpace: "pre-wrap", fontWeight: current.emphasized ? 700 : 400 }}
-        >
-          {current.summary}
-        </Typography>
+        <Stack spacing={1.25}>
+          <Typography
+            variant="body1"
+            sx={{ whiteSpace: "pre-wrap", fontWeight: current.emphasized ? 700 : 400 }}
+          >
+            {current.summary}
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            By: {current.actorDisplayName?.trim() || "Unknown"}
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            When: {formatAlertWhen(current.createdAt)}
+          </Typography>
+          {targetLabel ? (
+            <Typography variant="body2" color="text.secondary">
+              Target: {targetLabel}
+            </Typography>
+          ) : null}
+        </Stack>
       </DialogContent>
       <DialogActions sx={{ px: 3, pb: 2 }}>
         <Button variant="contained" onClick={() => void dismiss()} disabled={acking} autoFocus>

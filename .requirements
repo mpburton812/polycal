@@ -453,3 +453,10 @@
 2026-09-07 | f103607 | PC-494 | : Avoid SMS consent colliding with Reminders e2e locator. | src/components/profile/ProfileSettings.tsx
 2026-09-07 | 4dd3799 | PC-494 | : Fix e2e for age-gate bypass, Sunday week, Reminders locators. | src/components/brand/AgeGate.tsx
 2026-09-07 | 4f61fdb | PC-494 | : Bypass age gate in E2E via server E2E_TEST_MODE prop. | src/components/brand/AgeGate.tsx
+2026-09-08 | 563fcc9 | PC-506 | Admin UX batch — scope, alerts, onboarding, NLP, residency cut, Goto Today | src/actions/notifications.ts
+2026-09-08 | 1d43536 | PC-509 | adapt Add person and onboarding helpers to Admin UX batch | e2e/admin-create-user.spec.ts
+2026-09-08 | 136ad30 | PC-510 | harden Email and Password step for e2e FormData | src/components/onboarding/FirstLoginWizard.tsx
+2026-09-08 | 99e87b7 | PC-510 | prevent step-0 restore after password clears mustChangePassword | src/components/onboarding/FirstLoginWizard.tsx
+2026-09-08 | 51d7a0e | PC-510 | skip refresh after Email/Password so remount cannot reset step | src/components/onboarding/FirstLoginWizard.tsx
+2026-09-08 | b1b5cec | PC-510 | use uncontrolled email field so Continue is not blocked | src/components/onboarding/FirstLoginWizard.tsx
+2026-09-08 | 1b0ac4e | PC-510 | save notification email before password session bump | src/components/onboarding/FirstLoginWizard.tsx

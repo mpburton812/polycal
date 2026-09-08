@@ -53,9 +53,9 @@ test.describe("Compose login resume", () => {
     await page.waitForURL(/\/feed/, { timeout: 60_000 });
     await dismissBlockingDialogsIfOpen(page);
     const dialog = page.getByRole("dialog").filter({
-      has: page.getByRole("heading", { name: "New Event", exact: true }),
+      has: page.getByRole("heading", { name: "Legacy New Event", exact: true }),
     });
-    await expect(dialog.getByRole("heading", { name: "New Event", exact: true })).toBeVisible({
+    await expect(dialog.getByRole("heading", { name: "Legacy New Event", exact: true })).toBeVisible({
       timeout: 20_000,
     });
     await expect(dialog.getByLabel("Title")).toHaveValue("AfterLogin");

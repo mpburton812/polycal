@@ -23,7 +23,7 @@ test.describe("Passive user journey", () => {
 
     await page.getByRole("button", { name: "Add person" }).click();
     const createDialog = page.getByRole("dialog", { name: "Add person" });
-    await createDialog.getByRole("tab", { name: "Proxy profile" }).click();
+    await createDialog.getByRole("button", { name: "Proxy user", exact: true }).click();
     await createDialog.getByLabel("Display name").fill(displayName);
     await createDialog.getByRole("button", { name: "Create" }).click();
     await expect(createDialog.getByText(/Created proxy profile/i)).toBeVisible({

@@ -20,14 +20,12 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition, type MouseEvent } from "react";
 
 import { respondPartnershipAction } from "@/actions/partnerships";
-import { respondResidencyAction } from "@/actions/places";
 import {
   castProposalVoteAction,
   respondAttendeeUpdateAction,
 } from "@/actions/proposals";
 import { buildProposalNotificationDetail } from "@/lib/notifications-detail";
 import { isActionableProposalNotification } from "@/lib/notifications-inbox";
-import { RESIDENCY_CARD_PREFIX } from "@/lib/proposals/constants";
 import {
   clearAllNotificationsAction,
   dismissNotificationAction,
@@ -70,14 +68,9 @@ function formatNotificationType(type: string): string {
     .join(" ");
 }
 
-function isProposalOpenAction(
-  type: string,
-  proposalId: string | null,
-  residencyId: string | null,
-): boolean {
-  if (residencyId) return true;
+function isProposalOpenAction(type: string, proposalId: string | null): boolean {
   if (!proposalId) return false;
-  return type.startsWith("proposal") || type.includes("proposal") || type.startsWith("residency");
+  return type.startsWith("proposal") || type.includes("proposal");
 }
 
 /**
@@ -250,17 +243,6 @@ export function NotificationInbox({
     });
   }
 
-  function respondToResidency(logId: number, residencyId: string, accept: boolean) {
-    startTransition(async () => {
-      const result = await respondResidencyAction({ residencyId, accept });
-      if (!result.ok) return;
-      // Persist dismiss so SSR props after refresh stay clear (PC-218).
-      await dismissNotificationAction(logId);
-      removeFromList(logId);
-      router.refresh();
-    });
-  }
-
   function respondToPartnership(logId: number, partnershipId: string, accept: boolean) {
     startTransition(async () => {
       const result = await respondPartnershipAction({ partnershipId, accept });
@@ -346,20 +328,14 @@ export function NotificationInbox({
                 typeof item.metadata.partnershipId === "string"
                   ? item.metadata.partnershipId
                   : null;
-              const residencyId =
-                typeof item.metadata.residencyId === "string"
-                  ? item.metadata.residencyId
-                  : null;
               const proposalId =
                 typeof item.metadata.proposalId === "string"
                   ? item.metadata.proposalId
                   : null;
               const showOpenProposal =
-                isProposalOpenAction(item.type, proposalId, residencyId) &&
+                isProposalOpenAction(item.type, proposalId) &&
                 item.type !== "proposal_attendee_update";
-              const openTarget = residencyId
-                ? `${RESIDENCY_CARD_PREFIX}${residencyId}`
-                : proposalId;
+              const openTarget = proposalId;
               const showAccept = canAcceptFromNotification(
                 item.type,
                 proposalId,
@@ -415,26 +391,6 @@ export function NotificationInbox({
                     primaryTypographyProps={{ variant: "body2" }}
                   />
                   <Stack direction="row" spacing={1} sx={{ mt: 1, pr: 4 }} flexWrap="wrap" useFlexGap>
-                    {item.type === "residency_proposed" && residencyId && (
-                      <>
-                        <Button
-                          size="small"
-                          variant="outlined"
-                          disabled={pending}
-                          onClick={() => respondToResidency(item.id, residencyId, false)}
-                        >
-                          Decline
-                        </Button>
-                        <Button
-                          size="small"
-                          variant="contained"
-                          disabled={pending}
-                          onClick={() => respondToResidency(item.id, residencyId, true)}
-                        >
-                          Accept
-                        </Button>
-                      </>
-                    )}
                     {item.type === "partnership_proposed" && partnershipId && (
                       <>
                         <Button

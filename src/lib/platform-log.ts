@@ -14,11 +14,15 @@ export type PlatformLogInput = {
   networkName?: string | null;
   severity?: PlatformLogSeverity;
   emphasized?: boolean;
+  /** Optional subject of the event (e.g. removed member) — PC-497. */
+  targetUserId?: string | null;
+  targetDisplayName?: string | null;
 };
 
 /**
  * Appends a platform system log row. networkName is snapshotted so the row
- * survives a later network hard-wipe (PC-463).
+ * survives a later network hard-wipe (PC-463). Target fields support alert
+ * detail without relying on anonymous summaries (PC-497).
  */
 export async function logPlatformEvent(input: PlatformLogInput): Promise<string> {
   const db = getDb();
@@ -43,6 +47,16 @@ export async function logPlatformEvent(input: PlatformLogInput): Promise<string>
     networkName = network?.name ?? null;
   }
 
+  let targetDisplayName = input.targetDisplayName?.trim() || null;
+  if (!targetDisplayName && input.targetUserId) {
+    const [target] = await db
+      .select({ displayName: users.displayName })
+      .from(users)
+      .where(eq(users.id, input.targetUserId))
+      .limit(1);
+    targetDisplayName = target?.displayName ?? null;
+  }
+
   const id = randomUUID();
   await db.insert(platformSystemLog).values({
     id,
@@ -51,6 +65,8 @@ export async function logPlatformEvent(input: PlatformLogInput): Promise<string>
     networkId: input.networkId ?? null,
     actorUserId: input.actorUserId ?? null,
     actorDisplayName,
+    targetUserId: input.targetUserId ?? null,
+    targetDisplayName,
     severity: input.severity ?? "info",
     action: input.action,
     summary: input.summary,

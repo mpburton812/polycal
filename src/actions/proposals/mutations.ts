@@ -3,7 +3,6 @@
 import { eq, inArray } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 
-import { cleanupResidencyProposalLinkage } from "@/actions/residency-proposals";
 import { auth } from "@/lib/auth";
 import { adminAccessFromSessionUser, userHasAdminAccess } from "@/lib/admin-access";
 import { logUserActivity } from "@/lib/audit";
@@ -45,7 +44,6 @@ async function hardDeleteProposalCascade(
   await db.delete(calendarEventLinks).where(eq(calendarEventLinks.proposalId, proposal.id));
   await db.delete(calendarIcsPending).where(eq(calendarIcsPending.proposalId, proposal.id));
 
-  await cleanupResidencyProposalLinkage(db, proposal, true);
   await db
     .update(locationResidents)
     .set({ proposalId: null, updatedAt: new Date().toISOString() })

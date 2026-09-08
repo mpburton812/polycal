@@ -7,7 +7,6 @@ import { auth } from "@/lib/auth";
 import { getDb } from "@/lib/db/client";
 import { ensureDbReady } from "@/lib/db/ensure-ready";
 import {
-  locationResidents,
   notificationDismissals,
   proposalInvitees,
   proposals,
@@ -21,10 +20,8 @@ import {
   isAttendeeUpdateStillActionable,
   isPartnershipStillActionable,
   isProposalVoteStillActionable,
-  isResidencyStillActionable,
   partnershipIdFromNotificationMetadata,
   proposalIdFromNotificationMetadata,
-  residencyIdFromNotificationMetadata,
 } from "@/lib/notifications-inbox";
 
 export interface NotificationItem {
@@ -347,17 +344,8 @@ export async function reconcileInboxNotificationsAction(): Promise<{
         stale = !isPartnershipStillActionable(row?.status);
       }
     } else if (item.type === "residency_proposed") {
-      const residencyId = residencyIdFromNotificationMetadata(item.metadata);
-      if (!residencyId) {
-        stale = true;
-      } else {
-        const [row] = await db
-          .select({ status: locationResidents.status })
-          .from(locationResidents)
-          .where(eq(locationResidents.id, residencyId))
-          .limit(1);
-        stale = !isResidencyStillActionable(row?.status);
-      }
+      // Residency proposals removed (PC-503 / PC-514) — clear leftover actionable rows.
+      stale = true;
     } else if (item.type === "proposal_attendee_update") {
       const proposalId = proposalIdFromNotificationMetadata(item.metadata);
       if (!proposalId) {

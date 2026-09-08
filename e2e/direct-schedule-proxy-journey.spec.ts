@@ -155,7 +155,7 @@ test.describe("Direct booking and Booking for journey", () => {
       await exitDraftDialog(bookingsOnlyDraft);
       await openNewProposalFabMenu(page);
       await expect(page.getByRole("menuitem", { name: "Sleeping partner proposal" })).toBeVisible();
-      await expect(page.getByRole("menuitem", { name: "Residency Proposal" })).toBeVisible();
+      await expect(page.getByRole("menuitem", { name: "Residency Proposal" })).toHaveCount(0);
       await page.keyboard.press("Escape");
     } finally {
       await restoreDefaultComposerSettings(page);
