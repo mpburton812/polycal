@@ -12,12 +12,13 @@ export async function completeFirstLoginOnboarding(
   await expect(page.getByRole("heading", { name: "Welcome to PolyCal" })).toBeVisible();
 
   // Email and Password step (PC-510) — email required before Continue.
-  await page.locator('input[type="email"]').first().fill("e2e-onboard@example.com");
+  await page.getByTestId("onboarding-email").fill("e2e-onboard@example.com");
   await page.getByRole("textbox", { name: "New password", exact: true }).fill(newPassword);
   await page.getByRole("textbox", { name: "Confirm new password" }).fill(newPassword);
   await page.getByRole("button", { name: "Continue" }).click();
-  // Surface wizard errors instead of hanging on the next step.
-  const wizardError = page.getByRole("alert").filter({ hasText: /.+/ });
+  const wizardError = page.locator(".MuiAlert-standardError, [role='alert']").filter({
+    hasText: /./,
+  });
   await Promise.race([
     page.getByText("Accent theme").waitFor({ state: "visible", timeout: 30_000 }),
     wizardError.waitFor({ state: "visible", timeout: 30_000 }).then(async () => {

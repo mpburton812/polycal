@@ -121,7 +121,6 @@ function FirstLoginWizardInner({
   const [timezone, setTimezone] = useState(DEFAULT_VIEWER_TIMEZONE);
   const [selectedPartners, setSelectedPartners] = useState<string[]>([]);
   const [prefs, setPrefs] = useState<NotificationPrefs>(DEFAULT_NOTIFICATION_PREFS);
-  const [notificationEmail, setNotificationEmail] = useState("");
   const [emailStatus, setEmailStatus] = useState<string | null>(null);
   const [welcomeMessage, setWelcomeMessage] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -206,9 +205,9 @@ function FirstLoginWizardInner({
     setError(null);
     setEmailStatus(null);
     const formData = new FormData(event.currentTarget);
-    const email =
-      notificationEmail.trim() ||
-      String(formData.get("notificationEmail") ?? "").trim();
+    // Uncontrolled email input — FormData is the source of truth (avoids controlled+required
+    // blocking Playwright fills before React state catches up) (PC-510).
+    const email = String(formData.get("notificationEmail") ?? "").trim();
     if (!email) {
       setError("Enter an email to continue. You can verify it later from the link we send.");
       return;
@@ -406,12 +405,11 @@ function FirstLoginWizardInner({
               label="Email"
               name="notificationEmail"
               type="email"
-              value={notificationEmail}
-              onChange={(event) => setNotificationEmail(event.target.value)}
-              required
+              defaultValue=""
               fullWidth
               helperText="Used only for notifications, verification, password reset, or signing in with email."
               autoComplete="email"
+              inputProps={{ "data-testid": "onboarding-email" }}
             />
             <Typography variant="body2" color="text.secondary">
               See our{" "}
