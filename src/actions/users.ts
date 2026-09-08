@@ -565,6 +565,8 @@ export async function createActiveUserAction(
       action: "users.create_active",
       summary: `A user was added to ${networkSession.user.networkName}`,
       severity: "major",
+      targetUserId: userId,
+      targetDisplayName: parsed.data.displayName,
     });
   }
 
@@ -858,6 +860,8 @@ export async function updateUserAction(
       action: "users.admin_update",
       summary: `Access level changed for ${parsed.data.displayName}`,
       severity: "major",
+      targetUserId: user.id,
+      targetDisplayName: parsed.data.displayName,
     });
   }
 
@@ -993,8 +997,10 @@ export async function deleteUserAction(userId: string): Promise<UserActionResult
       actorUserId: adminResult.user.id,
       networkId: networkSession.ok ? networkSession.user.activeNetworkId : null,
       action: "users.network_remove",
-      summary: `A user was removed from ${networkSession.ok ? networkSession.user.networkName : "a network"}`,
+      summary: `${user.displayName} was removed from ${networkSession.ok ? networkSession.user.networkName : "a network"}`,
       severity: "major",
+      targetUserId: userId,
+      targetDisplayName: user.displayName,
     });
     revalidateAfterAccountRemoval();
     return {
@@ -1104,8 +1110,9 @@ export async function deleteMyAccountAction(
 }
 
 /**
- * Lists users for the admin management table (PC-31 / PC-157).
- * Soft-deleted ("Former User") rows are omitted from the management screen.
+ * Lists users for Admin → User management (PC-31 / PC-157 / PC-496).
+ * Scoped to active members of the admin's active network so a soft network
+ * remove drops the row instead of leaving a global non-deleted user visible.
  */
 export async function listAdminUsersAction(): Promise<AdminUserRow[]> {
   const adminResult = await requireAdminAccess();
@@ -1114,6 +1121,8 @@ export async function listAdminUsersAction(): Promise<AdminUserRow[]> {
   await ensureDbReady();
   const db = getDb();
   const networkSession = await requireNetworkSession();
+  if (!networkSession.ok) return [];
+
   const rows = await db
     .select({
       id: users.id,
@@ -1126,31 +1135,31 @@ export async function listAdminUsersAction(): Promise<AdminUserRow[]> {
       loginCount: users.loginCount,
       isPlatformAdmin: users.isPlatformAdmin,
       avatarKey: users.avatarKey,
+      networkRole: networkMembers.role,
     })
     .from(users)
-    .where(ne(users.status, "deleted"))
+    .innerJoin(networkMembers, eq(networkMembers.userId, users.id))
+    .where(
+      and(
+        eq(networkMembers.networkId, networkSession.user.activeNetworkId),
+        eq(networkMembers.status, "active"),
+        ne(users.status, "deleted"),
+      ),
+    )
     .orderBy(asc(users.displayName));
 
-  const memberships = networkSession.ok
-    ? await db
-        .select({
-          userId: networkMembers.userId,
-          role: networkMembers.role,
-        })
-        .from(networkMembers)
-        .where(
-          and(
-            eq(networkMembers.networkId, networkSession.user.activeNetworkId),
-            eq(networkMembers.status, "active"),
-          ),
-        )
-    : [];
-  const roleByUser = new Map(memberships.map((row) => [row.userId, row.role as NetworkMemberRole]));
-
   return rows.map((row) => ({
-    ...row,
+    id: row.id,
+    displayName: row.displayName,
+    username: row.username,
+    gender: row.gender,
+    role: row.role,
+    status: row.status,
+    lastLoginAt: row.lastLoginAt,
+    loginCount: row.loginCount,
+    avatarKey: row.avatarKey,
     isPlatformAdmin: row.isPlatformAdmin === true,
-    networkRole: roleByUser.get(row.id) ?? null,
+    networkRole: (row.networkRole as NetworkMemberRole) ?? null,
   }));
 }
 
@@ -1204,6 +1213,8 @@ export async function pauseUserAction(
     action: "users.admin_pause",
     summary: `User paused: ${user.displayName}`,
     severity: "major",
+    targetUserId: userId,
+    targetDisplayName: user.displayName,
   });
   revalidatePath("/admin");
   revalidatePath("/people-places");
@@ -1238,6 +1249,8 @@ export async function resumeUserAction(userId: string): Promise<UserActionResult
     action: "users.admin_resume",
     summary: `User resumed: ${user.displayName}`,
     severity: "major",
+    targetUserId: userId,
+    targetDisplayName: user.displayName,
   });
   revalidatePath("/admin");
   revalidatePath("/people-places");
@@ -1296,6 +1309,8 @@ export async function adminResetPasswordAction(
     action: "users.admin_reset_password",
     summary: `Admin reset password for ${user.displayName}`,
     severity: "major",
+    targetUserId: user.id,
+    targetDisplayName: user.displayName,
   });
 
   const canEmail = Boolean(user.notificationEmail && user.emailVerifiedAt);

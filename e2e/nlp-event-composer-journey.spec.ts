@@ -20,7 +20,7 @@ test.describe("NLP event composer journey", () => {
 
     const dialog = await openNlpEventComposer(page);
     await expect(
-      dialog.getByRole("heading", { name: "New Event (NLP Input)", exact: true }),
+      dialog.getByRole("heading", { name: "New Event", exact: true }),
     ).toBeVisible();
     await expect(dialog.getByLabel("Description")).toBeVisible();
     await expect(dialog.getByLabel("Title")).toHaveCount(0);

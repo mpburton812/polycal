@@ -37,7 +37,6 @@ import {
 import { sendEmail } from "@/lib/email/send";
 import { notifyUser } from "@/lib/notifications";
 import { parseBatchEntriesJson } from "@/lib/proposals/batch-sleeping";
-import { isNonScheduleProposal } from "@/lib/proposals/special-proposals";
 import { logUserActivity } from "@/lib/audit";
 
 type Db = ReturnType<typeof getDb>;
@@ -670,10 +669,6 @@ export async function syncProposalToExternalCalendars(
     const proposal = await loadProposal(db, proposalId);
     if (!proposal) {
       console.warn("[calendar-sync] skip: proposal not found", proposalId);
-      return;
-    }
-    if (isNonScheduleProposal(proposal.description)) {
-      console.info("[calendar-sync] skip: non-schedule proposal", proposalId);
       return;
     }
 

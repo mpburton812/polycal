@@ -39,13 +39,6 @@ import {
   shouldRecordProposalInviteeView,
 } from "@/lib/proposals/invitee-view";
 import {
-  getProposalSpecialKind,
-  isNonScheduleProposal,
-  parseResidencyProposalMeta,
-  proposalDescriptionForDisplay,
-} from "@/lib/proposals/special-proposals";
-import { syncResidencyRowOnSubmit } from "@/actions/residency-proposals";
-import {
   sleepingDateToStartIso,
   isoToSleepingDateInput,
   sleepingScheduleFromSlotRows,
@@ -423,29 +416,6 @@ export async function listProposalPlaceOptionsAction(): Promise<ProposalPlaceOpt
     viewerId: networkSession.user.id,
     restrictToLocationIds: eligibleIds,
   });
-  return enrichPlaceOptionsWithMembers(db, placeRows.map(mapPlaceOption));
-}
-
-/**
- * All places for residency self-join proposals, with owner/resident names (PC-190).
- */
-export async function listResidencyPlaceOptionsAction(): Promise<ProposalPlaceOption[]> {
-  await ensureDbReady();
-  const networkSession = await requireNetworkSession();
-  if (!networkSession.ok) return [];
-
-  const db = getDb();
-  const placeRows = await db
-    .select({
-      id: locations.id,
-      name: locations.name,
-      bedroomCount: locations.bedroomCount,
-      bedroomNames: locations.bedroomNames,
-    })
-    .from(locations)
-    .where(eq(locations.networkId, networkSession.user.activeNetworkId))
-    .orderBy(asc(locations.name));
-
   return enrichPlaceOptionsWithMembers(db, placeRows.map(mapPlaceOption));
 }
 
@@ -1045,10 +1015,6 @@ export async function updateDraftProposalAction(
   const subjectUserId = proposal.proposerId;
   const locationActorAccess = adminAccessFromSessionUser(session.user);
 
-  if (isNonScheduleProposal(proposal.description)) {
-    return { ok: false, message: "This draft cannot be edited here." };
-  }
-
   const isBatchSleeping =
     parsed.data.proposalType === "sleeping" &&
     Boolean(parsed.data.isBatchSleeping ?? proposal.isBatchSleeping);
@@ -1305,10 +1271,7 @@ export async function submitProposalAction(
     return { ok: false, message: "Title is required before submitting." };
   }
 
-  const residencyMeta = parseResidencyProposalMeta(proposal.description);
-  const isSpecial = isNonScheduleProposal(proposal.description);
-
-  if (!confirm && !isSpecial) {
+  if (!confirm) {
     const conflictCheck = await checkProposalConflictsAction(proposalId);
     if (conflictCheck.warnings.length > 0) {
       return {
@@ -1351,23 +1314,12 @@ export async function submitProposalAction(
     };
   }
 
-  let autoResolve = shouldAutoResolveOnSubmit(
+  const autoResolve = shouldAutoResolveOnSubmit(
     proposal.proposalType,
     intentionalSolo,
     requiredCount,
     proposal.postingKind,
   );
-
-  if (residencyMeta) {
-    const [target] = await db
-      .select({ role: users.role })
-      .from(users)
-      .where(eq(users.id, residencyMeta.targetUserId))
-      .limit(1);
-    if (target?.role === "passive") {
-      autoResolve = true;
-    }
-  }
 
   const slots = await db
     .select({ startAt: proposalTimeSlots.startAt, endAt: proposalTimeSlots.endAt })
@@ -1470,55 +1422,45 @@ export async function submitProposalAction(
     .where(eq(proposals.id, proposalId))
     .limit(1);
 
-  if (updatedProposal) {
-    if (autoResolve && isSpecial) {
-      await resolveProposal(db, updatedProposal, session.user.id);
-    } else if (residencyMeta && !autoResolve) {
-      await syncResidencyRowOnSubmit(db, updatedProposal);
-    }
-
+  if (updatedProposal && autoResolve) {
     // Intentional-solo auto-resolve flips state above without resolveProposal();
     // still decline collisions and push Google/ICS (PC-337 / PC-345).
-    if (autoResolve && !isSpecial) {
-      const { autoDeclineCollidingProposals } = await import(
-        "@/lib/proposals/services/conflicts"
-      );
-      await autoDeclineCollidingProposals(
-        db,
-        updatedProposal,
-        updatedProposal.scheduledStartAt,
-        updatedProposal.scheduledEndAt,
-        session.user.id,
-      );
-      const { scheduleCalendarSync } = await import("@/lib/calendar/sync");
-      await scheduleCalendarSync(updatedProposal.id, "upsert");
-    }
+    const { autoDeclineCollidingProposals } = await import(
+      "@/lib/proposals/services/conflicts"
+    );
+    await autoDeclineCollidingProposals(
+      db,
+      updatedProposal,
+      updatedProposal.scheduledStartAt,
+      updatedProposal.scheduledEndAt,
+      session.user.id,
+    );
+    const { scheduleCalendarSync } = await import("@/lib/calendar/sync");
+    await scheduleCalendarSync(updatedProposal.id, "upsert");
   }
 
   const notificationMessage = autoResolve
     ? `Proposal "${proposal.title}" was auto-approved.`
     : `Proposal "${proposal.title}" needs your review.`;
 
-  if (!(autoResolve && isSpecial)) {
-    // Surface the proposed time (resolved schedule, else earliest slot) and
-    // location so review notifications carry richer context than the title.
-    const earliestSlot = [...slots].sort((a, b) =>
-      a.startAt.localeCompare(b.startAt),
-    )[0];
-    const notifyIds = new Set<string>(invitees.map((row) => row.userId));
-    for (const userId of notifyIds) {
-      await notifyUser(userId, "proposal_submitted", notificationMessage, {
-        proposalId,
-        proposalTitle: proposal.title,
-        proposerId: session.user.id,
-        state: nextState,
-        proposalType: proposal.proposalType,
-        scheduledStartAt: schedule.start ?? earliestSlot?.startAt ?? undefined,
-        scheduledEndAt: schedule.end ?? earliestSlot?.endAt ?? undefined,
-        locationText: proposal.locationText ?? undefined,
-        isAllDay: proposal.isAllDay ?? undefined,
-      });
-    }
+  // Surface the proposed time (resolved schedule, else earliest slot) and
+  // location so review notifications carry richer context than the title.
+  const earliestSlot = [...slots].sort((a, b) =>
+    a.startAt.localeCompare(b.startAt),
+  )[0];
+  const notifyIds = new Set<string>(invitees.map((row) => row.userId));
+  for (const userId of notifyIds) {
+    await notifyUser(userId, "proposal_submitted", notificationMessage, {
+      proposalId,
+      proposalTitle: proposal.title,
+      proposerId: session.user.id,
+      state: nextState,
+      proposalType: proposal.proposalType,
+      scheduledStartAt: schedule.start ?? earliestSlot?.startAt ?? undefined,
+      scheduledEndAt: schedule.end ?? earliestSlot?.endAt ?? undefined,
+      locationText: proposal.locationText ?? undefined,
+      isAllDay: proposal.isAllDay ?? undefined,
+    });
   }
 
   revalidatePath("/proposals");
@@ -1653,7 +1595,7 @@ export async function getProposalDetailAction(
   }
 
   const display = row;
-  const userFacingDescription = proposalDescriptionForDisplay(row.description);
+  const userFacingDescription = row.description;
   // Detail dialog never applies schedule sleeping mask (PC-306) — content stays unmasked.
 
   // Preload sleeping partners for each proxy (passive) invitee so UI can show vote controls (PC-255 / PC-397).
@@ -1967,7 +1909,6 @@ export async function getProposalDetailAction(
       tentative: Boolean(row.tentative),
       canRename: canRenameOrTentative,
       canToggleTentative: canRenameOrTentative,
-      specialKind: getProposalSpecialKind(row.description) ?? undefined,
       pendingIcsId: (
         await latestIcsPendingIdsByProposal(db, session.user.id, [row.id])
       ).get(row.id) ?? null,

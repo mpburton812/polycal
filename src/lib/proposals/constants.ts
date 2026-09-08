@@ -3,9 +3,6 @@ import type { InviteeVoteStatus } from "@/lib/db/schema";
 /** Synthetic Kanban card id prefix for sleeping partnership proposals (PC-43). */
 export const PARTNERSHIP_CARD_PREFIX = "partnership:";
 
-/** Synthetic Kanban card id prefix for place residency proposals (PC-56). */
-export const RESIDENCY_CARD_PREFIX = "residency:";
-
 /**
  * Aggregate invitee vote statuses that count as "approving" a proposal (PC-40).
  * Shared by the resolution engine and the resolved-attendee lifecycle actions

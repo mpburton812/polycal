@@ -39,9 +39,6 @@ vi.mock("@/lib/calendar/ics", () => ({
 vi.mock("@/lib/email/send", () => ({
   sendEmail: vi.fn(),
 }));
-vi.mock("@/lib/proposals/special-proposals", () => ({
-  isNonScheduleProposal: () => false,
-}));
 vi.mock("next/server", () => ({
   after: (fn: () => void) => {
     void fn();

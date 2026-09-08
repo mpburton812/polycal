@@ -20,7 +20,8 @@ import { fontFamilies } from "@/theme/fonts";
 import { GARDEN_TOKENS, ORGANIC_RADIUS } from "@/theme/tokens";
 
 interface ScheduleWeekViewProps {
-  weekStart: Date;
+  /** Stable ISO anchor — avoid `new Date(iso)` every parent render (PC-515). */
+  weekStartIso: string;
   dayCount: number;
   events: ScheduleEvent[];
   timeZone?: string;
@@ -29,37 +30,46 @@ interface ScheduleWeekViewProps {
   onDayHeaderClick?: (day: Date) => void;
   /** Opens day sheet when overflow exceeds the visible chip cap (PC-165). */
   onDayOverflowClick?: (day: Date) => void;
+  /**
+   * When true, pin Today into view once per weekStartIso change (PC-400).
+   * Infinite-scroll hosts should pass false so the week stays at the top (PC-493 / PC-515).
+   */
+  pinToday?: boolean;
 }
 
 const COMPACT_VISIBLE = 3;
 
 /**
  * Compact agenda-style week list (Sun–Sat) so event titles stay readable (PC-42 / PC-494).
- * Scrolls so Today is first visible (PC-400).
+ * Optionally scrolls so Today is first visible (PC-400 / PC-515).
  */
 export function ScheduleWeekView({
-  weekStart,
+  weekStartIso,
   dayCount,
   events,
   timeZone = DEFAULT_VIEWER_TIMEZONE,
   onEventClick,
   onDayHeaderClick,
   onDayOverflowClick,
+  pinToday = true,
 }: ScheduleWeekViewProps) {
   const days = useMemo(() => {
-    const sunday = startOfWeekSunday(weekStart, timeZone);
+    const sunday = startOfWeekSunday(new Date(weekStartIso), timeZone);
     return Array.from({ length: dayCount }, (_, index) => addDays(sunday, index));
-  }, [weekStart, dayCount, timeZone]);
+  }, [weekStartIso, dayCount, timeZone]);
 
   const todayRef = useRef<HTMLDivElement | null>(null);
+  const pinnedWeekIsoRef = useRef<string | null>(null);
 
   useEffect(() => {
+    if (!pinToday) return;
+    if (pinnedWeekIsoRef.current === weekStartIso) return;
+    pinnedWeekIsoRef.current = weekStartIso;
     todayRef.current?.scrollIntoView({
       block: "start",
       behavior: "instant" in window ? "instant" : "auto",
     });
-  }, [days, timeZone]);
-
+  }, [weekStartIso, pinToday, timeZone]);
   const eventsByDay = useMemo(() => {
     const map = new Map<string, ScheduleEvent[]>();
     for (const day of days) {

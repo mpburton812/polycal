@@ -12,6 +12,7 @@ export type PlatformSystemLogEntry = {
   createdAt: string;
   networkName: string | null;
   actorDisplayName: string | null;
+  targetDisplayName: string | null;
   action: string;
   summary: string;
   severity: "major" | "info";
@@ -22,6 +23,10 @@ export type PlatformLogAlert = {
   id: string;
   summary: string;
   emphasized: boolean;
+  actorDisplayName: string | null;
+  createdAt: string;
+  targetUserId: string | null;
+  targetDisplayName: string | null;
 };
 
 /**
@@ -40,6 +45,7 @@ export async function listPlatformSystemLogAction(
       createdAt: platformSystemLog.createdAt,
       networkName: platformSystemLog.networkName,
       actorDisplayName: platformSystemLog.actorDisplayName,
+      targetDisplayName: platformSystemLog.targetDisplayName,
       action: platformSystemLog.action,
       summary: platformSystemLog.summary,
       severity: platformSystemLog.severity,
@@ -57,7 +63,7 @@ export async function listPlatformSystemLogAction(
 }
 
 /**
- * Unacked major (and emphasized) alerts for the signed-in platform operator (PC-463).
+ * Unacked major (and emphasized) alerts for the signed-in platform operator (PC-463 / PC-497).
  */
 export async function listUnackedPlatformLogAlertsAction(): Promise<PlatformLogAlert[]> {
   const admin = await requirePlatformAdmin();
@@ -76,6 +82,10 @@ export async function listUnackedPlatformLogAlertsAction(): Promise<PlatformLogA
       summary: platformSystemLog.summary,
       emphasized: platformSystemLog.emphasized,
       severity: platformSystemLog.severity,
+      actorDisplayName: platformSystemLog.actorDisplayName,
+      createdAt: platformSystemLog.createdAt,
+      targetUserId: platformSystemLog.targetUserId,
+      targetDisplayName: platformSystemLog.targetDisplayName,
     })
     .from(platformSystemLog)
     .where(
@@ -90,6 +100,10 @@ export async function listUnackedPlatformLogAlertsAction(): Promise<PlatformLogA
       id: row.id,
       summary: row.summary,
       emphasized: row.emphasized === true,
+      actorDisplayName: row.actorDisplayName ?? null,
+      createdAt: row.createdAt,
+      targetUserId: row.targetUserId ?? null,
+      targetDisplayName: row.targetDisplayName ?? null,
     }));
 }
 

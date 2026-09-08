@@ -32,11 +32,6 @@ const ProposalDraftDialog = dynamic(
     import("./ProposalDraftDialog").then((mod) => ({ default: mod.ProposalDraftDialog })),
   { ssr: false },
 );
-const ResidencyCreateDialog = dynamic(
-  () =>
-    import("./ResidencyCreateDialog").then((mod) => ({ default: mod.ResidencyCreateDialog })),
-  { ssr: false },
-);
 const SleepingPartnerCreateDialog = dynamic(
   () =>
     import("./SleepingPartnerCreateDialog").then((mod) => ({
@@ -55,6 +50,7 @@ const FastSleepDialog = dynamic(
 /**
  * Shared sage + create host mounted in AppShell so every screen has the full menu (PC-418).
  * Menu opens immediately; composer lists load in one bootstrap action (PC-449).
+ * FAB defaults to NLP as "New Event"; manual is "Legacy New Event" (PC-513).
  */
 export function ProposalCreateHost({
   children,
@@ -70,15 +66,13 @@ export function ProposalCreateHost({
   const [createInitialStartAt, setCreateInitialStartAt] = useState<string | null>(null);
   const [partnerCreateOpen, setPartnerCreateOpen] = useState(false);
   const [fastSleepOpen, setFastSleepOpen] = useState(false);
-  const [residencyCreateOpen, setResidencyCreateOpen] = useState(false);
   const [people, setPeople] = useState<PersonSummary[]>([]);
   const [places, setPlaces] = useState<ProposalPlaceOption[]>([]);
-  const [residencyPlaces, setResidencyPlaces] = useState<ProposalPlaceOption[]>([]);
   const [fastSleepEnabled, setFastSleepEnabled] = useState(true);
   const [composerSettings, setComposerSettings] = useState<DraftComposerSettings | null>(null);
   const [peopleRank, setPeopleRank] = useState<PersonRankStat[]>([]);
   const [editDetail, setEditDetail] = useState<ProposalDetail | null>(null);
-  const [composerMode, setComposerMode] = useState<"manual" | "nlp">("manual");
+  const [composerMode, setComposerMode] = useState<"manual" | "nlp">("nlp");
   const [initialTitle, setInitialTitle] = useState("");
   const [initialNlpText, setInitialNlpText] = useState("");
   const loadedAtRef = useRef(0);
@@ -96,7 +90,6 @@ export function ProposalCreateHost({
     const next = await getProposalCreateBootstrapAction();
     setPeople(next.people);
     setPlaces(next.places);
-    setResidencyPlaces(next.residencyPlaces);
     setFastSleepEnabled(next.fastSleepEnabled);
     setComposerSettings(next.composer);
     setPeopleRank(next.peopleRank);
@@ -117,6 +110,7 @@ export function ProposalCreateHost({
         setLockCreateType(Boolean(request?.lockedType));
         setCreateProposalType(request?.lockedType ?? "event");
         setCreateInitialStartAt(request?.initialStartAt ?? null);
+        // Calendar / locked create stays manual when mode omitted (PC-439 / PC-513).
         setComposerMode(request?.composerMode ?? "manual");
         setInitialTitle(request?.initialTitle ?? "");
         setInitialNlpText(request?.initialNlpText ?? "");
@@ -206,7 +200,7 @@ export function ProposalCreateHost({
               setCreateProposalType("event");
               setLockCreateType(false);
               setCreateInitialStartAt(null);
-              setComposerMode("manual");
+              setComposerMode("nlp");
               setInitialTitle("");
               setInitialNlpText("");
               setCreateOpen(true);
@@ -223,14 +217,14 @@ export function ProposalCreateHost({
               setCreateProposalType("event");
               setLockCreateType(false);
               setCreateInitialStartAt(null);
-              setComposerMode("nlp");
+              setComposerMode("manual");
               setInitialTitle("");
               setInitialNlpText("");
               setCreateOpen(true);
             });
           }}
         >
-          New Event (NLP Input)
+          Legacy New Event
         </MenuItem>
         {fastSleepEnabled ? (
           <MenuItem
@@ -250,14 +244,6 @@ export function ProposalCreateHost({
           }}
         >
           Sleeping partner proposal
-        </MenuItem>
-        <MenuItem
-          onClick={() => {
-            setFabMenuAnchor(null);
-            void loadCreateData(true).then(() => setResidencyCreateOpen(true));
-          }}
-        >
-          Residency Proposal
         </MenuItem>
       </Menu>
         </>
@@ -298,15 +284,6 @@ export function ProposalCreateHost({
         open={fastSleepOpen}
         onClose={() => setFastSleepOpen(false)}
         places={places}
-        currentUserId={currentUserId}
-      />
-      ) : null}
-      {residencyCreateOpen ? (
-      <ResidencyCreateDialog
-        open={residencyCreateOpen}
-        onClose={() => setResidencyCreateOpen(false)}
-        people={people}
-        places={residencyPlaces.length > 0 ? residencyPlaces : places}
         currentUserId={currentUserId}
       />
       ) : null}

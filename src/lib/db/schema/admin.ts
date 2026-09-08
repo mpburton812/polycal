@@ -79,6 +79,9 @@ export const platformSystemLog = sqliteTable(
     networkId: text("network_id"),
     actorUserId: text("actor_user_id").references(() => users.id),
     actorDisplayName: text("actor_display_name"),
+    /** Optional subject of the event (e.g. removed member) — PC-497. */
+    targetUserId: text("target_user_id").references(() => users.id),
+    targetDisplayName: text("target_display_name"),
     severity: text("severity", { enum: ["major", "info"] }).notNull().default("info"),
     action: text("action").notNull(),
     summary: text("summary").notNull(),
