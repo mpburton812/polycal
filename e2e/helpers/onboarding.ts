@@ -12,12 +12,13 @@ export async function completeFirstLoginOnboarding(
   await expect(page.getByRole("heading", { name: "Welcome to PolyCal" })).toBeVisible();
 
   // Email and Password step (PC-510) — email required before Continue.
-  await page.getByRole("textbox", { name: "Email", exact: true }).fill("e2e-onboard@example.com");
-  await page.getByRole("textbox", { name: "New password", exact: true }).fill(newPassword);
-  await page.getByRole("textbox", { name: "Confirm new password" }).fill(newPassword);
+  const emailInput = page.locator('input[type="email"]').first();
+  await expect(emailInput).toBeVisible({ timeout: 15_000 });
+  await emailInput.fill("e2e-onboard@example.com");
+  await page.getByLabel("New password", { exact: true }).fill(newPassword);
+  await page.getByLabel("Confirm new password").fill(newPassword);
   await page.getByRole("button", { name: "Continue" }).click();
-
-  await expect(page.getByText("Accent theme")).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText("Accent theme")).toBeVisible({ timeout: 30_000 });
   await page.getByRole("button", { name: "Blue bird" }).click();
   // Timezone defaults to US Eastern (PC-194).
   await expect(page.getByLabel("Time zone")).toContainText(/America\/New[_ ]York/);

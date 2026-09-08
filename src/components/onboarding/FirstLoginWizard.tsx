@@ -196,7 +196,9 @@ function FirstLoginWizardInner({
     setError(null);
     setEmailStatus(null);
     const formData = new FormData(event.currentTarget);
-    const email = notificationEmail.trim();
+    const email =
+      notificationEmail.trim() ||
+      String(formData.get("notificationEmail") ?? "").trim();
     if (!email) {
       setError("Enter an email to continue. You can verify it later from the link we send.");
       return;
@@ -391,6 +393,7 @@ function FirstLoginWizardInner({
           <Stack spacing={2}>
             <TextField
               label="Email"
+              name="notificationEmail"
               type="email"
               value={notificationEmail}
               onChange={(event) => setNotificationEmail(event.target.value)}
