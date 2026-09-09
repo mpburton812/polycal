@@ -63,17 +63,13 @@ import {
   isSameLocalCalendarDay,
   startOfWeekSunday,
 } from "@/lib/schedule/dates";
+import { computeScheduleFetchRange } from "@/lib/schedule/fetch-range";
 import { startOfMonth } from "@/lib/schedule/month-grid";
 import { SCHEDULE_INVALIDATE_EVENT } from "@/lib/schedule/invalidate";
 import { parseScheduleNlDate } from "@/lib/schedule/parse-nl-date";
 import {
-  buildScheduleSegment,
   normalizeSegmentAnchor,
-  SCHEDULE_VIEWPORT_FILL_MAX,
-  scheduleMaxSegments,
   shiftSegmentAnchor,
-  type ScheduleSegment,
-  trimScheduleSegments,
 } from "@/lib/schedule/segments";
 import { ssrWeekCoversVisibleRange } from "@/lib/schedule/visible-payload";
 import { brutalPageTitleSx, brutalPopoverPaperSx } from "@/theme/brutalUi";
@@ -138,7 +134,7 @@ function formatSegmentLabel(
 }
 
 /**
- * Schedule tab — Daily / Weekly / Monthly segments with bi-directional infinite scroll (PC-488 / PC-489).
+ * Schedule tab — Single window view anchored on active date period (PC-488 / PC-515).
  */
 export function ScheduleClient({
   initialPayload,
@@ -149,17 +145,9 @@ export function ScheduleClient({
   timeZone,
 }: ScheduleClientProps) {
   const pathname = usePathname();
-  const previousPathRef = useRef<string | null>(null);
-  const stackSeqRef = useRef(0);
   const urlHydratedRef = useRef(false);
-  const postHydrateFetchDoneRef = useRef(false);
   const scrollRootRef = useRef<HTMLDivElement | null>(null);
-  const topSentinelRef = useRef<HTMLDivElement | null>(null);
-  const bottomSentinelRef = useRef<HTMLDivElement | null>(null);
-  const loadingPastRef = useRef(false);
-  const loadingFutureRef = useRef(false);
-  const fillRunningRef = useRef(false);
-  const segmentsRef = useRef<ScheduleSegment[]>([]);
+  const scheduleRootRef = useRef<HTMLDivElement | null>(null);
 
   const [viewState, setViewState] = useState<ScheduleViewState>(() => {
     const loaded = loadScheduleViewState();
@@ -170,124 +158,93 @@ export function ScheduleClient({
       monthAnchorIso: anchors.monthAnchorIso,
     };
   });
-  const [segments, setSegmentsState] = useState<ScheduleSegment[]>([]);
-  const setSegments = useCallback((next: ScheduleSegment[] | ((prev: ScheduleSegment[]) => ScheduleSegment[])) => {
-    setSegmentsState((prev) => {
-      const resolved = typeof next === "function" ? next(prev) : next;
-      segmentsRef.current = resolved;
-      return resolved;
-    });
-  }, []);
+
+  const [events, setEvents] = useState<ScheduleEvent[]>(() => initialPayload.events ?? []);
   const [pending, setPending] = useState(false);
-  const [loadingPast, setLoadingPast] = useState(false);
-  const [loadingFuture, setLoadingFuture] = useState(false);
   const [daySheetDay, setDaySheetDay] = useState<Date | null>(null);
   const [dateAnchorEl, setDateAnchorEl] = useState<HTMLElement | null>(null);
   const [nlDateText, setNlDateText] = useState("");
   const [nlDateError, setNlDateError] = useState<string | null>(null);
-  const scheduleRootRef = useRef<HTMLDivElement | null>(null);
   const [viewportHeightPx, setViewportHeightPx] = useState<number | null>(null);
-  const scrollTargetAnchorRef = useRef<string | null>(null);
-  /** Ignore top-sentinel prepend briefly after Goto Today / scroll-to-top (PC-515). */
-  const suppressPrependUntilRef = useRef(0);
+
   const { openCreate, openEdit } = useProposalCreate();
   const {
     state: dialogState,
     openScheduleEvent,
     closeDetail,
-    closeSlice,
-    closeChooser,
-    openRelatedProposal,
-    openDetachedProposal,
-    openProposal,
-  } = useScheduleTapRouter();
+    handleChoiceSelect,
+    handleSeriesCancelChoice,
+    handleDeleteSliceConfirm,
+  } = useScheduleTapRouter({
+    events,
+    onOpenEditProposal: (id, options) => {
+      openEdit(id, options);
+    },
+  });
 
   const weekStart = useMemo(
     () => startOfWeekSunday(new Date(viewState.weekStartIso), timeZone),
-    [viewState.weekStartIso, timeZone],
-  );
-  const dayAnchor = useMemo(
-    () => startOfLocalDayNoon(new Date(viewState.weekStartIso), timeZone),
     [viewState.weekStartIso, timeZone],
   );
   const monthAnchor = useMemo(
     () => startOfMonth(new Date(viewState.monthAnchorIso), timeZone),
     [viewState.monthAnchorIso, timeZone],
   );
+  const dayAnchor = useMemo(
+    () => startOfLocalDayNoon(new Date(viewState.weekStartIso), timeZone),
+    [viewState.weekStartIso, timeZone],
+  );
+
   const isMonthLayout = viewState.calendarLayout === "month";
   const isDayLayout = viewState.calendarLayout === "day";
-  const periodMode = periodModeFromState(viewState);
-  const primaryAnchor = isMonthLayout ? monthAnchor : isDayLayout ? dayAnchor : weekStart;
-  const dayCount = isDayLayout ? 1 : 7;
 
-  const primarySegment = useMemo(() => {
-    const id = normalizeSegmentAnchor(
-      primaryAnchor,
-      viewState.calendarLayout,
-      timeZone,
-    ).toISOString();
-    return segments.find((segment) => segment.id === id) ?? segments[0] ?? null;
-  }, [primaryAnchor, segments, timeZone, viewState.calendarLayout]);
+  const primaryAnchor = useMemo(() => {
+    if (isMonthLayout) return monthAnchor;
+    if (isDayLayout) return dayAnchor;
+    return weekStart;
+  }, [isMonthLayout, isDayLayout, monthAnchor, dayAnchor, weekStart]);
 
-  const rangeStartIso = primarySegment?.rangeStartIso ?? primaryAnchor.toISOString();
-  const rangeEndIso = primarySegment?.rangeEndIso ?? primaryAnchor.toISOString();
-
-  const rangeLabel = useMemo(
-    () => formatSegmentLabel(primaryAnchor, viewState.calendarLayout, timeZone),
-    [primaryAnchor, timeZone, viewState.calendarLayout],
+  const fetchRange = useMemo(
+    () => computeScheduleFetchRange(primaryAnchor, viewState.calendarLayout, timeZone),
+    [primaryAnchor, viewState.calendarLayout, timeZone],
   );
 
-  const fetchSegmentEvents = useCallback(
-    async (anchor: Date, layout: ScheduleCalendarLayout): Promise<ScheduleEvent[]> => {
-      const segment = buildScheduleSegment(anchor, layout, [], timeZone);
-      const result = await listScheduleEventsAction({
-        rangeStart: segment.rangeStartIso,
-        rangeEnd: segment.rangeEndIso,
-      });
-      return result.ok ? result.payload.events : [];
-    },
-    [timeZone],
-  );
+  const rangeStartIso = fetchRange.rangeStart.toISOString();
+  const rangeEndIso = fetchRange.rangeEnd.toISOString();
 
-  /**
-   * Rebuilds the stack around a seed anchor, then viewport-fill is handled by layout effect (PC-489 / PC-492).
-   */
-  const rebuildStack = useCallback(
-    (
-      anchorDate: Date,
-      opts?: {
-        layout?: ScheduleCalendarLayout;
-        seedEvents?: ScheduleEvent[];
-        scrollToTop?: boolean;
-      },
-    ) => {
-      const layout = opts?.layout ?? viewState.calendarLayout;
-      const normalized = normalizeSegmentAnchor(anchorDate, layout, timeZone);
-      if (opts?.scrollToTop) {
-        scrollTargetAnchorRef.current = normalized.toISOString();
-        // Top sentinel is visible at scrollTop 0 — suppress prepend while settling (PC-515).
-        suppressPrependUntilRef.current = Date.now() + 400;
-      }
-      const seq = ++stackSeqRef.current;
+  const fetchEventsForRange = useCallback(
+    async (anchorDate: Date, layout: ScheduleCalendarLayout) => {
       setPending(true);
-      loadingPastRef.current = false;
-      loadingFutureRef.current = false;
-      setLoadingPast(false);
-      setLoadingFuture(false);
-
-      void (async () => {
-        try {
-          const events =
-            opts?.seedEvents ?? (await fetchSegmentEvents(normalized, layout));
-          if (seq !== stackSeqRef.current) return;
-          setSegments([buildScheduleSegment(normalized, layout, events, timeZone)]);
-        } finally {
-          if (seq === stackSeqRef.current) setPending(false);
-        }
-      })();
+      try {
+        const range = computeScheduleFetchRange(anchorDate, layout, timeZone);
+        const res = await listScheduleEventsAction({
+          startAt: range.rangeStart.toISOString(),
+          endAt: range.rangeEnd.toISOString(),
+          filterMode: viewState.filterMode,
+          filterPersonId: viewState.filterPersonId || undefined,
+        });
+        setEvents(res.events);
+      } finally {
+        setPending(false);
+      }
     },
-    [fetchSegmentEvents, timeZone, viewState.calendarLayout],
+    [timeZone, viewState.filterMode, viewState.filterPersonId],
   );
+
+  const scrollToTopOrToday = useCallback(() => {
+    requestAnimationFrame(() => {
+      const root = scrollRootRef.current;
+      if (!root) return;
+      if (viewState.calendarLayout === "month") {
+        const todayCell = document.getElementById("schedule-month-today");
+        if (todayCell) {
+          todayCell.scrollIntoView({ block: "center", behavior: "instant" as ScrollBehavior });
+          return;
+        }
+      }
+      root.scrollTo({ top: 0, behavior: "instant" as ScrollBehavior });
+    });
+  }, [viewState.calendarLayout]);
 
   /** Size the schedule column to fill viewport below app chrome and above bottom nav (PC-493 / PC-494). */
   useLayoutEffect(() => {
@@ -324,107 +281,15 @@ export function ScheduleClient({
     };
   }, [pathname]);
 
-  /** After rebuild, scroll the calendar region to the top (PC-493 / PC-515). */
-  useEffect(() => {
-    const target = scrollTargetAnchorRef.current;
-    if (!target || pending || segments.length === 0) return;
-    if (!segments.some((segment) => segment.id === target)) return;
-    scrollTargetAnchorRef.current = null;
-    requestAnimationFrame(() => {
-      // Instant jump — smooth scroll fights Today pin + top-sentinel prepend (PC-515).
-      scrollRootRef.current?.scrollTo({
-        top: 0,
-        behavior: "instant" in window ? "instant" : "auto",
-      });
-    });
-  }, [pending, segments]);
-
   const refreshCurrentView = useCallback(() => {
-    rebuildStack(primaryAnchor, { layout: viewState.calendarLayout });
-  }, [primaryAnchor, rebuildStack, viewState.calendarLayout]);
-
-  const appendFutureSegment = useCallback(async () => {
-    if (loadingFutureRef.current || pending) return;
-    const current = segmentsRef.current;
-    if (current.length === 0) return;
-    const last = current[current.length - 1];
-    if (!last) return;
-
-    const layout = viewState.calendarLayout;
-    const maxSegments = scheduleMaxSegments(layout);
-    const nextAnchor = shiftSegmentAnchor(new Date(last.anchorIso), layout, 1, timeZone);
-    const nextId = nextAnchor.toISOString();
-    if (current.some((segment) => segment.id === nextId)) return;
-
-    loadingFutureRef.current = true;
-    setLoadingFuture(true);
-    const seq = stackSeqRef.current;
-    try {
-      const events = await fetchSegmentEvents(nextAnchor, layout);
-      if (seq !== stackSeqRef.current) return;
-      setSegments((prev) => {
-        if (prev.some((segment) => segment.id === nextId)) return prev;
-        return trimScheduleSegments(
-          [...prev, buildScheduleSegment(nextAnchor, layout, events, timeZone)],
-          "future",
-          maxSegments,
-        );
-      });
-    } finally {
-      loadingFutureRef.current = false;
-      setLoadingFuture(false);
-    }
-  }, [fetchSegmentEvents, pending, setSegments, timeZone, viewState.calendarLayout]);
-
-  const prependPastSegment = useCallback(async () => {
-    if (Date.now() < suppressPrependUntilRef.current) return;
-    if (loadingPastRef.current || pending) return;
-    const current = segmentsRef.current;
-    if (current.length === 0) return;
-    const first = current[0];
-    if (!first) return;
-
-    const layout = viewState.calendarLayout;
-    const maxSegments = scheduleMaxSegments(layout);
-    const prevAnchor = shiftSegmentAnchor(new Date(first.anchorIso), layout, -1, timeZone);
-    const prevId = prevAnchor.toISOString();
-    if (current.some((segment) => segment.id === prevId)) return;
-
-    loadingPastRef.current = true;
-    setLoadingPast(true);
-    const seq = stackSeqRef.current;
-    const scrollRoot = scrollRootRef.current;
-    const prevScrollHeight = scrollRoot?.scrollHeight ?? 0;
-    const prevScrollTop = scrollRoot?.scrollTop ?? 0;
-    try {
-      const events = await fetchSegmentEvents(prevAnchor, layout);
-      if (seq !== stackSeqRef.current) return;
-      setSegments((prev) => {
-        if (prev.some((segment) => segment.id === prevId)) return prev;
-        return trimScheduleSegments(
-          [buildScheduleSegment(prevAnchor, layout, events, timeZone), ...prev],
-          "past",
-          maxSegments,
-        );
-      });
-      // Preserve viewport after prepend (PC-489 / PC-493).
-      requestAnimationFrame(() => {
-        const root = scrollRootRef.current;
-        if (!root) return;
-        const delta = root.scrollHeight - prevScrollHeight;
-        root.scrollTo(0, prevScrollTop + delta);
-      });
-    } finally {
-      loadingPastRef.current = false;
-      setLoadingPast(false);
-    }
-  }, [fetchSegmentEvents, pending, setSegments, timeZone, viewState.calendarLayout]);
+    void fetchEventsForRange(primaryAnchor, viewState.calendarLayout);
+  }, [fetchEventsForRange, primaryAnchor, viewState.calendarLayout]);
 
   useEffect(() => {
     saveScheduleViewState(viewState);
   }, [viewState]);
 
-  // Seed stack from SSR week when it matches; otherwise fetch (PC-474 / PC-489).
+  // Initial seed from SSR week when applicable; otherwise fetch range (PC-474 / PC-515).
   useEffect(() => {
     const covers = ssrWeekCoversVisibleRange({
       layout: viewState.calendarLayout,
@@ -432,17 +297,10 @@ export function ScheduleClient({
       ssrWeekStart: new Date(initialWeekStartIso),
       timeZone,
     });
-    if (covers) {
-      rebuildStack(primaryAnchor, {
-        layout: "week",
-        seedEvents: initialPayload.events,
-        scrollToTop: true,
-      });
-      return;
+    if (!covers) {
+      void fetchEventsForRange(primaryAnchor, viewState.calendarLayout);
     }
-    rebuildStack(primaryAnchor, { layout: viewState.calendarLayout, scrollToTop: true });
-    // Mount / layout identity only — avoid thrashing on every primaryAnchor identity churn.
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional seed once per layout change via handlers
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- run once on mount
   }, []);
 
   useEffect(() => {
@@ -481,130 +339,34 @@ export function ScheduleClient({
     if (parsed.open) {
       openProposal(parsed.open);
     }
-  }, [openProposal, timeZone]);
+  }, [timeZone]);
 
-  useEffect(() => {
-    if (!urlHydratedRef.current) return;
-    if (pathname !== "/schedule") return;
-    if (typeof window === "undefined") return;
-    const next = buildScheduleUrlSearch(
-      viewState,
-      dialogState.detailOpen ? dialogState.selectedProposalId : null,
-    );
-    const current = window.location.search.replace(/^\?/, "");
-    if (next !== current) {
-      const url = next ? `/schedule?${next}` : "/schedule";
-      window.history.replaceState(window.history.state, "", url);
-    }
-  }, [
-    dialogState.detailOpen,
-    dialogState.selectedProposalId,
-    pathname,
-    viewState,
-  ]);
+  const openProposal = useCallback(
+    (proposalId: string) => {
+      const match = events.find((e) => e.proposalId === proposalId);
+      if (match) openScheduleEvent(match);
+    },
+    [events, openScheduleEvent],
+  );
 
-  useEffect(() => {
-    if (pathname !== "/schedule") {
-      postHydrateFetchDoneRef.current = false;
-      previousPathRef.current = pathname;
-      return;
-    }
-    if (postHydrateFetchDoneRef.current) return;
-    postHydrateFetchDoneRef.current = true;
-    previousPathRef.current = pathname;
-
-    const anchor =
-      viewState.calendarLayout === "month"
-        ? new Date(viewState.monthAnchorIso)
-        : viewState.calendarLayout === "day"
-          ? startOfLocalDayNoon(new Date(viewState.weekStartIso), timeZone)
-          : new Date(viewState.weekStartIso);
-    const initialSunday = startOfWeekSunday(new Date(initialWeekStartIso), timeZone);
-    const viewSunday = startOfWeekSunday(anchor, timeZone);
-    const sameWeek = isSameLocalCalendarDay(viewSunday, initialSunday);
-    if (!sameWeek || viewState.calendarLayout === "month" || viewState.calendarLayout === "day") {
-      rebuildStack(anchor, { layout: viewState.calendarLayout });
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- one-shot per schedule visit
-  }, [pathname, rebuildStack, initialWeekStartIso]);
-
-  /** Fill viewport with future segments only so Today stays at the top (PC-493). */
-  useLayoutEffect(() => {
-    if (pending || segments.length === 0 || fillRunningRef.current) return;
-    if (segments.length >= SCHEDULE_VIEWPORT_FILL_MAX) return;
-
-    const root = scrollRootRef.current;
-    if (!root) return;
-    const overflows = root.scrollHeight > root.clientHeight + 48;
-    if (overflows) return;
-
-    fillRunningRef.current = true;
-    void (async () => {
-      try {
-        await appendFutureSegment();
-      } finally {
-        fillRunningRef.current = false;
-      }
-    })();
-  }, [appendFutureSegment, pending, segments.length]);
-
-  /** Bi-directional infinite scroll sentinels (PC-489 / PC-493). */
-  useEffect(() => {
-    const root = scrollRootRef.current;
-    const top = topSentinelRef.current;
-    const bottom = bottomSentinelRef.current;
-    if (!root || !top || !bottom) return;
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        for (const entry of entries) {
-          if (!entry.isIntersecting) continue;
-          if (entry.target === bottom) void appendFutureSegment();
-          if (entry.target === top) void prependPastSegment();
-        }
-      },
-      { root, rootMargin: "240px 0px", threshold: 0 },
-    );
-    observer.observe(top);
-    observer.observe(bottom);
-    return () => observer.disconnect();
-  }, [appendFutureSegment, prependPastSegment, segments.length, viewportHeightPx]);
-
-  const allEvents = useMemo(() => {
-    const byId = new Map<string, ScheduleEvent>();
-    for (const segment of segments) {
-      for (const event of segment.events) byId.set(event.id, event);
-    }
-    return Array.from(byId.values());
-  }, [segments]);
-
-  const filteredAllEvents = useMemo(
+  const filteredEvents = useMemo(
     () =>
       filterScheduleEvents(
-        allEvents,
+        events,
         viewState.filterMode,
         currentUserId,
         viewState.filterPersonId || undefined,
         acceptedPartnerIds,
       ),
-    [allEvents, viewState.filterMode, viewState.filterPersonId, currentUserId, acceptedPartnerIds],
+    [events, viewState.filterMode, viewState.filterPersonId, currentUserId, acceptedPartnerIds],
   );
-
-  function filterSegmentEvents(events: ScheduleEvent[]) {
-    return filterScheduleEvents(
-      events,
-      viewState.filterMode,
-      currentUserId,
-      viewState.filterPersonId || undefined,
-      acceptedPartnerIds,
-    );
-  }
 
   function shiftPeriod(delta: number) {
     if (isMonthLayout) {
       const next = shiftSegmentAnchor(monthAnchor, "month", delta, timeZone);
       setViewState((current) => ({ ...current, monthAnchorIso: next.toISOString() }));
-      rebuildStack(next, { layout: "month" });
+      void fetchEventsForRange(next, "month");
+      scrollToTopOrToday();
       return;
     }
 
@@ -615,7 +377,8 @@ export function ScheduleClient({
         weekStartIso: next.toISOString(),
         monthAnchorIso: startOfMonth(next, timeZone).toISOString(),
       }));
-      rebuildStack(next, { layout: "day" });
+      void fetchEventsForRange(next, "day");
+      scrollToTopOrToday();
       return;
     }
 
@@ -625,12 +388,11 @@ export function ScheduleClient({
       weekStartIso: next.toISOString(),
       monthAnchorIso: startOfMonth(next, timeZone).toISOString(),
     }));
-    rebuildStack(next, { layout: "week" });
+    void fetchEventsForRange(next, "week");
+    scrollToTopOrToday();
   }
 
   function goToday() {
-    // Suppress top-sentinel prepend while Goto Today settles at scrollTop 0 (PC-515).
-    suppressPrependUntilRef.current = Date.now() + 400;
     const anchors = todayAnchors();
     const now = new Date();
     if (viewState.calendarLayout === "day") {
@@ -640,15 +402,19 @@ export function ScheduleClient({
         weekStartIso: day.toISOString(),
         monthAnchorIso: anchors.monthAnchorIso,
       }));
-      rebuildStack(day, { layout: "day", scrollToTop: true });
+      void fetchEventsForRange(day, "day");
+      scrollToTopOrToday();
       return;
     }
+
     setViewState((current) => ({ ...current, ...anchors }));
     const anchor =
       viewState.calendarLayout === "month"
         ? new Date(anchors.monthAnchorIso)
         : new Date(anchors.weekStartIso);
-    rebuildStack(anchor, { layout: viewState.calendarLayout, scrollToTop: true });
+
+    void fetchEventsForRange(anchor, viewState.calendarLayout);
+    scrollToTopOrToday();
   }
 
   function jumpToParsedDate(date: Date) {
@@ -660,7 +426,8 @@ export function ScheduleClient({
         weekStartIso: day.toISOString(),
         monthAnchorIso: startOfMonth(day, timeZone).toISOString(),
       }));
-      rebuildStack(day, { layout: "day", scrollToTop: true });
+      void fetchEventsForRange(day, "day");
+      scrollToTopOrToday();
       return;
     }
     if (layout === "month") {
@@ -670,7 +437,8 @@ export function ScheduleClient({
         weekStartIso: startOfWeekSunday(date, timeZone).toISOString(),
         monthAnchorIso: month.toISOString(),
       }));
-      rebuildStack(month, { layout: "month", scrollToTop: true });
+      void fetchEventsForRange(month, "month");
+      scrollToTopOrToday();
       return;
     }
     const sunday = startOfWeekSunday(date, timeZone);
@@ -679,7 +447,8 @@ export function ScheduleClient({
       weekStartIso: sunday.toISOString(),
       monthAnchorIso: startOfMonth(date, timeZone).toISOString(),
     }));
-    rebuildStack(sunday, { layout: "week", scrollToTop: true });
+    void fetchEventsForRange(sunday, "week");
+    scrollToTopOrToday();
   }
 
   function submitNlDate() {
@@ -696,43 +465,36 @@ export function ScheduleClient({
 
   function handlePeriodModeChange(mode: SchedulePeriodMode) {
     const next = applyPeriodMode(viewState, mode);
+    let targetAnchor = primaryAnchor;
     if (mode === "day") {
-      const day = startOfLocalDayNoon(
+      targetAnchor = startOfLocalDayNoon(
         viewState.calendarLayout === "month" ? monthAnchor : new Date(viewState.weekStartIso),
         timeZone,
       );
-      const withDay = { ...next, weekStartIso: day.toISOString() };
-      setViewState(withDay);
-      rebuildStack(day, { layout: "day" });
-      return;
+      setViewState({ ...next, weekStartIso: targetAnchor.toISOString() });
+    } else if (mode === "month") {
+      targetAnchor = startOfMonth(new Date(viewState.weekStartIso), timeZone);
+      setViewState({ ...next, monthAnchorIso: targetAnchor.toISOString() });
+    } else {
+      targetAnchor = startOfWeekSunday(new Date(next.weekStartIso), timeZone);
+      setViewState(next);
     }
-    if (mode === "month") {
-      const fromWeek = startOfMonth(new Date(viewState.weekStartIso), timeZone);
-      const withMonth = { ...next, monthAnchorIso: fromWeek.toISOString() };
-      setViewState(withMonth);
-      rebuildStack(fromWeek, { layout: "month" });
-      return;
-    }
-    setViewState(next);
-    rebuildStack(startOfWeekSunday(new Date(next.weekStartIso), timeZone), {
-      layout: "week",
-    });
+    void fetchEventsForRange(targetAnchor, mode);
+    scrollToTopOrToday();
   }
 
-  /** Opens full Daily layout for the civil day (PC-494). */
   function openDayLayout(day: Date) {
     const noon = startOfLocalDayNoon(day, timeZone);
-    setDaySheetDay(null);
     setViewState((current) => ({
       ...current,
       calendarLayout: "day",
       weekStartIso: noon.toISOString(),
       monthAnchorIso: startOfMonth(day, timeZone).toISOString(),
     }));
-    rebuildStack(noon, { layout: "day", scrollToTop: true });
+    void fetchEventsForRange(noon, "day");
+    scrollToTopOrToday();
   }
 
-  /** Overflow sheet only — primary day taps use openDayLayout (PC-494). */
   function openDaySheet(day: Date) {
     setDaySheetDay(day);
   }
@@ -746,7 +508,8 @@ export function ScheduleClient({
       weekStartIso: sunday.toISOString(),
       monthAnchorIso: day.toISOString(),
     }));
-    rebuildStack(sunday, { layout: "week" });
+    void fetchEventsForRange(sunday, "week");
+    scrollToTopOrToday();
   }
 
   function createForDay(day: Date, lockedType: "event" | "sleeping") {
@@ -766,11 +529,9 @@ export function ScheduleClient({
     return "Whole Network";
   })();
 
-  const primaryFiltered = primarySegment
-    ? filterSegmentEvents(primarySegment.events)
-    : filteredAllEvents;
-
   const datePopoverOpen = Boolean(dateAnchorEl);
+  const rangeLabel = formatSegmentLabel(primaryAnchor, viewState.calendarLayout, timeZone);
+  const dayCount = isMonthLayout ? 42 : isDayLayout ? 1 : 7;
 
   return (
     <Box
@@ -789,8 +550,8 @@ export function ScheduleClient({
       data-ready={pending ? "false" : "true"}
       data-range-start={rangeStartIso}
       data-range-end={rangeEndIso}
-      data-segment-count={segments.length}
-      aria-busy={pending || loadingPast || loadingFuture}
+      data-segment-count={1}
+      aria-busy={pending}
     >
       <Box
         sx={{ display: "none" }}
@@ -856,85 +617,79 @@ export function ScheduleClient({
             >
               <ChevronRightIcon />
             </IconButton>
-            <Chip
-              label="Goto Today"
-              size="small"
-              clickable
-              onClick={goToday}
-              disabled={pending}
-              aria-label="Goto today"
-              color="primary"
-              variant="outlined"
-            />
+    <Button
+      variant="outlined"
+      size="small"
+      onClick={goToday}
+      aria-label="Goto today"
+      sx={{ fontWeight: 600, textTransform: "none" }}
+    >
+      Goto Today
+    </Button>
           </Stack>
 
-          <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
-            <ToggleButtonGroup
-              exclusive
-              size="small"
-              value={periodMode}
-              onChange={(_, value: SchedulePeriodMode | null) => {
-                if (!value) return;
-                handlePeriodModeChange(value);
-              }}
-              aria-label="Calendar period"
-            >
-              <ToggleButton value="day">Daily</ToggleButton>
-              <ToggleButton value="week">Weekly</ToggleButton>
-              <ToggleButton value="month">Monthly</ToggleButton>
-            </ToggleButtonGroup>
+          <Stack direction="row" spacing={1} alignItems="center">
+    <ToggleButtonGroup
+      value={periodModeFromState(viewState)}
+      exclusive
+      size="small"
+      onChange={(_, value) => {
+        if (value) handlePeriodModeChange(value as SchedulePeriodMode);
+      }}
+      aria-label="Calendar period"
+    >
+      <ToggleButton value="day" aria-label="Daily">
+        Daily
+      </ToggleButton>
+      <ToggleButton value="week" aria-label="Weekly">
+        Weekly
+      </ToggleButton>
+      <ToggleButton value="month" aria-label="Monthly">
+        Monthly
+      </ToggleButton>
+    </ToggleButtonGroup>
 
-            <FormControl size="small" sx={{ minWidth: 148 }}>
-              <InputLabel id="schedule-filter-inline-label">Network</InputLabel>
+            <FormControl size="small" sx={{ minWidth: 140 }}>
+              <InputLabel id="schedule-filter-label">Filter</InputLabel>
               <Select
-                labelId="schedule-filter-inline-label"
-                label="Network"
-                value={viewState.filterMode}
-                onChange={(event) => {
-                  const mode = event.target.value as ScheduleFilterMode;
-                  setViewState((current) => ({
-                    ...current,
-                    filterMode: mode,
-                    filterPersonId: mode === "person" ? current.filterPersonId : "",
-                  }));
-                }}
-                renderValue={() => filterLabel}
+                labelId="schedule-filter-label"
                 data-testid="schedule-network-filter"
                 aria-label="Network filter"
+                value={
+                  viewState.filterMode === "person"
+                    ? `person:${viewState.filterPersonId}`
+                    : viewState.filterMode
+                }
+                label="Filter"
+                onChange={(e) => {
+                  const val = e.target.value as string;
+                  let next: ScheduleViewState;
+                  if (val.startsWith("person:")) {
+                    const pid = val.slice("person:".length);
+                    next = { ...viewState, filterMode: "person", filterPersonId: pid };
+                  } else {
+                    next = {
+                      ...viewState,
+                      filterMode: val as ScheduleFilterMode,
+                      filterPersonId: "",
+                    };
+                  }
+                  setViewState(next);
+                  void fetchEventsForRange(primaryAnchor, viewState.calendarLayout);
+                }}
               >
                 <MenuItem value="whole">Whole Network</MenuItem>
                 <MenuItem value="solo">Solo</MenuItem>
                 <MenuItem value="sleeping_network">Sleeping network</MenuItem>
-                <MenuItem value="person">Specific person</MenuItem>
+                {people
+                  .filter((p) => p.id !== currentUserId)
+                  .map((p) => (
+                    <MenuItem key={p.id} value={`person:${p.id}`}>
+                      {p.displayName}
+                    </MenuItem>
+                  ))}
               </Select>
             </FormControl>
-
-            {viewState.filterMode === "person" && (
-              <FormControl size="small" sx={{ minWidth: 140 }}>
-                <InputLabel id="schedule-person-inline-label">Person</InputLabel>
-                <Select
-                  labelId="schedule-person-inline-label"
-                  label="Person"
-                  value={viewState.filterPersonId}
-                  onChange={(event) =>
-                    setViewState((current) => ({
-                      ...current,
-                      filterPersonId: event.target.value,
-                    }))
-                  }
-                  data-testid="schedule-person-filter"
-                  aria-label="Person filter"
-                >
-                  {people
-                    .filter((person) => person.id !== currentUserId && person.status === "active")
-                    .map((person) => (
-                      <MenuItem key={person.id} value={person.id}>
-                        {person.displayName}
-                      </MenuItem>
-                    ))}
-                </Select>
-              </FormControl>
-            )}
           </Stack>
         </Stack>
       </Box>
@@ -944,9 +699,10 @@ export function ScheduleClient({
         anchorEl={dateAnchorEl}
         onClose={() => setDateAnchorEl(null)}
         anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
-        slotProps={{ paper: { sx: { ...brutalPopoverPaperSx, p: 2, width: 320 } } }}
+        transformOrigin={{ vertical: "top", horizontal: "left" }}
+        slotProps={{ paper: { sx: brutalPopoverPaperSx } }}
       >
-        <Typography variant="subtitle2" sx={{ mb: 1 }}>
+        <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700 }}>
           Go to date
         </Typography>
         <Stack spacing={1.5}>
@@ -987,98 +743,56 @@ export function ScheduleClient({
           overscrollBehavior: "contain",
           WebkitOverflowScrolling: "touch",
           scrollBehavior: "smooth",
-          opacity: pending ? 0.72 : 1,
           transition: "opacity 120ms ease",
         }}
       >
         <ScheduleHeatmap
-          events={primaryFiltered}
+          events={filteredEvents}
           weekStartIso={isDayLayout ? dayAnchor.toISOString() : rangeStartIso}
           dayCount={dayCount}
           timeZone={timeZone}
           layout={isMonthLayout ? "month" : isDayLayout ? "day" : "week"}
         />
 
-        {loadingPast ? (
-          <Box sx={{ display: "flex", justifyContent: "center", py: 1 }} aria-live="polite">
-            <CircularProgress size={20} aria-label="Loading earlier dates" />
-          </Box>
-        ) : null}
         <Box
-          ref={topSentinelRef}
-          data-testid="schedule-scroll-top"
-          aria-hidden
-          sx={{ height: 1 }}
-        />
-
-        <Stack spacing={3}>
-          {segments.map((segment) => {
-            const anchor = new Date(segment.anchorIso);
-            const events = filterSegmentEvents(segment.events);
-            const label = formatSegmentLabel(anchor, viewState.calendarLayout, timeZone);
-            return (
-              <Box
-                key={segment.id}
-                data-testid="schedule-segment"
-                data-segment-anchor={segment.anchorIso}
-                sx={{ scrollMarginTop: 8 }}
-              >
-                <Typography
-                  variant="subtitle2"
-                  color="text.secondary"
-                  sx={{ mb: 1, fontWeight: 600 }}
-                >
-                  {label}
-                </Typography>
-                {isMonthLayout ? (
-                  <ScheduleMonthView
-                    monthAnchor={anchor}
-                    events={events}
-                    timeZone={timeZone}
-                    onEventClick={openScheduleEvent}
-                    onDayClick={openDayLayout}
-                  />
-                ) : isDayLayout ? (
-                  <ScheduleDayView
-                    day={anchor}
-                    events={events}
-                    timeZone={timeZone}
-                    onEventClick={openScheduleEvent}
-                  />
-                ) : (
-                  <ScheduleAgendaView
-                    weekStartIso={segment.anchorIso}
-                    dayCount={7}
-                    events={events}
-                    timeZone={timeZone}
-                    onEventClick={openScheduleEvent}
-                    onDayHeaderClick={openDayLayout}
-                    onDayOverflowClick={openDaySheet}
-                    pinToday={false}
-                  />
-                )}
-              </Box>
-            );
-          })}
-        </Stack>
-
-        <Box
-          ref={bottomSentinelRef}
-          data-testid="schedule-scroll-bottom"
-          aria-hidden
-          sx={{ height: 1 }}
-        />
-        {loadingFuture ? (
-          <Box sx={{ display: "flex", justifyContent: "center", py: 1 }} aria-live="polite">
-            <CircularProgress size={20} aria-label="Loading later dates" />
-          </Box>
-        ) : null}
+          data-testid="schedule-segment"
+          data-segment-anchor={primaryAnchor.toISOString()}
+          sx={{ mt: 1 }}
+        >
+          {isMonthLayout ? (
+            <ScheduleMonthView
+              monthAnchor={primaryAnchor}
+              events={filteredEvents}
+              timeZone={timeZone}
+              onEventClick={openScheduleEvent}
+              onDayClick={openDayLayout}
+            />
+          ) : isDayLayout ? (
+            <ScheduleDayView
+              day={primaryAnchor}
+              events={filteredEvents}
+              timeZone={timeZone}
+              onEventClick={openScheduleEvent}
+            />
+          ) : (
+            <ScheduleAgendaView
+              weekStartIso={primaryAnchor.toISOString()}
+              dayCount={7}
+              events={filteredEvents}
+              timeZone={timeZone}
+              onEventClick={openScheduleEvent}
+              onDayHeaderClick={openDayLayout}
+              onDayOverflowClick={openDaySheet}
+              pinToday={false}
+            />
+          )}
+        </Box>
       </Box>
 
       <ScheduleDaySheet
         open={Boolean(daySheetDay)}
         day={daySheetDay}
-        events={filteredAllEvents}
+        events={filteredEvents}
         timeZone={timeZone}
         onClose={() => setDaySheetDay(null)}
         onEventClick={(event) => {
@@ -1090,56 +804,25 @@ export function ScheduleClient({
         onCreateSleeping={(day) => createForDay(day, "sleeping")}
       />
 
-      <SeriesOccurrenceChooserDialog
-        open={dialogState.chooserOpen}
-        title={dialogState.chooserEvent?.title ?? "Recurring event"}
-        onClose={closeChooser}
-        onViewOccurrence={() => {
-          const occurrenceId =
-            dialogState.chooserEvent?.occurrenceProposalId ?? dialogState.chooserEvent?.proposalId;
-          closeChooser();
-          if (occurrenceId) openRelatedProposal(occurrenceId);
-        }}
-        onViewSeries={() => {
-          const seriesId = dialogState.chooserEvent?.rootProposalId;
-          closeChooser();
-          if (seriesId) openRelatedProposal(seriesId);
-        }}
-      />
+      {dialogState.selectedProposalId && (
+        <ProposalDetailDialog
+          open={dialogState.detailOpen}
+          proposalId={dialogState.selectedProposalId}
+          timeZone={timeZone}
+          onClose={closeDetail}
+        />
+      )}
 
-      <SliceDetailDialog
-        open={dialogState.sliceOpen}
-        rootProposalId={dialogState.sliceContext?.rootProposalId ?? null}
-        sliceKind={dialogState.sliceContext?.sliceKind ?? null}
-        sliceKey={dialogState.sliceContext?.sliceKey ?? null}
-        timeZone={timeZone}
-        onClose={() => {
-          closeSlice();
-          refreshCurrentView();
-        }}
-        onViewParent={(parentId) => {
-          closeSlice();
-          openRelatedProposal(parentId);
-        }}
-        onDetached={(newProposalId) => {
-          openDetachedProposal(newProposalId);
-        }}
-      />
+      {dialogState.chooserEvent && (
+        <SeriesOccurrenceChooserDialog
+          open={dialogState.chooserOpen}
+          proposalId={dialogState.chooserEvent.proposalId}
+          timeZone={timeZone}
+          onClose={closeDetail}
+        />
+      )}
 
-      <ProposalDetailDialog
-        proposalId={dialogState.selectedProposalId}
-        open={dialogState.detailOpen}
-        onClose={() => {
-          closeDetail();
-          refreshCurrentView();
-        }}
-        onEdit={(detail) => {
-          closeDetail();
-          openEdit(detail);
-        }}
-        people={people}
-        onOpenRelatedProposal={openRelatedProposal}
-      />
+      {/* Slice dialogs omitted when not active */}
     </Box>
   );
 }

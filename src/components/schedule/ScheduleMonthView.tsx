@@ -112,6 +112,7 @@ export function ScheduleMonthView({
               return (
                 <Box
                   key={key}
+                  id={isToday ? "schedule-month-today" : undefined}
                   component={onDayClick ? "button" : "div"}
                   type={onDayClick ? "button" : undefined}
                   aria-label={
