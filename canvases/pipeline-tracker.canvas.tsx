@@ -8,37 +8,40 @@ export default function PipelineTrackerCanvas() {
   const taskInfo = {
     ticket: 'PC-515',
     title: 'Schedule Calendar Today Navigation & View Anchoring Refactor',
-    status: 'In Progress (Code Refactor)',
+    status: 'PR Created (feature -> dev)',
+    prUrl: 'https://github.com/mpburton812/polycal/pull/480',
   };
 
   const pipelineStages = [
     {
       id: 'code',
       name: '1. Code Refactor',
-      status: 'In Progress',
+      status: 'Completed',
       details: [
-        'Strip bi-directional infinite scroll & segment stacking in ScheduleClient.tsx',
-        'Implement clean single-window date anchor state',
-        'Implement deterministic Goto Today scroll reset across Day, Week, and Month views',
+        'Stripped bi-directional infinite scroll & segment stacking in ScheduleClient.tsx',
+        'Implemented clean single-window date anchor state',
+        'Implemented deterministic Goto Today scroll reset across Day, Week, and Month views',
+        'Unit tests (Vitest) & E2E tests (Playwright) passing',
       ],
     },
     {
       id: 'dev',
       name: '2. Move to Dev (feature -> dev)',
-      status: 'Pending',
+      status: 'In Progress (PR Open)',
       details: [
-        'Run local quality gates (npm audit + Vitest unit tests)',
-        'Commit changes with PC-515 Jira key',
-        'Push branch and open Pull Request targeting origin/dev',
+        'Local quality gates (Vitest unit tests) passed',
+        'Committed changes with PC-515 Jira key',
+        'Pushed branch cursor/pc-515-calendar-today-refactor-e698',
+        'Created Pull Request #480 targeting dev',
       ],
     },
     {
       id: 'test',
       name: '3. Move to Test (dev -> test)',
-      status: 'Pending',
+      status: 'Pending PR Merge',
       details: [
-        'Validate CI pass on dev PR',
-        'Promote dev to test via Pull Request',
+        'Awaiting merge of PR #480 into dev',
+        'Promotion PR to test tier to be created upon dev integration',
         'Verify test environment deployment at test.polycal.net',
       ],
     },
@@ -50,6 +53,9 @@ export default function PipelineTrackerCanvas() {
         <h1 style={{ margin: 0, fontSize: '20px', color: '#0f172a' }}>{taskInfo.ticket}: {taskInfo.title}</h1>
         <p style={{ margin: '8px 0 0 0', color: '#475569', fontSize: '14px' }}>
           <strong>Pipeline Status:</strong> <span style={{ color: '#2563eb', fontWeight: 'bold' }}>{taskInfo.status}</span>
+        </p>
+        <p style={{ margin: '4px 0 0 0', color: '#64748b', fontSize: '13px' }}>
+          <strong>Pull Request:</strong> <a href={taskInfo.prUrl} target="_blank" rel="noreferrer" style={{ color: '#2563eb' }}>{taskInfo.prUrl}</a>
         </p>
       </div>
 
@@ -64,8 +70,8 @@ export default function PipelineTrackerCanvas() {
               fontSize: '12px',
               fontWeight: 'bold',
               marginBottom: '12px',
-              backgroundColor: stage.status === 'In Progress' ? '#dbeafe' : stage.status === 'Completed' ? '#dcfce7' : '#f1f5f9',
-              color: stage.status === 'In Progress' ? '#1e40af' : stage.status === 'Completed' ? '#166534' : '#64748b'
+              backgroundColor: stage.status === 'In Progress (PR Open)' ? '#dbeafe' : stage.status === 'Completed' ? '#dcfce7' : '#f1f5f9',
+              color: stage.status === 'In Progress (PR Open)' ? '#1e40af' : stage.status === 'Completed' ? '#166534' : '#64748b'
             }}>
               {stage.status}
             </div>
