@@ -8,7 +8,7 @@ export default function PipelineTrackerCanvas() {
   const taskInfo = {
     ticket: 'PC-515',
     title: 'Schedule Calendar Today Navigation & View Anchoring Refactor',
-    status: 'PR Created (feature -> dev)',
+    status: 'CI green — awaiting merge of PR #480 into dev',
     prUrl: 'https://github.com/mpburton812/polycal/pull/480',
   };
 
@@ -27,14 +27,12 @@ export default function PipelineTrackerCanvas() {
     {
       id: 'dev',
       name: '2. Move to Dev (feature -> dev)',
-      status: 'In Progress (PR Open)',
+      status: 'Ready to merge',
       details: [
-        'Local quality gates (Vitest unit tests) passed',
-        'Restored ProposalDetail/Slice/Chooser dialog wiring for production build',
-        'Cleared npm audit gate (next 15.5.25, sharp 0.35.4, vitest 4.1.11, js-yaml 4.3.2)',
-        'Committed changes with PC-515 Jira key',
-        'Pushed branch cursor/pc-515-calendar-today-refactor-e698',
-        'Created Pull Request #480 targeting dev — awaiting green CI',
+        'PR #480 open and MERGEABLE into dev',
+        'All 14 CI checks SUCCESS (audit, vitest, build, Playwright, Vercel)',
+        'Build/dialog wiring + npm audit deps fixed on head e803214',
+        'Blocked only on merge — agent cannot merge protected branch',
       ],
     },
     {
@@ -72,8 +70,8 @@ export default function PipelineTrackerCanvas() {
               fontSize: '12px',
               fontWeight: 'bold',
               marginBottom: '12px',
-              backgroundColor: stage.status === 'In Progress (PR Open)' ? '#dbeafe' : stage.status === 'Completed' ? '#dcfce7' : '#f1f5f9',
-              color: stage.status === 'In Progress (PR Open)' ? '#1e40af' : stage.status === 'Completed' ? '#166534' : '#64748b'
+              backgroundColor: stage.status === 'Ready to merge' ? '#dbeafe' : stage.status === 'Completed' ? '#dcfce7' : '#f1f5f9',
+              color: stage.status === 'Ready to merge' ? '#1e40af' : stage.status === 'Completed' ? '#166534' : '#64748b'
             }}>
               {stage.status}
             </div>
