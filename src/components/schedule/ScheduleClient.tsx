@@ -5,8 +5,6 @@ import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import {
   Box,
   Button,
-  Chip,
-  CircularProgress,
   FormControl,
   IconButton,
   InputLabel,
@@ -45,7 +43,6 @@ import { ScheduleHeatmap } from "@/components/schedule/ScheduleHeatmap";
 import { ScheduleMonthView } from "@/components/schedule/ScheduleMonthView";
 import {
   applyPeriodMode,
-  buildScheduleUrlSearch,
   loadScheduleViewState,
   parseScheduleUrlParams,
   periodModeFromState,
@@ -60,7 +57,6 @@ import { useScheduleTapRouter } from "@/components/schedule/useScheduleTapRouter
 import { filterScheduleEvents } from "@/lib/schedule/filters";
 import {
   addDays,
-  isSameLocalCalendarDay,
   startOfWeekSunday,
 } from "@/lib/schedule/dates";
 import { computeScheduleFetchRange } from "@/lib/schedule/fetch-range";
@@ -68,7 +64,6 @@ import { startOfMonth } from "@/lib/schedule/month-grid";
 import { SCHEDULE_INVALIDATE_EVENT } from "@/lib/schedule/invalidate";
 import { parseScheduleNlDate } from "@/lib/schedule/parse-nl-date";
 import {
-  normalizeSegmentAnchor,
   shiftSegmentAnchor,
 } from "@/lib/schedule/segments";
 import { ssrWeekCoversVisibleRange } from "@/lib/schedule/visible-payload";
@@ -172,15 +167,11 @@ export function ScheduleClient({
     state: dialogState,
     openScheduleEvent,
     closeDetail,
-    handleChoiceSelect,
-    handleSeriesCancelChoice,
-    handleDeleteSliceConfirm,
-  } = useScheduleTapRouter({
-    events,
-    onOpenEditProposal: (id, options) => {
-      openEdit(id, options);
-    },
-  });
+    closeSlice,
+    closeChooser,
+    openRelatedProposal,
+    openDetachedProposal,
+  } = useScheduleTapRouter();
 
   const weekStart = useMemo(
     () => startOfWeekSunday(new Date(viewState.weekStartIso), timeZone),
@@ -218,17 +209,15 @@ export function ScheduleClient({
       try {
         const range = computeScheduleFetchRange(anchorDate, layout, timeZone);
         const res = await listScheduleEventsAction({
-          startAt: range.rangeStart.toISOString(),
-          endAt: range.rangeEnd.toISOString(),
-          filterMode: viewState.filterMode,
-          filterPersonId: viewState.filterPersonId || undefined,
+          rangeStart: range.rangeStart.toISOString(),
+          rangeEnd: range.rangeEnd.toISOString(),
         });
-        setEvents(res.events);
+        setEvents(res.payload?.events ?? []);
       } finally {
         setPending(false);
       }
     },
-    [timeZone, viewState.filterMode, viewState.filterPersonId],
+    [timeZone],
   );
 
   const scrollToTopOrToday = useCallback(() => {
@@ -337,17 +326,10 @@ export function ScheduleClient({
       return next;
     });
     if (parsed.open) {
-      openProposal(parsed.open);
-    }
-  }, [timeZone]);
-
-  const openProposal = useCallback(
-    (proposalId: string) => {
-      const match = events.find((e) => e.proposalId === proposalId);
+      const match = events.find((e) => e.proposalId === parsed.open);
       if (match) openScheduleEvent(match);
-    },
-    [events, openScheduleEvent],
-  );
+    }
+  }, [events, openScheduleEvent, timeZone]);
 
   const filteredEvents = useMemo(
     () =>
@@ -518,16 +500,6 @@ export function ScheduleClient({
     setDaySheetDay(null);
     openCreate({ lockedType, initialStartAt: start.toISOString() });
   }
-
-  const filterLabel = (() => {
-    if (viewState.filterMode === "solo") return "Solo";
-    if (viewState.filterMode === "sleeping_network") return "Sleeping network";
-    if (viewState.filterMode === "person") {
-      const person = people.find((p) => p.id === viewState.filterPersonId);
-      return person?.displayName ? person.displayName : "Person";
-    }
-    return "Whole Network";
-  })();
 
   const datePopoverOpen = Boolean(dateAnchorEl);
   const rangeLabel = formatSegmentLabel(primaryAnchor, viewState.calendarLayout, timeZone);
@@ -804,25 +776,56 @@ export function ScheduleClient({
         onCreateSleeping={(day) => createForDay(day, "sleeping")}
       />
 
-      {dialogState.selectedProposalId && (
-        <ProposalDetailDialog
-          open={dialogState.detailOpen}
-          proposalId={dialogState.selectedProposalId}
-          timeZone={timeZone}
-          onClose={closeDetail}
-        />
-      )}
+      <SeriesOccurrenceChooserDialog
+        open={dialogState.chooserOpen}
+        title={dialogState.chooserEvent?.title ?? "Recurring event"}
+        onClose={closeChooser}
+        onViewOccurrence={() => {
+          const occurrenceId =
+            dialogState.chooserEvent?.occurrenceProposalId ?? dialogState.chooserEvent?.proposalId;
+          closeChooser();
+          if (occurrenceId) openRelatedProposal(occurrenceId);
+        }}
+        onViewSeries={() => {
+          const seriesId = dialogState.chooserEvent?.rootProposalId;
+          closeChooser();
+          if (seriesId) openRelatedProposal(seriesId);
+        }}
+      />
 
-      {dialogState.chooserEvent && (
-        <SeriesOccurrenceChooserDialog
-          open={dialogState.chooserOpen}
-          proposalId={dialogState.chooserEvent.proposalId}
-          timeZone={timeZone}
-          onClose={closeDetail}
-        />
-      )}
+      <SliceDetailDialog
+        open={dialogState.sliceOpen}
+        rootProposalId={dialogState.sliceContext?.rootProposalId ?? null}
+        sliceKind={dialogState.sliceContext?.sliceKind ?? null}
+        sliceKey={dialogState.sliceContext?.sliceKey ?? null}
+        timeZone={timeZone}
+        onClose={() => {
+          closeSlice();
+          refreshCurrentView();
+        }}
+        onViewParent={(parentId) => {
+          closeSlice();
+          openRelatedProposal(parentId);
+        }}
+        onDetached={(newProposalId) => {
+          openDetachedProposal(newProposalId);
+        }}
+      />
 
-      {/* Slice dialogs omitted when not active */}
+      <ProposalDetailDialog
+        proposalId={dialogState.selectedProposalId}
+        open={dialogState.detailOpen}
+        onClose={() => {
+          closeDetail();
+          refreshCurrentView();
+        }}
+        onEdit={(detail) => {
+          closeDetail();
+          openEdit(detail);
+        }}
+        people={people}
+        onOpenRelatedProposal={openRelatedProposal}
+      />
     </Box>
   );
 }
