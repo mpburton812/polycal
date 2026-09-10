@@ -4,6 +4,17 @@ All notable changes to PolyCal are documented here.
 
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [2026.09.10a] - 2026-09-10
+
+### Changed
+
+- PC-515: Schedule calendar single-window Today navigation (no bi-directional infinite scroll).
+- PC-515: Bump next 15.5.25, sharp 0.35.4, vitest 4.1.11, js-yaml 4.3.2 for npm audit gate. Change control: `2026.09.10a`.
+
+### Fixed
+
+- PC-515: Restore ScheduleClient tap-router dialogs (detail/slice/chooser) for production builds.
+
 ## [2026.09.08a] - 2026-09-08
 
 ### Fixed
