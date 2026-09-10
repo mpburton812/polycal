@@ -28,6 +28,29 @@ import { CHANGELOG_ARCHIVE } from "./entries.archive";
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "2026.09.10a",
+    date: "2026-09-10",
+    summary:
+      "Schedule single-window Today navigation (PC-515); npm audit bumps for next/sharp/vitest/js-yaml.",
+    changes: [
+      {
+        type: "changed",
+        description:
+          "Schedule calendar uses a single-window date anchor (no bi-directional infinite scroll) so Goto Today and period nav land cleanly (PC-515).",
+      },
+      {
+        type: "fixed",
+        description:
+          "Restore ScheduleClient tap-router dialogs (detail/slice/chooser) for production builds (PC-515).",
+      },
+      {
+        type: "changed",
+        description:
+          "Bump next 15.5.25, sharp 0.35.4, vitest 4.1.11, js-yaml 4.3.2 for the npm audit gate (PC-515).",
+      },
+    ],
+  },
+  {
     version: "2026.09.08a",
     date: "2026-09-08",
     summary:

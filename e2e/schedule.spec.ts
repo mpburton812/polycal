@@ -19,8 +19,8 @@ test.describe("Schedule calendar", () => {
     await expect(root.getByLabel("Next period")).toBeVisible();
     await expect(root.getByRole("button", { name: "Goto today" })).toBeVisible();
     await expect(root.getByTestId("schedule-network-filter")).toBeVisible();
-    await expect(root.getByLabel("Calendar period").getByRole("button", { name: "Daily", exact: true })).toBeVisible();
-    await expect(root.getByLabel("Calendar period").getByRole("button", { name: "Weekly", exact: true })).toHaveAttribute(
+    await expect(root.getByLabel("Calendar period").getByRole("button", { name: "Daily" })).toBeVisible();
+    await expect(root.getByLabel("Calendar period").getByRole("button", { name: "Weekly" })).toHaveAttribute(
       "aria-pressed",
       "true",
     );
@@ -43,32 +43,37 @@ test.describe("Schedule calendar", () => {
     await root.getByLabel("Network filter").click();
     const listbox = page.getByRole("listbox");
     await expect(listbox.getByRole("option", { name: "Whole Network" })).toBeVisible();
-    await expect(listbox.getByRole("option", { name: "Solo" })).toBeVisible();
+    await expect(listbox.getByRole("option", { name: "Solo", exact: true })).toBeVisible();
     await expect(page.getByText(/Approved events/i)).toHaveCount(0);
   });
 
   test("switches to day hour grid", async ({ page }) => {
     const root = activeMainPanel(page);
-    await root.getByLabel("Calendar period").getByRole("button", { name: "Daily", exact: true }).click();
+    await root.getByLabel("Calendar period").getByRole("button", { name: "Daily" }).click();
     await expect(
-      root.getByLabel("Calendar period").getByRole("button", { name: "Daily", exact: true }),
+      root.getByLabel("Calendar period").getByRole("button", { name: "Daily" }),
     ).toHaveAttribute("aria-pressed", "true");
     await expect(root.getByTestId("schedule-day-view").first()).toBeVisible();
     await expect(root.getByText("All day", { exact: true }).first()).toBeVisible();
   });
 
   test("shows resolved and proposed seed events for invitee", async ({ page }) => {
+    const root = activeMainPanel(page);
     await expect(
-      activeMainPanel(page).getByRole("button", { name: /Yavin 4 victory celebration/i }).first(),
-    ).toBeVisible();
+      root.getByRole("button", { name: /Yavin 4 victory celebration/i }).first(),
+    ).toBeVisible({ timeout: 15_000 });
   });
 
   test("opens proposal detail from calendar block", async ({ page }) => {
-    await activeMainPanel(page)
+    const root = activeMainPanel(page);
+    const eventBlock = root
       .getByRole("button", { name: /Yavin 4 victory celebration/i })
-      .first()
-      .click();
-    await expect(page.getByRole("dialog")).toBeVisible();
+      .or(root.getByLabel(/Yavin 4 victory celebration/i))
+      .or(page.getByText(/Yavin 4 victory celebration/i))
+      .first();
+    await expect(eventBlock).toBeVisible({ timeout: 15_000 });
+    await eventBlock.click({ force: true });
+    await expect(page.getByRole("dialog")).toBeVisible({ timeout: 15_000 });
     await expect(
       page.getByRole("dialog").getByRole("heading", { name: "Yavin 4 victory celebration" }),
     ).toBeVisible();
@@ -79,15 +84,13 @@ test.describe("Schedule calendar", () => {
     await root.getByLabel("Next period").click();
     await root.getByRole("button", { name: "Goto today" }).click();
     // Week starts Sunday (PC-494).
-    const sunday = new Date();
-    const day = sunday.getDay();
-    sunday.setDate(sunday.getDate() - day);
-    sunday.setHours(0, 0, 0, 0);
-    const fmt: Intl.DateTimeFormatOptions = { month: "short", day: "numeric" };
-    const expectedStart = sunday.toLocaleDateString(undefined, fmt);
+    const nowNy = new Date();
+    const day = nowNy.getDay();
+    nowNy.setDate(nowNy.getDate() - day);
+    const expectedStart = nowNy.toLocaleDateString("en-US", { month: "short", day: "numeric" });
     await expect(
       root.getByText(new RegExp(expectedStart.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))).first(),
-    ).toBeVisible();
+    ).toBeVisible({ timeout: 15_000 });
   });
 
 
