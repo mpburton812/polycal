@@ -2,13 +2,13 @@ import React from 'react';
 
 /**
  * Pipeline Tracker Canvas - Schedule Calendar Today Reset Refactor (PC-515)
- * Tracks status of development, testing, and promotion from Code -> Dev -> Test.
+ * Tracks status of development, testing, and promotion from Code -> Dev -> Test -> Production.
  */
 export default function PipelineTrackerCanvas() {
   const taskInfo = {
     ticket: 'PC-515',
     title: 'Schedule Calendar Today Navigation & View Anchoring Refactor',
-    status: 'CI green — awaiting merge of PR #480 into dev',
+    status: 'PR #480 reopened — promoting toward production',
     prUrl: 'https://github.com/mpburton812/polycal/pull/480',
   };
 
@@ -27,25 +27,40 @@ export default function PipelineTrackerCanvas() {
     {
       id: 'dev',
       name: '2. Move to Dev (feature -> dev)',
-      status: 'Ready to merge',
+      status: 'CI re-running',
       details: [
-        'PR #480 open and MERGEABLE into dev',
-        'All 14 CI checks SUCCESS (audit, vitest, build, Playwright, Vercel)',
-        'Build/dialog wiring + npm audit deps fixed on head e803214',
-        'Blocked only on merge — agent cannot merge protected branch',
+        'PR #480 reopened and targeting dev',
+        'Audit/unit/build already green; Playwright shards queued on head 19f808f',
+        'Merge into dev required next (protected branch)',
       ],
     },
     {
       id: 'test',
       name: '3. Move to Test (dev -> test)',
-      status: 'Pending PR Merge',
+      status: 'Pending',
       details: [
-        'Awaiting merge of PR #480 into dev',
-        'Promotion PR to test tier to be created upon dev integration',
-        'Verify test environment deployment at test.polycal.net',
+        'Open promotion PR after #480 merges to dev',
+        'Verify test.polycal.net after merge',
+      ],
+    },
+    {
+      id: 'production',
+      name: '4. Move to Production (test -> production)',
+      status: 'Pending',
+      details: [
+        'Mandatory user-journey suite before opening/merging production PR',
+        'Open test → production PR after journeys pass',
       ],
     },
   ];
+
+  const statusStyle = (status: string) => {
+    if (status === 'Completed') return { backgroundColor: '#dcfce7', color: '#166534' };
+    if (status === 'CI re-running' || status === 'Ready to merge') {
+      return { backgroundColor: '#dbeafe', color: '#1e40af' };
+    }
+    return { backgroundColor: '#f1f5f9', color: '#64748b' };
+  };
 
   return (
     <div style={{ padding: '24px', fontFamily: 'system-ui, sans-serif', backgroundColor: '#f8fafc', minHeight: '100vh' }}>
@@ -59,8 +74,10 @@ export default function PipelineTrackerCanvas() {
         </p>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
-        {pipelineStages.map((stage) => (
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px' }}>
+        {pipelineStages.map((stage) => {
+          const badge = statusStyle(stage.status);
+          return (
           <div key={stage.id} style={{ backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '16px' }}>
             <h2 style={{ fontSize: '16px', margin: '0 0 12px 0', color: '#1e293b' }}>{stage.name}</h2>
             <div style={{
@@ -70,8 +87,8 @@ export default function PipelineTrackerCanvas() {
               fontSize: '12px',
               fontWeight: 'bold',
               marginBottom: '12px',
-              backgroundColor: stage.status === 'Ready to merge' ? '#dbeafe' : stage.status === 'Completed' ? '#dcfce7' : '#f1f5f9',
-              color: stage.status === 'Ready to merge' ? '#1e40af' : stage.status === 'Completed' ? '#166534' : '#64748b'
+              backgroundColor: badge.backgroundColor,
+              color: badge.color,
             }}>
               {stage.status}
             </div>
@@ -81,7 +98,8 @@ export default function PipelineTrackerCanvas() {
               ))}
             </ul>
           </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
