@@ -30,9 +30,11 @@ export default function PipelineTrackerCanvas() {
       status: 'In Progress (PR Open)',
       details: [
         'Local quality gates (Vitest unit tests) passed',
+        'Restored ProposalDetail/Slice/Chooser dialog wiring for production build',
+        'Cleared npm audit gate (next 15.5.25, sharp 0.35.4, vitest 4.1.11, js-yaml 4.3.2)',
         'Committed changes with PC-515 Jira key',
         'Pushed branch cursor/pc-515-calendar-today-refactor-e698',
-        'Created Pull Request #480 targeting dev',
+        'Created Pull Request #480 targeting dev — awaiting green CI',
       ],
     },
     {
