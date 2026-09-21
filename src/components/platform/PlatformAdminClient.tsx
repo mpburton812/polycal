@@ -10,7 +10,6 @@ import {
   Paper,
   Select,
   Stack,
-  TextField,
   Typography,
 } from "@mui/material";
 import { useSession } from "next-auth/react";
@@ -23,9 +22,16 @@ import { AdminPlatformSystemLogPanel } from "@/components/admin/AdminPlatformSys
 import type { PlatformSettings } from "@/types/network";
 import { ModerationDialog } from "@/components/platform/ModerationDialog";
 import { NetworkDetailDialog } from "@/components/platform/NetworkDetailDialog";
+import { ClampedNumberField } from "@/components/ui/ClampedNumberField";
 import { OrganicAvatar } from "@/components/ui/OrganicAvatar";
 import { avatarSrcForKey } from "@/lib/constants/avatars";
 import type { AccountAccessLevel } from "@/lib/users/role-labels";
+import {
+  MAX_NETWORK_CREATES_PER_DAY_MAX,
+  MAX_NETWORK_CREATES_PER_DAY_MIN,
+  MAX_NETWORKS_PER_EMAIL_MAX,
+  MAX_NETWORKS_PER_EMAIL_MIN,
+} from "@/lib/validation/clamped-number";
 import { brutalPaperSx } from "@/theme/brutalUi";
 import { fontFamilies } from "@/theme/fonts";
 
@@ -223,18 +229,20 @@ export function PlatformAdminClient({
           Creation caps
         </Typography>
         <Stack spacing={2} sx={{ maxWidth: 420 }}>
-          <TextField
+          <ClampedNumberField
             label="Max networks per email"
-            type="number"
             value={maxPerEmail}
-            onChange={(e) => setMaxPerEmail(Number(e.target.value))}
+            min={MAX_NETWORKS_PER_EMAIL_MIN}
+            max={MAX_NETWORKS_PER_EMAIL_MAX}
+            onChange={setMaxPerEmail}
             fullWidth
           />
-          <TextField
+          <ClampedNumberField
             label="Max network creates per day"
-            type="number"
             value={maxPerDay}
-            onChange={(e) => setMaxPerDay(Number(e.target.value))}
+            min={MAX_NETWORK_CREATES_PER_DAY_MIN}
+            max={MAX_NETWORK_CREATES_PER_DAY_MAX}
+            onChange={setMaxPerDay}
             fullWidth
           />
           <Box>
