@@ -22,6 +22,7 @@ import {
 } from "@/actions/networks";
 import { updateNetworkSettingsAction } from "@/actions/network-settings";
 import { AdminCollapsibleSection } from "@/components/admin/AdminCollapsibleSection";
+import { ClampedNumberField } from "@/components/ui/ClampedNumberField";
 import { useToast } from "@/components/providers/ToastProvider";
 import { LONG_TEXT_MAX } from "@/lib/validation/string-limits";
 import type { NetworkSettings } from "@/types/network-settings";
@@ -351,105 +352,49 @@ export function AdminNetworkSettingsPanel({
 
         {schedulingProposalsEnabled(settings.schedulingPosting) ? (
         <SettingsSubsection title="Proposal enforcement">
-          <TextField
+          <ClampedNumberField
             label="Max days in proposed"
-            type="number"
-            inputProps={{ min: 0, max: 365 }}
+            min={0}
+            max={365}
             value={settings.proposedMaxDays}
-            onChange={(e) =>
-              persistText(
-                "proposedMaxDays",
-                Math.min(365, Math.max(0, Number(e.target.value) || 0)),
-              )
-            }
-            onBlur={(e) =>
-              flushText(
-                "proposedMaxDays",
-                Math.min(365, Math.max(0, Number(e.target.value) || 0)),
-              )
-            }
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                e.preventDefault();
-                flushText("proposedMaxDays", settings.proposedMaxDays);
-              }
-            }}
+            onChange={(value) => persistText("proposedMaxDays", value)}
+            onCommit={(value) => flushText("proposedMaxDays", value)}
             helperText="0 = expire only when event start passes without resolution"
           />
-          <TextField
+          <ClampedNumberField
             label="At-risk draft TTL (days)"
-            type="number"
-            inputProps={{ min: 1, max: 365 }}
+            min={1}
+            max={365}
             value={settings.atRiskTtlDays}
-            onChange={(e) =>
-              persistText(
-                "atRiskTtlDays",
-                Math.min(365, Math.max(1, Number(e.target.value) || 1)),
-              )
-            }
-            onBlur={(e) =>
-              flushText(
-                "atRiskTtlDays",
-                Math.min(365, Math.max(1, Number(e.target.value) || 1)),
-              )
-            }
+            onChange={(value) => persistText("atRiskTtlDays", value)}
+            onCommit={(value) => flushText("atRiskTtlDays", value)}
             helperText="How long collision/re-draft drafts stay editable before archive"
           />
-          <TextField
+          <ClampedNumberField
             label="Sleeping partner proposal TTL (days)"
-            type="number"
-            inputProps={{ min: 1, max: 365 }}
+            min={1}
+            max={365}
             value={settings.sleepingPartnerProposalMaxDays}
-            onChange={(e) =>
-              persistText(
-                "sleepingPartnerProposalMaxDays",
-                Math.min(365, Math.max(1, Number(e.target.value) || 1)),
-              )
-            }
-            onBlur={(e) =>
-              flushText(
-                "sleepingPartnerProposalMaxDays",
-                Math.min(365, Math.max(1, Number(e.target.value) || 1)),
-              )
-            }
+            onChange={(value) => persistText("sleepingPartnerProposalMaxDays", value)}
+            onCommit={(value) => flushText("sleepingPartnerProposalMaxDays", value)}
             helperText="Unanswered sleeping-partner proposals are deleted after this many days; both people are notified"
           />
-          <TextField
+          <ClampedNumberField
             label="Archive grace (hours after end)"
-            type="number"
-            inputProps={{ min: 0, max: 8760 }}
+            min={0}
+            max={8760}
             value={settings.archiveGraceHours}
-            onChange={(e) =>
-              persistText(
-                "archiveGraceHours",
-                Math.min(8760, Math.max(0, Number(e.target.value) || 0)),
-              )
-            }
-            onBlur={(e) =>
-              flushText(
-                "archiveGraceHours",
-                Math.min(8760, Math.max(0, Number(e.target.value) || 0)),
-              )
-            }
+            onChange={(value) => persistText("archiveGraceHours", value)}
+            onCommit={(value) => flushText("archiveGraceHours", value)}
             helperText="Resolved events auto-archive this many hours after scheduled end"
           />
-          <TextField
+          <ClampedNumberField
             label="Redraft deadline (hours before start)"
-            type="number"
-            inputProps={{ min: 1, max: 168 }}
+            min={1}
+            max={168}
             value={settings.redraftDeadlineHours}
-            onChange={(e) =>
-              persistText(
-                "redraftDeadlineHours",
-                Math.min(168, Math.max(1, Number(e.target.value) || 1)),
-              )
-            }
-            onBlur={(e) =>
-              flushText(
-                "redraftDeadlineHours",
-                Math.min(168, Math.max(1, Number(e.target.value) || 1)),
-              )
-            }
+            onChange={(value) => persistText("redraftDeadlineHours", value)}
+            onCommit={(value) => flushText("redraftDeadlineHours", value)}
             helperText="At-risk resolved events return to proposed within this window"
           />
         </SettingsSubsection>
@@ -493,23 +438,13 @@ export function AdminNetworkSettingsPanel({
         </SettingsSubsection>
 
         <SettingsSubsection title="Onboarding & logs">
-          <TextField
+          <ClampedNumberField
             label="System log tail length"
-            type="number"
-            inputProps={{ min: 0, max: 1000 }}
+            min={0}
+            max={1000}
             value={settings.logTailLength}
-            onChange={(e) =>
-              persistText(
-                "logTailLength",
-                Math.min(1000, Math.max(0, Number(e.target.value) || 0)),
-              )
-            }
-            onBlur={(e) =>
-              flushText(
-                "logTailLength",
-                Math.min(1000, Math.max(0, Number(e.target.value) || 0)),
-              )
-            }
+            onChange={(value) => persistText("logTailLength", value)}
+            onCommit={(value) => flushText("logTailLength", value)}
             helperText="0 hides the log; max 1000 entries"
           />
           <TextField

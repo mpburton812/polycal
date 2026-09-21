@@ -531,7 +531,12 @@ async function computeFeedFingerprint(
       maxCreatedAt: sql<string | null>`max(${networkChatComments.createdAt})`,
       maxDeletedAt: sql<string | null>`max(${networkChatComments.deletedAt})`,
     })
-    .from(networkChatComments);
+    .from(networkChatComments)
+    .innerJoin(
+      networkChatMessages,
+      eq(networkChatComments.messageId, networkChatMessages.id),
+    )
+    .where(eq(networkChatMessages.networkId, networkId));
 
   const [proposalCommentsAgg] = await db
     .select({
@@ -539,19 +544,54 @@ async function computeFeedFingerprint(
       maxCreatedAt: sql<string | null>`max(${proposalComments.createdAt})`,
       maxDeletedAt: sql<string | null>`max(${proposalComments.deletedAt})`,
     })
-    .from(proposalComments);
+    .from(proposalComments)
+    .innerJoin(proposals, eq(proposalComments.proposalId, proposals.id))
+    .where(eq(proposals.networkId, networkId));
+
+  const chatIds = db
+    .select({ id: networkChatMessages.id })
+    .from(networkChatMessages)
+    .where(eq(networkChatMessages.networkId, networkId));
+  const chatCommentIds = db
+    .select({ id: networkChatComments.id })
+    .from(networkChatComments)
+    .innerJoin(
+      networkChatMessages,
+      eq(networkChatComments.messageId, networkChatMessages.id),
+    )
+    .where(eq(networkChatMessages.networkId, networkId));
+  const milestoneIds = db
+    .select({ id: proposalStateLog.id })
+    .from(proposalStateLog)
+    .innerJoin(proposals, eq(proposalStateLog.proposalId, proposals.id))
+    .where(eq(proposals.networkId, networkId));
+  const proposalCommentIds = db
+    .select({ id: proposalComments.id })
+    .from(proposalComments)
+    .innerJoin(proposals, eq(proposalComments.proposalId, proposals.id))
+    .where(eq(proposals.networkId, networkId));
+  const networkLikeScope = or(
+    and(eq(feedLikes.targetType, "chat"), inArray(feedLikes.targetId, chatIds)),
+    and(eq(feedLikes.targetType, "chat_comment"), inArray(feedLikes.targetId, chatCommentIds)),
+    and(eq(feedLikes.targetType, "milestone"), inArray(feedLikes.targetId, milestoneIds)),
+    and(
+      eq(feedLikes.targetType, "proposal_comment"),
+      inArray(feedLikes.targetId, proposalCommentIds),
+    ),
+  );
 
   const [likesAgg] = await db
     .select({
       count: sql<number>`count(*)`,
       maxCreatedAt: sql<string | null>`max(${feedLikes.createdAt})`,
     })
-    .from(feedLikes);
+    .from(feedLikes)
+    .where(networkLikeScope);
 
   const [viewerLikesAgg] = await db
     .select({ count: sql<number>`count(*)` })
     .from(feedLikes)
-    .where(eq(feedLikes.userId, viewerId));
+    .where(and(eq(feedLikes.userId, viewerId), networkLikeScope));
 
   const nowIso = now.toISOString();
   const activeEventRows = await db

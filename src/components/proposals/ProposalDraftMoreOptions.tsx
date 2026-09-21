@@ -18,7 +18,13 @@ import {
   Typography,
 } from "@mui/material";
 
+import { ClampedNumberField } from "@/components/ui/ClampedNumberField";
 import type { EventIconKey } from "@/lib/event-icons/registry";
+import {
+  RECURRENCE_COUNT_MAX,
+  RECURRENCE_COUNT_MIN,
+  REMINDER_AMOUNT_MIN,
+} from "@/lib/validation/clamped-number";
 import { LONG_TEXT_MAX } from "@/lib/validation/string-limits";
 import { GARDEN_TOKENS } from "@/theme/tokens";
 
@@ -162,17 +168,13 @@ export function ProposalDraftMoreOptions({
                       <MenuItem value="yearly">Yearly</MenuItem>
                     </Select>
                   </FormControl>
-                  <TextField
+                  <ClampedNumberField
                     label="Occurrences"
-                    type="number"
                     size="small"
                     value={recurrenceCount}
-                    onChange={(event) =>
-                      onRecurrenceCountChange(
-                        Math.min(52, Math.max(2, Number(event.target.value) || 2)),
-                      )
-                    }
-                    inputProps={{ min: 2, max: 52 }}
+                    min={RECURRENCE_COUNT_MIN}
+                    max={RECURRENCE_COUNT_MAX}
+                    onChange={onRecurrenceCountChange}
                     sx={{ width: { xs: "100%", sm: 140 } }}
                   />
                 </Stack>
@@ -238,15 +240,12 @@ export function ProposalDraftMoreOptions({
               />
               {reminderEnabled && (
                 <Stack direction="row" spacing={1} alignItems="center">
-                  <TextField
+                  <ClampedNumberField
                     label="Amount"
-                    type="number"
                     size="small"
                     value={reminderValue}
-                    onChange={(event) =>
-                      onReminderValueChange(Math.max(1, Number(event.target.value) || 1))
-                    }
-                    inputProps={{ min: 1 }}
+                    min={REMINDER_AMOUNT_MIN}
+                    onChange={onReminderValueChange}
                     sx={{ width: 100 }}
                   />
                   <FormControl size="small" sx={{ minWidth: 120 }}>
