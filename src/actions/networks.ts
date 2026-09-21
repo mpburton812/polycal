@@ -19,6 +19,12 @@ import { getPublicAppUrl } from "@/lib/env";
 import { logUserActivity } from "@/lib/audit";
 import { logPlatformEvent } from "@/lib/platform-log";
 import {
+  MAX_NETWORK_CREATES_PER_DAY_MAX,
+  MAX_NETWORK_CREATES_PER_DAY_MIN,
+  MAX_NETWORKS_PER_EMAIL_MAX,
+  MAX_NETWORKS_PER_EMAIL_MIN,
+} from "@/lib/validation/clamped-number";
+import {
   ensureOwnedPassivesInNetwork,
   getMembership,
   listActiveMemberships,
@@ -182,10 +188,13 @@ export async function updatePlatformSettingsAction(input: {
 }): Promise<{ ok: boolean; message: string }> {
   const admin = await requirePlatformAdmin();
   if (!admin.ok) return { ok: false, message: admin.message };
-  const maxNetworksPerEmail = Math.max(1, Math.min(100, Math.floor(input.maxNetworksPerEmail)));
+  const maxNetworksPerEmail = Math.max(
+    MAX_NETWORKS_PER_EMAIL_MIN,
+    Math.min(MAX_NETWORKS_PER_EMAIL_MAX, Math.floor(input.maxNetworksPerEmail)),
+  );
   const maxNetworkCreatesPerDay = Math.max(
-    1,
-    Math.min(1000, Math.floor(input.maxNetworkCreatesPerDay)),
+    MAX_NETWORK_CREATES_PER_DAY_MIN,
+    Math.min(MAX_NETWORK_CREATES_PER_DAY_MAX, Math.floor(input.maxNetworkCreatesPerDay)),
   );
   await ensureDbReady();
   const db = getDb();

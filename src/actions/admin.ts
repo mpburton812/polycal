@@ -1,6 +1,6 @@
 "use server";
 
-import { desc, eq } from "drizzle-orm";
+import { desc, eq, inArray } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 
 import { auth } from "@/lib/auth";
@@ -218,7 +218,8 @@ export async function listActivityLogAction(): Promise<ActivityLogEntry[]> {
   if (userIds.length > 0) {
     const userRows = await db
       .select({ id: users.id, displayName: users.displayName })
-      .from(users);
+      .from(users)
+      .where(inArray(users.id, userIds));
     for (const u of userRows) {
       userMap.set(u.id, u.displayName);
     }

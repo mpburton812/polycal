@@ -28,6 +28,29 @@ import { CHANGELOG_ARCHIVE } from "./entries.archive";
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "2026.09.21a",
+    date: "2026-09-21",
+    summary:
+      "Replaceable reminder/occurrence number fields; scoped feed fingerprint and activity-log lookups; unused admin/feed panels removed.",
+    changes: [
+      {
+        type: "fixed",
+        description:
+          "Number fields keep an empty draft while focused so Reminder Amount 1 can be replaced with 2 instead of becoming 12 (PC-519).",
+      },
+      {
+        type: "changed",
+        description:
+          "Remove unused AdminPlatformDashboardPanel, AdminFastSleepingPlanPanel, and FeedCodeStatusPanel (PC-520).",
+      },
+      {
+        type: "fixed",
+        description:
+          "Activity log user map uses inArray; feed fingerprint comment/like aggregates and viewer likes are network-scoped; alpha-feedback list limited to 200 (PC-521).",
+      },
+    ],
+  },
+  {
     version: "2026.09.10a",
     date: "2026-09-10",
     summary:

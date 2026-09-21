@@ -4,6 +4,17 @@ All notable changes to PolyCal are documented here.
 
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [2026.09.21a] - 2026-09-21
+
+### Fixed
+
+- PC-519: Reminder Amount, Occurrences, and other number fields can replace the current digit instead of appending (shared ClampedNumberField).
+- PC-521: Activity log name map loads only referenced users; feed fingerprint comment/like counts are network-scoped; alpha-feedback list is capped.
+
+### Changed
+
+- PC-520: Remove unused AdminPlatformDashboardPanel, AdminFastSleepingPlanPanel, and FeedCodeStatusPanel. Change control: `2026.09.21a`.
+
 ## [2026.09.10a] - 2026-09-10
 
 ### Changed

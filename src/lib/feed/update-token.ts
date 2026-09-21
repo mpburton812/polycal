@@ -30,7 +30,7 @@ export interface FeedFingerprintInput {
   chatMessages: FeedFingerprintTable;
   chatComments: FeedFingerprintTable;
   proposalComments: FeedFingerprintTable;
-  /** Global like activity + this viewer's own like count (multi-device safety). */
+  /** Network-scoped like activity + this viewer's own like count (multi-device safety). */
   likes: FeedFingerprintTable & { viewerCount: number };
   activeEvents: FeedFingerprintActiveEvent[];
 }

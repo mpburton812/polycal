@@ -10,6 +10,9 @@ import { getDb } from "@/lib/db/client";
 import { ensureDbReady } from "@/lib/db/ensure-ready";
 import { alphaFeedbackSubmissions } from "@/lib/db/schema";
 
+/** Hard cap so the tracker inbox cannot pull every historical screenshot row (PC-521). */
+const ALPHA_FEEDBACK_LIST_LIMIT = 200;
+
 export function OPTIONS(request: Request): NextResponse {
   return alphaFeedbackOptions(request);
 }
@@ -61,7 +64,8 @@ export async function GET(request: Request): Promise<NextResponse> {
         ? isNotNull(alphaFeedbackSubmissions.archivedAt)
         : isNull(alphaFeedbackSubmissions.archivedAt),
     )
-    .orderBy(desc(alphaFeedbackSubmissions.submittedAt));
+    .orderBy(desc(alphaFeedbackSubmissions.submittedAt))
+    .limit(ALPHA_FEEDBACK_LIST_LIMIT);
 
   return withAlphaFeedbackCors(
     request,
