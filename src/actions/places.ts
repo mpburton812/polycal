@@ -25,6 +25,10 @@ import { userIsPlaceOwner } from "@/lib/places/membership";
 import type { PlaceRole } from "@/types/relationship";
 import type { UserRole } from "@/types/user";
 import {
+  BEDROOM_COUNT_MAX,
+  BEDROOM_COUNT_MIN,
+} from "@/lib/validation/clamped-number";
+import {
   LONG_TEXT_MAX,
   SHORT_TEXT_MAX,
   limitedString,
@@ -35,7 +39,7 @@ import {
 const placeSchema = z.object({
   name: requiredLimitedString("Home name", LONG_TEXT_MAX),
   address: limitedString("Address", SHORT_TEXT_MAX).optional(),
-  bedroomCount: z.number().int().min(0).max(20),
+  bedroomCount: z.number().int().min(BEDROOM_COUNT_MIN).max(BEDROOM_COUNT_MAX),
   bedroomNames: z
     .array(
       z

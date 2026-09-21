@@ -4,6 +4,10 @@ import { EVENT_ICON_KEYS } from "@/lib/event-icons/registry";
 import { MAX_FEED_IMAGES } from "@/lib/feed/images";
 import { batchSleepingEntriesSchema } from "@/lib/proposals/batch-sleeping";
 import {
+  RECURRENCE_COUNT_MAX,
+  RECURRENCE_COUNT_MIN,
+} from "@/lib/validation/clamped-number";
+import {
   LONG_TEXT_MAX,
   SHORT_TEXT_MAX,
   limitedString,
@@ -26,7 +30,7 @@ export const timeSlotInputSchema = z.object({
 export const recurrenceRuleSchema = z.object({
   pattern: z.enum(["daily", "weekly", "monthly", "yearly"]),
   interval: z.number().int().min(1).max(12).default(1),
-  count: z.number().int().min(2).max(52),
+  count: z.number().int().min(RECURRENCE_COUNT_MIN).max(RECURRENCE_COUNT_MAX),
 });
 
 export const draftProposalSchema = z.object({

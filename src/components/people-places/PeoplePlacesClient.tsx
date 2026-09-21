@@ -56,8 +56,10 @@ import {
   type ResidentView,
 } from "@/actions/places";
 import { AdminCollapsibleSection } from "@/components/admin/AdminCollapsibleSection";
+import { ClampedNumberField } from "@/components/ui/ClampedNumberField";
 import { AVATAR_OPTIONS, avatarSrcForKey } from "@/lib/constants/avatars";
 import { formatUserRole } from "@/lib/users/role-labels";
+import { BEDROOM_COUNT_MAX, BEDROOM_COUNT_MIN } from "@/lib/validation/clamped-number";
 import { LONG_TEXT_MAX, SHORT_TEXT_MAX } from "@/lib/validation/string-limits";
 import { brutalPersonRowSx } from "@/theme/brutalUi";
 import { GARDEN_TOKENS } from "@/theme/tokens";
@@ -858,16 +860,15 @@ function PlaceDetail({
               fullWidth
               inputProps={{ maxLength: SHORT_TEXT_MAX }}
             />
-            <TextField
+            <ClampedNumberField
               label="Bedrooms"
-              type="number"
               value={editBedroomCount}
-              onChange={(event) => {
-                const count = Number(event.target.value);
+              min={BEDROOM_COUNT_MIN}
+              max={BEDROOM_COUNT_MAX}
+              onChange={(count) => {
                 setEditBedroomCount(count);
                 setEditBedroomLabels((current) => syncBedroomNames(count, current));
               }}
-              inputProps={{ min: 0, max: 20 }}
               fullWidth
             />
             {editBedroomCount > 0 && (
@@ -1052,16 +1053,15 @@ function CreatePlaceDialog({
             fullWidth
             inputProps={{ maxLength: SHORT_TEXT_MAX }}
           />
-          <TextField
+          <ClampedNumberField
             label="Bedrooms"
-            type="number"
             value={bedroomCount}
-            onChange={(event) => {
-              const count = Number(event.target.value);
+            min={BEDROOM_COUNT_MIN}
+            max={BEDROOM_COUNT_MAX}
+            onChange={(count) => {
               setBedroomCount(count);
               setBedroomLabels((current) => bedroomLabelsForForm(count, current));
             }}
-            inputProps={{ min: 0, max: 20 }}
             fullWidth
           />
           {bedroomCount > 0 && (
