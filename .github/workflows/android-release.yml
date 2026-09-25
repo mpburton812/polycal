@@ -53,7 +53,12 @@ jobs:
           java-version: "17"
 
       - name: Set up Android SDK
+        # The action default still requests the removed SDK `tools` package, and
+        # sdkmanager exits 1 before the APK build (PC-525). Command-line tools
+        # are installed by the action itself; platform-tools is the rest we need.
         uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
 
       - name: Decode keystore
         env:
