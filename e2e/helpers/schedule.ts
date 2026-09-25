@@ -76,10 +76,27 @@ async function revealEventFromOverflow(page: Page, titlePattern: RegExp): Promis
     const link = more.nth(index);
     if (!(await link.isVisible().catch(() => false))) continue;
     await link.click();
-    const dialog = page.getByRole("dialog");
-    const hit = dialog.getByText(titlePattern).first();
-    const found = await hit.isVisible().catch(() => false);
-    await page.keyboard.press("Escape");
+    // React paints the flyout after the click. An immediate visibility check
+    // misses the title and leaves the event looking absent (PC-523).
+    const dialog = page.getByRole("dialog").last();
+    const opened = await dialog
+      .waitFor({ state: "visible", timeout: 3_000 })
+      .then(() => true)
+      .catch(() => false);
+    if (!opened) continue;
+    const found = await dialog
+      .getByText(titlePattern)
+      .first()
+      .waitFor({ state: "visible", timeout: 2_000 })
+      .then(() => true)
+      .catch(() => false);
+    const close = dialog.getByRole("button", { name: "Close" });
+    if (await close.isVisible().catch(() => false)) {
+      await close.click();
+    } else {
+      await page.keyboard.press("Escape");
+    }
+    await dialog.waitFor({ state: "hidden", timeout: 3_000 }).catch(() => {});
     if (found) return true;
   }
   return false;
