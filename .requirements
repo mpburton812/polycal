@@ -466,3 +466,4 @@
 2026-09-25 | 3759a19 | PC-523 | list month events as bars and timed lines | src/components/schedule/MonthEventChip.tsx
 2026-09-25 | e19f839 | PC-523 | treat month overflow lists as visible events | e2e/helpers/schedule.ts
 2026-09-25 | c834d60 | PC-523 | wait for the month overflow list before reading a title | e2e/helpers/schedule.ts
+2026-09-25 | b5a2f74 | PC-525 | stop the release job from installing the removed SDK tools package | .github/workflows/android-release.yml
