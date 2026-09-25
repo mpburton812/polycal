@@ -463,3 +463,5 @@
 2026-09-08 | 155eaaa | PC-517 | default bulk sleep to Solo with primary toggle and error-night highlight | src/actions/fast-sleep.ts
 2026-09-10 | 99720f3 | PC-515 | add 2026.09.10a change control for promotion | src/lib/changelog/entries.ts
 2026-09-21 | 79808aa | PC-519 | let number fields replace digits without appending | src/actions/admin.ts
+2026-09-25 | 3759a19 | PC-523 | list month events as bars and timed lines | src/components/schedule/MonthEventChip.tsx
+2026-09-25 | e19f839 | PC-523 | treat month overflow lists as visible events | e2e/helpers/schedule.ts

@@ -64,6 +64,27 @@ function eventLocator(page: Page, namePattern: RegExp) {
     .first();
 }
 
+/**
+ * Month cells and compact week rows hide overflow behind "N more".
+ * The event still counts as visible when that read-only list (or day sheet) shows the title (PC-523).
+ */
+async function revealEventFromOverflow(page: Page, titlePattern: RegExp): Promise<boolean> {
+  const root = activeMainPanel(page);
+  const more = root.getByRole("button", { name: /Show \d+ more events/i });
+  const count = await more.count();
+  for (let index = 0; index < count; index += 1) {
+    const link = more.nth(index);
+    if (!(await link.isVisible().catch(() => false))) continue;
+    await link.click();
+    const dialog = page.getByRole("dialog");
+    const hit = dialog.getByText(titlePattern).first();
+    const found = await hit.isVisible().catch(() => false);
+    await page.keyboard.press("Escape");
+    if (found) return true;
+  }
+  return false;
+}
+
 /** Shifts a yyyy-MM-dd date by a number of calendar days. */
 export function shiftIsoDate(isoDate: string, dayDelta: number): string {
   const date = parseIsoDate(isoDate);
@@ -201,7 +222,7 @@ async function expectEventVisibleInView(
     await expect(locator).toBeVisible({ timeout: 15_000 });
     return;
   } catch {
-    // Fall through to hard recovery below.
+    if (await revealEventFromOverflow(page, titlePattern)) return;
   }
 
   await clearScheduleViewState(page);
@@ -210,7 +231,14 @@ async function expectEventVisibleInView(
   await selectView(page);
   await navigateScheduleUntilDateInRange(page, targetDateIso);
   await waitForScheduleReady(page);
-  await expect(eventLocator(page, titlePattern)).toBeVisible({ timeout: 25_000 });
+  const recovered = eventLocator(page, titlePattern);
+  try {
+    await expect(recovered).toBeVisible({ timeout: 8_000 });
+    return;
+  } catch {
+    if (await revealEventFromOverflow(page, titlePattern)) return;
+  }
+  await expect(recovered).toBeVisible({ timeout: 25_000 });
 }
 
 /** Waits until schedule data has finished loading for the visible range. */

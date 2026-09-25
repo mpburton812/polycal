@@ -4,6 +4,16 @@ All notable changes to PolyCal are documented here.
 
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [2026.09.24a] - 2026-09-24
+
+### Changed
+
+- PC-523: Month cells list sleeping bars first (including a single night), then single-day all-day bars, then other multi-day bars, then timed lines with a short start time. Long titles ellipsize, and the line count follows the window.
+
+### Added
+
+- PC-524: N more opens a read-only day list that closes with the X, Escape, or a click outside. The date number still opens the day schedule.
+
 ## [2026.09.21a] - 2026-09-21
 
 ### Fixed
