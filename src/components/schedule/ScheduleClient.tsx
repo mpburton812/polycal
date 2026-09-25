@@ -38,6 +38,7 @@ import type { PersonSummary } from "@/actions/users";
 import { useProposalCreate } from "@/components/proposals/ProposalCreateContext";
 import { ScheduleAgendaView } from "@/components/schedule/ScheduleAgendaView";
 import { ScheduleDaySheet } from "@/components/schedule/ScheduleDaySheet";
+import { ScheduleMonthDayFlyout } from "@/components/schedule/ScheduleMonthDayFlyout";
 import { ScheduleDayView } from "@/components/schedule/ScheduleDayView";
 import { ScheduleHeatmap } from "@/components/schedule/ScheduleHeatmap";
 import { ScheduleMonthView } from "@/components/schedule/ScheduleMonthView";
@@ -157,6 +158,7 @@ export function ScheduleClient({
   const [events, setEvents] = useState<ScheduleEvent[]>(() => initialPayload.events ?? []);
   const [pending, setPending] = useState(false);
   const [daySheetDay, setDaySheetDay] = useState<Date | null>(null);
+  const [monthFlyoutDay, setMonthFlyoutDay] = useState<Date | null>(null);
   const [dateAnchorEl, setDateAnchorEl] = useState<HTMLElement | null>(null);
   const [nlDateText, setNlDateText] = useState("");
   const [nlDateError, setNlDateError] = useState<string | null>(null);
@@ -711,25 +713,29 @@ export function ScheduleClient({
         sx={{
           flex: 1,
           minHeight: 0,
-          overflowY: "auto",
+          overflowY: isMonthLayout ? "hidden" : "auto",
+          display: "flex",
+          flexDirection: "column",
           overscrollBehavior: "contain",
           WebkitOverflowScrolling: "touch",
           scrollBehavior: "smooth",
           transition: "opacity 120ms ease",
         }}
       >
-        <ScheduleHeatmap
-          events={filteredEvents}
-          weekStartIso={isDayLayout ? dayAnchor.toISOString() : rangeStartIso}
-          dayCount={dayCount}
-          timeZone={timeZone}
-          layout={isMonthLayout ? "month" : isDayLayout ? "day" : "week"}
-        />
+        <Box sx={{ flexShrink: 0 }}>
+          <ScheduleHeatmap
+            events={filteredEvents}
+            weekStartIso={isDayLayout ? dayAnchor.toISOString() : rangeStartIso}
+            dayCount={dayCount}
+            timeZone={timeZone}
+            layout={isMonthLayout ? "month" : isDayLayout ? "day" : "week"}
+          />
+        </Box>
 
         <Box
           data-testid="schedule-segment"
           data-segment-anchor={primaryAnchor.toISOString()}
-          sx={{ mt: 1 }}
+          sx={{ mt: 1, ...(isMonthLayout ? { flex: 1, minHeight: 0, display: "flex", flexDirection: "column" } : {}) }}
         >
           {isMonthLayout ? (
             <ScheduleMonthView
@@ -738,6 +744,7 @@ export function ScheduleClient({
               timeZone={timeZone}
               onEventClick={openScheduleEvent}
               onDayClick={openDayLayout}
+              onMoreClick={setMonthFlyoutDay}
             />
           ) : isDayLayout ? (
             <ScheduleDayView
@@ -760,6 +767,14 @@ export function ScheduleClient({
           )}
         </Box>
       </Box>
+
+      <ScheduleMonthDayFlyout
+        open={Boolean(monthFlyoutDay)}
+        day={monthFlyoutDay}
+        events={filteredEvents}
+        timeZone={timeZone}
+        onClose={() => setMonthFlyoutDay(null)}
+      />
 
       <ScheduleDaySheet
         open={Boolean(daySheetDay)}

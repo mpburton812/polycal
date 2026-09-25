@@ -1,14 +1,9 @@
 "use client";
 
-import BedIcon from "@mui/icons-material/Bed";
-import EventIcon from "@mui/icons-material/Event";
 import { Box, Typography } from "@mui/material";
 
 import type { ScheduleEvent } from "@/actions/schedule";
-import { EventCategoryIcon } from "@/lib/event-icons/EventCategoryIcon";
-import { isEventIconKey } from "@/lib/event-icons/registry";
 import { MASKED_TITLE } from "@/lib/proposals/access";
-import { isSleepingLikeType } from "@/lib/proposals/sleeping-like";
 import { scheduleBlockSx, type ScheduleBlockVariant } from "@/lib/schedule/colors";
 import { TENTATIVE_HATCH_BACKGROUND } from "@/lib/proposals/tentative-title";
 import { GARDEN_TOKENS } from "@/theme/tokens";
@@ -20,12 +15,16 @@ interface MonthEventChipProps {
 }
 
 /**
- * Compact status-colored calendar icon for single-day month cells (PC-77).
+ * Timed month line: color dot, short start time, truncated title (PC-523).
  */
-export function MonthEventIcon({ event, variant, onClick }: MonthEventChipProps) {
+export function MonthTimedLine({
+  event,
+  variant,
+  timeLabel,
+  onClick,
+}: MonthEventChipProps & { timeLabel: string }) {
   const colors = scheduleBlockSx(variant, 0);
   const label = event.isContentMasked ? MASKED_TITLE : event.title;
-  const isSleeping = isSleepingLikeType(event.proposalType);
 
   return (
     <Box
@@ -35,46 +34,53 @@ export function MonthEventIcon({ event, variant, onClick }: MonthEventChipProps)
         eventClick.stopPropagation();
         onClick();
       }}
-      aria-label={label}
-      title={label}
+      title={`${timeLabel} ${label}`}
+      aria-label={`${timeLabel} ${label}`}
       sx={{
-        display: "inline-flex",
+        display: "flex",
         alignItems: "center",
-        justifyContent: "center",
+        gap: 0.5,
+        width: "100%",
+        minWidth: 0,
+        height: 18,
         border: "none",
-        p: 0,
-        m: 0,
         bgcolor: "transparent",
+        p: 0,
         cursor: "pointer",
-        lineHeight: 0,
+        textAlign: "left",
         opacity: event.state === "archived" ? 0.85 : 1,
       }}
     >
-      {isSleeping ? (
-        <BedIcon
-          sx={{
-            fontSize: 16,
-            color: colors.bgcolor,
-            filter: `drop-shadow(0 0 0.75px ${colors.color})`,
-          }}
-        />
-      ) : isEventIconKey(event.eventIconKey) ? (
-        <EventCategoryIcon
-          iconKey={event.eventIconKey}
-          sx={{
-            fontSize: 16,
-            filter: `drop-shadow(0 0 0.75px ${colors.color})`,
-          }}
-        />
-      ) : (
-        <EventIcon
-          sx={{
-            fontSize: 16,
-            color: colors.bgcolor,
-            filter: `drop-shadow(0 0 0.75px ${colors.color})`,
-          }}
-        />
-      )}
+      <Box
+        aria-hidden
+        sx={{
+          width: 6,
+          height: 6,
+          borderRadius: "50%",
+          bgcolor: colors.bgcolor,
+          border: `1px solid ${GARDEN_TOKENS.ink}`,
+          flexShrink: 0,
+        }}
+      />
+      <Typography
+        component="span"
+        sx={{ fontSize: "0.65rem", fontWeight: 700, lineHeight: 1.2, flexShrink: 0 }}
+      >
+        {timeLabel}
+      </Typography>
+      <Typography
+        component="span"
+        sx={{
+          fontSize: "0.65rem",
+          lineHeight: 1.2,
+          overflow: "hidden",
+          whiteSpace: "nowrap",
+          textOverflow: "ellipsis",
+          minWidth: 0,
+        }}
+      >
+        {label}
+      </Typography>
     </Box>
   );
 }
@@ -220,38 +226,7 @@ export function MonthMoreLink({ count, onClick }: MonthMoreLinkProps) {
         "&:hover": { textDecoration: "underline" },
       }}
     >
-      +{count} more
+      {count} more
     </Typography>
-  );
-}
-
-interface StateDotStripProps {
-  variants: ScheduleBlockVariant[];
-}
-
-/** Up to four state dots when multiple event types share a day. */
-export function StateDotStrip({ variants }: StateDotStripProps) {
-  if (variants.length <= 1) return null;
-
-  return (
-    <Box sx={{ display: "flex", gap: 0.25, justifyContent: "flex-end", mb: 0.25 }}>
-      {variants.map((variant) => {
-        const colors = scheduleBlockSx(variant, 0);
-        return (
-          <Box
-            key={variant}
-            sx={{
-              width: 6,
-              height: 6,
-              borderRadius: "50%",
-              bgcolor: colors.bgcolor,
-              border: "1px solid",
-              borderColor: "divider",
-            }}
-            aria-hidden
-          />
-        );
-      })}
-    </Box>
   );
 }
