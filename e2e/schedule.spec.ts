@@ -110,7 +110,8 @@ test.describe("Schedule calendar", () => {
     expect(Math.abs((before?.y ?? 0) - (after?.y ?? 0))).toBeLessThan(4);
   });
 
-  test("switches to month view and opens day sheet from overflow", async ({ page }) => {
+  test("switches to month view and opens a read-only day flyout from overflow", async ({ page }) => {
+    await page.setViewportSize({ width: 1200, height: 640 });
     const root = activeMainPanel(page);
     await root.getByLabel("Calendar period").getByRole("button", { name: "Monthly" }).click();
     await expect(
@@ -130,11 +131,28 @@ test.describe("Schedule calendar", () => {
       root.getByRole("button", { name: /Yavin 4 victory celebration/i }).first(),
     ).toBeVisible({ timeout: 15_000 });
 
-    const moreLink = root.getByRole("button", { name: /Show \d+ more events|\+\d+ more/i }).first();
-    if (await moreLink.isVisible().catch(() => false)) {
-      await moreLink.click();
-      await expect(page.getByRole("dialog")).toBeVisible();
-      await expect(page.getByRole("button", { name: "Open in week" })).toBeVisible();
-    }
+    const moreLink = root.getByRole("button", { name: /Show \d+ more events/i }).first();
+    await expect(moreLink).toBeVisible({ timeout: 15_000 });
+    await moreLink.click();
+
+    const dialog = page.getByRole("dialog");
+    await expect(dialog).toBeVisible();
+    await expect(dialog.getByRole("button", { name: "Close" })).toBeVisible();
+    await expect(dialog.getByRole("button", { name: "Open in week" })).toHaveCount(0);
+    await expect(dialog.getByRole("button", { name: "New event" })).toHaveCount(0);
+    await expect(dialog.getByRole("button", { name: "New sleeping" })).toHaveCount(0);
+
+    await page.keyboard.press("Escape");
+    await expect(dialog).toBeHidden();
+
+    await moreLink.click();
+    await expect(dialog).toBeVisible();
+    await page.mouse.click(8, 8);
+    await expect(dialog).toBeHidden();
+
+    await root.getByRole("button", { name: /Open day schedule/i }).first().click();
+    await expect(
+      root.getByLabel("Calendar period").getByRole("button", { name: "Daily" }),
+    ).toHaveAttribute("aria-pressed", "true");
   });
 });

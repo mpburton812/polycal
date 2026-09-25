@@ -3,7 +3,10 @@ import { describe, expect, it } from "vitest";
 import type { ScheduleEvent } from "@/actions/schedule";
 import {
   buildMonthLayout,
+  chooseVisibleBarLanes,
   isMultiDayMonthSpan,
+  monthLineTier,
+  packMonthDay,
   splitSpanAtWeekBoundaries,
 } from "./month-layout";
 import { buildMonthGrid } from "./month-grid";
@@ -90,47 +93,98 @@ describe("splitSpanAtWeekBoundaries", () => {
 });
 
 describe("buildMonthLayout", () => {
-  it("places timed events as single-day chips without spanning columns", () => {
+  it("places timed events as single-day lines without spanning columns", () => {
     const grid = buildMonthGrid(new Date("2099-07-15T12:00:00.000Z"), "UTC");
-    const layout = buildMonthLayout(
-      grid,
-      [
-        makeEvent({
-          id: "e1",
-          startAt: "2099-07-14T18:00:00.000Z",
-          endAt: "2099-07-14T20:00:00.000Z",
-          title: "Volleyball",
-        }),
-      ],
-      "UTC",
-      3,
-    );
+    const layout = buildMonthLayout(grid, [
+      makeEvent({
+        id: "e1",
+        startAt: "2099-07-14T18:00:00.000Z",
+        endAt: "2099-07-14T20:00:00.000Z",
+        title: "Volleyball",
+      }),
+    ], "UTC");
     const totalSpans = layout.weeks.reduce((sum, week) => sum + week.spanSegments.length, 0);
     expect(totalSpans).toBe(0);
-    const chips = layout.weeks.flatMap((week) => week.days.flatMap((day) => day.chips));
-    expect(chips.length).toBe(1);
+    const timed = layout.weeks.flatMap((week) => week.days.flatMap((day) => day.timed));
+    expect(timed).toHaveLength(1);
   });
 
-  it("assigns archived variant through layout", () => {
+  it("assigns archived variant to a single-day all-day bar", () => {
     const grid = buildMonthGrid(new Date("2099-07-15T12:00:00.000Z"), "UTC");
     const start = sleepingDateToStartIso("2099-07-10")!;
+    const layout = buildMonthLayout(grid, [
+      makeEvent({
+        id: "arch",
+        state: "archived",
+        isAllDay: true,
+        startAt: start,
+        endAt: null,
+        title: "Past event",
+      }),
+    ], "UTC");
+    const bar = layout.weeks.flatMap((week) => week.days.flatMap((day) => day.bars))[0];
+    expect(bar?.variant).toBe("archived");
+    expect(bar?.lane).toBe(0);
+  });
+
+  it("stacks a one-day sleep above a single all-day event, then a multi-day event, then a timed event", () => {
+    const grid = buildMonthGrid(new Date("2099-07-15T12:00:00.000Z"), "UTC");
+    const day = "2099-07-14";
     const layout = buildMonthLayout(
       grid,
       [
         makeEvent({
-          id: "arch",
-          state: "archived",
+          id: "timed",
+          startAt: `${day}T15:00:00.000Z`,
+          endAt: `${day}T16:00:00.000Z`,
+          title: "Timed",
+        }),
+        makeEvent({
+          id: "multi",
           isAllDay: true,
-          startAt: start,
+          startAt: sleepingDateToStartIso(day)!,
+          endAt: sleepingDateToStartIso("2099-07-16")!,
+          title: "Multi",
+        }),
+        makeEvent({
+          id: "allday",
+          isAllDay: true,
+          startAt: sleepingDateToStartIso(day)!,
           endAt: null,
-          title: "Past event",
+          title: "All day",
+        }),
+        makeEvent({
+          id: "sleep",
+          proposalType: "sleeping",
+          startAt: sleepingDateToStartIso(day)!,
+          endAt: null,
+          title: "Sleep",
         }),
       ],
       "UTC",
-      3,
     );
-    const chip = layout.weeks.flatMap((week) => week.days.flatMap((day) => day.chips))[0];
-    expect(chip?.variant).toBe("archived");
+    const cell = layout.weeks.flatMap((week) => week.days).find((item) =>
+      item.bars.some((bar) => bar.event.id === "sleep") &&
+      item.timed.some((line) => line.event.id === "timed"),
+    );
+    expect(cell).toBeTruthy();
+    const lanes = Object.fromEntries(cell!.bars.map((bar) => [bar.event.id, bar.lane]));
+    expect(lanes.sleep).toBeLessThan(lanes.allday);
+    expect(lanes.allday).toBeLessThan(lanes.multi);
+    expect(monthLineTier(cell!.timed[0]!.event, "UTC")).toBe(3);
+  });
+
+  it("hides timed lines before bars when the cell runs out of room", () => {
+    const bars = [{ lane: 0 }, { lane: 1 }];
+    const fitting = packMonthDay({ bars, timedCount: 1, maxLines: 4, visibleBarLanes: 2 });
+    expect(fitting).toEqual({ visibleTimedCount: 1, hiddenCount: 0 });
+
+    const overflowing = packMonthDay({ bars, timedCount: 5, maxLines: 4, visibleBarLanes: 2 });
+    expect(overflowing.visibleTimedCount).toBe(1);
+    expect(overflowing.hiddenCount).toBe(4);
+
+    const lanes = chooseVisibleBarLanes(2, 4, [{ bars, timedCount: 5 }]);
+    expect(lanes).toBe(2);
   });
 
   it("merges virtual_span_day windows into one continuous NY month bar (PC-258)", () => {
@@ -152,7 +206,7 @@ describe("buildMonthLayout", () => {
       }),
     );
 
-    const layout = buildMonthLayout(grid, events, tz, 3);
+    const layout = buildMonthLayout(grid, events, tz);
     const titled = layout.weeks.flatMap((week) =>
       week.spanSegments.filter((segment) => segment.showTitle),
     );

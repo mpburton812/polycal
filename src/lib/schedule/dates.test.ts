@@ -4,6 +4,7 @@ import {
   addDays,
   endOfWeekSaturday,
   eventInRange,
+  formatCompactStartTime,
   formatEventTime,
   intervalsOverlap,
   isSameLocalCalendarDay,
@@ -166,5 +167,14 @@ describe("formatEventTime", () => {
     expect(localDateKey(startAt, "America/New_York")).toBe(
       localDateKey(endAt, "America/New_York"),
     );
+  });
+});
+
+describe("formatCompactStartTime", () => {
+  it("drops :00 and keeps minutes", () => {
+    expect(formatCompactStartTime("2026-07-16T21:00:00.000Z", "UTC")).toBe("9pm");
+    expect(formatCompactStartTime("2026-07-16T21:40:00.000Z", "UTC")).toBe("9:40pm");
+    expect(formatCompactStartTime("2026-07-16T13:00:00.000Z", "UTC")).toBe("1pm");
+    expect(formatCompactStartTime("2026-07-16T13:05:00.000Z", "UTC")).toBe("1:05pm");
   });
 });

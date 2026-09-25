@@ -28,6 +28,24 @@ import { CHANGELOG_ARCHIVE } from "./entries.archive";
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "2026.09.24a",
+    date: "2026-09-24",
+    summary:
+      "Month view lists sleeping and all-day bars above timed lines, with a read-only day flyout when a day runs out of room.",
+    changes: [
+      {
+        type: "changed",
+        description:
+          "Month cells show sleeping bars first (including a single night), then single-day all-day bars, then other multi-day bars, then timed lines with a short start time. Long titles ellipsize. Line count follows the window (PC-523).",
+      },
+      {
+        type: "added",
+        description:
+          "N more opens a read-only day list that closes with the X, Escape, or a click outside. The date number still opens the day schedule (PC-524).",
+      },
+    ],
+  },
+  {
     version: "2026.09.21a",
     date: "2026-09-21",
     summary:
