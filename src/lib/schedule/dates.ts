@@ -227,6 +227,28 @@ export function formatEventTime(
   return `${start.toLocaleString(undefined, { month: "short", day: "numeric", ...dateOpts })} – ${end.toLocaleString(undefined, { month: "short", day: "numeric", ...dateOpts })}`;
 }
 
+/**
+ * Short clock label for month timed lines: `5pm` when minutes are zero, `9:40am` otherwise.
+ */
+export function formatCompactStartTime(
+  iso: string,
+  timeZone = DEFAULT_VIEWER_TIMEZONE,
+): string {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  }).formatToParts(new Date(iso));
+  const hour = parts.find((part) => part.type === "hour")?.value ?? "";
+  const minute = parts.find((part) => part.type === "minute")?.value ?? "00";
+  const dayPeriod = (parts.find((part) => part.type === "dayPeriod")?.value ?? "")
+    .replace(/\s+/g, "")
+    .toLowerCase();
+  const clock = minute === "00" ? hour : `${hour}:${minute}`;
+  return `${clock}${dayPeriod}`;
+}
+
 /** ISO date key yyyy-mm-dd in the viewer timezone for grouping. */
 export function localDateKey(iso: string, timeZone = DEFAULT_VIEWER_TIMEZONE): string {
   const parts = new Intl.DateTimeFormat("en-CA", {

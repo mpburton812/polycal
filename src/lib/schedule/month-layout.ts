@@ -28,7 +28,14 @@ export interface WeekSpanSegment {
   showTitle: boolean;
 }
 
-export interface DayChipRender {
+export interface DayBarRender {
+  key: string;
+  event: ScheduleEvent;
+  variant: ScheduleBlockVariant;
+  lane: number;
+}
+
+export interface DayTimedRender {
   key: string;
   event: ScheduleEvent;
   variant: ScheduleBlockVariant;
@@ -36,9 +43,10 @@ export interface DayChipRender {
 
 export interface DayCellLayout {
   dayIndex: number;
-  chips: DayChipRender[];
-  hiddenCount: number;
-  stateDots: ScheduleBlockVariant[];
+  /** Sleeping, single-day all-day, and other multi-day bars, already lane-assigned. */
+  bars: DayBarRender[];
+  /** Timed events for this day, earliest start first. */
+  timed: DayTimedRender[];
 }
 
 export interface MonthWeekLayout {
@@ -50,22 +58,22 @@ export interface MonthWeekLayout {
 
 export interface MonthViewLayout {
   weeks: MonthWeekLayout[];
-  maxSpanLanes: number;
-  maxChipsPerDay: number;
 }
 
-const MAX_ICONS_PER_DAY = 5;
-
 /**
- * Lower priority number = shown first when space is limited.
+ * Vertical order in a month cell and in the overflow flyout.
+ * 0 sleeping (including one night), 1 single-day all-day, 2 other multi-day, 3 timed.
  */
-export function eventDisplayPriority(event: ScheduleEvent): number {
-  if (event.hasOverlap) return 0;
-  if (event.atRisk) return 1;
-  if (event.state === "proposed") return 2;
-  if (isSleepingLikeType(event.proposalType)) return 3;
-  if (event.state === "resolved") return 4;
-  return 5;
+export function monthLineTier(event: ScheduleEvent, timeZone: string): 0 | 1 | 2 | 3 {
+  if (isSleepingLikeType(event.proposalType)) return 0;
+  if (event.isAllDay && !isMultiDayMonthSpan(event, timeZone)) return 1;
+  if (isMultiDayMonthSpan(event, timeZone)) return 2;
+  return 3;
+}
+
+/** True when the event is a bar rather than a timed line. */
+export function isMonthBarEvent(event: ScheduleEvent, timeZone: string): boolean {
+  return monthLineTier(event, timeZone) < 3;
 }
 
 /** True when the event should render as a multi-column span in month view. */
@@ -139,7 +147,7 @@ export function monthEventSpan(
     startIndex: span.startIndex,
     endIndex,
     displayMode: multiDay ? "span" : "single",
-    priority: eventDisplayPriority(event),
+    priority: monthLineTier(event, timeZone),
     variant: scheduleBlockVariant({
       state: event.state,
       proposalType: event.proposalType,
@@ -191,7 +199,7 @@ function segmentsOverlap(a: RawWeekSegment, b: RawWeekSegment): boolean {
 
 function assignSpanLanes(
   segments: RawWeekSegment[],
-  maxLanes: number,
+  maxLanes: number | null,
 ): { placed: WeekSpanSegment[]; overflow: RawWeekSegment[] } {
   const sorted = [...segments].sort((a, b) => {
     if (a.span.priority !== b.span.priority) return a.span.priority - b.span.priority;
@@ -201,11 +209,11 @@ function assignSpanLanes(
 
   const placed: WeekSpanSegment[] = [];
   const overflow: RawWeekSegment[] = [];
-  const lanes: RawWeekSegment[][] = Array.from({ length: maxLanes }, () => []);
+  const lanes: RawWeekSegment[][] = Array.from({ length: maxLanes ?? 0 }, () => []);
 
   for (const segment of sorted) {
     let lane = -1;
-    for (let index = 0; index < maxLanes; index += 1) {
+    for (let index = 0; index < lanes.length; index += 1) {
       const conflicts = lanes[index]!.some((existing) => segmentsOverlap(existing, segment));
       if (!conflicts) {
         lane = index;
@@ -214,8 +222,12 @@ function assignSpanLanes(
     }
 
     if (lane < 0) {
-      overflow.push(segment);
-      continue;
+      if (maxLanes != null && lanes.length >= maxLanes) {
+        overflow.push(segment);
+        continue;
+      }
+      lane = lanes.length;
+      lanes.push([]);
     }
 
     lanes[lane]!.push(segment);
@@ -236,26 +248,15 @@ function assignSpanLanes(
   return { placed, overflow };
 }
 
-function variantForEvent(event: ScheduleEvent): ScheduleBlockVariant {
-  return scheduleBlockVariant({
-    state: event.state,
-    proposalType: event.proposalType,
-    isContentMasked: event.isContentMasked,
-    hasOverlap: event.hasOverlap,
-    atRisk: event.atRisk,
-    isPartnerOnlySleeping: event.isPartnerOnlySleeping,
-  });
-}
-
 /**
- * Builds Outlook-style month layout: week-split spans, stacked lanes, per-day chips.
+ * Builds the month layout: week-split bars (sleeping, all-day, multi-day) and per-day timed lines.
  * Merges virtual_span_day slices of the same proposal into one continuous bar (PC-258).
+ * The view decides how many lines fit; this function places every bar on a lane.
  */
 export function buildMonthLayout(
   grid: Date[],
   events: ScheduleEvent[],
   timeZone: string,
-  maxSpanLanes: number,
 ): MonthViewLayout {
   const spans: MonthEventSpan[] = [];
   const seen = new Set<string>();
@@ -271,39 +272,44 @@ export function buildMonthLayout(
 
   const weekCount = Math.ceil(grid.length / 7);
   const spanSegmentsByWeek = new Map<number, WeekSpanSegment[]>();
-  const spanOverflowByDay = new Map<number, number>();
-  const eventsByDay = new Map<number, ScheduleEvent[]>();
+  const barsByDay = new Map<number, DayBarRender[]>();
+  const timedByDay = new Map<number, DayTimedRender[]>();
 
   for (let dayIndex = 0; dayIndex < grid.length; dayIndex += 1) {
-    eventsByDay.set(dayIndex, []);
+    barsByDay.set(dayIndex, []);
+    timedByDay.set(dayIndex, []);
   }
 
-  const spanItems = spans.filter((span) => span.displayMode === "span");
-  const singleItems = spans.filter((span) => span.displayMode === "single");
-
-  for (const span of spanItems) {
-    for (let dayIndex = span.startIndex; dayIndex <= span.endIndex; dayIndex += 1) {
-      eventsByDay.get(dayIndex)!.push(span.event);
-    }
-  }
-
-  for (const span of singleItems) {
-    eventsByDay.get(span.startIndex)!.push(span.event);
-  }
+  const barItems = spans.filter((span) => isMonthBarEvent(span.event, timeZone));
+  const timedItems = spans.filter((span) => !isMonthBarEvent(span.event, timeZone));
 
   for (let weekIndex = 0; weekIndex < weekCount; weekIndex += 1) {
-    const rawSegments = spanItems.flatMap((span) =>
+    const rawSegments = barItems.flatMap((span) =>
       splitSpanAtWeekBoundaries(span).filter((segment) => segment.weekIndex === weekIndex),
     );
-    const { placed, overflow } = assignSpanLanes(rawSegments, maxSpanLanes);
+    const { placed } = assignSpanLanes(rawSegments, null);
     spanSegmentsByWeek.set(weekIndex, placed);
 
-    for (const segment of overflow) {
+    for (const segment of placed) {
       for (let col = segment.startCol; col < segment.endCol; col += 1) {
         const dayIndex = weekIndex * 7 + (col - 1);
-        spanOverflowByDay.set(dayIndex, (spanOverflowByDay.get(dayIndex) ?? 0) + 1);
+        barsByDay.get(dayIndex)!.push({
+          key: `${segment.key}:d${dayIndex}`,
+          event: segment.event,
+          variant: segment.variant,
+          lane: segment.lane,
+        });
       }
     }
+  }
+
+  for (const span of timedItems) {
+    const dayIndex = span.startIndex;
+    timedByDay.get(dayIndex)!.push({
+      key: `${span.event.id}:d${dayIndex}`,
+      event: span.event,
+      variant: span.variant,
+    });
   }
 
   const weeks: MonthWeekLayout[] = [];
@@ -313,35 +319,13 @@ export function buildMonthLayout(
 
     for (let col = 0; col < 7; col += 1) {
       const dayIndex = weekIndex * 7 + col;
-      const dayEvents = eventsByDay.get(dayIndex) ?? [];
-
-      const singleDayEvents = singleItems
-        .filter((span) => span.startIndex === dayIndex)
-        .map((span) => span.event);
-
-      const sortedSingles = [...singleDayEvents].sort(
-        (a, b) => eventDisplayPriority(a) - eventDisplayPriority(b),
+      const timed = [...(timedByDay.get(dayIndex) ?? [])].sort((a, b) =>
+        a.event.startAt.localeCompare(b.event.startAt),
       );
-      const visibleSingles = sortedSingles.slice(0, MAX_ICONS_PER_DAY);
-      const hiddenSingles = sortedSingles.length - visibleSingles.length;
-      const spanHidden = spanOverflowByDay.get(dayIndex) ?? 0;
-
-      const chips: DayChipRender[] = visibleSingles.map((event) => ({
-        key: `${event.id}:d${dayIndex}`,
-        event,
-        variant: variantForEvent(event),
-      }));
-
-      const allVariants = [...new Set(dayEvents.map((event) => variantForEvent(event)))].slice(
-        0,
-        4,
-      );
-
       days.push({
         dayIndex,
-        chips,
-        hiddenCount: hiddenSingles + spanHidden,
-        stateDots: allVariants,
+        bars: barsByDay.get(dayIndex) ?? [],
+        timed,
       });
     }
 
@@ -356,9 +340,60 @@ export function buildMonthLayout(
     });
   }
 
+  return { weeks };
+}
+
+export interface MonthPackDayInput {
+  bars: { lane: number }[];
+  timedCount: number;
+}
+
+/**
+ * How many timed lines fit under the reserved bar lanes, and how many events the more-link covers.
+ * When anything is hidden, the last line is reserved for the more-link.
+ */
+export function packMonthDay(options: {
+  bars: { lane: number }[];
+  timedCount: number;
+  maxLines: number;
+  visibleBarLanes: number;
+}): { visibleTimedCount: number; hiddenCount: number } {
+  const hiddenBars = options.bars.filter((bar) => bar.lane >= options.visibleBarLanes).length;
+  const room = Math.max(0, options.maxLines - options.visibleBarLanes);
+  if (hiddenBars === 0 && options.timedCount <= room) {
+    return { visibleTimedCount: options.timedCount, hiddenCount: 0 };
+  }
+  const timedSlots = Math.max(0, room - 1);
+  const visibleTimedCount = Math.min(options.timedCount, timedSlots);
   return {
-    weeks,
-    maxSpanLanes: maxSpanLanes,
-    maxChipsPerDay: MAX_ICONS_PER_DAY,
+    visibleTimedCount,
+    hiddenCount: hiddenBars + options.timedCount - visibleTimedCount,
   };
+}
+
+/**
+ * Largest bar-lane count that keeps spans aligned. Timed overflow still keeps those lanes
+ * when one row remains for the more-link.
+ */
+export function chooseVisibleBarLanes(
+  barLaneCount: number,
+  maxLines: number,
+  days: MonthPackDayInput[],
+): number {
+  if (maxLines <= 0 || barLaneCount <= 0) return 0;
+  const upper = Math.min(barLaneCount, maxLines);
+  for (let lanes = upper; lanes >= 0; lanes -= 1) {
+    const overflows = days.some(
+      (day) =>
+        packMonthDay({
+          bars: day.bars,
+          timedCount: day.timedCount,
+          maxLines,
+          visibleBarLanes: lanes,
+        }).hiddenCount > 0,
+    );
+    if (!overflows) return lanes;
+    if (lanes <= maxLines - 1) return lanes;
+  }
+  return 0;
 }
