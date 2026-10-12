@@ -195,6 +195,8 @@ export interface ProposalDetail {
   reminderOffsetMinutes: number | null;
   /** Optional category icon for social events (PC-116). */
   eventIconKey: string | null;
+  /** Shared event color key. Null keeps sage (PC-527). */
+  scheduleColor?: string | null;
   /** When true, lifecycle milestones appear on Feed (PC-414). */
   postToFeed: boolean;
   /** Proposal vs direct calendar booking (PC-427). */

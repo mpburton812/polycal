@@ -18,6 +18,8 @@ import { GARDEN_TOKENS } from "@/theme/tokens";
 interface ScheduleEventBlockProps {
   event: ScheduleEvent;
   compact?: boolean;
+  /** Stretch the painted block to the day-grid duration (PC-532). */
+  fillHeight?: boolean;
   timeZone?: string;
   rotationIndex?: number;
   onClick: () => void;
@@ -48,6 +50,7 @@ function formatStatusLabel(event: ScheduleEvent): string {
 export function ScheduleEventBlock({
   event,
   compact = false,
+  fillHeight = false,
   timeZone = DEFAULT_VIEWER_TIMEZONE,
   rotationIndex = 0,
   onClick,
@@ -60,7 +63,7 @@ export function ScheduleEventBlock({
     atRisk: event.atRisk,
     isPartnerOnlySleeping: event.isPartnerOnlySleeping,
   });
-  const colors = scheduleBlockSx(variant, rotationIndex);
+  const colors = scheduleBlockSx(variant, rotationIndex, event.scheduleColor);
   const stakeholders = formatStakeholders(event);
   const timeLabel = formatEventTime(
     event.startAt,
@@ -108,6 +111,8 @@ export function ScheduleEventBlock({
         position: "relative",
         display: "block",
         width: "100%",
+        height: fillHeight ? "100%" : undefined,
+        boxSizing: "border-box",
         maxWidth: "100%",
         minWidth: 0,
         overflow: "hidden",
@@ -115,7 +120,7 @@ export function ScheduleEventBlock({
         cursor: "pointer",
         px: compact ? 0.75 : 1,
         py: compact ? 0.5 : 0.75,
-        mb: compact ? 0.5 : 0.75,
+        mb: fillHeight ? 0 : compact ? 0.5 : 0.75,
         bgcolor: colors.bgcolor,
         color: colors.color,
         border: colors.border,

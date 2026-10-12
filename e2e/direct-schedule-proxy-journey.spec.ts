@@ -5,7 +5,7 @@ import { loginWithOnboardingIfNeeded, logout } from "./helpers/auth";
 import { USERS } from "./helpers/constants";
 import { fillProposalDateTimeField, selectDraftScheduleMode } from "./helpers/datePickers";
 import { expandAdminSection } from "./helpers/admin";
-import { goToAdmin, goToProposals, selectProposalTab } from "./helpers/navigation";
+import { goToAdmin, goToPeoplePlaces, goToProposals, goToSchedule, selectProposalTab } from "./helpers/navigation";
 import { expectToast } from "./helpers/toast";
 import {
   exitDraftDialog,
@@ -140,7 +140,9 @@ test.describe("Direct booking and Booking for journey", () => {
 
       await logout(page);
       await loginWithOnboardingIfNeeded(page, USERS.han.username);
-      await goToProposals(page);
+      const nav = page.getByRole("navigation", { name: "Main navigation" });
+      await expect(nav.getByRole("link", { name: "Proposals" })).toHaveCount(0);
+      await goToSchedule(page);
       const bookingsOnlyDraft = await openEventProposalDraft(page);
       await expect(bookingsOnlyDraft.getByRole("button", { name: "Proposal", exact: true })).toHaveCount(
         0,
@@ -153,9 +155,14 @@ test.describe("Direct booking and Booking for journey", () => {
       await expandDraftMoreOptions(bookingsOnlyDraft);
       await expect(bookingsOnlyDraft.getByRole("button", { name: "Poll", exact: true })).toHaveCount(0);
       await exitDraftDialog(bookingsOnlyDraft);
+      await goToPeoplePlaces(page);
       await openNewProposalFabMenu(page);
       await expect(page.getByRole("menuitem", { name: "Sleeping partner proposal" })).toBeVisible();
-      await expect(page.getByRole("menuitem", { name: "Residency Proposal" })).toHaveCount(0);
+      await expect(page.getByRole("menuitem", { name: "New Event", exact: true })).toHaveCount(0);
+      await page.keyboard.press("Escape");
+      await goToSchedule(page);
+      await openNewProposalFabMenu(page);
+      await expect(page.getByRole("menuitem", { name: "Sleeping partner proposal" })).toHaveCount(0);
       await page.keyboard.press("Escape");
     } finally {
       await restoreDefaultComposerSettings(page);

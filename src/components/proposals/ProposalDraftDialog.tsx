@@ -56,6 +56,7 @@ import {
   ProposalConflictConfirmDialog,
 } from "./ProposalConflictConfirmDialog";
 import { ProposalDraftEventFields } from "./ProposalDraftEventFields";
+import { EventColorPicker } from "./EventColorPicker";
 import { ProposalDraftMoreOptions } from "./ProposalDraftMoreOptions";
 import {
   flagsFromTimingMode,
@@ -76,6 +77,8 @@ import {
 import { GARDEN_TOKENS } from "@/theme/tokens";
 import { invalidateSchedule } from "@/lib/schedule/invalidate";
 import { sleepingDateToStartIso } from "@/lib/proposals/sleeping-schedule";
+import { isEventScheduleColor, type EventScheduleColorKey } from "@/lib/schedule/event-colors";
+import { DEFAULT_VIEWER_TIMEZONE } from "@/lib/schedule/timezone";
 import { formatSleepingDisplayTitle } from "@/lib/proposals/sleeping-display";
 import { parseEventIntent, type EventIntentChip } from "@/lib/proposals/event-intent-parse";
 import { inviteeIsSelected } from "@/lib/proposals/invitee-tap-cycle";
@@ -137,6 +140,8 @@ interface ProposalDraftDialogProps {
   initialTitle?: string;
   /** Prefills NLP Description so parseEventIntent runs as today (PC-476). */
   initialNlpText?: string;
+  /** Account timezone so sleeping nights stay on the civil date the user picked (PC-530). */
+  viewerTimeZone?: string;
 }
 
 /**
@@ -156,6 +161,7 @@ export function ProposalDraftDialog({
   composerMode = "manual",
   initialTitle = "",
   initialNlpText = "",
+  viewerTimeZone = DEFAULT_VIEWER_TIMEZONE,
 }: ProposalDraftDialogProps) {
   const router = useRouter();
   const [savedDraftId, setSavedDraftId] = useState<string | null>(null);
@@ -210,6 +216,7 @@ export function ProposalDraftDialog({
     [],
   );
   const [eventIconKey, setEventIconKey] = useState<EventIconKey | null>(null);
+  const [scheduleColor, setScheduleColor] = useState<EventScheduleColorKey>("sage");
   const [isRecurring, setIsRecurring] = useState(false);
   const [recurrencePattern, setRecurrencePattern] = useState<
     "daily" | "weekly" | "monthly" | "yearly"
@@ -326,21 +333,21 @@ export function ProposalDraftDialog({
   const previewStartIso = useMemo(() => {
     if (batchMode && configuredBatchEntries.length > 0) {
       const sorted = [...configuredBatchEntries]
-        .map((entry) => sleepingDateToStartIso(entry.nightDate.slice(0, 10)))
+        .map((entry) => sleepingDateToStartIso(entry.nightDate.slice(0, 10), viewerTimeZone))
         .filter((iso): iso is string => Boolean(iso))
         .sort((a, b) => a.localeCompare(b));
       return sorted[0];
     }
     const first = slots.find((s) => s.startAt);
     if (!first) return undefined;
-    if (proposalType === "sleeping") return sleepingDateToStartIso(first.startAt);
+    if (proposalType === "sleeping") return sleepingDateToStartIso(first.startAt, viewerTimeZone);
     return allDay ? localDateToStartIso(first.startAt) : localInputToIso(first.startAt);
-  }, [batchMode, configuredBatchEntries, slots, proposalType, allDay]);
+  }, [batchMode, configuredBatchEntries, slots, proposalType, allDay, viewerTimeZone]);
 
   const previewEndIso = useMemo(() => {
     if (batchMode && configuredBatchEntries.length > 0) {
       const sorted = [...configuredBatchEntries]
-        .map((entry) => sleepingDateToStartIso(entry.nightDate.slice(0, 10)))
+        .map((entry) => sleepingDateToStartIso(entry.nightDate.slice(0, 10), viewerTimeZone))
         .filter((iso): iso is string => Boolean(iso))
         .sort((a, b) => a.localeCompare(b));
       return sorted[sorted.length - 1];
@@ -348,13 +355,13 @@ export function ProposalDraftDialog({
     const first = slots.find((s) => s.startAt);
     if (!first) return undefined;
     if (proposalType === "sleeping") {
-      return sleepingDateToStartIso(first.endAt || first.startAt);
+      return sleepingDateToStartIso(first.endAt || first.startAt, viewerTimeZone);
     }
     if (allDay) {
       return first.endAt ? localDateToEndIso(first.endAt) : localDateToEndIso(first.startAt);
     }
     return first.endAt ? localInputToIso(first.endAt) : undefined;
-  }, [batchMode, configuredBatchEntries, slots, proposalType, allDay]);
+  }, [batchMode, configuredBatchEntries, slots, proposalType, allDay, viewerTimeZone]);
 
   useEffect(() => {
     if (!open) return;
@@ -612,6 +619,9 @@ export function ProposalDraftDialog({
       setEventIconKey(
         isEventIconKey(initialDetail.eventIconKey) ? initialDetail.eventIconKey : null,
       );
+      setScheduleColor(
+        isEventScheduleColor(initialDetail.scheduleColor) ? initialDetail.scheduleColor : "sage",
+      );
       setIsRecurring(initialDetail.isRecurrenceParent);
       if (initialDetail.recurrenceRule) {
         setRecurrencePattern(initialDetail.recurrenceRule.pattern);
@@ -682,7 +692,7 @@ export function ProposalDraftDialog({
       const startInput =
         initialStartAt != null && initialStartAt.length > 0
           ? type === "sleeping"
-            ? toLocalDateInput(initialStartAt)
+            ? toLocalDateInput(initialStartAt, viewerTimeZone)
             : toLocalInput(initialStartAt)
           : "";
       // Day-sheet create already chose a day — show When with Window so the prefill is visible (PC-418).
@@ -699,8 +709,9 @@ export function ProposalDraftDialog({
       setReminderUnit("hours");
       setPostToFeed(false);
       setTentative(false);
+      setScheduleColor("sage");
     }
-  }, [open, initialDetail, lockedProposalType, savedDraftId, initialStartAt, initialTitle, initialNlpText]);
+  }, [open, initialDetail, lockedProposalType, savedDraftId, initialStartAt, initialTitle, initialNlpText, viewerTimeZone]);
 
   function handleClose() {
     setSavedDraftId(null);
@@ -749,6 +760,7 @@ export function ProposalDraftDialog({
     setOnBehalfOfUserId(detail.onBehalfOfUserId ?? "");
     setTentative(Boolean(detail.tentative));
     setEventIconKey(isEventIconKey(detail.eventIconKey) ? detail.eventIconKey : null);
+    setScheduleColor(isEventScheduleColor(detail.scheduleColor) ? detail.scheduleColor : "sage");
     setIsRecurring(detail.isRecurrenceParent);
     if (detail.recurrenceRule) {
       setRecurrencePattern(detail.recurrenceRule.pattern);
@@ -817,11 +829,11 @@ export function ProposalDraftDialog({
       : slots
           .map((slot) => {
             if (proposalType === "sleeping") {
-              const startIso = sleepingDateToStartIso(slot.startAt);
+              const startIso = sleepingDateToStartIso(slot.startAt, viewerTimeZone);
               if (!startIso) return null;
               const endIso =
                 slot.endAt && slot.endAt !== slot.startAt
-                  ? sleepingDateToStartIso(slot.endAt)
+                  ? sleepingDateToStartIso(slot.endAt, viewerTimeZone)
                   : null;
               return {
                 startAt: startIso,
@@ -902,6 +914,7 @@ export function ProposalDraftDialog({
           ? onBehalfOfUserId
           : null,
       eventIconKey: proposalType === "event" ? eventIconKey : null,
+      scheduleColor: proposalType === "event" ? scheduleColor : null,
       isRecurring: !batchMode && isRecurring,
       recurrenceRule:
         !batchMode && isRecurring
@@ -1038,6 +1051,7 @@ export function ProposalDraftDialog({
       fullWidth
       maxWidth="sm"
       scroll="paper"
+      disableEnforceFocus
       PaperProps={{
         sx: { bgcolor: "transparent", boxShadow: "none", overflow: "visible", maxHeight: "92vh" },
       }}
@@ -1382,6 +1396,8 @@ export function ProposalDraftDialog({
           ) : null}
 
           {showTypeBody && proposalType === "event" && (
+            <Stack spacing={1.5}>
+            <EventColorPicker value={scheduleColor} onChange={setScheduleColor} disabled={pending} />
             <ProposalDraftEventFields
               title={title}
               onTitleChange={(value) => {
@@ -1429,6 +1445,7 @@ export function ProposalDraftDialog({
               }}
               onClearBedroom={() => setBedroomIndex("")}
             />
+            </Stack>
           )}
 
           {showTypeBody && proposalType === "sleeping" && (

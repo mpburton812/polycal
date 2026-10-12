@@ -24,12 +24,13 @@ export function computeScheduleFetchRange(
   }
 
   if (layout === "day") {
-    // Local midnight→EOD around the anchor; day chrome uses noon-UTC civil anchors (PC-204).
-    const rangeStart = new Date(anchorDate);
-    rangeStart.setHours(0, 0, 0, 0);
-    const rangeEnd = new Date(rangeStart);
-    rangeEnd.setHours(23, 59, 59, 999);
-    return { rangeStart, rangeEnd };
+    // Civil midnight→EOD in the viewer timezone. Browser setHours(0) shifts
+    // tonight's sleeping night off the day when the host clock differs (PC-530).
+    const dayKey = localDateKey(anchorDate.toISOString(), timeZone);
+    return {
+      rangeStart: startOfCivilDayInZone(dayKey, timeZone),
+      rangeEnd: endOfCivilDayInZone(dayKey, timeZone),
+    };
   }
 
   const sundayNoon = startOfWeekSunday(anchorDate, timeZone);

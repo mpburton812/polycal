@@ -20,6 +20,7 @@ function googleEventBody(payload: CalendarEventPayload): Record<string, unknown>
     description: payload.description ?? undefined,
     location: payload.location ?? undefined,
     transparency: payload.transparencyFree ? "transparent" : "opaque",
+    ...(payload.googleColorId ? { colorId: payload.googleColorId } : {}),
   };
 
   if (payload.isAllDay) {
