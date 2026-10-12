@@ -28,6 +28,34 @@ import { CHANGELOG_ARCHIVE } from "./entries.archive";
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "2026.10.12a",
+    date: "2026-10-12",
+    summary:
+      "Shared event colors, Just Bookings hides Proposals, split create menus, and calendar, notification, and day-grid fixes.",
+    changes: [
+      {
+        type: "added",
+        description:
+          "Social events can use sage, sky, teal, slate, olive, or sand. Red and purple stay reserved for conflict and sleeping. Everyone sees the color, including Google Calendar (PC-527).",
+      },
+      {
+        type: "changed",
+        description:
+          "Just Bookings hides the Proposals tab. The People & Places + opens only a sleeping partner proposal; the schedule + does not (PC-528, PC-529).",
+      },
+      {
+        type: "fixed",
+        description:
+          "Tonight's sleeping night stays on that civil date. Tapping or typing an event date commits. Multi-hour events fill their duration on the day schedule (PC-530, PC-532).",
+      },
+      {
+        type: "changed",
+        description:
+          "Cancel, Google Calendar add/update/remove, and booking notices name the person. Just Bookings says they booked the event instead of auto-approved (PC-531, PC-533).",
+      },
+    ],
+  },
+  {
     version: "2026.09.24a",
     date: "2026-09-24",
     summary:

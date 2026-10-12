@@ -30,6 +30,8 @@ export async function applyProposalsMigrations(sql: Client): Promise<void> {
   await ensureColumn(sql, "proposals", "detached_from_slot_id", "TEXT");
   await ensureColumn(sql, "proposals", "detached_at", "TEXT");
   await ensureColumn(sql, "proposals", "event_icon_key", "TEXT");
+  // PC-527: optional shared event color. Null keeps the sage resolved fill.
+  await ensureColumn(sql, "proposals", "schedule_color", "TEXT");
   // PC-410: cancelled vs auto-archive; cancelled rows leave the schedule, auto keep GCal.
   await ensureColumn(sql, "proposals", "archive_kind", "TEXT");
   // PC-414: Post to Feed (app default OFF). Existing rows backfilled ON so history stays.

@@ -4,6 +4,7 @@ import {
   computeScheduleFetchRange,
   scheduleFetchRangeDayCount,
 } from "./fetch-range";
+import { localDateKey } from "./dates";
 
 describe("computeScheduleFetchRange", () => {
   it("uses the full month grid for month layout", () => {
@@ -19,11 +20,12 @@ describe("computeScheduleFetchRange", () => {
     expect(scheduleFetchRangeDayCount(range)).toBeLessThanOrEqual(8);
   });
 
-  it("uses a single local calendar day for day layout", () => {
-    const anchor = new Date(2099, 6, 15, 15, 30, 0);
-    const range = computeScheduleFetchRange(anchor, "day");
-    expect(range.rangeStart.getHours()).toBe(0);
-    expect(range.rangeEnd.getHours()).toBe(23);
-    expect(scheduleFetchRangeDayCount(range)).toBe(1);
+  it("uses one civil day in the viewer timezone for day layout", () => {
+    const anchor = new Date("2099-07-15T19:30:00.000Z");
+    const timeZone = "America/Los_Angeles";
+    const range = computeScheduleFetchRange(anchor, "day", timeZone);
+    expect(localDateKey(range.rangeStart.toISOString(), timeZone)).toBe("2099-07-15");
+    expect(localDateKey(range.rangeEnd.toISOString(), timeZone)).toBe("2099-07-15");
+    expect(range.rangeEnd.getTime()).toBeGreaterThan(range.rangeStart.getTime());
   });
 });

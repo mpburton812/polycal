@@ -71,13 +71,15 @@ export function ProposalCreateHost({
   const [fastSleepEnabled, setFastSleepEnabled] = useState(true);
   const [composerSettings, setComposerSettings] = useState<DraftComposerSettings | null>(null);
   const [peopleRank, setPeopleRank] = useState<PersonRankStat[]>([]);
+  const [viewerTimeZone, setViewerTimeZone] = useState<string | undefined>(undefined);
   const [editDetail, setEditDetail] = useState<ProposalDetail | null>(null);
   const [composerMode, setComposerMode] = useState<"manual" | "nlp">("nlp");
   const [initialTitle, setInitialTitle] = useState("");
   const [initialNlpText, setInitialNlpText] = useState("");
   const loadedAtRef = useRef(0);
   const pathname = usePathname();
-  const hideFab = pathname === "/feed" || pathname === "/people-places";
+  const hideFab = pathname === "/feed";
+  const partnerOnlyFab = pathname === "/people-places";
 
   /**
    * Prefetch may use the TTL cache; opening a composer always force-refreshes.
@@ -93,6 +95,7 @@ export function ProposalCreateHost({
     setFastSleepEnabled(next.fastSleepEnabled);
     setComposerSettings(next.composer);
     setPeopleRank(next.peopleRank);
+    setViewerTimeZone(next.viewerTimeZone);
     loadedAtRef.current = Date.now();
   }, []);
 
@@ -192,6 +195,7 @@ export function ProposalCreateHost({
         anchorOrigin={{ vertical: "top", horizontal: "center" }}
         transformOrigin={{ vertical: "bottom", horizontal: "center" }}
       >
+        {!partnerOnlyFab ? (
         <MenuItem
           onClick={() => {
             setFabMenuAnchor(null);
@@ -209,6 +213,8 @@ export function ProposalCreateHost({
         >
           New Event
         </MenuItem>
+        ) : null}
+        {!partnerOnlyFab ? (
         <MenuItem
           onClick={() => {
             setFabMenuAnchor(null);
@@ -226,7 +232,8 @@ export function ProposalCreateHost({
         >
           Legacy New Event
         </MenuItem>
-        {fastSleepEnabled ? (
+        ) : null}
+        {!partnerOnlyFab && fastSleepEnabled ? (
           <MenuItem
             onClick={() => {
               setFabMenuAnchor(null);
@@ -237,6 +244,7 @@ export function ProposalCreateHost({
             Bulk Sleep Booking
           </MenuItem>
         ) : null}
+        {partnerOnlyFab ? (
         <MenuItem
           onClick={() => {
             setFabMenuAnchor(null);
@@ -245,6 +253,7 @@ export function ProposalCreateHost({
         >
           Sleeping partner proposal
         </MenuItem>
+        ) : null}
       </Menu>
         </>
       )}
@@ -269,6 +278,7 @@ export function ProposalCreateHost({
         composerMode={editDetail ? "manual" : composerMode}
         initialTitle={editDetail ? "" : initialTitle}
         initialNlpText={editDetail ? "" : initialNlpText}
+        viewerTimeZone={viewerTimeZone}
       />
       ) : null}
       {partnerCreateOpen ? (

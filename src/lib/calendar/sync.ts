@@ -189,17 +189,31 @@ async function notifyGoogleSynced(
 ): Promise<void> {
   const batchNote =
     kind !== "removed" ? batchNightNotifySuffix(proposal, nightCount) : "";
+  const session = await auth();
+  const actorName = session?.user?.displayName?.trim() || "";
   const verb =
     kind === "added" ? "Added to" : kind === "updated" ? "Updated on" : "Removed from";
+  const message = actorName
+    ? kind === "added"
+      ? `${actorName} added "${proposal.title}" to Google Calendar${batchNote}.`
+      : kind === "updated"
+        ? `${actorName} updated "${proposal.title}" on Google Calendar${batchNote}.`
+        : `${actorName} removed "${proposal.title}" from Google Calendar.`
+    : `${verb} Google Calendar: ${proposal.title}${batchNote}.`;
+  const actor =
+    actorName && session?.user?.id
+      ? { actorUserId: session.user.id, actorDisplayName: actorName }
+      : {};
   await notifyUser(
     connection.userId,
     "calendar_google_synced",
-    `${verb} Google Calendar: ${proposal.title}${batchNote}.`,
+    message,
     {
       proposalId: proposal.id,
       url: `/proposals?open=${encodeURIComponent(proposal.id)}`,
       proposalType: proposal.proposalType,
       kind,
+      ...actor,
     },
   );
 }

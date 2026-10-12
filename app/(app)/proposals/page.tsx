@@ -6,6 +6,7 @@ import { listProposalBoardAction } from "@/actions/proposals";
 import { listPeopleAction } from "@/actions/users";
 import { ProposalsClient } from "@/components/proposals/ProposalsClient";
 import { auth } from "@/lib/auth";
+import { isProposalsTabVisible } from "@/lib/networks/proposals-tab";
 import { userHasAdminAccess } from "@/lib/admin-access";
 import { brutalPageTitleSx } from "@/theme/brutalUi";
 import type { UserRole } from "@/types/user";
@@ -14,6 +15,9 @@ export default async function ProposalsPage() {
   const session = await auth();
   if (!session?.user) {
     redirect("/login");
+  }
+  if (!(await isProposalsTabVisible())) {
+    redirect("/schedule");
   }
 
   const isAdmin = await userHasAdminAccess(session.user.role as UserRole);

@@ -73,7 +73,7 @@ test.describe("App navigation (admin)", () => {
     await expect(page.getByRole("heading", { name: "Profile", level: 1 })).toBeVisible();
   });
 
-  test("sage create FAB is on Schedule and Proposals, not Feed or People & Places", async ({ page }) => {
+  test("sage create FAB is on Schedule and Proposals, sleeping partner + is on People & Places", async ({ page }) => {
     for (const go of [goToSchedule, goToProposals]) {
       await go(page);
       await openNewProposalFabMenu(page);
@@ -85,16 +85,22 @@ test.describe("App navigation (admin)", () => {
       ).toBeVisible();
       await expect(page.getByRole("menuitem", { name: "Sleeping proposal" })).toHaveCount(0);
       await expect(page.getByRole("menuitem", { name: "Bulk Sleep Booking" })).toBeVisible();
-      await expect(page.getByRole("menuitem", { name: "Sleeping partner proposal" })).toBeVisible();
+      await expect(page.getByRole("menuitem", { name: "Sleeping partner proposal" })).toHaveCount(0);
       await expect(page.getByRole("menuitem", { name: "Residency Proposal" })).toHaveCount(0);
       await page.keyboard.press("Escape");
       await expect(page.getByRole("menuitem", { name: "New Event", exact: true })).toBeHidden();
     }
 
-    for (const go of [goToFeed, goToPeoplePlaces]) {
+    for (const go of [goToFeed]) {
       await go(page);
       await expect(page.getByRole("button", { name: "New proposal" })).toHaveCount(0);
     }
+
+    await goToPeoplePlaces(page);
+    await openNewProposalFabMenu(page);
+    await expect(page.getByRole("menuitem", { name: "Sleeping partner proposal" })).toBeVisible();
+    await expect(page.getByRole("menuitem", { name: "New Event", exact: true })).toHaveCount(0);
+    await page.keyboard.press("Escape");
   });
 });
 
