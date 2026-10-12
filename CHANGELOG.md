@@ -4,6 +4,24 @@ All notable changes to PolyCal are documented here.
 
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [2026.10.12a] - 2026-10-12
+
+### Added
+
+- PC-527: Social events can use sage, sky, teal, slate, olive, or sand. Red and purple stay reserved for conflict and sleeping. Everyone sees the color, including Google Calendar.
+
+### Changed
+
+- PC-528: Just Bookings hides the Proposals tab. Opening /proposals goes to the schedule.
+- PC-529: The People & Places + opens only a sleeping partner proposal. The schedule + does not include that item.
+- PC-531: Cancel, Google Calendar add/update/remove, and booking notices name the person who did it.
+- PC-533: When proposals are disabled, the notice says the person booked the event instead of auto-approved.
+
+### Fixed
+
+- PC-530: Tonight's sleeping night stays on the civil date that was picked, and tapping or typing an event date commits.
+- PC-532: A multi-hour event on the daily schedule fills its full duration.
+
 ## [2026.09.24a] - 2026-09-24
 
 ### Changed

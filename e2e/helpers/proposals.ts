@@ -1,7 +1,7 @@
 import { type Locator, type Page, expect } from "@playwright/test";
 
 import { fillProposalDateTimeField, fillProposalDateRange, selectDraftScheduleMode } from "./datePickers";
-import { goToProposals, openProposalCard, selectProposalTab } from "./navigation";
+import { goToPeoplePlaces, goToProposals, openProposalCard, selectProposalTab } from "./navigation";
 import { dismissBlockingDialogsIfOpen } from "./motd";
 import { activeMainPanel } from "./tab-swipe";
 import { expectToast } from "./toast";
@@ -126,8 +126,9 @@ export async function openEventOrSleepingProposalDraft(page: Page): Promise<Loca
   return openEventProposalDraft(page);
 }
 
-/** Opens the sleeping partner proposal dialog from the FAB menu. */
+/** Opens the sleeping partner proposal dialog from the People & Places + menu. */
 export async function openSleepingPartnerProposal(page: Page): Promise<Locator> {
+  await goToPeoplePlaces(page);
   await openNewProposalFabMenu(page);
   await page.getByRole("menuitem", { name: /Sleeping partner proposal/i }).click();
   const dialog = page.getByRole("dialog");

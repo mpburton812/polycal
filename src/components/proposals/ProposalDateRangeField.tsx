@@ -111,7 +111,6 @@ export function ProposalDateRangeField({
         selected={Boolean(isEdge)}
         onPointerDown={(event) => {
           if (disabled || outsideCurrentMonth) return;
-          skipClickRef.current = true;
           const originIso = anchor
             ? anchor.format("YYYY-MM-DD")
             : startValue && isStrictIsoDate(startValue)
@@ -122,6 +121,9 @@ export function ProposalDateRangeField({
         }}
         onPointerEnter={() => {
           if (!dragRef.current || disabled) return;
+          if (dragRef.current.origin === iso) return;
+          // A drag across days owns the selection; the following click must not reset it.
+          skipClickRef.current = true;
           applyOrderedRange(dragRef.current.origin, iso);
         }}
         onPointerUp={() => {

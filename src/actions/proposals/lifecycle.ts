@@ -731,7 +731,8 @@ export async function cancelProposalAction(
     db,
     proposal,
     "proposal_cancelled",
-    `Proposal "${proposal.title}" was cancelled.`,
+    `${actorNotifyFields(session.user).actorDisplayName} cancelled "${proposal.title}".`,
+    actorNotifyFields(session.user),
   );
 
   revalidatePath("/proposals");

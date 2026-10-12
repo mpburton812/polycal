@@ -14,6 +14,7 @@ import { getLiveUserStatus } from "@/lib/auth-session";
 import { userCanSeeAdminTab } from "@/lib/admin-access";
 import { normalizeUserThemeId } from "@/lib/constants/themes";
 import { isFeedEnabledForActiveNetwork } from "@/lib/feed/feed-enabled";
+import { isProposalsTabVisible } from "@/lib/networks/proposals-tab";
 import { DEFAULT_NOTIFICATION_PREFS } from "@/types/notification-prefs";
 
 /**
@@ -77,6 +78,7 @@ async function AppLayoutReady({ children }: { children: React.ReactNode }) {
   const notificationPrefsPromise = getNotificationPrefsAction();
   const groupNamePromise = getNetworkDisplayNameAction();
   const feedEnabledPromise = isFeedEnabledForActiveNetwork();
+  const proposalsTabPromise = isProposalsTabVisible();
   const isPlatformAdmin = session.user.isPlatformAdmin === true;
 
   return (
@@ -114,6 +116,7 @@ async function AppLayoutReady({ children }: { children: React.ReactNode }) {
           notificationPrefsPromise={notificationPrefsPromise}
           groupNamePromise={groupNamePromise}
           feedEnabledPromise={feedEnabledPromise}
+          proposalsTabPromise={proposalsTabPromise}
         >
           {children}
         </AppShellWithData>
@@ -136,6 +139,7 @@ async function AppShellWithData({
   notificationPrefsPromise,
   groupNamePromise,
   feedEnabledPromise,
+  proposalsTabPromise,
 }: {
   children: React.ReactNode;
   displayName: string;
@@ -150,12 +154,14 @@ async function AppShellWithData({
   notificationPrefsPromise: ReturnType<typeof getNotificationPrefsAction>;
   groupNamePromise: ReturnType<typeof getNetworkDisplayNameAction>;
   feedEnabledPromise: Promise<boolean>;
+  proposalsTabPromise: Promise<boolean>;
 }) {
-  const [notificationInbox, notificationPrefs, groupName, feedEnabled] = await Promise.all([
+  const [notificationInbox, notificationPrefs, groupName, feedEnabled, proposalsTabEnabled] = await Promise.all([
     notificationInboxPromise,
     notificationPrefsPromise,
     groupNamePromise,
     feedEnabledPromise,
+    proposalsTabPromise,
   ]);
 
   let partnerOptions: { id: string; displayName: string }[] = [];
@@ -178,6 +184,7 @@ async function AppShellWithData({
       notificationPrefs={notificationPrefs}
       isPlatformAdmin={isPlatformAdmin}
       feedEnabled={feedEnabled}
+      proposalsTabEnabled={proposalsTabEnabled}
     >
       {showOnboarding ? (
         <FirstLoginWizard

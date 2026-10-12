@@ -20,6 +20,8 @@ const textFieldSlotProps = {
     fullWidth: true,
     InputLabelProps: { shrink: true },
   },
+  popper: { sx: { zIndex: 2000 } },
+  dialog: { sx: { zIndex: 2000 } },
 };
 
 /** Parses yyyy-MM-dd stored in sleeping draft slots. */
@@ -50,7 +52,9 @@ export function ProposalDateField({
     <DatePicker
       label={label}
       value={parseDateValue(value)}
-      onChange={(next) => onChange(next?.isValid() ? next.format("YYYY-MM-DD") : "")}
+      onChange={(next) => {
+        if (next?.isValid()) onChange(next.format("YYYY-MM-DD"));
+      }}
       disabled={disabled}
       slotProps={{
         ...textFieldSlotProps,
@@ -78,7 +82,9 @@ export function ProposalDateTimeField({
     <DateTimePicker
       label={label}
       value={parseDateTimeValue(value)}
-      onChange={(next) => onChange(next?.isValid() ? next.format("YYYY-MM-DDTHH:mm") : "")}
+      onChange={(next) => {
+        if (next?.isValid()) onChange(next.format("YYYY-MM-DDTHH:mm"));
+      }}
       disabled={disabled}
       ampm
       // Explicit digital time entry — do not use renderTimeViewClock.
@@ -120,10 +126,7 @@ export function ProposalSplitDateTimeField({
         label={`${label} date`}
         value={datePart ? dayjs(datePart, "YYYY-MM-DD", true) : null}
         onChange={(next) => {
-          if (!next?.isValid()) {
-            onChange("");
-            return;
-          }
+          if (!next?.isValid()) return;
           const hours = timePart?.hour() ?? 9;
           const minutes = timePart?.minute() ?? 0;
           onChange(next.hour(hours).minute(minutes).format("YYYY-MM-DDTHH:mm"));

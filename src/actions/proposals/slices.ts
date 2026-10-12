@@ -654,6 +654,7 @@ export async function detachProposalSliceAction(
         bedroomIndex: parent.bedroomIndex,
         notes: parent.notes,
         eventIconKey: parent.eventIconKey,
+        scheduleColor: parent.scheduleColor,
         detachedFromParentId: rootProposalId,
         detachedFromSlotId: sourceSlotId,
         detachedAt: now,

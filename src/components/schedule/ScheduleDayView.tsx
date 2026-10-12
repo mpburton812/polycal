@@ -7,6 +7,7 @@ import type { ScheduleEvent } from "@/actions/schedule";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ScheduleEventBlock } from "@/components/schedule/ScheduleEventBlock";
 import { isSleepingLikeType } from "@/lib/proposals/sleeping-like";
+import { dayGridSpanMinutes } from "@/lib/schedule/day-span";
 import {
   formatDayHeader,
   localDateKey,
@@ -17,7 +18,6 @@ import { fontFamilies } from "@/theme/fonts";
 import { GARDEN_TOKENS, ORGANIC_RADIUS } from "@/theme/tokens";
 
 const HOUR_HEIGHT_PX = 48;
-const DAY_MINUTES = 24 * 60;
 
 interface ScheduleDayViewProps {
   day: Date;
@@ -32,19 +32,6 @@ interface ScheduleDayViewProps {
  */
 function isAllDayLaneEvent(event: ScheduleEvent): boolean {
   return event.isAllDay || isSleepingLikeType(event.proposalType);
-}
-
-/** Minutes from local midnight for an instant in the viewer timezone. */
-function minutesInTimeZone(iso: string, timeZone: string): number {
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone,
-    hour: "numeric",
-    minute: "numeric",
-    hourCycle: "h23",
-  }).formatToParts(new Date(iso));
-  const hour = Number(parts.find((p) => p.type === "hour")?.value ?? "0");
-  const minute = Number(parts.find((p) => p.type === "minute")?.value ?? "0");
-  return hour * 60 + minute;
 }
 
 /**
@@ -70,10 +57,6 @@ function zonedHourOnDay(dayIso: string, hour: number, timeZone: string): Date {
   }
   // Local wall time = UTC + offset → UTC = wall - offset.
   return new Date(Date.UTC(year!, month! - 1, dayNum!, hour, 0, 0) - offsetMinutes * 60_000);
-}
-
-function clamp(value: number, min: number, max: number): number {
-  return Math.min(max, Math.max(min, value));
 }
 
 /**
@@ -253,20 +236,14 @@ export function ScheduleDayView({
           ) : null}
 
           {timedEvents.map((event, index) => {
-            const startKey = localDateKey(event.startAt, timeZone);
-            const endIso = event.endAt ?? event.startAt;
-            const endKey = localDateKey(endIso, timeZone);
-            let startMin =
-              startKey === dayKey ? minutesInTimeZone(event.startAt, timeZone) : 0;
-            let endMin =
-              endKey === dayKey
-                ? minutesInTimeZone(endIso, timeZone)
-                : DAY_MINUTES;
-            if (endMin <= startMin) endMin = Math.min(DAY_MINUTES, startMin + 60);
-            startMin = clamp(startMin, 0, DAY_MINUTES - 15);
-            endMin = clamp(endMin, startMin + 15, DAY_MINUTES);
-            const top = (startMin / DAY_MINUTES) * (HOUR_HEIGHT_PX * 24);
-            const height = ((endMin - startMin) / DAY_MINUTES) * (HOUR_HEIGHT_PX * 24);
+            const { startMin, endMin } = dayGridSpanMinutes(
+              event.startAt,
+              event.endAt,
+              dayKey,
+              timeZone,
+            );
+            const top = (startMin / (24 * 60)) * (HOUR_HEIGHT_PX * 24);
+            const height = ((endMin - startMin) / (24 * 60)) * (HOUR_HEIGHT_PX * 24);
 
             return (
               <Box
@@ -283,6 +260,7 @@ export function ScheduleDayView({
                 <ScheduleEventBlock
                   event={event}
                   compact
+                  fillHeight
                   timeZone={timeZone}
                   rotationIndex={index}
                   onClick={() => onEventClick(event)}
