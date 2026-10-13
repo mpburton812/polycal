@@ -65,6 +65,8 @@ export const proposals = sqliteTable("proposals", {
   lastNudgeAt: text("last_nudge_at"),
   /** Optional category icon key for social events (PC-116). */
   eventIconKey: text("event_icon_key"),
+  /** Shared schedule fill for social events. Null keeps sage. Red and purple are not stored (PC-527). */
+  scheduleColor: text("schedule_color"),
   /**
    * How this row was archived: user cancel vs auto-archive (PC-410).
    * `cancelled` is excluded from the PolyCal schedule; `auto` stays visible and keeps GCal.

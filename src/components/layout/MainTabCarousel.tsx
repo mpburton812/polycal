@@ -61,10 +61,12 @@ function matchMainTab(
 export function MainTabCarousel({
   children,
   feedEnabled = true,
+  proposalsTabEnabled = true,
 }: {
   children: ReactNode;
   isAdmin?: boolean;
   feedEnabled?: boolean;
+  proposalsTabEnabled?: boolean;
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -72,9 +74,10 @@ export function MainTabCarousel({
     () =>
       MAIN_TAB_HREFS.filter((href) => {
         if (!feedEnabled && href === "/feed") return false;
+        if (!proposalsTabEnabled && href === "/proposals") return false;
         return true;
       }),
-    [feedEnabled],
+    [feedEnabled, proposalsTabEnabled],
   );
 
   const activeHref = matchMainTab(pathname, visibleHrefs);

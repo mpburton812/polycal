@@ -25,6 +25,7 @@ import type { ScheduleSliceKind } from "@/lib/schedule/slice-types";
 import { parseBatchSlotMeta } from "@/lib/proposals/batch-sleeping";
 import { formatSleepingDisplayTitle } from "@/lib/proposals/sleeping-display";
 import { isSleepingLikeType } from "@/lib/proposals/sleeping-like";
+import { sleepingCalendarDayEnd } from "@/lib/proposals/sleeping-schedule";
 import { formatTentativeTitle } from "@/lib/proposals/tentative-title";
 import {
   MASKED_TITLE,
@@ -67,6 +68,8 @@ export interface ScheduleEvent {
   occurrenceProposalId: string | null;
   /** Category icon key; omitted when content is masked (PC-116). */
   eventIconKey: string | null;
+  /** Shared event color; null keeps sage (PC-527). */
+  scheduleColor?: string | null;
   /**
    * True when this sleeping block is visible only because an accepted partner
    * is involved and the viewer is not (PC-366).
@@ -224,6 +227,7 @@ export async function listScheduleEventsAction(
       parentProposalId: proposals.parentProposalId,
       isRecurrenceParent: proposals.isRecurrenceParent,
       eventIconKey: proposals.eventIconKey,
+      scheduleColor: proposals.scheduleColor,
       tentative: proposals.tentative,
     })
     .from(proposals)
@@ -387,7 +391,13 @@ export async function listScheduleEventsAction(
     }
 
     for (const window of windows) {
-      if (!eventInRange(window.startAt, window.endAt, rangeStart, rangeEnd)) continue;
+      // A single sleeping night is stored at civil midnight. Treat it as the whole
+      // day so tonight is not dropped as a zero-length point on the range start (PC-530).
+      const rangeEndAt =
+        isSleepingLikeType(row.proposalType) && !window.endAt
+          ? sleepingCalendarDayEnd(window.startAt, viewerTimeZone).toISOString()
+          : window.endAt;
+      if (!eventInRange(window.startAt, rangeEndAt, rangeStart, rangeEnd)) continue;
 
       // Only sleeping-network masking remains (privacy levels removed PC-280).
       const maskedTitle = MASKED_TITLE;
@@ -484,6 +494,8 @@ export async function listScheduleEventsAction(
         occurrenceProposalId: window.occurrenceProposalId,
         eventIconKey:
           isContentMasked || row.proposalType !== "event" ? null : row.eventIconKey ?? null,
+        scheduleColor:
+          isContentMasked || row.proposalType !== "event" ? null : row.scheduleColor ?? null,
         isPartnerOnlySleeping,
       });
     }

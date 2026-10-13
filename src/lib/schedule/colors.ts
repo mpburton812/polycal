@@ -6,6 +6,7 @@ import {
   type ScheduleSemanticVariant,
 } from "@/theme/tokens";
 import { isSleepingLikeType } from "@/lib/proposals/sleeping-like";
+import { eventScheduleColor } from "@/lib/schedule/event-colors";
 
 /** @deprecated Use GARDEN_TOKENS / SCHEDULE_SEMANTIC_COLORS — kept for imports during migration. */
 export const SCHEDULE_COLORS = {
@@ -47,6 +48,7 @@ export function scheduleBlockVariant(event: {
 export function scheduleBlockSx(
   variant: ScheduleBlockVariant,
   rotationIndex = 0,
+  scheduleColorKey?: string | null,
 ): {
   bgcolor: string;
   color: string;
@@ -58,10 +60,15 @@ export function scheduleBlockSx(
   const semantic = SCHEDULE_SEMANTIC_COLORS[variant];
   const rotation =
     EVENT_BLOCK_ROTATIONS[rotationIndex % EVENT_BLOCK_ROTATIONS.length] ?? "0deg";
+  // Chosen color is for social events. Conflict, sleeping, and masked fills stay semantic.
+  const chosen =
+    variant === "resolved_event" || variant === "proposed"
+      ? eventScheduleColor(scheduleColorKey)
+      : null;
 
   const base = {
-    bgcolor: semantic.fill,
-    color: semantic.text,
+    bgcolor: chosen?.fill ?? semantic.fill,
+    color: chosen?.text ?? semantic.text,
     border: `2px ${semantic.borderStyle} ${GARDEN_TOKENS.ink}`,
     borderRadius: ORGANIC_RADIUS,
     transform: `rotate(${rotation})`,

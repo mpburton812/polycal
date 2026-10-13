@@ -58,7 +58,10 @@ import { useScheduleTapRouter } from "@/components/schedule/useScheduleTapRouter
 import { filterScheduleEvents } from "@/lib/schedule/filters";
 import {
   addDays,
+  localDateKey,
+  startOfCivilDayInZone,
   startOfWeekSunday,
+  zonedWallTimeToUtc,
 } from "@/lib/schedule/dates";
 import { computeScheduleFetchRange } from "@/lib/schedule/fetch-range";
 import { startOfMonth } from "@/lib/schedule/month-grid";
@@ -497,8 +500,11 @@ export function ScheduleClient({
   }
 
   function createForDay(day: Date, lockedType: "event" | "sleeping") {
-    const start = new Date(day);
-    start.setHours(lockedType === "event" ? 10 : 0, 0, 0, 0);
+    const dayKey = localDateKey(day.toISOString(), timeZone);
+    const start =
+      lockedType === "event"
+        ? zonedWallTimeToUtc(dayKey, 10, 0, 0, 0, timeZone)
+        : startOfCivilDayInZone(dayKey, timeZone);
     setDaySheetDay(null);
     openCreate({ lockedType, initialStartAt: start.toISOString() });
   }

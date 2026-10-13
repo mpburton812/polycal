@@ -18,9 +18,13 @@ PolyCal coordinates a **poly group’s shared calendar**. Most scheduling happen
 Approved proposals appear on the **Schedule** tab. Color coding:
 
 - **Yellow / striped** — proposed (tentative)
-- **Green** — approved events
-- **Blue** — approved sleeping arrangements
+- **Chosen event color** — approved social events. While setting up an event, pick sage, sky, teal, slate, olive, or sand. Everyone in the group sees that color. Red and purple are not offered: red marks conflicts and purple marks sleeping.
+- **Purple** — approved sleeping arrangements
 - **Red / warning** — conflicts or **at risk** status
+
+When an admin sets Event Types to **Just Bookings**, the **Proposals** tab is hidden. New events go on the calendar as bookings.
+
+The **+** on **Schedule** creates events and bulk sleep bookings. The **+** on **People & Places** creates only a sleeping partner proposal.
 
 The **Feed** tab is a shared network timeline (milestones + chat). When you include an `https` URL in a chat message or comment, PolyCal linkifies it and may show a Facebook-style preview card (title, description, image) from the page’s Open Graph metadata.
 

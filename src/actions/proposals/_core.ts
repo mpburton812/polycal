@@ -28,6 +28,11 @@ import {
   type ProposalType,
 } from "@/lib/db/schema";
 import { actorNotifyFields, notifyUser } from "@/lib/notifications";
+import { resolveTimezone } from "@/lib/schedule/timezone";
+import {
+  submitNotificationMessage,
+  submitResultMessage,
+} from "@/lib/proposals/submit-copy";
 import { dismissNotificationsForProposal } from "@/actions/notifications";
 import { formatConflictMessage } from "@/lib/proposals/conflict-message";
 import {
@@ -608,6 +613,7 @@ async function createRecurringChildProposals(
       bedroomIndex: parent.bedroomIndex,
       notes: parent.notes,
       eventIconKey: parent.eventIconKey,
+      scheduleColor: parent.scheduleColor,
       postingKind: parent.postingKind,
       onBehalfOfUserId: parent.onBehalfOfUserId,
       tentative: parent.tentative ?? false,
@@ -944,8 +950,10 @@ export async function createDraftProposalAction(
     reminderOffsetMinutes:
       parsed.data.proposalType === "event" ? (parsed.data.reminderOffsetMinutes ?? null) : null,
     reminderSentAt: null,
-    eventIconKey:
+      eventIconKey:
       parsed.data.proposalType === "event" ? (parsed.data.eventIconKey ?? null) : null,
+    scheduleColor:
+      parsed.data.proposalType === "event" ? (parsed.data.scheduleColor ?? null) : null,
     postToFeed: Boolean(parsed.data.postToFeed),
     postingKind,
     onBehalfOfUserId:
@@ -1194,6 +1202,10 @@ export async function updateDraftProposalAction(
         parsed.data.proposalType === "event"
           ? (parsed.data.eventIconKey ?? null)
           : null,
+      scheduleColor:
+        parsed.data.proposalType === "event"
+          ? (parsed.data.scheduleColor ?? null)
+          : null,
       postToFeed:
         parsed.data.postToFeed !== undefined
           ? Boolean(parsed.data.postToFeed)
@@ -1326,9 +1338,20 @@ export async function submitProposalAction(
     .from(proposalTimeSlots)
     .where(eq(proposalTimeSlots.proposalId, proposalId));
 
+  const [proposerTz] = await db
+    .select({ timezone: users.timezone })
+    .from(users)
+    .where(eq(users.id, proposal.proposerId))
+    .limit(1);
+  const proposerTimeZone = resolveTimezone(proposerTz?.timezone);
+  const networkSettings = proposal.networkId
+    ? await loadNetworkSettings(proposal.networkId, db)
+    : null;
+  const schedulingPosting = networkSettings?.schedulingPosting ?? "proposals_only";
+
   const schedule = autoResolve
     ? proposal.proposalType === "sleeping"
-      ? sleepingScheduleFromSlotRows(slots)
+      ? sleepingScheduleFromSlotRows(slots, proposerTimeZone)
       : scheduleFromSlots(slots)
     : { start: null, end: null };
   const now = new Date().toISOString();
@@ -1439,9 +1462,13 @@ export async function submitProposalAction(
     await scheduleCalendarSync(updatedProposal.id, "upsert");
   }
 
-  const notificationMessage = autoResolve
-    ? `Proposal "${proposal.title}" was auto-approved.`
-    : `Proposal "${proposal.title}" needs your review.`;
+  const actor = actorNotifyFields(session.user);
+  const notificationMessage = submitNotificationMessage({
+    autoResolve,
+    schedulingPosting,
+    actorDisplayName: actor.actorDisplayName,
+    title: proposal.title,
+  });
 
   // Surface the proposed time (resolved schedule, else earliest slot) and
   // location so review notifications carry richer context than the title.
@@ -1454,6 +1481,7 @@ export async function submitProposalAction(
       proposalId,
       proposalTitle: proposal.title,
       proposerId: session.user.id,
+      ...actor,
       state: nextState,
       proposalType: proposal.proposalType,
       scheduledStartAt: schedule.start ?? earliestSlot?.startAt ?? undefined,
@@ -1469,9 +1497,7 @@ export async function submitProposalAction(
 
   return {
     ok: true,
-    message: autoResolve
-      ? "Proposal auto-approved and resolved."
-      : "Proposal submitted to your network.",
+    message: submitResultMessage({ autoResolve, schedulingPosting }),
   };
 }
 
@@ -1520,6 +1546,7 @@ export async function getProposalDetailAction(
       batchEntriesJson: proposals.batchEntriesJson,
       reminderOffsetMinutes: proposals.reminderOffsetMinutes,
       eventIconKey: proposals.eventIconKey,
+      scheduleColor: proposals.scheduleColor,
       postToFeed: proposals.postToFeed,
       postingKind: proposals.postingKind,
       onBehalfOfUserId: proposals.onBehalfOfUserId,
@@ -1903,6 +1930,7 @@ export async function getProposalDetailAction(
       displayState,
       reminderOffsetMinutes: row.reminderOffsetMinutes ?? null,
       eventIconKey: row.proposalType !== "event" ? null : row.eventIconKey ?? null,
+      scheduleColor: row.proposalType !== "event" ? null : row.scheduleColor ?? null,
       postToFeed: Boolean(row.postToFeed),
       postingKind: row.postingKind === "booking" ? "booking" : "proposal",
       onBehalfOfUserId: row.onBehalfOfUserId ?? null,

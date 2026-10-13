@@ -11,6 +11,7 @@ import {
   stripConfirmedFromSleepingTitle,
 } from "@/lib/proposals/sleeping-display";
 import { isSleepingLikeType } from "@/lib/proposals/sleeping-like";
+import { googleColorIdForScheduleColor } from "@/lib/schedule/event-colors";
 
 export type ProposalRow = typeof proposals.$inferSelect;
 
@@ -29,6 +30,8 @@ export interface CalendarEventPayload {
    * Empty string for non-batch / single span; YYYY-MM-DD for each batch night.
    */
   nightKey: string;
+  /** Google Calendar colorId when the event has a shared PolyCal color (PC-527). */
+  googleColorId?: string;
 }
 
 /** Names needed to build per-night sleeping titles during sync. */
@@ -144,6 +147,9 @@ function buildSingleCalendarEventPayload(
     transparencyFree: isSleeping,
     proposalType: proposal.proposalType,
     nightKey: "",
+    googleColorId: isSleeping
+      ? undefined
+      : googleColorIdForScheduleColor(proposal.scheduleColor),
   };
 }
 

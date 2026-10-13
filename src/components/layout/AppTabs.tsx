@@ -54,13 +54,16 @@ function FeedParrotIcon({ selected }: { selected: boolean }) {
 export function AppTabs({
   isAdmin,
   feedEnabled = true,
+  proposalsTabEnabled = true,
 }: {
   isAdmin: boolean;
   feedEnabled?: boolean;
+  proposalsTabEnabled?: boolean;
 }) {
   const pathname = usePathname();
   const visibleTabs = MAIN_TAB_HREFS.filter((href) => {
     if (!feedEnabled && href === "/feed") return false;
+    if (!proposalsTabEnabled && href === "/proposals") return false;
     return true;
   }).map((href) => ({ href, ...tabMeta[href] }));
 

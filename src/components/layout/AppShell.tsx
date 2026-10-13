@@ -30,6 +30,7 @@ export function AppShell({
   notificationPrefs,
   isPlatformAdmin = false,
   feedEnabled = true,
+  proposalsTabEnabled = true,
 }: {
   children: React.ReactNode;
   currentUserId: string;
@@ -43,6 +44,8 @@ export function AppShell({
   isPlatformAdmin?: boolean;
   /** When false, Feed tab is hidden (PC-385). */
   feedEnabled?: boolean;
+  /** When false, Proposals tab is hidden (Just Bookings, PC-528). */
+  proposalsTabEnabled?: boolean;
 }) {
   const avatarSrc = avatarSrcForKey(avatarKey);
   const vapidPublicKey = getVapidPublicKey();
@@ -81,11 +84,11 @@ export function AppShell({
         maxWidth="md"
         sx={{ py: 2, pb: 10, minHeight: "calc(100vh - 120px)" }}
       >
-        <MainTabCarousel isAdmin={isAdmin} feedEnabled={feedEnabled}>
+        <MainTabCarousel isAdmin={isAdmin} feedEnabled={feedEnabled} proposalsTabEnabled={proposalsTabEnabled}>
           {children}
         </MainTabCarousel>
       </Container>
-      <AppTabs isAdmin={isAdmin} feedEnabled={feedEnabled} />
+      <AppTabs isAdmin={isAdmin} feedEnabled={feedEnabled} proposalsTabEnabled={proposalsTabEnabled} />
       <MotdPopupHost />
       {isPlatformAdmin ? <PlatformLogAlertHost /> : null}
       <CalendarSyncFailurePopupHost disabled={e2eTestMode} />
