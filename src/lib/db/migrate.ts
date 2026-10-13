@@ -27,7 +27,7 @@ export const SCHEMA_VERSION = "56";
  * SCHEMA_VERSION; do not rewrite an existing entry (PC-534).
  */
 export const SCHEMA_VERSION_SOURCE_SHA256: Record<string, string> = {
-  "56": "58e3a824b2c0de7cc844f69e0c1945570f8102cbd6f65d848665855de846e545",
+  "56": "f954395d8c405b97ae45e98e2a2465dbeefd6d563bee344f78d75923cf8c8b14",
 };
 
 /**

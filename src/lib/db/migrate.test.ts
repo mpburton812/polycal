@@ -20,7 +20,8 @@ function migrationSourceSha256(): string {
   for (const file of files) {
     hash.update(file);
     hash.update("\0");
-    hash.update(readFileSync(path.join(dir, file)));
+    // Git checkouts on Windows are CRLF; CI is LF. Hash the LF form (PC-534).
+    hash.update(readFileSync(path.join(dir, file), "utf8").replace(/\r\n/g, "\n"));
     hash.update("\0");
   }
   return hash.digest("hex");
