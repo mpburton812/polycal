@@ -470,3 +470,4 @@
 2026-10-12 | 292312e | PC-527 | share event colors and fix calendar booking UX | src/actions/proposals/_core.ts
 2026-10-12 | d24ad12 | PC-527 | patch Next and sharp audit findings | package.json
 2026-10-12 | b2768c0 | PC-531 | match cancel notices that name the actor | e2e/proposals-week-network-journey.spec.ts
+2026-10-12 | f87e1c4 | PC-534 | re-run migrations so hosted databases get schedule_color | src/lib/changelog/entries.ts
