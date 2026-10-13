@@ -28,6 +28,19 @@ import { CHANGELOG_ARCHIVE } from "./entries.archive";
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "2026.10.13a",
+    date: "2026-10-13",
+    summary:
+      "Schedule loads again after event colors: existing databases pick up proposals.schedule_color.",
+    changes: [
+      {
+        type: "fixed",
+        description:
+          "SCHEMA_VERSION 56 re-runs migrations so proposals.schedule_color exists on databases already stamped at 55. A migration-source hash fails CI when columns change without a version bump (PC-534).",
+      },
+    ],
+  },
+  {
     version: "2026.10.12a",
     date: "2026-10-12",
     summary:
