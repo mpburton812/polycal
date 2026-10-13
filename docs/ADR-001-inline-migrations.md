@@ -26,7 +26,7 @@ round-trips on warm schema versions (typical after idle serverless cold starts).
 
 - **Pros:** Single-file deploys; no migration runner in CI; Turso/libSQL friendly; matches current seed/reset workflows; cheap warm-schema cold starts.
 - **Cons:** No versioned migration history in git; reviewers must verify schema + migration module stay in sync manually; forgetting to bump `SCHEMA_VERSION` means new columns never apply on existing DBs.
-- **Mitigation:** PR checklist includes schema/migration/`SCHEMA_VERSION` pairing; Vitest + E2E catch most drift.
+- **Mitigation:** `SCHEMA_VERSION_SOURCE_SHA256` must match a hash of the migration modules (Vitest, PC-534). Fresh E2E databases still apply every `ensureColumn`, so they do not catch a missing version bump on an already-current hosted database.
 
 ## Alternatives considered
 

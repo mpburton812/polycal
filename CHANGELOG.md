@@ -4,6 +4,12 @@ All notable changes to PolyCal are documented here.
 
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [2026.10.13a] - 2026-10-13
+
+### Fixed
+
+- PC-534: Schedule no longer crashes on databases that already recorded schema version 55. SCHEMA_VERSION 56 adds `proposals.schedule_color`. CI hashes migration sources so a new column without a version bump fails unit tests.
+
 ## [2026.10.12a] - 2026-10-12
 
 ### Added
