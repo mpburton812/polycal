@@ -14,8 +14,21 @@ import { applyNetworksMigrations } from "./networks-migrations";
 import { applyMotdMigrations } from "./motd-migrations";
 import { applyPlatformLogMigrations } from "./platform-log-migrations";
 
-/** Bump whenever bootstrap DDL or *-migrations.ts modules change (PC-143). */
-export const SCHEMA_VERSION = "55";
+/**
+ * Bump whenever bootstrap DDL or *-migrations.ts modules change (PC-143).
+ * Hosted databases skip every ensureColumn when schema_meta.version already
+ * matches, so a new column without a bump never reaches production (PC-534).
+ */
+export const SCHEMA_VERSION = "56";
+
+/**
+ * SHA-256 of src/lib/db/*-migrations.ts plus bootstrap-sql.ts, keyed by the
+ * schema version that introduced that source tree. Append a key when bumping
+ * SCHEMA_VERSION; do not rewrite an existing entry (PC-534).
+ */
+export const SCHEMA_VERSION_SOURCE_SHA256: Record<string, string> = {
+  "56": "58e3a824b2c0de7cc844f69e0c1945570f8102cbd6f65d848665855de846e545",
+};
 
 /**
  * True when the stored schema version already matches the app target — skip
