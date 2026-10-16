@@ -5,6 +5,7 @@ import { z } from "zod";
 
 import type { getDb } from "@/lib/db/client";
 import { users } from "@/lib/db/schema";
+import { legacyRoleForUser } from "@/lib/networks/membership";
 
 export const setupUsernameSchema = z
   .string()
@@ -72,7 +73,7 @@ export async function resolveSetupCreator(
       .from(users)
       .where(eq(users.id, input.sessionUserId))
       .limit(1);
-    if (!row || row.status !== "active" || row.role === "passive") {
+    if (!row || row.status !== "active" || (await legacyRoleForUser(row.id)) === "passive") {
       return { ok: false, message: "Your account cannot create a network." };
     }
     if (!notificationEmailMatchesToken(row.notificationEmail, tokenEmail)) {
@@ -106,7 +107,7 @@ export async function resolveSetupCreator(
       .from(users)
       .where(eq(users.username, username))
       .limit(1);
-    if (!row || row.status !== "active" || row.role === "passive") {
+    if (!row || row.status !== "active" || (await legacyRoleForUser(row.id)) === "passive") {
       return { ok: false, message: "No active account found for that username." };
     }
     if (!notificationEmailMatchesToken(row.notificationEmail, tokenEmail)) {
@@ -168,7 +169,7 @@ export async function resolveSetupCreator(
     status: "active",
     mustChangePassword: false,
     onboardingComplete: false,
-    theme: "mint",
+    theme: "sage",
     timezone: "America/New_York",
     notificationEmail: tokenEmail,
     createdAt: now,

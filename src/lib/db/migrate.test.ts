@@ -9,12 +9,19 @@ import {
   SCHEMA_VERSION_SOURCE_SHA256,
   shouldSkipMigrations,
 } from "./migrate";
+import { needsLegacyMigrations } from "./apply-deltas";
 
 /** Same bytes the schema-version lock hashes — keep in sync with migrate.ts (PC-534). */
 function migrationSourceSha256(): string {
   const dir = path.join(process.cwd(), "src/lib/db");
   const files = readdirSync(dir)
-    .filter((name) => name.endsWith("-migrations.ts") || name === "bootstrap-sql.ts")
+    .filter(
+      (name) =>
+        name.endsWith("-migrations.ts") ||
+        name === "bootstrap-sql.ts" ||
+        name === "delta-sql.ts" ||
+        name === "apply-deltas.ts",
+    )
     .sort();
   const hash = createHash("sha256");
   for (const file of files) {
@@ -33,6 +40,12 @@ describe("shouldSkipMigrations (PC-143)", () => {
     expect(shouldSkipMigrations("21", "21")).toBe(true);
   });
 
+  it("runs legacy migrations only below the freeze ceiling (PC-537)", () => {
+    expect(needsLegacyMigrations(null)).toBe(true);
+    expect(needsLegacyMigrations("55")).toBe(true);
+    expect(needsLegacyMigrations("56")).toBe(false);
+    expect(needsLegacyMigrations(SCHEMA_VERSION)).toBe(false);
+  });
   it("runs migrations when versions differ or are missing", () => {
     expect(shouldSkipMigrations(null)).toBe(false);
     expect(shouldSkipMigrations(undefined)).toBe(false);

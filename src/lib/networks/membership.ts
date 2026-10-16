@@ -1,10 +1,11 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { randomUUID } from "crypto";
 
 import { getDb } from "@/lib/db/client";
 import { networkMembers, networks, users } from "@/lib/db/schema";
 import type { NetworkMemberRole, NetworkStatus } from "@/types/network";
-import { networkRoleToLegacyRole } from "@/types/network";
+import { primaryLegacyRole } from "@/types/network";
+import type { UserRole } from "@/types/user";
 import { isSponsorRole } from "@/lib/networks/roles";
 
 export type MembershipRow = {
@@ -87,26 +88,50 @@ export async function getMembership(
 }
 
 /**
- * Keeps users.role aligned with the user's highest active network membership
- * (denormalized cache for legacy call sites — schema refactor phase 2).
+ * Writes users.role from memberships. Queries must not read the column (PC-536).
  */
 export async function syncDenormalizedUserRole(userId: string): Promise<void> {
   const memberships = await listActiveMemberships(userId);
-  const primary =
-    memberships.find((m) => m.role === "sponsor") ??
-    memberships.find((m) => m.role === "network_admin") ??
-    memberships[0];
-  if (!primary) return;
+  const legacy = primaryLegacyRole(memberships.map((membership) => membership.role));
+  if (memberships.length === 0) return;
 
   const db = getDb();
   const now = new Date().toISOString();
   await db
     .update(users)
     .set({
-      role: networkRoleToLegacyRole(primary.role),
+      role: legacy,
       updatedAt: now,
     })
     .where(eq(users.id, userId));
+}
+
+/** Legacy session role derived only from active memberships (PC-536). */
+export async function legacyRoleForUser(userId: string): Promise<UserRole> {
+  const memberships = await listActiveMemberships(userId);
+  return primaryLegacyRole(memberships.map((membership) => membership.role));
+}
+
+/** Batch form of {@link legacyRoleForUser}. Users with no membership map to `user`. */
+export async function legacyRolesForUsers(userIds: readonly string[]): Promise<Map<string, UserRole>> {
+  const unique = [...new Set(userIds)];
+  const map = new Map<string, UserRole>();
+  if (unique.length === 0) return map;
+  const db = getDb();
+  const rows = await db
+    .select({ userId: networkMembers.userId, role: networkMembers.role })
+    .from(networkMembers)
+    .where(and(inArray(networkMembers.userId, unique), eq(networkMembers.status, "active")));
+  const grouped = new Map<string, NetworkMemberRole[]>();
+  for (const row of rows) {
+    const list = grouped.get(row.userId) ?? [];
+    list.push(row.role as NetworkMemberRole);
+    grouped.set(row.userId, list);
+  }
+  for (const id of unique) {
+    map.set(id, primaryLegacyRole(grouped.get(id) ?? []));
+  }
+  return map;
 }
 
 /**
@@ -207,10 +232,18 @@ export async function ensureOwnedPassivesInNetwork(
   networkId: string,
 ): Promise<void> {
   const db = getDb();
-  const passives = await db
+  const rows = await db
     .select({ id: users.id })
     .from(users)
-    .where(and(eq(users.ownedByUserId, ownerUserId), eq(users.role, "passive")));
+    .innerJoin(networkMembers, eq(networkMembers.userId, users.id))
+    .where(
+      and(
+        eq(users.ownedByUserId, ownerUserId),
+        eq(networkMembers.role, "passive"),
+        eq(networkMembers.status, "active"),
+      ),
+    );
+  const passives = [...new Map(rows.map((row) => [row.id, row])).values()];
 
   for (const passive of passives) {
     await upsertMembership({

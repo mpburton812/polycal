@@ -19,11 +19,18 @@ public abstract class ComposeAppWidget extends AppWidgetProvider {
     abstract int inputId();
     abstract int sendId();
     abstract int rootId();
+    /** Header label and field hint so one layout can serve both widgets (PC-541). */
+    abstract int headerLabelRes();
+    abstract int hintRes();
 
     @Override
     public void onUpdate(Context context, AppWidgetManager appWidgetManager, int[] appWidgetIds) {
         for (int appWidgetId : appWidgetIds) {
             RemoteViews views = new RemoteViews(context.getPackageName(), layoutRes());
+            views.setTextViewText(headerId(), context.getString(headerLabelRes()));
+            views.setTextViewText(inputId(), context.getString(hintRes()));
+            views.setContentDescription(headerId(), context.getString(headerLabelRes()));
+            views.setContentDescription(inputId(), context.getString(hintRes()));
             views.setOnClickPendingIntent(headerId(), launchIntent(context, appWidgetId, true, 1));
             views.setOnClickPendingIntent(rootId(), launchIntent(context, appWidgetId, true, 2));
             views.setOnClickPendingIntent(inputId(), launchIntent(context, appWidgetId, false, 3));

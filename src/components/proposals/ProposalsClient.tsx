@@ -6,7 +6,7 @@ import {
   Tabs,
 } from "@mui/material";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 
 import {
   adminDeleteProposalAction,
@@ -24,6 +24,7 @@ import { PartnershipProposalDialog } from "./PartnershipProposalDialog";
 import { PARTNERSHIP_CARD_PREFIX } from "@/lib/proposals/constants";
 import { useToast } from "@/components/providers/ToastProvider";
 import { useProposalCreate } from "@/components/proposals/ProposalCreateContext";
+import { QueryValueSync } from "@/components/navigation/useQueryValue";
 import { EmptyState, type EmptyStateIllustration } from "@/components/ui/EmptyState";
 import { GARDEN_TOKENS } from "@/theme/tokens";
 import dynamic from "next/dynamic";
@@ -108,6 +109,11 @@ export function ProposalsClient({
   const { showToast } = useToast();
   const [, startTransition] = useTransition();
   const [nudgeTargetId, setNudgeTargetId] = useState<string | null>(null);
+
+  const onProposalQuery = useCallback((id: string) => {
+    setSelectedProposalId(id);
+    setDetailOpen(true);
+  }, []);
 
   const proposals = board[activeTab];
 
@@ -215,6 +221,13 @@ export function ProposalsClient({
 
   return (
     <Box sx={{ position: "relative", pb: 10 }}>
+      <Suspense fallback={null}>
+        <QueryValueSync
+          queryKey="proposal"
+          value={detailOpen ? selectedProposalId : null}
+          onValue={onProposalQuery}
+        />
+      </Suspense>
       <Tabs
         value={activeTab}
         onChange={(_, value: TabKey) => setActiveTab(value)}

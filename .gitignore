@@ -29,6 +29,9 @@ e2e-w*.db-*
 /db-wal
 /db-shm
 
+# Local object store for avatars and feed images when BLOB_READ_WRITE_TOKEN is unset.
+.data/
+
 # OS / editor
 .DS_Store
 Thumbs.db

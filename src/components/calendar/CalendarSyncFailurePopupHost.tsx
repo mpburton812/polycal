@@ -16,6 +16,7 @@ import {
   getNotificationInboxAction,
   type NotificationItem,
 } from "@/actions/notifications";
+import { useOverlaySlot } from "@/components/overlay/OverlayQueue";
 import { GARDEN_TOKENS } from "@/theme/tokens";
 
 const POLL_MS = 60_000;
@@ -69,7 +70,8 @@ export function CalendarSyncFailurePopupHost({
   }, [pathname, refresh]);
 
   if (skip) return null;
-  if (!item) return null;
+  const showSyncFailure = useOverlaySlot("calendar-sync", Boolean(item) && !skip);
+  if (!item || !showSyncFailure) return null;
 
   async function dismissOnly() {
     if (!item || busy) return;

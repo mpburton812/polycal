@@ -12,7 +12,7 @@ import { authConfig } from "../../auth.config";
 import { getDb } from "@/lib/db/client";
 import { ensureDbReady } from "@/lib/db/ensure-ready";
 import { users, type UserRole } from "@/lib/db/schema";
-import { listActiveMemberships } from "@/lib/networks/membership";
+import { legacyRoleForUser, listActiveMemberships } from "@/lib/networks/membership";
 import { checkRateLimitPersistent } from "@/lib/rate-limit";
 import { canAccessRestrictedNetwork, isElevatedNetworkRole } from "@/lib/networks/roles";
 import type { NetworkMemberRole } from "@/types/network";
@@ -124,7 +124,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             .from(users)
             .where(eq(users.emailLoginToken, tokenHash))
             .limit(1);
-          if (!row || row.status !== "active" || row.role === "passive") {
+          if (!row || row.status !== "active" || (await legacyRoleForUser(row.id)) === "passive") {
             return null;
           }
           if (isEmailLoginTokenExpired(row.emailLoginTokenExpiresAt)) {
@@ -146,7 +146,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             id: row.id,
             name: row.displayName,
             email: row.username,
-            role: row.role,
+            role: await legacyRoleForUser(row.id),
             accountStatus: row.status,
             mustChangePassword: false,
             onboardingComplete: row.onboardingComplete,
@@ -179,7 +179,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             .from(users)
             .where(eq(users.id, String(raw.impersonateUserId)))
             .limit(1);
-          if (!row || row.status !== "active" || row.role === "passive") {
+          if (!row || row.status !== "active" || (await legacyRoleForUser(row.id)) === "passive") {
             return null;
           }
           const claims = await networkClaimsForUser(row.id);
@@ -187,7 +187,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             id: row.id,
             name: row.displayName,
             email: row.username,
-            role: row.role as UserRole,
+            role: await legacyRoleForUser(row.id),
             accountStatus: row.status,
             mustChangePassword: row.mustChangePassword,
             onboardingComplete: row.onboardingComplete,
@@ -216,7 +216,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           .where(eq(users.username, parsed.data.username.toLowerCase()))
           .limit(1);
 
-        if (!row || row.status === "deleted" || row.role === "passive") {
+        if (!row || row.status === "deleted" || (await legacyRoleForUser(row.id)) === "passive") {
           return null;
         }
 
@@ -228,7 +228,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             id: row.id,
             name: row.displayName,
             email: row.username,
-            role: row.role,
+            role: await legacyRoleForUser(row.id),
             accountStatus: "banned",
             mustChangePassword: row.mustChangePassword,
             onboardingComplete: row.onboardingComplete,
@@ -251,7 +251,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           id: row.id,
           name: row.displayName,
           email: row.username,
-          role: row.role,
+          role: await legacyRoleForUser(row.id),
           accountStatus: row.status,
           mustChangePassword: row.mustChangePassword,
           onboardingComplete: row.onboardingComplete,

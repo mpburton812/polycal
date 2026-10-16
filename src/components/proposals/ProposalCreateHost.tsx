@@ -23,6 +23,7 @@ import {
   ProposalCreateContext,
   type ProposalCreateRequest,
 } from "@/components/proposals/ProposalCreateContext";
+import { useQueryValue } from "@/components/navigation/useQueryValue";
 import { GARDEN_TOKENS } from "@/theme/tokens";
 
 const BOOTSTRAP_TTL_MS = 60_000;
@@ -162,6 +163,14 @@ export function ProposalCreateHost({
     <ProposalCreateContext.Provider value={contextValue}>
       <Suspense fallback={null}>
         <ComposeDeepLinkOpener onIntent={openFromComposeQuery} />
+        <DraftQuerySync
+          open={createOpen}
+          mode={composerMode}
+          onOpen={(mode) => {
+            setComposerMode(mode);
+            setCreateOpen(true);
+          }}
+        />
       </Suspense>
       {children}
       {hideFab ? null : (
@@ -305,6 +314,22 @@ export function ProposalCreateHost({
  * Consumes `/feed?compose=` once, opens the matching composer, then strips the query
  * so refresh/back does not re-open the dialog (PC-476).
  */
+function DraftQuerySync({
+  open,
+  mode,
+  onOpen,
+}: {
+  open: boolean;
+  mode: "manual" | "nlp";
+  onOpen: (mode: "manual" | "nlp") => void;
+}) {
+  const onValue = useCallback((next: string) => {
+    if (next === "manual" || next === "nlp") onOpen(next);
+  }, [onOpen]);
+  useQueryValue("draft", open ? mode : null, onValue);
+  return null;
+}
+
 function ComposeDeepLinkOpener({
   onIntent,
 }: {

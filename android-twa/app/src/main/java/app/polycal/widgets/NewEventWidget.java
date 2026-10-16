@@ -11,7 +11,17 @@ public class NewEventWidget extends ComposeAppWidget {
 
     @Override
     int layoutRes() {
-        return R.layout.widget_new_event;
+        return R.layout.widget_compose;
+    }
+
+    @Override
+    int headerLabelRes() {
+        return R.string.widget_new_event_label;
+    }
+
+    @Override
+    int hintRes() {
+        return R.string.widget_new_event_hint;
     }
 
     @Override

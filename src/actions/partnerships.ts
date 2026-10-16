@@ -12,7 +12,7 @@ import { getDb } from "@/lib/db/client";
 import { ensureDbReady } from "@/lib/db/ensure-ready";
 import { sleepingPartnerships, users } from "@/lib/db/schema";
 import { requireNetworkSession } from "@/lib/networks/context";
-import { getMembership } from "@/lib/networks/membership";
+import { getMembership, legacyRolesForUsers } from "@/lib/networks/membership";
 import { loadNetworkSettings } from "@/lib/networks/settings";
 import { canonicalUserPair } from "@/lib/users/pair";
 import { notifyUser } from "@/lib/notifications";
@@ -103,11 +103,11 @@ export async function listPartnershipsForUserAction(
     .select({
       id: users.id,
       displayName: users.displayName,
-      role: users.role,
     })
     .from(users)
     .where(inArray(users.id, partnerIds));
 
+  const partnerRoles = await legacyRolesForUsers(partnerRows.map((row) => row.id));
   const partnerMap = new Map(partnerRows.map((row) => [row.id, row]));
 
   const views: PartnershipView[] = [];
@@ -119,7 +119,7 @@ export async function listPartnershipsForUserAction(
       id: row.id,
       partnerId,
       partnerName: partner.displayName,
-      partnerRole: partner.role,
+      partnerRole: partnerRoles.get(partner.id) ?? "user",
       status: row.status,
       proposedById: row.proposedById,
       isIncoming: row.status === "proposed" && row.proposedById !== userId,
