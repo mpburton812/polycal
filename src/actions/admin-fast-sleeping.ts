@@ -10,6 +10,7 @@ import {
 } from "@/actions/proposals";
 import type { PersonSummary } from "@/actions/users";
 import { requireAdminAccess, withDb } from "@/lib/actions/context";
+import { legacyRoleForUser, legacyRolesForUsers } from "@/lib/networks/membership";
 import { logUserActivity } from "@/lib/audit";
 import {
   proposalComments,
@@ -71,7 +72,6 @@ export async function listSleepingPartnersForUserAction(
         id: users.id,
         username: users.username,
         displayName: users.displayName,
-        role: users.role,
         status: users.status,
         avatarKey: users.avatarKey,
         profileBio: users.profileBio,
@@ -80,8 +80,10 @@ export async function listSleepingPartnersForUserAction(
       .where(inArray(users.id, partnerIds))
       .orderBy(asc(users.displayName));
 
+    const roles = await legacyRolesForUsers(rows.map((row) => row.id));
     return rows.map((row) => ({
       ...row,
+      role: roles.get(row.id) ?? "user",
       avatarKey: row.avatarKey ?? null,
       profileBio: row.profileBio ?? null,
     }));
@@ -117,7 +119,6 @@ export async function adminFastAddSleepingPlanAction(
       .select({
         id: users.id,
         displayName: users.displayName,
-        role: users.role,
         status: users.status,
       })
       .from(users)
@@ -127,13 +128,14 @@ export async function adminFastAddSleepingPlanAction(
     if (!targetUser || targetUser.status === "deleted") {
       return { ok: false, message: "Target user not found." };
     }
-    if (targetUser.role === "passive") {
+    const targetRole = await legacyRoleForUser(targetUser.id);
+    if (targetRole === "passive") {
       return { ok: false, message: "Cannot fast-add sleeping plans for proxy users." };
     }
 
     const validation = await validateBatchSleepingEntries(db, {
       subjectUserId: targetUserId,
-      subjectRole: targetUser.role,
+      subjectRole: targetRole,
       entries: batchEntries,
       locationPolicy: "exists",
     });

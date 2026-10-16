@@ -1,6 +1,7 @@
 import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
+import { readStoredImageBytes } from "@/lib/blobs/image-bytes";
 import { auth } from "@/lib/auth";
 import { getDb } from "@/lib/db/client";
 import { ensureDbReady } from "@/lib/db/ensure-ready";
@@ -38,16 +39,19 @@ export async function GET(
 
   const db = getDb();
   const [row] = await db
-    .select({ mimeType: storedImages.mimeType, data: storedImages.data })
+    .select({
+      mimeType: storedImages.mimeType,
+      data: storedImages.data,
+      storageKey: storedImages.storageKey,
+    })
     .from(storedImages)
     .where(eq(storedImages.id, id))
     .limit(1);
 
-  if (!row?.data) {
+  const bytes = row ? await readStoredImageBytes(row) : null;
+  if (!row || !bytes) {
     return new NextResponse("Not found", { status: 404 });
   }
-
-  const bytes = row.data instanceof Buffer ? row.data : Buffer.from(row.data);
   return new NextResponse(new Uint8Array(bytes), {
     headers: {
       "Content-Type": row.mimeType,

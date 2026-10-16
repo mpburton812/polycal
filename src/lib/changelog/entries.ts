@@ -28,6 +28,39 @@ import { CHANGELOG_ARCHIVE } from "./entries.archive";
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "2026.10.16a",
+    date: "2026-10-16",
+    summary:
+      "Schema updates after version 56 are deltas only, membership is the role source, and new images can live outside the database.",
+    changes: [
+      {
+        type: "changed",
+        description:
+          "Databases already at schema 56 apply versioned SQL deltas only. Fresh and older databases still run the historical migrators, without altering poly_group. A Drizzle snapshot must match the committed schema (PC-537).",
+      },
+      {
+        type: "changed",
+        description:
+          "Authorization reads network membership. users.role is a write-only cache. Sponsor and proxy names share one map (PC-536).",
+      },
+      {
+        type: "added",
+        description:
+          "New avatars and feed images write to object storage when it is configured. Existing bytes stay in the database until a background batch copies them. Production without a blob token keeps storing bytes (PC-538).",
+      },
+      {
+        type: "changed",
+        description:
+          "Proposal and feed server actions are split into smaller modules. Draft and proposal dialogs keep a URL so refresh reopens them. Update, message-of-the-day, platform log, and calendar sync share one overlay queue (PC-539, PC-540).",
+      },
+      {
+        type: "changed",
+        description:
+          "New users start on the sage theme. Android compose widgets share one layout. The unused proxy scheduling flag is no longer read (PC-541).",
+      },
+    ],
+  },
+  {
     version: "2026.10.13a",
     date: "2026-10-13",
     summary:

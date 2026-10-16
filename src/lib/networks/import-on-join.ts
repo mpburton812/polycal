@@ -8,7 +8,7 @@ import {
   sleepingPartnerships,
   users,
 } from "@/lib/db/schema";
-import { ensureOwnedPassivesInNetwork } from "@/lib/networks/membership";
+import { ensureOwnedPassivesInNetwork, legacyRolesForUsers } from "@/lib/networks/membership";
 
 /**
  * Copies residences and/or sleeping ties with owned passives into a destination
@@ -26,8 +26,11 @@ export async function importResidencesAndPassiveSleeping(input: {
   const ownedPassives = await db
     .select({ id: users.id })
     .from(users)
-    .where(and(eq(users.ownedByUserId, input.userId), eq(users.role, "passive")));
-  const passiveIds = new Set(ownedPassives.map((p) => p.id));
+    .where(eq(users.ownedByUserId, input.userId));
+  const ownedRoles = await legacyRolesForUsers(ownedPassives.map((row) => row.id));
+  const passiveIds = new Set(
+    ownedPassives.filter((row) => ownedRoles.get(row.id) === "passive").map((row) => row.id),
+  );
 
   if (input.importResidences) {
     const myResidencies = await db

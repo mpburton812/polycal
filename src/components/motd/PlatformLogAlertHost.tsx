@@ -16,6 +16,7 @@ import {
   listUnackedPlatformLogAlertsAction,
   type PlatformLogAlert,
 } from "@/actions/platform-log";
+import { useOverlaySlot } from "@/components/overlay/OverlayQueue";
 import { GARDEN_TOKENS } from "@/theme/tokens";
 
 const POLL_MS = 45_000;
@@ -61,6 +62,7 @@ export function PlatformLogAlertHost() {
   }, [refresh]);
 
   const current = queue[0] ?? null;
+  const showAlert = useOverlaySlot("platform-log", Boolean(current));
 
   async function dismiss() {
     if (!current || acking) return;
@@ -75,7 +77,7 @@ export function PlatformLogAlertHost() {
     }
   }
 
-  if (!current) return null;
+  if (!current || !showAlert) return null;
 
   const targetLabel = current.targetDisplayName?.trim() || null;
 

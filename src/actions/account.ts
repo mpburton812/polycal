@@ -6,6 +6,7 @@ import { alias } from "drizzle-orm/sqlite-core";
 import { logUserActivity } from "@/lib/audit";
 import { requireSession, withDb } from "@/lib/actions/context";
 import { proposals, sleepingPartnerships, users } from "@/lib/db/schema";
+import { legacyRoleForUser } from "@/lib/networks/membership";
 import { checkRateLimit } from "@/lib/rate-limit";
 import {
   buildAccountExport,
@@ -47,7 +48,6 @@ export async function exportMyDataAction(): Promise<ExportMyDataResult> {
         id: users.id,
         username: users.username,
         displayName: users.displayName,
-        role: users.role,
         status: users.status,
         gender: users.gender,
         profileBio: users.profileBio,
@@ -114,7 +114,7 @@ export async function exportMyDataAction(): Promise<ExportMyDataResult> {
     const generatedAt = new Date().toISOString();
     const data = buildAccountExport({
       generatedAt,
-      profile,
+      profile: { ...profile, role: await legacyRoleForUser(userId) },
       proposals: authoredProposals,
       partnerships: partnershipRows.map((row) => ({
         partnerDisplayName:

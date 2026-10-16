@@ -11,7 +11,17 @@ public class NlpEventWidget extends ComposeAppWidget {
 
     @Override
     int layoutRes() {
-        return R.layout.widget_nlp_event;
+        return R.layout.widget_compose;
+    }
+
+    @Override
+    int headerLabelRes() {
+        return R.string.widget_nlp_label;
+    }
+
+    @Override
+    int hintRes() {
+        return R.string.widget_nlp_hint;
     }
 
     @Override

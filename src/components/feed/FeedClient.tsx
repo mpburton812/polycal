@@ -17,7 +17,7 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
-import { useCallback, useEffect, useRef, useState, useTransition } from "react";
+import { Suspense, useCallback, useEffect, useRef, useState, useTransition } from "react";
 
 import {
   deleteFeedMilestoneAction,
@@ -30,6 +30,7 @@ import {
   previewFeedLinkAction,
   uploadFeedImageAction,
 } from "@/actions/feed";
+import { QueryValueSync } from "@/components/navigation/useQueryValue";
 import {
   addProposalCommentAction,
   deleteProposalCommentAction,
@@ -362,6 +363,10 @@ export function FeedClient({
   const [sending, setSending] = useState(false);
   const [selectedProposalId, setSelectedProposalId] = useState<string | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
+  const onProposalQuery = useCallback((id: string) => {
+    setSelectedProposalId(id);
+    setDetailOpen(true);
+  }, []);
   const [commentDrafts, setCommentDrafts] = useState<Record<string, string>>({});
   const [pendingImages, setPendingImages] = useState<PendingImage[]>([]);
   const [pendingCommentImages, setPendingCommentImages] = useState<
@@ -1111,6 +1116,13 @@ export function FeedClient({
 
   return (
     <Box sx={{ pb: 18 }}>
+      <Suspense fallback={null}>
+        <QueryValueSync
+          queryKey="proposal"
+          value={detailOpen ? selectedProposalId : null}
+          onValue={onProposalQuery}
+        />
+      </Suspense>
       <Stack direction="row" alignItems="flex-start" justifyContent="space-between" sx={{ mb: 0.5 }}>
         <Typography variant="h5" component="h1" sx={brutalPageTitleSx}>
           Feed

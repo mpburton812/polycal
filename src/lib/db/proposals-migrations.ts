@@ -99,23 +99,6 @@ export async function applyProposalsMigrations(sql: Client): Promise<void> {
     WHERE added_by_user_id IS NULL
   `);
 
-  await ensureColumn(sql, "poly_group", "archive_grace_hours", "INTEGER NOT NULL DEFAULT 24");
-  await ensureColumn(sql, "poly_group", "redraft_deadline_hours", "INTEGER NOT NULL DEFAULT 24");
-  await ensureColumn(sql, "poly_group", "proposed_max_days", "INTEGER NOT NULL DEFAULT 0");
-  await ensureColumn(sql, "poly_group", "at_risk_ttl_days", "INTEGER NOT NULL DEFAULT 7");
-  await ensureColumn(
-    sql,
-    "poly_group",
-    "sleeping_partner_proposal_max_days",
-    "INTEGER NOT NULL DEFAULT 5",
-  );
-  await ensureColumn(
-    sql,
-    "poly_group",
-    "admin_can_see_uninvolved",
-    "INTEGER NOT NULL DEFAULT 1",
-  );
-
   // One-time hours → days migration (ceil(hours/24); 0 stays 0) (PC-273).
   const hoursToDaysFlag = await sql.execute(
     `SELECT value FROM schema_meta WHERE key = 'enforcement_hours_to_days_v1' LIMIT 1`,
@@ -126,7 +109,9 @@ export async function applyProposalsMigrations(sql: Client): Promise<void> {
     // migration complete so we never retry.
     const hasHourColumns =
       (await hasColumn(sql, "poly_group", "proposed_max_hours")) &&
-      (await hasColumn(sql, "poly_group", "at_risk_ttl_hours"));
+      (await hasColumn(sql, "poly_group", "at_risk_ttl_hours")) &&
+      (await hasColumn(sql, "poly_group", "proposed_max_days")) &&
+      (await hasColumn(sql, "poly_group", "at_risk_ttl_days"));
     if (hasHourColumns) {
       await sql.execute(`
         UPDATE poly_group SET

@@ -9,6 +9,8 @@ export const storedImages = sqliteTable("stored_images", {
   id: text("id").primaryKey(),
   mimeType: text("mime_type").notNull(),
   data: blob("data", { mode: "buffer" }).notNull(),
+  /** Object-storage key. Empty `data` means the bytes live outside Turso (PC-538). */
+  storageKey: text("storage_key"),
   createdAt: text("created_at").notNull(),
 });
 

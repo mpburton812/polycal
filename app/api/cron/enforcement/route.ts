@@ -30,11 +30,15 @@ export async function GET(request: Request): Promise<NextResponse> {
   const { runPendingNetworkDeletes } = await import("@/lib/networks/pending-delete");
   const pendingDeletes = await runPendingNetworkDeletes();
 
+  const { migrateStoredImagesBatch } = await import("@/lib/blobs/migrate-stored-images");
+  const imagesMigrated = await migrateStoredImagesBatch(20);
+
   return NextResponse.json({
     ok: true,
     ranAt: new Date().toISOString(),
     remindersSent,
     motdsExpired,
     pendingDeletes,
+    imagesMigrated,
   });
 }

@@ -49,7 +49,6 @@ type NetworkSettingsRow = {
   feedEnabled: boolean | null;
   pollEnabled: boolean | null;
   schedulingPosting: string | null;
-  proxySchedulingEnabled: boolean | null;
   proxySchedulingScope: string | null;
   placesMapVisibility: string;
   logTailLength: number;
@@ -82,9 +81,7 @@ function mapNetworkRow(row: NetworkSettingsRow): NetworkSettings {
     feedEnabled: row.feedEnabled ?? true,
     pollEnabled: row.pollEnabled ?? true,
     schedulingPosting: parseSchedulingPosting(row.schedulingPosting),
-    proxySchedulingEnabled: bookingsEnabled(parseSchedulingPosting(row.schedulingPosting))
-      ? true
-      : Boolean(row.proxySchedulingEnabled),
+    proxySchedulingEnabled: bookingsEnabled(parseSchedulingPosting(row.schedulingPosting)),
     proxySchedulingScope:
       row.proxySchedulingScope === "anyone" ? "anyone" : "sleeping_partners",
     placesMapVisibility: row.placesMapVisibility as PlacesMapVisibility,
@@ -119,7 +116,6 @@ const loadNetworkSettingsMemo = cache(async (networkId: string): Promise<Network
       feedEnabled: networks.feedEnabled,
       pollEnabled: networks.pollEnabled,
       schedulingPosting: networks.schedulingPosting,
-      proxySchedulingEnabled: networks.proxySchedulingEnabled,
       proxySchedulingScope: networks.proxySchedulingScope,
       placesMapVisibility: networks.placesMapVisibility,
       logTailLength: networks.logTailLength,
@@ -162,7 +158,6 @@ export async function loadNetworkSettings(
       feedEnabled: networks.feedEnabled,
       pollEnabled: networks.pollEnabled,
       schedulingPosting: networks.schedulingPosting,
-      proxySchedulingEnabled: networks.proxySchedulingEnabled,
       proxySchedulingScope: networks.proxySchedulingScope,
       placesMapVisibility: networks.placesMapVisibility,
       logTailLength: networks.logTailLength,

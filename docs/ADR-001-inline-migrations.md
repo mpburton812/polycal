@@ -22,6 +22,11 @@ We **do not** maintain Drizzle Kit migration SQL files for this project. Instead
 DDL plus all `ensureColumn` loops. This avoids ~70 serial Turso `PRAGMA table_info`
 round-trips on warm schema versions (typical after idle serverless cold starts).
 
+**Deltas after schema 56 (PC-537):** A stored version below 56 still runs the historical
+`ensureColumn` chain, then `SCHEMA_DELTA_SQL`. A stored version of 56 or newer applies
+only the versioned statements in `src/lib/db/delta-sql.ts`. `poly_group` is not altered.
+`schema-snapshot.json` must match the Drizzle schema object.
+
 ## Consequences
 
 - **Pros:** Single-file deploys; no migration runner in CI; Turso/libSQL friendly; matches current seed/reset workflows; cheap warm-schema cold starts.
