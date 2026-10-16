@@ -60,7 +60,7 @@ import {
   generateTemporaryPassword,
 } from "@/lib/users/credentials";
 import { LONG_TEXT_MAX, maxCharsMessage } from "@/lib/validation/string-limits";
-import { networkRoleToLegacyRole, type NetworkMemberRole } from "@/types/network";
+import { legacyRoleToNetworkRole, networkRoleToLegacyRole, type NetworkMemberRole } from "@/types/network";
 
 /** Shared username rules for provisioned active accounts. */
 const usernameSchema = z
@@ -1429,6 +1429,15 @@ export async function activatePassiveUserAction(
       updatedAt: now,
     })
     .where(eq(users.id, user.id));
+
+  const networkSession = await requireNetworkSession();
+  if (networkSession.ok) {
+    await upsertMembership({
+      networkId: networkSession.user.activeNetworkId,
+      userId: user.id,
+      role: legacyRoleToNetworkRole(role),
+    });
+  }
 
   await logUserActivity(
     sessionResult.user.id,

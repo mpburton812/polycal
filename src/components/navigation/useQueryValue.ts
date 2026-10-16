@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useLayoutEffect, useRef } from "react";
 
 /**
  * Mirrors a dialog flag into the URL. On the first paint, a value already in
@@ -19,7 +19,7 @@ export function useQueryValue(
   const fromQuery = searchParams.get(key);
   const adoptQuery = useRef(fromQuery != null);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (adoptQuery.current) {
       adoptQuery.current = false;
       if (fromQuery) onValue(fromQuery);
@@ -30,7 +30,10 @@ export function useQueryValue(
     if (value) params.set(key, value);
     else params.delete(key);
     const next = params.toString();
-    router.replace(next ? `${pathname}?${next}` : pathname, { scroll: false });
+    const url = next ? `${pathname}?${next}` : pathname;
+    // Synchronous so a following reload does not reopen a dialog that just closed (PC-540).
+    window.history.replaceState(window.history.state, "", url);
+    router.replace(url, { scroll: false });
   }, [fromQuery, key, onValue, pathname, router, searchParams, value]);
 }
 
