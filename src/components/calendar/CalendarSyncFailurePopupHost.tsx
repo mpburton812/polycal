@@ -69,9 +69,8 @@ export function CalendarSyncFailurePopupHost({
     void refresh();
   }, [pathname, refresh]);
 
-  if (skip) return null;
   const showSyncFailure = useOverlaySlot("calendar-sync", Boolean(item) && !skip);
-  if (!item || !showSyncFailure) return null;
+  if (skip || !item || !showSyncFailure) return null;
 
   async function dismissOnly() {
     if (!item || busy) return;
