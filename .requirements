@@ -473,3 +473,4 @@
 2026-10-12 | f87e1c4 | PC-534 | re-run migrations so hosted databases get schedule_color | src/lib/changelog/entries.ts
 2026-10-12 | 4b30a1a | PC-534 | hash migration sources with LF so CI matches Windows | src/lib/db/migrate.test.ts
 2026-10-16 | 0e02d16 | PC-535 | freeze schema deltas and read roles from membership | src/actions/account.ts
+2026-10-16 | db49ae1 | PC-535 | call the calendar overlay hook before any return | src/components/calendar/CalendarSyncFailurePopupHost.tsx
