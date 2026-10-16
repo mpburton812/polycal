@@ -17,6 +17,7 @@ import {
   users,
 } from "@/lib/db/schema";
 import { requireNetworkSession } from "@/lib/networks/context";
+import { legacyRoleForUser, legacyRolesForUsers } from "@/lib/networks/membership";
 import { loadNetworkSettings } from "@/lib/networks/settings";
 import { unionFastSleepParticipantIds } from "@/lib/proposals/batch-sleeping";
 import {
@@ -101,17 +102,18 @@ export async function createFastSleepProposalAction(
 
   return withDb(async (db) => {
     const [scheduler] = await db
-      .select({ displayName: users.displayName, role: users.role })
+      .select({ displayName: users.displayName })
       .from(users)
       .where(eq(users.id, schedulerId))
       .limit(1);
     if (!scheduler) {
       return { ok: false, message: "User not found." };
     }
+    const schedulerRole = await legacyRoleForUser(schedulerId);
 
     const validation = await validateFastSleepEntries(db, {
       schedulerId,
-      schedulerRole: scheduler.role,
+      schedulerRole,
       entries: batchEntries,
       locationPolicy: "network",
       networkId,
@@ -252,7 +254,6 @@ export async function listFastSleepGraphAction(): Promise<{
               id: users.id,
               username: users.username,
               displayName: users.displayName,
-              role: users.role,
               status: users.status,
               avatarKey: users.avatarKey,
               profileBio: users.profileBio,
@@ -261,8 +262,10 @@ export async function listFastSleepGraphAction(): Promise<{
             .where(inArray(users.id, reachableIds))
             .orderBy(asc(users.displayName));
 
+    const graphRoles = await legacyRolesForUsers(peopleRows.map((row) => row.id));
     const toPerson = (row: (typeof peopleRows)[number]): FastSleepGraphPerson => ({
       ...row,
+      role: graphRoles.get(row.id) ?? "user",
       avatarKey: row.avatarKey ?? null,
       profileBio: row.profileBio ?? null,
     });
@@ -284,13 +287,14 @@ export async function listFastSleepGraphAction(): Promise<{
             id: users.id,
             username: users.username,
             displayName: users.displayName,
-            role: users.role,
             status: users.status,
             avatarKey: users.avatarKey,
             profileBio: users.profileBio,
           })
           .from(users)
           .where(inArray(users.id, missing));
+        const extraRoles = await legacyRolesForUsers(missing);
+        for (const [id, role] of extraRoles) graphRoles.set(id, role);
         extras = extraRows.map(toPerson);
       }
       partnersByUserId[subjectId] = [...known, ...extras].sort((a, b) =>

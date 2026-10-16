@@ -16,7 +16,6 @@ import {
   castAllPollSlotVotes,
   clickCommentPost,
   createAndSubmitPoll,
-  expectResolvedProposal,
   proposalCard,
 } from "./helpers/proposals";
 import { dateOffsetIso } from "./helpers/schedule";
@@ -98,28 +97,26 @@ test.describe("Poll optional decline journey", () => {
     await openProposalCard(page, pollTitle);
     const hanDialog = page.getByRole("dialog");
     await castAllPollSlotVotes(hanDialog, "Accept", page);
-    const resolvedInDialog = await hanDialog
-      .getByText("RESOLVED", { exact: true })
-      .first()
-      .isVisible()
-      .catch(() => false);
-    if (!resolvedInDialog) {
-      const hanCloseSoft = hanDialog.getByRole("button", { name: "Close" });
-      if (await hanCloseSoft.isVisible().catch(() => false)) {
-        await hanCloseSoft.click();
+    // Resolution can land in the open dialog or on the board after it closes.
+    // A single immediate isVisible() check races the state update (PC-535).
+    await expect(async () => {
+      const dialogOpen = await hanDialog.isVisible().catch(() => false);
+      if (dialogOpen) {
+        await expect(hanDialog.getByText("RESOLVED", { exact: true }).first()).toBeVisible({
+          timeout: 4_000,
+        });
+        return;
       }
-      await expect(hanDialog).toBeHidden({ timeout: 15_000 }).catch(() => {});
-      await expectResolvedProposal(page, pollTitle);
-    } else {
-      await expect(hanDialog.getByText("RESOLVED", { exact: true }).first()).toBeVisible({
-        timeout: 25_000,
+      await selectProposalTab(page, "Resolved");
+      await expect(page.getByRole("heading", { name: pollTitle, level: 2 }).first()).toBeVisible({
+        timeout: 4_000,
       });
-      const hanClose = hanDialog.getByRole("button", { name: "Close" });
-      if (await hanClose.isVisible().catch(() => false)) {
-        await hanClose.click();
-      }
-      await expect(hanDialog).toBeHidden({ timeout: 25_000 }).catch(() => {});
+    }).toPass({ timeout: 40_000 });
+    const hanClose = hanDialog.getByRole("button", { name: "Close" });
+    if (await hanClose.isVisible().catch(() => false)) {
+      await hanClose.click();
     }
+    await expect(hanDialog).toBeHidden({ timeout: 25_000 }).catch(() => {});
 
     // —— Proposer sees the decline and the message ——
     await logout(page);

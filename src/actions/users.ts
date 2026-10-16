@@ -30,6 +30,7 @@ import {
 } from "@/lib/db/schema";
 import {
   getMembership,
+  legacyRoleForUser,
   listActiveMemberships,
   removeMembership,
   upsertMembership,
@@ -59,7 +60,7 @@ import {
   generateTemporaryPassword,
 } from "@/lib/users/credentials";
 import { LONG_TEXT_MAX, maxCharsMessage } from "@/lib/validation/string-limits";
-import type { NetworkMemberRole } from "@/types/network";
+import { legacyRoleToNetworkRole, networkRoleToLegacyRole, type NetworkMemberRole } from "@/types/network";
 
 /** Shared username rules for provisioned active accounts. */
 const usernameSchema = z
@@ -443,7 +444,7 @@ export async function listPeopleAction(): Promise<PersonSummary[]> {
   }
   const db = getDb();
   const memberRows = await db
-    .select({ userId: networkMembers.userId })
+    .select({ userId: networkMembers.userId, role: networkMembers.role })
     .from(networkMembers)
     .where(
       and(
@@ -453,13 +454,15 @@ export async function listPeopleAction(): Promise<PersonSummary[]> {
     );
   const memberIds = memberRows.map((r) => r.userId);
   if (memberIds.length === 0) return [];
+  const roleByUser = new Map(
+    memberRows.map((row) => [row.userId, networkRoleToLegacyRole(row.role as NetworkMemberRole)]),
+  );
 
   const rows = await db
     .select({
       id: users.id,
       username: users.username,
       displayName: users.displayName,
-      role: users.role,
       status: users.status,
       avatarKey: users.avatarKey,
       profileBio: users.profileBio,
@@ -470,6 +473,7 @@ export async function listPeopleAction(): Promise<PersonSummary[]> {
 
   return rows.map((row) => ({
     ...row,
+    role: roleByUser.get(row.id) ?? "user",
     avatarKey: row.avatarKey ?? null,
     profileBio: row.profileBio?.trim() || null,
   }));
@@ -532,7 +536,7 @@ export async function createActiveUserAction(
     status: "active",
     mustChangePassword: true,
     avatarKey: parsed.data.avatarKey ?? "bird_blue",
-    theme: "mint",
+    theme: "sage",
     loginCount: 0,
     onboardingComplete: false,
     notificationEmail,
@@ -731,7 +735,7 @@ export async function createPassiveUserAction(
     status: "active",
     mustChangePassword: false,
     avatarKey: parsed.data.avatarKey ?? "bird_green",
-    theme: "mint",
+    theme: "sage",
     loginCount: 0,
     ownedByUserId: sessionResult.user.id,
     createdAt: now,
@@ -1081,12 +1085,20 @@ export async function deleteMyAccountAction(
     return { ok: false, message: "Password is incorrect." };
   }
 
-  // Losing the last administrator would leave the group with no way to manage accounts.
-  if (user.role === "admin") {
+  const legacyRole = await legacyRoleForUser(user.id);
+  if (legacyRole === "admin") {
     const remainingAdmins = await db
-      .select({ id: users.id })
-      .from(users)
-      .where(and(eq(users.role, "admin"), eq(users.status, "active"), ne(users.id, user.id)));
+      .select({ id: networkMembers.userId })
+      .from(networkMembers)
+      .innerJoin(users, eq(users.id, networkMembers.userId))
+      .where(
+        and(
+          inArray(networkMembers.role, ["sponsor", "network_admin"]),
+          eq(networkMembers.status, "active"),
+          eq(users.status, "active"),
+          ne(networkMembers.userId, user.id),
+        ),
+      );
     if (remainingAdmins.length === 0) {
       return {
         ok: false,
@@ -1129,7 +1141,6 @@ export async function listAdminUsersAction(): Promise<AdminUserRow[]> {
       displayName: users.displayName,
       username: users.username,
       gender: users.gender,
-      role: users.role,
       status: users.status,
       lastLoginAt: users.lastLoginAt,
       loginCount: users.loginCount,
@@ -1153,7 +1164,7 @@ export async function listAdminUsersAction(): Promise<AdminUserRow[]> {
     displayName: row.displayName,
     username: row.username,
     gender: row.gender,
-    role: row.role,
+    role: networkRoleToLegacyRole(row.networkRole as NetworkMemberRole),
     status: row.status,
     lastLoginAt: row.lastLoginAt,
     loginCount: row.loginCount,
@@ -1418,6 +1429,15 @@ export async function activatePassiveUserAction(
       updatedAt: now,
     })
     .where(eq(users.id, user.id));
+
+  const networkSession = await requireNetworkSession();
+  if (networkSession.ok) {
+    await upsertMembership({
+      networkId: networkSession.user.activeNetworkId,
+      userId: user.id,
+      role: legacyRoleToNetworkRole(role),
+    });
+  }
 
   await logUserActivity(
     sessionResult.user.id,

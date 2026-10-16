@@ -3,6 +3,7 @@
 import { Box, CircularProgress, Typography } from "@mui/material";
 import { useEffect, useState } from "react";
 
+import { useOverlaySlot } from "@/components/overlay/OverlayQueue";
 import { fontFamilies } from "@/theme/fonts";
 import { GARDEN_TOKENS } from "@/theme/tokens";
 
@@ -73,7 +74,8 @@ export function PwaUpdateGate() {
     };
   }, []);
 
-  if (!updating) return null;
+  const showUpdate = useOverlaySlot("pwa-update", updating);
+  if (!showUpdate) return null;
 
   return (
     <Box

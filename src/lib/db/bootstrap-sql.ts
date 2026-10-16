@@ -9,7 +9,7 @@ CREATE TABLE IF NOT EXISTS users (
   status TEXT NOT NULL DEFAULT 'active',
   must_change_password INTEGER NOT NULL DEFAULT 0,
   avatar_key TEXT,
-  theme TEXT NOT NULL DEFAULT 'mint',
+  theme TEXT NOT NULL DEFAULT 'sage',
   login_count INTEGER NOT NULL DEFAULT 0,
   last_login_at TEXT,
   created_at TEXT NOT NULL,

@@ -28,6 +28,7 @@ import {
 import { isCroppedAvatarLargeEnough } from "@/lib/avatars/crop";
 import { getDb } from "@/lib/db/client";
 import { ensureDbReady } from "@/lib/db/ensure-ready";
+import { storedImageInsert } from "@/lib/blobs/image-bytes";
 import { storedImages, users } from "@/lib/db/schema";
 import { checkRateLimit } from "@/lib/rate-limit";
 import {
@@ -265,12 +266,14 @@ export async function uploadCustomAvatarAction(
       .limit(1);
 
     const buffer = Buffer.from(await file.arrayBuffer());
-    await db.insert(storedImages).values({
-      id: imageId,
-      mimeType: file.type,
-      data: buffer,
-      createdAt: now,
-    });
+    await db.insert(storedImages).values(
+      await storedImageInsert({
+        id: imageId,
+        mimeType: file.type,
+        bytes: buffer,
+        createdAt: now,
+      }),
+    );
 
     await db
       .update(users)

@@ -7,46 +7,7 @@ export async function applyAdminMigrations(sql: Client): Promise<void> {
   // PC-332: retired columns (group name proposals, power management, per-level event
   // privacy, sleeping network visibility) are no longer ensured. Existing DBs keep the
   // columns; fresh DBs simply omit them. The app no longer reads them.
-  await ensureColumn(sql, "poly_group", "audit_log_visibility", "TEXT NOT NULL DEFAULT 'admin_only'");
-  await ensureColumn(sql, "poly_group", "hide_sleeping_arrangements", "INTEGER NOT NULL DEFAULT 0");
-  await ensureColumn(
-    sql,
-    "poly_group",
-    "see_partners_sleeping_arrangements",
-    "INTEGER NOT NULL DEFAULT 0",
-  );
-  await ensureColumn(
-    sql,
-    "poly_group",
-    "fast_sleep_enabled",
-    "INTEGER NOT NULL DEFAULT 1",
-  );
-  await ensureColumn(
-    sql,
-    "poly_group",
-    "feed_enabled",
-    "INTEGER NOT NULL DEFAULT 1",
-  );
-  await ensureColumn(sql, "poly_group", "poll_enabled", "INTEGER NOT NULL DEFAULT 1");
-  await ensureColumn(
-    sql,
-    "poly_group",
-    "scheduling_posting",
-    "TEXT NOT NULL DEFAULT 'proposals_only'",
-  );
-  await ensureColumn(
-    sql,
-    "poly_group",
-    "proxy_scheduling_enabled",
-    "INTEGER NOT NULL DEFAULT 0",
-  );
-  await ensureColumn(
-    sql,
-    "poly_group",
-    "proxy_scheduling_scope",
-    "TEXT NOT NULL DEFAULT 'sleeping_partners'",
-  );
-  await ensureColumn(sql, "poly_group", "places_map_visibility", "TEXT NOT NULL DEFAULT 'all'");
+  // poly_group is no longer altered. Settings live on networks (PC-537).
 
   await sql.execute(`
     CREATE TABLE IF NOT EXISTS network_chat_messages (
@@ -64,7 +25,7 @@ export async function applyAdminMigrations(sql: Client): Promise<void> {
   const mapDefaultFlag = await sql.execute(
     `SELECT value FROM schema_meta WHERE key = 'places_map_default_all_v1' LIMIT 1`,
   );
-  if (mapDefaultFlag.rows.length === 0) {
+  if (mapDefaultFlag.rows.length === 0 && (await hasColumn(sql, "poly_group", "places_map_visibility"))) {
     await sql.execute(
       `UPDATE poly_group SET places_map_visibility = 'all' WHERE places_map_visibility = 'none'`,
     );
@@ -74,9 +35,6 @@ export async function applyAdminMigrations(sql: Client): Promise<void> {
       args: [],
     });
   }
-
-  await ensureColumn(sql, "poly_group", "log_tail_length", "INTEGER NOT NULL DEFAULT 100");
-  await ensureColumn(sql, "poly_group", "onboarding_welcome_message", "TEXT");
 
   await ensureColumn(sql, "users", "gender", "TEXT");
   await ensureColumn(sql, "users", "notification_email", "TEXT");
@@ -113,6 +71,11 @@ export async function applyAdminMigrations(sql: Client): Promise<void> {
   await ensureColumn(sql, "sleeping_partnerships", "passive_auto_accepted", "INTEGER NOT NULL DEFAULT 0");
   await ensureColumn(sql, "sleeping_partnerships", "initiated_by_user_id", "TEXT");
   await ensureColumn(sql, "location_residents", "proposal_id", "TEXT");
+}
+
+async function hasColumn(sql: Client, table: string, column: string): Promise<boolean> {
+  const info = await sql.execute(`PRAGMA table_info(${table})`);
+  return info.rows.some((row) => row.name === column);
 }
 
 async function ensureColumn(

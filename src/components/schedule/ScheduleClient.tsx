@@ -20,6 +20,7 @@ import {
 import dynamic from "next/dynamic";
 import { usePathname } from "next/navigation";
 import {
+  Suspense,
   useCallback,
   useEffect,
   useLayoutEffect,
@@ -35,6 +36,7 @@ import {
   type SchedulePayload,
 } from "@/actions/schedule";
 import type { PersonSummary } from "@/actions/users";
+import { QueryValueSync } from "@/components/navigation/useQueryValue";
 import { useProposalCreate } from "@/components/proposals/ProposalCreateContext";
 import { ScheduleAgendaView } from "@/components/schedule/ScheduleAgendaView";
 import { ScheduleDaySheet } from "@/components/schedule/ScheduleDaySheet";
@@ -177,6 +179,12 @@ export function ScheduleClient({
     openRelatedProposal,
     openDetachedProposal,
   } = useScheduleTapRouter();
+  const onProposalQuery = useCallback(
+    (id: string) => {
+      openRelatedProposal(id);
+    },
+    [openRelatedProposal],
+  );
 
   const weekStart = useMemo(
     () => startOfWeekSunday(new Date(viewState.weekStartIso), timeZone),
@@ -533,6 +541,13 @@ export function ScheduleClient({
       data-segment-count={1}
       aria-busy={pending}
     >
+      <Suspense fallback={null}>
+        <QueryValueSync
+          queryKey="proposal"
+          value={dialogState.detailOpen ? dialogState.selectedProposalId : null}
+          onValue={onProposalQuery}
+        />
+      </Suspense>
       <Box
         sx={{ display: "none" }}
         data-testid="schedule-range-start"

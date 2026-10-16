@@ -6,6 +6,7 @@ import { adminAccessFromSessionUser } from "@/lib/admin-access";
 import { canViewerAccessCustomAvatar } from "@/lib/avatars/access";
 import { getDb } from "@/lib/db/client";
 import { ensureDbReady } from "@/lib/db/ensure-ready";
+import { readStoredImageBytes } from "@/lib/blobs/image-bytes";
 import { storedImages, users } from "@/lib/db/schema";
 
 /**
@@ -51,16 +52,19 @@ export async function GET(
   }
 
   const [row] = await db
-    .select({ mimeType: storedImages.mimeType, data: storedImages.data })
+    .select({
+      mimeType: storedImages.mimeType,
+      data: storedImages.data,
+      storageKey: storedImages.storageKey,
+    })
     .from(storedImages)
     .where(eq(storedImages.id, id))
     .limit(1);
 
-  if (!row?.data) {
+  const bytes = row ? await readStoredImageBytes(row) : null;
+  if (!row || !bytes) {
     return new NextResponse("Not found", { status: 404 });
   }
-
-  const bytes = row.data instanceof Buffer ? row.data : Buffer.from(row.data);
 
   // Stored image ids are content-addressed at upload, so a weak ETag over the
   // id + byte length lets browsers revalidate with a 304 instead of re-reading

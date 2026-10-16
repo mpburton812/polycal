@@ -16,6 +16,7 @@ import {
   getActiveMotdsForViewerAction,
 } from "@/actions/motd";
 import type { MotdPublic } from "@/lib/motd/types";
+import { useOverlaySlot } from "@/components/overlay/OverlayQueue";
 import { GARDEN_TOKENS } from "@/theme/tokens";
 
 const POLL_MS = 45_000;
@@ -57,6 +58,7 @@ export function MotdPopupHost() {
   }, [pathname, refresh]);
 
   const current = queue[0] ?? null;
+  const showMotd = useOverlaySlot("motd", Boolean(current));
 
   async function dismiss() {
     if (!current || acking) return;
@@ -71,7 +73,7 @@ export function MotdPopupHost() {
     }
   }
 
-  if (!current) return null;
+  if (!current || !showMotd) return null;
 
   const title =
     current.scope === "platform" ? "Platform message" : "Network message";

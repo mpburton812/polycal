@@ -32,6 +32,8 @@ import {
   moderationExpiresFromDays,
 } from "@/lib/users/moderation";
 import { LONG_TEXT_MAX, maxCharsMessage } from "@/lib/validation/string-limits";
+import type { NetworkMemberRole } from "@/types/network";
+import { networkRoleToLegacyRole, primaryLegacyRole } from "@/types/network";
 import type { UserRole } from "@/types/user";
 
 const moderationInputSchema = z.object({
@@ -111,7 +113,6 @@ export async function getNetworkDetailReportAction(
       networkRole: networkMembers.role,
       username: users.username,
       displayName: users.displayName,
-      userRole: users.role,
       status: users.status,
     })
     .from(networkMembers)
@@ -188,7 +189,7 @@ export async function getNetworkDetailReportAction(
         username: row.username,
         displayName: row.displayName,
         networkRole: row.networkRole,
-        userRole: formatUserRole(row.userRole),
+        userRole: formatUserRole(networkRoleToLegacyRole(row.networkRole as NetworkMemberRole)),
         status: row.status,
       })),
       calendarEventCount: Number(calendarRow?.count ?? 0),
@@ -258,7 +259,6 @@ export async function listPlatformUsersAction(): Promise<PlatformUserRow[]> {
       username: users.username,
       displayName: users.displayName,
       status: users.status,
-      role: users.role,
       isPlatformAdmin: users.isPlatformAdmin,
       avatarKey: users.avatarKey,
       moderationReason: users.moderationReason,
@@ -297,8 +297,11 @@ export async function listPlatformUsersAction(): Promise<PlatformUserRow[]> {
       : memberNetworks.some((m) => m.role === "network_admin")
         ? "network_admin"
         : undefined;
+    const legacyRole = primaryLegacyRole(
+      memberNetworks.map((member) => member.role as NetworkMemberRole),
+    );
     const accessLevel = resolveAccessLevel({
-      role: row.role,
+      role: legacyRole,
       isPlatformAdmin: row.isPlatformAdmin === true,
       networkRole,
     });
@@ -307,7 +310,7 @@ export async function listPlatformUsersAction(): Promise<PlatformUserRow[]> {
       username: row.username,
       displayName: row.displayName,
       status: row.status,
-      role: row.role as UserRole,
+      role: legacyRole,
       isPlatformAdmin: row.isPlatformAdmin === true,
       accessLevel,
       accessLevelLabel: formatAccessLevel(accessLevel),
@@ -350,7 +353,9 @@ export async function setUserAccessLevelAction(
     return { ok: false, message: "User not found." };
   }
 
-  if (user.role === "passive") {
+  const memberships = await listActiveMemberships(user.id);
+  const legacyRole = primaryLegacyRole(memberships.map((membership) => membership.role));
+  if (legacyRole === "passive") {
     return {
       ok: false,
       message: "Activate the proxy user before changing access level.",
@@ -358,7 +363,6 @@ export async function setUserAccessLevelAction(
   }
 
   const now = new Date().toISOString();
-  const memberships = await listActiveMemberships(user.id);
   const isSponsor = memberships.some((m) => m.role === "sponsor");
   if (isSponsor && parsed.data.accessLevel === "user") {
     return { ok: false, message: "The Sponsor cannot be demoted." };
@@ -371,7 +375,7 @@ export async function setUserAccessLevelAction(
       ? "admin"
       : parsed.data.accessLevel === "user"
         ? "user"
-        : user.role === "admin"
+        : legacyRole === "admin"
           ? "admin"
           : "user";
 
@@ -401,7 +405,7 @@ export async function setUserAccessLevelAction(
       userId: user.id,
       accessLevel: parsed.data.accessLevel,
       previous: {
-        role: user.role,
+        role: legacyRole,
         isPlatformAdmin: user.isPlatformAdmin === true,
       },
     }),

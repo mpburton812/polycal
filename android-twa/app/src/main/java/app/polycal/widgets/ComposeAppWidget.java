@@ -5,6 +5,7 @@ import android.appwidget.AppWidgetManager;
 import android.appwidget.AppWidgetProvider;
 import android.content.Context;
 import android.content.Intent;
+import android.os.Build;
 import android.widget.RemoteViews;
 
 /**
@@ -19,11 +20,22 @@ public abstract class ComposeAppWidget extends AppWidgetProvider {
     abstract int inputId();
     abstract int sendId();
     abstract int rootId();
+    /** Header label and field hint so one layout can serve both widgets (PC-541). */
+    abstract int headerLabelRes();
+    abstract int hintRes();
 
     @Override
     public void onUpdate(Context context, AppWidgetManager appWidgetManager, int[] appWidgetIds) {
         for (int appWidgetId : appWidgetIds) {
             RemoteViews views = new RemoteViews(context.getPackageName(), layoutRes());
+            views.setTextViewText(headerId(), context.getString(headerLabelRes()));
+            views.setTextViewText(inputId(), context.getString(hintRes()));
+            // RemoteViews.setContentDescription exists only on API 31+. Calling it
+            // earlier throws and kills the process when the launcher refreshes widgets.
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                views.setContentDescription(headerId(), context.getString(headerLabelRes()));
+                views.setContentDescription(inputId(), context.getString(hintRes()));
+            }
             views.setOnClickPendingIntent(headerId(), launchIntent(context, appWidgetId, true, 1));
             views.setOnClickPendingIntent(rootId(), launchIntent(context, appWidgetId, true, 2));
             views.setOnClickPendingIntent(inputId(), launchIntent(context, appWidgetId, false, 3));
