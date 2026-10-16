@@ -474,3 +474,4 @@
 2026-10-12 | 4b30a1a | PC-534 | hash migration sources with LF so CI matches Windows | src/lib/db/migrate.test.ts
 2026-10-16 | 0e02d16 | PC-535 | freeze schema deltas and read roles from membership | src/actions/account.ts
 2026-10-16 | db49ae1 | PC-535 | call the calendar overlay hook before any return | src/components/calendar/CalendarSyncFailurePopupHost.tsx
+2026-10-16 | a227cbf | PC-535 | clear dialog URLs before reload and promote activated proxies | src/actions/users.ts
