@@ -3,6 +3,7 @@
 import CssBaseline from "@mui/material/CssBaseline";
 import { ThemeProvider } from "@mui/material/styles";
 
+import { OverlayProvider } from "@/components/overlay/OverlayQueue";
 import { PwaUpdateGate } from "@/components/pwa/PwaUpdateGate";
 import { AuthSessionProvider } from "@/components/providers/AuthSessionProvider";
 import { DatePickerProvider } from "@/components/providers/DatePickerProvider";
@@ -19,8 +20,10 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
         <DatePickerProvider>
           <ToastProvider>
             <AuthSessionProvider>
-              <PwaUpdateGate />
-              {children}
+              <OverlayProvider>
+                <PwaUpdateGate />
+                {children}
+              </OverlayProvider>
             </AuthSessionProvider>
           </ToastProvider>
         </DatePickerProvider>

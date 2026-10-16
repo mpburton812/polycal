@@ -15,6 +15,7 @@ import { getClientIpFromHeaders } from "@/lib/http/client-ip";
 import { getDb } from "@/lib/db/client";
 import { ensureDbReady } from "@/lib/db/ensure-ready";
 import { users } from "@/lib/db/schema";
+import { legacyRoleForUser } from "@/lib/networks/membership";
 import { checkRateLimitPersistent } from "@/lib/rate-limit";
 import { type ActionFailure, type ActionResult } from "@/lib/actions/result";
 
@@ -70,7 +71,6 @@ export async function requestPasswordResetAction(
     .select({
       id: users.id,
       status: users.status,
-      role: users.role,
       notificationEmail: users.notificationEmail,
       emailVerifiedAt: users.emailVerifiedAt,
     })
@@ -82,7 +82,7 @@ export async function requestPasswordResetAction(
   if (
     user &&
     user.status === "active" &&
-    user.role !== "passive" &&
+    (await legacyRoleForUser(user.id)) !== "passive" &&
     user.notificationEmail &&
     user.emailVerifiedAt
   ) {

@@ -95,19 +95,7 @@ export async function applyNetworksMigrations(sql: Client): Promise<void> {
   );
   await ensureColumn(
     sql,
-    "poly_group",
-    "see_partners_sleeping_arrangements",
-    "INTEGER NOT NULL DEFAULT 0",
-  );
-  await ensureColumn(
-    sql,
     "networks",
-    "fast_sleep_enabled",
-    "INTEGER NOT NULL DEFAULT 1",
-  );
-  await ensureColumn(
-    sql,
-    "poly_group",
     "fast_sleep_enabled",
     "INTEGER NOT NULL DEFAULT 1",
   );
@@ -119,19 +107,7 @@ export async function applyNetworksMigrations(sql: Client): Promise<void> {
   );
   await ensureColumn(
     sql,
-    "poly_group",
-    "feed_enabled",
-    "INTEGER NOT NULL DEFAULT 1",
-  );
-  await ensureColumn(
-    sql,
     "networks",
-    "poll_enabled",
-    "INTEGER NOT NULL DEFAULT 1",
-  );
-  await ensureColumn(
-    sql,
-    "poly_group",
     "poll_enabled",
     "INTEGER NOT NULL DEFAULT 1",
   );
@@ -143,19 +119,7 @@ export async function applyNetworksMigrations(sql: Client): Promise<void> {
   );
   await ensureColumn(
     sql,
-    "poly_group",
-    "scheduling_posting",
-    "TEXT NOT NULL DEFAULT 'proposals_only'",
-  );
-  await ensureColumn(
-    sql,
     "networks",
-    "proxy_scheduling_enabled",
-    "INTEGER NOT NULL DEFAULT 0",
-  );
-  await ensureColumn(
-    sql,
-    "poly_group",
     "proxy_scheduling_enabled",
     "INTEGER NOT NULL DEFAULT 0",
   );
@@ -165,13 +129,6 @@ export async function applyNetworksMigrations(sql: Client): Promise<void> {
     "proxy_scheduling_scope",
     "TEXT NOT NULL DEFAULT 'sleeping_partners'",
   );
-  await ensureColumn(
-    sql,
-    "poly_group",
-    "proxy_scheduling_scope",
-    "TEXT NOT NULL DEFAULT 'sleeping_partners'",
-  );
-
   await sql.execute(
     `CREATE INDEX IF NOT EXISTS idx_locations_network ON locations(network_id)`,
   );
@@ -202,18 +159,22 @@ async function backfillBookingEnums(sql: Client): Promise<void> {
     SET scheduling_posting = 'proposals_and_bookings'
     WHERE scheduling_posting = 'proposals_and_schedule'
   `);
-  await sql.execute(`
-    UPDATE poly_group
-    SET scheduling_posting = 'proposals_and_bookings'
-    WHERE scheduling_posting = 'proposals_and_schedule'
-  `);
+  if (await hasColumn(sql, "poly_group", "scheduling_posting")) {
+    await sql.execute(`
+      UPDATE poly_group
+      SET scheduling_posting = 'proposals_and_bookings'
+      WHERE scheduling_posting = 'proposals_and_schedule'
+    `);
+    if (await hasColumn(sql, "poly_group", "proxy_scheduling_enabled")) {
+      await sql.execute(`
+        UPDATE poly_group
+        SET proxy_scheduling_enabled = 1
+        WHERE scheduling_posting = 'proposals_and_bookings'
+      `);
+    }
+  }
   await sql.execute(`
     UPDATE networks
-    SET proxy_scheduling_enabled = 1
-    WHERE scheduling_posting = 'proposals_and_bookings'
-  `);
-  await sql.execute(`
-    UPDATE poly_group
     SET proxy_scheduling_enabled = 1
     WHERE scheduling_posting = 'proposals_and_bookings'
   `);
@@ -479,6 +440,11 @@ async function backfillSponsors(sql: Client): Promise<void> {
       args: [now, networkId, sponsorUserId],
     });
   }
+}
+
+async function hasColumn(sql: Client, table: string, column: string): Promise<boolean> {
+  const info = await sql.execute(`PRAGMA table_info(${table})`);
+  return info.rows.some((row) => row.name === column);
 }
 
 async function ensureColumn(

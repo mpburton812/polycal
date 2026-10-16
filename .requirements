@@ -472,3 +472,7 @@
 2026-10-12 | b2768c0 | PC-531 | match cancel notices that name the actor | e2e/proposals-week-network-journey.spec.ts
 2026-10-12 | f87e1c4 | PC-534 | re-run migrations so hosted databases get schedule_color | src/lib/changelog/entries.ts
 2026-10-12 | 4b30a1a | PC-534 | hash migration sources with LF so CI matches Windows | src/lib/db/migrate.test.ts
+2026-10-16 | 0e02d16 | PC-535 | freeze schema deltas and read roles from membership | src/actions/account.ts
+2026-10-16 | db49ae1 | PC-535 | call the calendar overlay hook before any return | src/components/calendar/CalendarSyncFailurePopupHost.tsx
+2026-10-16 | a227cbf | PC-535 | clear dialog URLs before reload and promote activated proxies | src/actions/users.ts
+2026-10-16 | c2a7a07 | PC-535 | do not set orientation on Android 8.0 launch | android-twa/app/src/main/java/app/polycal/LauncherActivity.java

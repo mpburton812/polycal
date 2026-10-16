@@ -13,6 +13,7 @@ import { hashLinkToken } from "@/lib/crypto/token-hash";
 import { getDb } from "@/lib/db/client";
 import { ensureDbReady } from "@/lib/db/ensure-ready";
 import { users } from "@/lib/db/schema";
+import { legacyRoleForUser } from "@/lib/networks/membership";
 import { newEmailLoginToken } from "@/lib/email/credentials";
 import { sendEmail } from "@/lib/email/send";
 import { buildEmailLoginContent } from "@/lib/email/templates";
@@ -56,7 +57,6 @@ export async function requestEmailLoginAction(
     .select({
       id: users.id,
       status: users.status,
-      role: users.role,
       notificationEmail: users.notificationEmail,
       emailVerifiedAt: users.emailVerifiedAt,
     })
@@ -67,7 +67,7 @@ export async function requestEmailLoginAction(
   if (
     user &&
     user.status === "active" &&
-    user.role !== "passive" &&
+    (await legacyRoleForUser(user.id)) !== "passive" &&
     user.notificationEmail &&
     user.emailVerifiedAt
   ) {

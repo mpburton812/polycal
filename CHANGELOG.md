@@ -4,6 +4,20 @@ All notable changes to PolyCal are documented here.
 
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [2026.10.16a] - 2026-10-16
+
+### Changed
+
+- PC-537: Databases already at schema 56 apply versioned SQL deltas only. Older databases still run historical migrators, and those migrators no longer alter `poly_group`.
+- PC-536: Authorization reads network membership. `users.role` is only a cached copy.
+- PC-539: Proposal and feed server actions are split into smaller modules.
+- PC-540: Opening a draft or a proposal keeps `draft` or `proposal` in the URL. App overlays share one queue.
+- PC-541: New users start on sage. The Android new-event and natural-language widgets share one layout.
+
+### Added
+
+- PC-538: New avatars and feed images can be stored outside the database. Existing bytes remain until copied. Production without a blob token still stores bytes in the database.
+
 ## [2026.10.13a] - 2026-10-13
 
 ### Fixed

@@ -12,6 +12,7 @@ import {
 import { getDb } from "@/lib/db/client";
 import { ensureDbReady } from "@/lib/db/ensure-ready";
 import { users } from "@/lib/db/schema";
+import { legacyRoleForUser } from "@/lib/networks/membership";
 import type { UserRole } from "@/types/user";
 
 export type { AdminApiUser };
@@ -43,7 +44,6 @@ export async function requireAdminApiAccess(
     const [row] = await db
       .select({
         id: users.id,
-        role: users.role,
         status: users.status,
         displayName: users.displayName,
         isPlatformAdmin: users.isPlatformAdmin,
@@ -52,11 +52,14 @@ export async function requireAdminApiAccess(
       .where(eq(users.id, tokenUser.id))
       .limit(1);
 
-    if (
-      !row ||
-      row.status !== "active" ||
-      !(await userHasAdminAccess(adminAccessFromUserRow(row)))
-    ) {
+    if (!row || row.status !== "active") {
+      return {
+        ok: false,
+        response: NextResponse.json({ error: "Forbidden" }, { status: 403 }),
+      };
+    }
+    const role = await legacyRoleForUser(row.id);
+    if (!(await userHasAdminAccess(adminAccessFromUserRow({ ...row, role })))) {
       return {
         ok: false,
         response: NextResponse.json({ error: "Forbidden" }, { status: 403 }),
@@ -64,7 +67,7 @@ export async function requireAdminApiAccess(
     }
     return {
       ok: true,
-      user: { id: row.id, role: row.role as UserRole, displayName: row.displayName },
+      user: { id: row.id, role, displayName: row.displayName },
     };
   }
 
