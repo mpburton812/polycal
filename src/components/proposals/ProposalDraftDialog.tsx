@@ -221,6 +221,7 @@ export function ProposalDraftDialog({
   const [recurrencePattern, setRecurrencePattern] = useState<
     "daily" | "weekly" | "monthly" | "yearly"
   >("weekly");
+  const [recurrenceInterval, setRecurrenceInterval] = useState(1);
   const [recurrenceCount, setRecurrenceCount] = useState(4);
   const [reminderEnabled, setReminderEnabled] = useState(false);
   const [reminderValue, setReminderValue] = useState(1);
@@ -239,6 +240,12 @@ export function ProposalDraftDialog({
   const [conflictDialogOpen, setConflictDialogOpen] = useState(false);
   const [pending, startTransition] = useTransition();
   const contentRef = useRef<HTMLDivElement>(null);
+  /**
+   * Set synchronously before a confirmed submit. Closing the conflict dialog
+   * on click lets that click land on Add to calendar as handleSubmit() with
+   * no argument; this keeps the same-tick call confirmed.
+   */
+  const forceConfirmRef = useRef(false);
 
   const hasSelectedInvitees = Object.values(inviteeMode).some(inviteeIsSelected);
   const isSoloProposal = !hasSelectedInvitees;
@@ -624,8 +631,11 @@ export function ProposalDraftDialog({
       );
       setIsRecurring(initialDetail.isRecurrenceParent);
       if (initialDetail.recurrenceRule) {
-        setRecurrencePattern(initialDetail.recurrenceRule.pattern);
-        setRecurrenceCount(initialDetail.recurrenceRule.count);
+        const rule = initialDetail.recurrenceRule;
+        const everyOtherWeek = rule.pattern === "weekly" && rule.interval === 2;
+        setRecurrencePattern(rule.pattern);
+        setRecurrenceInterval(everyOtherWeek ? 2 : 1);
+        setRecurrenceCount(rule.count);
       }
       setSlots(
         initialDetail.timeSlots.length > 0
@@ -687,6 +697,7 @@ export function ProposalDraftDialog({
       setBatchLocationOptions([]);
       setIsRecurring(false);
       setRecurrencePattern("weekly");
+      setRecurrenceInterval(1);
       setRecurrenceCount(4);
       const type = lockedProposalType ?? "event";
       const startInput =
@@ -763,8 +774,11 @@ export function ProposalDraftDialog({
     setScheduleColor(isEventScheduleColor(detail.scheduleColor) ? detail.scheduleColor : "sage");
     setIsRecurring(detail.isRecurrenceParent);
     if (detail.recurrenceRule) {
-      setRecurrencePattern(detail.recurrenceRule.pattern);
-      setRecurrenceCount(detail.recurrenceRule.count);
+      const rule = detail.recurrenceRule;
+      const everyOtherWeek = rule.pattern === "weekly" && rule.interval === 2;
+      setRecurrencePattern(rule.pattern);
+      setRecurrenceInterval(everyOtherWeek ? 2 : 1);
+      setRecurrenceCount(rule.count);
     }
     setSlots(
       detail.timeSlots.length > 0
@@ -918,7 +932,11 @@ export function ProposalDraftDialog({
       isRecurring: !batchMode && isRecurring,
       recurrenceRule:
         !batchMode && isRecurring
-          ? { pattern: recurrencePattern, interval: 1, count: recurrenceCount }
+          ? {
+              pattern: recurrencePattern,
+              interval: recurrencePattern === "weekly" && recurrenceInterval === 2 ? 2 : 1,
+              count: recurrenceCount,
+            }
           : undefined,
       invitees: batchMode ? [] : invitees,
       timeSlots,
@@ -1017,11 +1035,15 @@ export function ProposalDraftDialog({
     !nlpBookingBlocked;
 
   function handleSubmit(confirm = false) {
+    const confirmed = confirm || forceConfirmRef.current;
     startTransition(async () => {
       const proposalId = await persistDraft();
-      if (!proposalId) return;
+      if (!proposalId) {
+        if (confirmed) forceConfirmRef.current = false;
+        return;
+      }
 
-      const result = await submitProposalAction(proposalId, confirm);
+      const result = await submitProposalAction(proposalId, confirmed);
       if (!result.ok && result.warnings && result.warnings.length > 0) {
         setConflictWarnings(result.warnings);
         setShowConflictConfirm(true);
@@ -1030,9 +1052,11 @@ export function ProposalDraftDialog({
         return;
       }
       if (!result.ok) {
+        if (confirmed) forceConfirmRef.current = false;
         showToast(result.message, "error");
         return;
       }
+      forceConfirmRef.current = false;
       showToast(result.message, "success");
       setConflictWarnings([]);
       setShowConflictConfirm(false);
@@ -1526,7 +1550,11 @@ export function ProposalDraftDialog({
             isRecurring={isRecurring}
             onRecurringChange={setIsRecurring}
             recurrencePattern={recurrencePattern}
-            onRecurrencePatternChange={setRecurrencePattern}
+            recurrenceInterval={recurrenceInterval}
+            onRecurrencePatternChange={(pattern, interval) => {
+              setRecurrencePattern(pattern);
+              setRecurrenceInterval(interval);
+            }}
             recurrenceCount={recurrenceCount}
             onRecurrenceCountChange={setRecurrenceCount}
           />
@@ -1564,9 +1592,13 @@ export function ProposalDraftDialog({
       open={conflictDialogOpen}
       warnings={conflictWarnings}
       pending={pending}
-      onClose={() => setConflictDialogOpen(false)}
-      onSubmitAnyway={() => {
+      onClose={() => {
+        forceConfirmRef.current = false;
         setConflictDialogOpen(false);
+      }}
+      onSubmitAnyway={() => {
+        // Stay open while the confirmed submit runs so this click cannot fall through.
+        forceConfirmRef.current = true;
         handleSubmit(true);
       }}
     />

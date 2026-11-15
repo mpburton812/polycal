@@ -830,6 +830,7 @@ export async function redraftProposalAction(
     proposal,
     "proposal_redrafted",
     formatDraftReturnNotification(proposal.title, "Moved back for editing"),
+    actorNotifyFields(session.user),
   );
 
   revalidatePath("/proposals");
@@ -908,6 +909,7 @@ export async function nudgePendingVotersAction(
         proposalTitle: proposal.title,
         proposalType: proposal.proposalType,
         action: "vote",
+        ...actorNotifyFields(session.user),
       },
     );
   }

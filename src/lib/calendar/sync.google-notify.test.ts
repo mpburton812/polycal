@@ -354,4 +354,22 @@ describe("syncProposalToExternalCalendars Google notify matrix (PC-346 / PC-347 
       expect.objectContaining({ reason: "no_connections" }),
     );
   });
+
+  it("names the actor when sync is given an actor option", async () => {
+    const proposal = baseProposal({ title: "Karaoke League", isBatchSleeping: false });
+    const michael = googleConnection("user-michael");
+    const { db } = createQueuedDb([[proposal], [], nameRows, [michael], []]);
+    getDb.mockReturnValue(db);
+
+    await syncProposalToExternalCalendars("prop-1", "upsert", {
+      actor: { actorUserId: "user-katie", actorDisplayName: "Katie" },
+    });
+
+    expect(notifyUser).toHaveBeenCalledWith(
+      "user-michael",
+      "calendar_google_synced",
+      expect.stringContaining('Katie added "Karaoke League" to Google Calendar'),
+      expect.objectContaining({ actorDisplayName: "Katie", actorUserId: "user-katie" }),
+    );
+  });
 });

@@ -9,6 +9,13 @@ import {
   type ProposalType,
 } from "@/lib/db/schema";
 import { isNonProductionEnvironment } from "@/lib/env";
+import {
+  addDays,
+  localDateKey,
+  startOfWeekSunday,
+  zonedWallTimeToUtc,
+} from "@/lib/schedule/dates";
+import { DEFAULT_VIEWER_TIMEZONE } from "@/lib/schedule/timezone";
 import { usesTestFamilySeed } from "@/lib/seed/seed-profile";
 import { randomUUID } from "node:crypto";
 
@@ -37,47 +44,44 @@ interface DemoProposal {
   timeSlots?: DemoTimeSlot[];
 }
 
-/** Monday 00:00 local for the week containing `date`. */
-function startOfWeekMonday(date: Date): Date {
-  const monday = new Date(date);
-  monday.setHours(0, 0, 0, 0);
-  const day = monday.getDay();
-  const diff = day === 0 ? -6 : 1 - day;
-  monday.setDate(monday.getDate() + diff);
-  return monday;
-}
-
 /**
- * Calendar anchor for demo proposal seeds. Uses the current date so resolved
- * events align with the schedule view; E2E_ANCHOR_DATE documents the Monday
- * ISO for the active Playwright run (PC-64).
+ * Builds ISO timestamps on the Sunday week the schedule shows.
+ * A Monday anchor puts offset-2 events in the previous week whenever "today"
+ * is Sunday in America/New_York, which is the viewer zone used by e2e (PC-542).
  */
-function getSeedAnchorDate(): Date {
-  return new Date();
-}
-
-/** Builds ISO timestamps anchored to the seed week for schedule demos. */
-function scheduleWindow(
+export function demoScheduleWindow(
   offsetDays: number,
   startHour: number,
   durationHours: number,
-  options?: { ensureFuture?: boolean; minFutureHours?: number },
+  options?: { ensureFuture?: boolean; minFutureHours?: number; now?: Date },
 ): { startAt: string; endAt: string } {
-  const start = startOfWeekMonday(getSeedAnchorDate());
-  start.setDate(start.getDate() + offsetDays);
-  start.setHours(startHour, 0, 0, 0);
+  const zone = DEFAULT_VIEWER_TIMEZONE;
+  const now = options?.now ?? new Date();
+  const sunday = startOfWeekSunday(now, zone);
+  let day = addDays(sunday, offsetDays);
+  let start = zonedWallTimeToUtc(
+    localDateKey(day.toISOString(), zone),
+    startHour,
+    0,
+    0,
+    0,
+    zone,
+  );
   if (options?.ensureFuture) {
-    const now = new Date();
     const minFutureMs = (options.minFutureHours ?? 2) * 60 * 60 * 1000;
-    while (start.getTime() <= now.getTime()) {
-      start.setDate(start.getDate() + 1);
-    }
     while (start.getTime() < now.getTime() + minFutureMs) {
-      start.setHours(start.getHours() + 1);
+      day = addDays(day, 1);
+      start = zonedWallTimeToUtc(
+        localDateKey(day.toISOString(), zone),
+        startHour,
+        0,
+        0,
+        0,
+        zone,
+      );
     }
   }
-  const end = new Date(start);
-  end.setTime(end.getTime() + durationHours * 60 * 60 * 1000);
+  const end = new Date(start.getTime() + durationHours * 60 * 60 * 1000);
   return { startAt: start.toISOString(), endAt: end.toISOString() };
 }
 
@@ -221,7 +225,7 @@ export async function seedDemoProposals(options?: {
       proposal.scheduledStartHour !== undefined &&
       proposal.scheduledDurationHours !== undefined
     ) {
-      const window = scheduleWindow(
+      const window = demoScheduleWindow(
         proposal.scheduledOffsetDays,
         proposal.scheduledStartHour,
         proposal.scheduledDurationHours,
@@ -259,7 +263,7 @@ export async function seedDemoProposals(options?: {
 
     for (let index = 0; index < (proposal.timeSlots ?? []).length; index += 1) {
       const slot = proposal.timeSlots![index];
-      const window = scheduleWindow(
+      const window = demoScheduleWindow(
         slot.startOffsetDays,
         slot.startHour,
         slot.durationHours,

@@ -72,6 +72,10 @@ export function ProposalConflictConfirmDialog({
         </Button>
         <Button
           variant="contained"
+          onMouseDown={(event) => {
+            // Keep the press from focusing the composer button underneath this dialog.
+            event.preventDefault();
+          }}
           onClick={onSubmitAnyway}
           disabled={pending}
           sx={primaryButtonSx}

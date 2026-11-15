@@ -58,7 +58,7 @@ import { extractFirstUrl, normalizeLinkUrl } from "@/lib/feed/link-preview";
 import { checkRateLimitPersistent } from "@/lib/rate-limit";
 import { composeFeedFingerprint } from "@/lib/feed/update-token";
 import { isFeedMilestoneVisibleViaAdminOnly } from "@/lib/feed/admin-only-visibility";
-import { notifyUser } from "@/lib/notifications";
+import { actorNotifyFields, notifyUser } from "@/lib/notifications";
 import {
   viewerCanSeeAuditLog,
   viewerCanSeeFeedMilestoneAudit,
@@ -338,6 +338,7 @@ export async function postNetworkChatCommentAction(
       await notifyUser(message.authorId, "feed_chat_reply", `${authorName} replied: ${preview}`, {
         url: "/feed",
         chatMessageId: parsed.data.messageId,
+        ...actorNotifyFields({ id: sessionResult.user.id, displayName: author?.displayName }),
       });
     }
 
