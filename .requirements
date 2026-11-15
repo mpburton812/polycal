@@ -478,3 +478,4 @@
 2026-10-16 | c2a7a07 | PC-535 | do not set orientation on Android 8.0 launch | android-twa/app/src/main/java/app/polycal/LauncherActivity.java
 2026-10-16 | 9286ca7 | PC-535 | wait for poll resolution before checking the board | e2e/poll-optional-decline-journey.spec.ts
 2026-11-15 | 7507151 | PC-542 | name the actor on alerts and keep confirmed submits | src/actions/feed-writes.ts
+2026-11-15 | dbcb17c | PC-542 | allowlist Serwist nested advisories that only downgrade | scripts/audit-allowlist.mjs
