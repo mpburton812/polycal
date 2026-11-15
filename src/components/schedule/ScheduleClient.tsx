@@ -149,6 +149,8 @@ export function ScheduleClient({
   const urlHydratedRef = useRef(false);
   const scrollRootRef = useRef<HTMLDivElement | null>(null);
   const scheduleRootRef = useRef<HTMLDivElement | null>(null);
+  /** Latest range fetch; older responses must not replace a newer event list. */
+  const fetchGenerationRef = useRef(0);
 
   const [viewState, setViewState] = useState<ScheduleViewState>(() => {
     const loaded = loadScheduleViewState();
@@ -218,6 +220,7 @@ export function ScheduleClient({
 
   const fetchEventsForRange = useCallback(
     async (anchorDate: Date, layout: ScheduleCalendarLayout) => {
+      const requestId = ++fetchGenerationRef.current;
       setPending(true);
       try {
         const range = computeScheduleFetchRange(anchorDate, layout, timeZone);
@@ -225,9 +228,13 @@ export function ScheduleClient({
           rangeStart: range.rangeStart.toISOString(),
           rangeEnd: range.rangeEnd.toISOString(),
         });
+        // A slower earlier fetch must not drop events from a newer range.
+        if (requestId !== fetchGenerationRef.current) return;
         setEvents(res.payload?.events ?? []);
       } finally {
-        setPending(false);
+        if (requestId === fetchGenerationRef.current) {
+          setPending(false);
+        }
       }
     },
     [timeZone],
@@ -860,6 +867,7 @@ export function ScheduleClient({
           openEdit(detail);
         }}
         people={people}
+        currentUserId={currentUserId}
         onOpenRelatedProposal={openRelatedProposal}
       />
     </Box>

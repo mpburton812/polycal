@@ -28,6 +28,39 @@ import { CHANGELOG_ARCHIVE } from "./entries.archive";
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "2026.11.15a",
+    date: "2026-11-15",
+    summary:
+      "Every-other-week events, a confirmed conflict submit, occurrence edit, and an actor on every alert.",
+    changes: [
+      {
+        type: "added",
+        description:
+          "Recurrence can be every other week. That choice is stored as a weekly rule with interval 2, and a missing interval still means every week (PC-542).",
+      },
+      {
+        type: "fixed",
+        description:
+          "Submit anyway keeps the conflict dialog open until the confirmed submit finishes, so the click cannot fall through to Add to calendar and reopen the warning (PC-543).",
+      },
+      {
+        type: "changed",
+        description:
+          "Opening an event from the schedule knows who you are, so the host can rename it or mark it tentative. A resolved occurrence has Edit, which returns that occurrence to a draft (PC-544).",
+      },
+      {
+        type: "fixed",
+        description:
+          "The first open of an occurrence starts loading immediately, and the detail reads that do not depend on each other run together (PC-545). A slower calendar refresh cannot replace a newer one, so a just-added event stays visible (PC-546).",
+      },
+      {
+        type: "changed",
+        description:
+          "Every inbox alert names the person who did it. Calendar sync records that person before the request ends. Alerts with no person say PolyCal (PC-547).",
+      },
+    ],
+  },
+  {
     version: "2026.10.16a",
     date: "2026-10-16",
     summary:

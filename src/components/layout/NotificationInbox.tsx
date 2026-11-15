@@ -68,6 +68,13 @@ function formatNotificationType(type: string): string {
     .join(" ");
 }
 
+/** Accountable person from metadata; system alerts with no actor read as PolyCal. */
+function notificationActorLabel(metadata: Record<string, unknown>): string {
+  const name = metadata.actorDisplayName;
+  if (typeof name === "string" && name.trim()) return name.trim();
+  return "PolyCal";
+}
+
 function isProposalOpenAction(type: string, proposalId: string | null): boolean {
   if (!proposalId) return false;
   return type.startsWith("proposal") || type.includes("proposal");
@@ -383,7 +390,7 @@ export function NotificationInbox({
                           </Typography>
                         )}
                         <Typography component="span" variant="caption" display="block">
-                          {formatNotificationType(item.type)} ·{" "}
+                          {formatNotificationType(item.type)} · {notificationActorLabel(item.metadata)} ·{" "}
                           {new Date(item.createdAt).toLocaleString()}
                         </Typography>
                       </>

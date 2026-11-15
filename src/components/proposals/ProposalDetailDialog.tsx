@@ -198,7 +198,7 @@ export function ProposalDetailDialog({
       setDetailLoading(true);
       setUnavailableMessage(null);
     }
-    startTransition(async () => {
+    async function load() {
       try {
         const result = await getProposalDetailAction(id);
         if (!result.ok || !result.detail) {
@@ -222,6 +222,14 @@ export function ProposalDetailDialog({
           setDetailLoading(false);
         }
       }
+    }
+    // First paint must not wait on startTransition; React defers it and the skeleton stalls.
+    if (options?.isInitial) {
+      void load();
+      return;
+    }
+    startTransition(async () => {
+      await load();
     });
   }
 
@@ -1248,6 +1256,16 @@ export function ProposalDetailDialog({
             {detail?.canCancel && detail.state === "proposed" && (
               <Button variant="outlined" onClick={handleBackToDraft} disabled={pending} sx={outlinedButtonSx}>
                 Back to Draft
+              </Button>
+            )}
+            {detail?.canRedraft && (
+              <Button
+                variant="contained"
+                onClick={handleRedraft}
+                disabled={pending}
+                sx={primaryButtonSx}
+              >
+                Edit
               </Button>
             )}
             {detail?.canRedraft && (

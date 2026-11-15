@@ -11,7 +11,7 @@ import { ALPHA_FEEDBACK_STATUS_LABELS } from "@/lib/alpha-feedback/schema";
 import { getDb } from "@/lib/db/client";
 import { ensureDbReady } from "@/lib/db/ensure-ready";
 import { alphaFeedbackSubmissions } from "@/lib/db/schema";
-import { notifyUser } from "@/lib/notifications";
+import { actorNotifyFields, notifyUser } from "@/lib/notifications";
 
 const notifySchema = z.object({
   /** Optional override; defaults to the stored submitter comment. */
@@ -116,6 +116,7 @@ export async function POST(
     feedbackId: row.id,
     feedbackTitle: row.title,
     feedbackStatus: row.status,
+    ...actorNotifyFields(access.user),
   });
 
   return withAlphaFeedbackCors(
