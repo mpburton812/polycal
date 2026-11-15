@@ -480,3 +480,4 @@
 2026-11-15 | 7507151 | PC-542 | name the actor on alerts and keep confirmed submits | src/actions/feed-writes.ts
 2026-11-15 | dbcb17c | PC-542 | allowlist Serwist nested advisories that only downgrade | scripts/audit-allowlist.mjs
 2026-11-15 | c1a1e8a | PC-542 | restore lint and skip Jira when the site is suspended | package.json
+2026-11-15 | 28f4a0c | PC-542 | keep demo events on the Sunday week the schedule shows | src/lib/seed/demo-proposals.test.ts
