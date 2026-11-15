@@ -57,7 +57,12 @@ export interface ProposalDraftMoreOptionsProps {
   isRecurring?: boolean;
   onRecurringChange?: (value: boolean) => void;
   recurrencePattern?: "daily" | "weekly" | "monthly" | "yearly";
-  onRecurrencePatternChange?: (value: "daily" | "weekly" | "monthly" | "yearly") => void;
+  /** 2 with weekly is Every other week; any other stored interval displays as Weekly. */
+  recurrenceInterval?: number;
+  onRecurrencePatternChange?: (
+    value: "daily" | "weekly" | "monthly" | "yearly",
+    interval: number,
+  ) => void;
   recurrenceCount?: number;
   onRecurrenceCountChange?: (value: number) => void;
 }
@@ -90,6 +95,7 @@ export function ProposalDraftMoreOptions({
   isRecurring = false,
   onRecurringChange,
   recurrencePattern = "weekly",
+  recurrenceInterval = 1,
   onRecurrencePatternChange,
   recurrenceCount = 4,
   onRecurrenceCountChange,
@@ -155,15 +161,26 @@ export function ProposalDraftMoreOptions({
                     <Select
                       labelId="recurrence-pattern-label"
                       label="Pattern"
-                      value={recurrencePattern}
-                      onChange={(event) =>
-                        onRecurrencePatternChange(
-                          event.target.value as "daily" | "weekly" | "monthly" | "yearly",
-                        )
+                      value={
+                        recurrencePattern === "weekly" && recurrenceInterval === 2
+                          ? "biweekly"
+                          : recurrencePattern
                       }
+                      onChange={(event) => {
+                        const choice = event.target.value;
+                        if (choice === "biweekly") {
+                          onRecurrencePatternChange("weekly", 2);
+                          return;
+                        }
+                        onRecurrencePatternChange(
+                          choice as "daily" | "weekly" | "monthly" | "yearly",
+                          1,
+                        );
+                      }}
                     >
                       <MenuItem value="daily">Daily</MenuItem>
                       <MenuItem value="weekly">Weekly</MenuItem>
+                      <MenuItem value="biweekly">Every other week</MenuItem>
                       <MenuItem value="monthly">Monthly</MenuItem>
                       <MenuItem value="yearly">Yearly</MenuItem>
                     </Select>

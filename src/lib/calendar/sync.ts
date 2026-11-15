@@ -35,7 +35,7 @@ import {
   users,
 } from "@/lib/db/schema";
 import { sendEmail } from "@/lib/email/send";
-import { notifyUser } from "@/lib/notifications";
+import { actorNotifyFields, notifyUser } from "@/lib/notifications";
 import { parseBatchEntriesJson } from "@/lib/proposals/batch-sleeping";
 import { logUserActivity } from "@/lib/audit";
 
@@ -52,6 +52,26 @@ const CALENDAR_SYNC_NIGHT_CONCURRENCY = 4;
 type ProposalRow = typeof proposals.$inferSelect;
 type LinkRow = typeof calendarEventLinks.$inferSelect;
 type ConnectionRow = typeof calendarConnections.$inferSelect;
+
+/** Person who triggered sync, captured before `after()` drops the request session. */
+type CalendarSyncActor = {
+  actorUserId: string;
+  actorDisplayName: string;
+};
+
+function calendarActorMetadata(actor?: CalendarSyncActor): Record<string, string> {
+  const id = actor?.actorUserId?.trim();
+  if (!id) return {};
+  const name = actor?.actorDisplayName?.trim();
+  return name ? { actorUserId: id, actorDisplayName: name } : { actorUserId: id };
+}
+
+/** Prefixes a system sentence when the triggering person is known. */
+function messageWithActor(message: string, actor?: CalendarSyncActor): string {
+  const name = actor?.actorDisplayName?.trim();
+  if (!name) return message;
+  return `${name}: ${message}`;
+}
 
 async function loadProposal(db: Db, proposalId: string) {
   const [row] = await db.select().from(proposals).where(eq(proposals.id, proposalId)).limit(1);
@@ -186,11 +206,11 @@ async function notifyGoogleSynced(
   proposal: ProposalRow,
   kind: "added" | "updated" | "removed",
   nightCount = 0,
+  actor?: CalendarSyncActor,
 ): Promise<void> {
   const batchNote =
     kind !== "removed" ? batchNightNotifySuffix(proposal, nightCount) : "";
-  const session = await auth();
-  const actorName = session?.user?.displayName?.trim() || "";
+  const actorName = actor?.actorDisplayName?.trim() || "";
   const verb =
     kind === "added" ? "Added to" : kind === "updated" ? "Updated on" : "Removed from";
   const message = actorName
@@ -200,10 +220,6 @@ async function notifyGoogleSynced(
         ? `${actorName} updated "${proposal.title}" on Google Calendar${batchNote}.`
         : `${actorName} removed "${proposal.title}" from Google Calendar.`
     : `${verb} Google Calendar: ${proposal.title}${batchNote}.`;
-  const actor =
-    actorName && session?.user?.id
-      ? { actorUserId: session.user.id, actorDisplayName: actorName }
-      : {};
   await notifyUser(
     connection.userId,
     "calendar_google_synced",
@@ -213,7 +229,7 @@ async function notifyGoogleSynced(
       url: `/proposals?open=${encodeURIComponent(proposal.id)}`,
       proposalType: proposal.proposalType,
       kind,
-      ...actor,
+      ...calendarActorMetadata(actor),
     },
   );
 }
@@ -223,11 +239,13 @@ async function notifyGoogleFailed(
   userId: string,
   proposal: ProposalRow,
   message: string,
+  actor?: CalendarSyncActor,
 ): Promise<void> {
-  await notifyUser(userId, "calendar_google_failed", message, {
+  await notifyUser(userId, "calendar_google_failed", messageWithActor(message, actor), {
     proposalId: proposal.id,
     url: "/profile",
     proposalType: proposal.proposalType,
+    ...calendarActorMetadata(actor),
   });
 }
 
@@ -258,6 +276,7 @@ async function syncGoogleForUser(
   proposal: ProposalRow,
   action: CalendarSyncAction,
   nameCtx: CalendarPayloadNameContext,
+  actor?: CalendarSyncActor,
 ): Promise<void> {
   if (!connection.googleCalendarId) {
     console.warn(
@@ -269,6 +288,7 @@ async function syncGoogleForUser(
       connection.userId,
       proposal,
       `Google Calendar connect is incomplete for "${proposal.title}" — pick a calendar in Profile.`,
+      actor,
     );
     return;
   }
@@ -283,6 +303,7 @@ async function syncGoogleForUser(
       connection.userId,
       proposal,
       `Google Calendar needs reconnect before syncing "${proposal.title}". Open Profile to reconnect.`,
+      actor,
     );
     return;
   }
@@ -298,7 +319,7 @@ async function syncGoogleForUser(
       }
       await db.delete(calendarEventLinks).where(eq(calendarEventLinks.id, link.id));
     }
-    await notifyGoogleSynced(connection, proposal, "removed");
+    await notifyGoogleSynced(connection, proposal, "removed", 0, actor);
     return;
   }
 
@@ -383,7 +404,7 @@ async function syncGoogleForUser(
   }
 
   const kind = created > 0 && updated === 0 ? "added" : "updated";
-  await notifyGoogleSynced(connection, proposal, kind, payloads.length);
+  await notifyGoogleSynced(connection, proposal, kind, payloads.length, actor);
 }
 
 async function queueIcsPending(
@@ -452,6 +473,7 @@ async function syncIcsForUser(
   proposal: ProposalRow,
   action: CalendarSyncAction,
   nameCtx: CalendarPayloadNameContext,
+  actor?: CalendarSyncActor,
 ): Promise<void> {
   const delivery = (connection.icsDelivery ?? "download") as IcsDeliveryMode;
   const links = await loadLinksForProposal(db, connection.userId, proposal.id);
@@ -635,19 +657,17 @@ async function syncIcsForUser(
       body: doc.body,
       title: proposal.title,
     });
-    await notifyUser(
-      connection.userId,
-      "calendar_ics_pending",
+    const icsMessage =
       action === "delete"
         ? `Please manually delete “${proposal.title}” from your calendar.`
-        : `You have a calendar ics available for the event : ${proposal.title}.`,
-      {
-        proposalId: proposal.id,
-        pendingId,
-        url: `/proposals?open=${encodeURIComponent(proposal.id)}`,
-        proposalType: proposal.proposalType,
-      },
-    );
+        : `You have a calendar ics available for the event : ${proposal.title}.`;
+    await notifyUser(connection.userId, "calendar_ics_pending", messageWithActor(icsMessage, actor), {
+      proposalId: proposal.id,
+      pendingId,
+      url: `/proposals?open=${encodeURIComponent(proposal.id)}`,
+      proposalType: proposal.proposalType,
+      ...calendarActorMetadata(actor),
+    });
   }
 }
 
@@ -667,10 +687,11 @@ function escapeHtml(value: string): string {
 export async function syncProposalToExternalCalendars(
   proposalId: string,
   action: CalendarSyncAction,
-  options?: { skipGoogle?: boolean },
+  options?: { skipGoogle?: boolean; actor?: CalendarSyncActor },
 ): Promise<void> {
   try {
     const skipGoogle = options?.skipGoogle === true;
+    const actor = options?.actor;
     if (skipGoogle) {
       console.info(
         "[calendar-sync] skip Google provider: impersonating session",
@@ -712,12 +733,16 @@ export async function syncProposalToExternalCalendars(
         await notifyUser(
           proposal.proposerId,
           "calendar_google_failed",
-          `No calendar integration is connected for anyone on "${proposal.title}". Connect Google Calendar in Profile, then use Retry calendar sync on the proposal.`,
+          messageWithActor(
+            `No calendar integration is connected for anyone on "${proposal.title}". Connect Google Calendar in Profile, then use Retry calendar sync on the proposal.`,
+            actor,
+          ),
           {
             proposalId: proposal.id,
             url: "/profile",
             proposalType: proposal.proposalType,
             reason: "no_connections",
+            ...calendarActorMetadata(actor),
           },
         );
       }
@@ -737,9 +762,9 @@ export async function syncProposalToExternalCalendars(
       try {
         if (connection.provider === "google") {
           if (skipGoogle) return;
-          await syncGoogleForUser(db, connection, proposal, action, nameCtx);
+          await syncGoogleForUser(db, connection, proposal, action, nameCtx, actor);
         } else if (connection.provider === "ics") {
-          await syncIcsForUser(db, connection, proposal, action, nameCtx);
+          await syncIcsForUser(db, connection, proposal, action, nameCtx, actor);
         }
       } catch (err) {
         console.error(
@@ -765,6 +790,7 @@ export async function syncProposalToExternalCalendars(
             connection.userId,
             proposal,
             `Could not sync "${proposal.title}" to Google Calendar. Try reconnecting in Profile, then use Retry calendar sync on the proposal.`,
+            actor,
           );
         }
       }
@@ -782,28 +808,34 @@ export async function syncProposalToExternalCalendars(
  * In E2E (`E2E_TEST_MODE=1`), awaits sync so journeys can assert Download ICS immediately.
  * Pass `awaitSync: true` for admin Fast sleeping (PC-347) so push does not rely solely
  * on post-response work.
- * Captures impersonation from the current request before `after()` so Google
- * API calls stay disabled under admin impersonation (PC-344).
+ * Captures impersonation and the acting user from the current request before
+ * `after()` so Google stays disabled under impersonation (PC-344) and alerts
+ * still name that person after the response drops the session (PC-542).
  */
 export async function scheduleCalendarSync(
   proposalId: string,
   action: CalendarSyncAction,
   options?: { awaitSync?: boolean },
 ): Promise<void> {
-  const impersonationGate = auth()
-    .then((session) => session?.user?.isImpersonating === true)
-    .catch(() => false);
-
-  if (process.env.E2E_TEST_MODE === "1" || options?.awaitSync === true) {
-    const skipGoogle = await impersonationGate;
-    await syncProposalToExternalCalendars(proposalId, action, { skipGoogle });
-    return;
-  }
+  const requestContext = auth()
+    .then((session) => ({
+      skipGoogle: session?.user?.isImpersonating === true,
+      actor: session?.user?.id ? actorNotifyFields(session.user) : undefined,
+    }))
+    .catch(() => ({
+      skipGoogle: false,
+      actor: undefined as ReturnType<typeof actorNotifyFields> | undefined,
+    }));
 
   const run = async () => {
-    const skipGoogle = await impersonationGate;
-    await syncProposalToExternalCalendars(proposalId, action, { skipGoogle });
+    const { skipGoogle, actor } = await requestContext;
+    await syncProposalToExternalCalendars(proposalId, action, { skipGoogle, actor });
   };
+
+  if (process.env.E2E_TEST_MODE === "1" || options?.awaitSync === true) {
+    await run();
+    return;
+  }
   try {
     after(run);
   } catch {

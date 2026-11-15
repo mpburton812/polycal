@@ -709,7 +709,7 @@ export async function addPersonToPlaceAction(
     parsed.data.targetUserId,
     "place_member_added",
     `${session.user.displayName ?? "Someone"} added you as ${roleLabel} at ${place.name}.`,
-    { url: "/people-places", placeId: place.id },
+    { url: "/people-places", placeId: place.id, ...actorNotifyFields(session.user) },
   );
 
   await logUserActivity(
@@ -826,7 +826,7 @@ export async function updatePlaceMemberRoleAction(
     parsed.data.targetUserId,
     "place_member_role_changed",
     `${session.user.displayName ?? "Someone"} set your access at ${place.name} to ${roleLabel}.`,
-    { url: "/people-places", placeId: place.id },
+    { url: "/people-places", placeId: place.id, ...actorNotifyFields(session.user) },
   );
 
   await logUserActivity(
@@ -934,7 +934,7 @@ export async function removePersonFromPlaceAction(
     parsed.data.targetUserId,
     "place_member_removed",
     `${session.user.displayName ?? "Someone"} removed you as ${roleLabel} from ${place.name}.`,
-    { url: "/people-places", placeId: place.id },
+    { url: "/people-places", placeId: place.id, ...actorNotifyFields(session.user) },
   );
 
   await logUserActivity(

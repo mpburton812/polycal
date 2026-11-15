@@ -176,6 +176,36 @@ export function resolveNotificationUrl(
   return "/proposals";
 }
 
+function hasActorAttribution(metadata?: Record<string, unknown>): boolean {
+  const id = metadata?.actorUserId;
+  const name = metadata?.actorDisplayName;
+  return (
+    typeof id === "string" &&
+    id.trim().length > 0 &&
+    typeof name === "string" &&
+    name.trim().length > 0
+  );
+}
+
+/**
+ * Fills actor metadata from the current request when the caller omitted it.
+ * Cron and post-response work have no session; those alerts stay unattributed
+ * so the inbox can label them PolyCal. auth() outside a request must not throw.
+ */
+async function withSessionActor(
+  metadata?: Record<string, unknown>,
+): Promise<Record<string, unknown> | undefined> {
+  if (hasActorAttribution(metadata)) return metadata;
+  try {
+    const { auth } = await import("@/lib/auth");
+    const session = await auth();
+    if (!session?.user?.id) return metadata;
+    return { ...metadata, ...actorNotifyFields(session.user) };
+  } catch {
+    return metadata;
+  }
+}
+
 /**
  * Records a user-targeted system notification in the activity log (PC-40 inbox).
  * Fans out to Web Push and email when each channel is enabled (PC-43/PC-58/PC-160).
@@ -197,26 +227,27 @@ export async function notifyUser(
 
   if (!prefs.globalEnabled || !alertTypeAllowed(prefs, notificationType, metadata)) return;
 
-  const url = resolveNotificationUrl(notificationType, metadata);
+  const storedMetadata = await withSessionActor(metadata);
+  const url = resolveNotificationUrl(notificationType, storedMetadata);
   // Enrich outward-facing surfaces (push + email) with proposal context (when /
   // where) when the metadata carries it. The in-app inbox renders this detail
   // itself from metadata, so the stored message string is left unchanged.
-  const detail = buildProposalNotificationDetail(metadata);
+  const detail = buildProposalNotificationDetail(storedMetadata);
 
   if (prefs.channels.inApp && !shouldSuppressInAppDelivery(prefs, notificationType)) {
     await logUserActivity(
       userId,
       `notification.${notificationType}`,
-      JSON.stringify({ message, url, ...metadata }),
+      JSON.stringify({ message, url, ...storedMetadata }),
       "system",
     );
   }
 
   if (prefs.channels.push && !shouldSuppressPushDelivery(prefs, notificationType)) {
     const proposalId =
-      typeof metadata?.proposalId === "string" ? metadata.proposalId : undefined;
+      typeof storedMetadata?.proposalId === "string" ? storedMetadata.proposalId : undefined;
     const actions =
-      proposalId && canAcceptFromNotification(notificationType, metadata)
+      proposalId && canAcceptFromNotification(notificationType, storedMetadata)
         ? [
             { action: "accept", title: "Accept" },
             { action: "open", title: "Open Proposal" },
@@ -230,11 +261,19 @@ export async function notifyUser(
       notificationType,
       proposalId,
       actions,
-      metadata,
+      metadata: storedMetadata,
     });
   }
 
-  await maybeQueueEmailNotification(userId, notificationType, message, metadata, prefs, detail, url);
+  await maybeQueueEmailNotification(
+    userId,
+    notificationType,
+    message,
+    storedMetadata,
+    prefs,
+    detail,
+    url,
+  );
 }
 
 function formatPushTitle(notificationType: string): string {
