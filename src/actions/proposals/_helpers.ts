@@ -6,9 +6,13 @@ import type { ProposalPlaceOption, RecurrencePattern, RecurrenceRule } from "./t
 export function parseRecurrenceRule(raw: string | null): RecurrenceRule | null {
   if (!raw) return null;
   try {
-    const parsed = JSON.parse(raw) as RecurrenceRule;
+    const parsed = JSON.parse(raw) as Partial<RecurrenceRule>;
     if (!parsed.pattern || !parsed.count) return null;
-    return parsed;
+    return {
+      pattern: parsed.pattern,
+      count: parsed.count,
+      interval: parsed.interval ?? 1,
+    };
   } catch {
     return null;
   }

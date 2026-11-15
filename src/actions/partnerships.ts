@@ -15,7 +15,7 @@ import { requireNetworkSession } from "@/lib/networks/context";
 import { getMembership, legacyRolesForUsers } from "@/lib/networks/membership";
 import { loadNetworkSettings } from "@/lib/networks/settings";
 import { canonicalUserPair } from "@/lib/users/pair";
-import { notifyUser } from "@/lib/notifications";
+import { actorNotifyFields, notifyUser } from "@/lib/notifications";
 import { notifySleepingNetworkOfPartnershipChange } from "@/lib/partnerships/network-notify";
 import { LONG_TEXT_MAX, limitedString } from "@/lib/validation/string-limits";
 
@@ -241,12 +241,17 @@ export async function proposePartnershipAction(
     JSON.stringify({ targetUserId, status, networkId }),
   );
 
+  const actor =
+    networkSession.user.id === proposerId
+      ? actorNotifyFields({ id: networkSession.user.id, displayName: proposer?.displayName })
+      : undefined;
+
   if (!autoAccept) {
     await notifyUser(
       targetUserId,
       "partnership_proposed",
       `${proposer?.displayName ?? "Someone"} proposed a sleeping partnership with you.`,
-      { partnershipId, proposerId, partnerId: targetUserId },
+      { partnershipId, proposerId, partnerId: targetUserId, ...actor },
     );
   } else {
     await notifySleepingNetworkOfPartnershipChange(
@@ -254,7 +259,7 @@ export async function proposePartnershipAction(
       userLowId,
       userHighId,
       `${proposer?.displayName ?? "Someone"} established a sleeping partnership with ${target.displayName}.`,
-      { partnershipId, userLowId, userHighId },
+      { partnershipId, userLowId, userHighId, ...actor },
     );
   }
 
@@ -310,11 +315,15 @@ export async function withdrawPartnershipProposalAction(
     .where(eq(users.id, networkSession.user.id))
     .limit(1);
 
+  const actor = actorNotifyFields({
+    id: networkSession.user.id,
+    displayName: proposer?.displayName,
+  });
   await notifyUser(
     partnerId,
     "partnership_withdrawn",
     `${proposer?.displayName ?? "Someone"} withdrew their sleeping partnership proposal.`,
-    { partnershipId: row.id },
+    { partnershipId: row.id, ...actor },
   );
 
   await logUserActivity(networkSession.user.id, "partnership.withdraw", row.id);
@@ -386,11 +395,15 @@ export async function respondPartnershipAction(
   const lowName = lowUser?.displayName ?? "a member";
   const highName = highUser?.displayName ?? "a member";
 
+  const actor = actorNotifyFields({
+    id: networkSession.user.id,
+    displayName: responder?.displayName,
+  });
   await notifyUser(
     row.proposedById,
     parsed.data.accept ? "partnership_accepted" : "partnership_declined",
     `${responder?.displayName ?? "Someone"} ${parsed.data.accept ? "accepted" : "declined"} your sleeping partnership proposal.`,
-    { partnershipId: row.id, partnerId },
+    { partnershipId: row.id, partnerId, ...actor },
   );
 
   if (parsed.data.accept) {
@@ -399,7 +412,7 @@ export async function respondPartnershipAction(
       row.userLowId,
       row.userHighId,
       `${responder?.displayName ?? "Someone"} accepted the sleeping partnership between ${lowName} and ${highName}.`,
-      { partnershipId: row.id, userLowId: row.userLowId, userHighId: row.userHighId },
+      { partnershipId: row.id, userLowId: row.userLowId, userHighId: row.userHighId, ...actor },
     );
   }
 
@@ -485,7 +498,12 @@ export async function removePartnershipAction(
       row.userLowId,
       row.userHighId,
       `${actor?.displayName ?? "Someone"} removed the sleeping partnership between ${lowUser?.displayName ?? "a member"} and ${highUser?.displayName ?? "a member"}.`,
-      { partnershipId, userLowId: row.userLowId, userHighId: row.userHighId },
+      {
+        partnershipId,
+        userLowId: row.userLowId,
+        userHighId: row.userHighId,
+        ...actorNotifyFields({ id: networkSession.user.id, displayName: actor?.displayName }),
+      },
     );
   }
 

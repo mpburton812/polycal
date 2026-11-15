@@ -13,6 +13,12 @@ const ALLOWED_ADVISORIES = new Set([
   // only by eslint-config-next → fast-glob → micromatch, which is lint tooling.
   // Downgrading eslint-config-next to 14 is a breaking change and not a fix.
   "GHSA-vfj7-8cjw-p6xm",
+  // glob, minimatch, and zod are nested under @serwist/next ^9.5.11 (build-time
+  // service worker only). npm's suggested fix is a downgrade to @serwist/next@8.4.4,
+  // which is not a patch of the installed major (PC-542).
+  "GHSA-3g3m-2fjr-6pw4",
+  "GHSA-g3hv-75wg-m249",
+  "GHSA-mrhx-c7xc-m3w5",
 ]);
 
 function isAllowed(name, vulnerabilities, seen) {

@@ -271,22 +271,46 @@ export async function getProposalDetailAction(
     }
   }
 
-  const slotRows = await db
-    .select()
-    .from(proposalTimeSlots)
-    .where(eq(proposalTimeSlots.proposalId, proposalId))
-    .orderBy(asc(proposalTimeSlots.sortOrder));
-
-  const slotVoteRows = await db
-    .select({
-      timeSlotId: proposalSlotVotes.timeSlotId,
-      userId: proposalSlotVotes.userId,
-      displayName: users.displayName,
-      voteStatus: proposalSlotVotes.voteStatus,
-    })
-    .from(proposalSlotVotes)
-    .innerJoin(users, eq(proposalSlotVotes.userId, users.id))
-    .where(eq(proposalSlotVotes.proposalId, proposalId));
+  const [slotRows, slotVoteRows, commentRows, logRows] = await Promise.all([
+    db
+      .select()
+      .from(proposalTimeSlots)
+      .where(eq(proposalTimeSlots.proposalId, proposalId))
+      .orderBy(asc(proposalTimeSlots.sortOrder)),
+    db
+      .select({
+        timeSlotId: proposalSlotVotes.timeSlotId,
+        userId: proposalSlotVotes.userId,
+        displayName: users.displayName,
+        voteStatus: proposalSlotVotes.voteStatus,
+      })
+      .from(proposalSlotVotes)
+      .innerJoin(users, eq(proposalSlotVotes.userId, users.id))
+      .where(eq(proposalSlotVotes.proposalId, proposalId)),
+    db
+      .select({
+        id: proposalComments.id,
+        body: proposalComments.body,
+        createdAt: proposalComments.createdAt,
+        authorName: users.displayName,
+        sliceTag: proposalComments.sliceTag,
+      })
+      .from(proposalComments)
+      .innerJoin(users, eq(proposalComments.authorId, users.id))
+      .where(and(eq(proposalComments.proposalId, proposalId), isNull(proposalComments.deletedAt)))
+      .orderBy(asc(proposalComments.createdAt)),
+    db
+      .select({
+        action: proposalStateLog.action,
+        details: proposalStateLog.details,
+        createdAt: proposalStateLog.createdAt,
+        actorName: users.displayName,
+      })
+      .from(proposalStateLog)
+      .leftJoin(users, eq(proposalStateLog.actorUserId, users.id))
+      .where(eq(proposalStateLog.proposalId, proposalId))
+      .orderBy(asc(proposalStateLog.createdAt)),
+  ]);
 
   const viewerInvitee = inviteeRows.find((invitee) => invitee.userId === session.user.id);
   if (
@@ -315,31 +339,6 @@ export async function getProposalDetailAction(
   const pollSlotsIncomplete =
     isPollMatrix &&
     slotRows.some((slot) => !viewerSlotVotes[slot.id] || viewerSlotVotes[slot.id] === "not_seen");
-
-  const commentRows = await db
-    .select({
-      id: proposalComments.id,
-      body: proposalComments.body,
-      createdAt: proposalComments.createdAt,
-      authorName: users.displayName,
-      sliceTag: proposalComments.sliceTag,
-    })
-    .from(proposalComments)
-    .innerJoin(users, eq(proposalComments.authorId, users.id))
-    .where(and(eq(proposalComments.proposalId, proposalId), isNull(proposalComments.deletedAt)))
-    .orderBy(asc(proposalComments.createdAt));
-
-  const logRows = await db
-    .select({
-      action: proposalStateLog.action,
-      details: proposalStateLog.details,
-      createdAt: proposalStateLog.createdAt,
-      actorName: users.displayName,
-    })
-    .from(proposalStateLog)
-    .leftJoin(users, eq(proposalStateLog.actorUserId, users.id))
-    .where(eq(proposalStateLog.proposalId, proposalId))
-    .orderBy(asc(proposalStateLog.createdAt));
 
   const isProposer = row.proposerId === session.user.id;
   const isInvitee = inviteeUserIds.includes(session.user.id);
