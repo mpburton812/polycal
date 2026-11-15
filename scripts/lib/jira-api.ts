@@ -99,6 +99,16 @@ export async function tryGetIssueStatus(
     return null;
   }
 
+  // A suspended or unavailable Jira site (503) must not fail promotion CI.
+  // Missing issues already skip; treat gateway failures the same way.
+  if (response.status === 502 || response.status === 503 || response.status === 504) {
+    const body = await response.text();
+    console.warn(
+      `[jira-sync] ${issueKey} status unavailable (${response.status}); skipping. ${body}`,
+    );
+    return null;
+  }
+
   if (!response.ok) {
     const body = await response.text();
     throw new Error(`Failed to load status for ${issueKey}: ${response.status} ${body}`);
